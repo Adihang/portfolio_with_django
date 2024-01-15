@@ -1,8 +1,15 @@
 from django.shortcuts import render
+from .models import Project, Project_Comment
+from django.shortcuts import get_object_or_404
 
-from django.http import HttpResponse
+def main(request):
+    context = dict()
+    context['projects'] = Project.objects.all()
+    return render(request, 'main/main.html', context)
 
-def index(request):
-    return HttpResponse("안녕하세요 main에 오신것을 환영합니다.")
+def ProjectDetail(request, project_title):
+    context = dict()
+    context['project'] = get_object_or_404(Project, title=project_title)
+    return render(request, 'main/ProjectDetail.html', context)
 
 # Create your views here.

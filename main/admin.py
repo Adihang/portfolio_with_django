@@ -1,10 +1,10 @@
 from django.contrib import admin
 
-from .models import Portfolio, Portfolio_Tag
+from .models import Project, Project_Tag
 
-@admin.register(Portfolio)
-class PortfolioAdmin(admin.ModelAdmin):
-    list_display = ['portfolio']
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ['title']
 
-admin.site.register(Portfolio_Tag)
+admin.site.register(Project_Tag)
 # Register your models here.
