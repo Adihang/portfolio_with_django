@@ -1,26 +1,12 @@
-<section class="projects">
-    <div class="projects_head">
-        <div class="projects_title">
-            <h1><b>프로젝트</b></h1>
-            <h2>흥미를 가지고 진행했던 프로젝트들을 소개합니다</h2>
-        </div>
-    </div>
-    <ul class="project_cards">
-        {% for project in projects %}
-        <li class="project_card">
-            <a href="/{{ project.title }}/">
-                <img class="project_card_img" src="{{ project.banner_img.url }}">
-            </a>
-            <div class="project_card_contents">
-                <div class="project_card_contents_title">{{ project.title }}</div>
-                <div class="news__card__contents__description">{{ project.content }}</div>
-                <ul class="tags">
-                    {% for tag in project.tags.all %}
-                    <li class="tag">{{ tag.tag }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </li>
-        {% endfor %}
-    </ul>
-</section>
+<div>
+    Made with Django
+</div>
+<div class = 'main_banner'>
+    <h1 class = 'main_title'>
+        움직이는 개발자, 임한별 입니다.
+    </h1>
+    <h2 class = 'main_subtitle'>
+        자신이 당장 하지 못하는 일이라고 손가락을 빨며 멀리서 지켜 보는 게 아니라 일단 발을 담궈 봅니다.<br />
+        수동적으로 시키는 일만 하며 멈춰 있는 것이 아닌, 본인이 할 수 있는 일을 계속해서 만들어냅니다.
+    </h2>
+</div>

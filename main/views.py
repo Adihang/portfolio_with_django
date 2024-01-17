@@ -10,6 +10,7 @@ def main(request):
 def ProjectDetail(request, project_title):
     context = dict()
     context['project'] = get_object_or_404(Project, title=project_title)
+    context['project_comment'] = get_object_or_404(Project_Comment, title=project_title)
     return render(request, 'main/ProjectDetail.html', context)
 
 # Create your views here.
