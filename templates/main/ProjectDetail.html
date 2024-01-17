@@ -6,3 +6,8 @@
         {% endfor %}
     </ul>
 </div>
+<form action="{% url 'main:ProjectComment_create' project.id %}" method="post">
+    {% csrf_token %}
+    <textarea name="content" id="content" rows="15"></textarea>
+    <input type="submit" value="의견등록">
+</form>

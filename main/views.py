@@ -1,16 +1,20 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
 from .models import Project, Project_Comment
-from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 def main(request):
     context = dict()
     context['projects'] = Project.objects.all()
-    return render(request, 'main/main.html', context)
+    return render(request, 'main/Projects.html', context)
 
-def ProjectDetail(request, project_title):
+def ProjectDetail(request, project_id):
     context = dict()
-    context['project'] = get_object_or_404(Project, title=project_title)
-    context['project_comment'] = get_object_or_404(Project_Comment, title=project_title)
+    context['project'] = get_object_or_404(Project, id=project_id)
     return render(request, 'main/ProjectDetail.html', context)
+
+def ProjectComment_create(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    project.project_comment_set.create(content=request.POST.get('content'), create_date=timezone.now())
+    return redirect('main:ProjectDetail', project_id=project.id)
 
 # Create your views here.

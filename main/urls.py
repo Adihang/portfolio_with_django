@@ -8,6 +8,7 @@ app_name = 'main'
 
 urlpatterns = [
     path('', views.main, name='main'),
-    path('<str:project_title>/', views.ProjectDetail, name='project_detail')
+    path('<int:project_id>/', views.ProjectDetail, name='ProjectDetail'),
+    path('comment/create/<int:project_id>/', views.ProjectComment_create, name='ProjectComment_create')
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += staticfiles_urlpatterns()

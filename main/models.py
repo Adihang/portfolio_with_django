@@ -21,14 +21,10 @@ class Project(models.Model):
     tags =  models.ManyToManyField(Project_Tag, verbose_name="태그")
     content = models.TextField('내용')
     create_date = models.DateField('날짜')
-    def __str__(self):
-        return self.title
 
 
 class Project_Comment(models.Model):
-    title = models.ForeignKey(Project, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
     content = models.TextField('내용')
-    create_date = models.DateField('날짜')
-    def __str__(self):
-        return self.title
+    create_date = models.DateTimeField('날짜')
 # Create your models here.
