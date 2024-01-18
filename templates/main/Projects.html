@@ -1,18 +1,20 @@
 <section class="projects">
     <div class="projects_head">
         <div class="projects_title">
-            <h1><b>프로젝트</b></h1>
-            <h2>흥미를 가지고 진행했던 프로젝트들을 소개합니다</h2>
+            <h2>Project</h2>
+            <div>흥미를 가지고 진행했던 프로젝트들을 소개합니다</div>
         </div>
     </div>
     <ul class="project_cards">
         {% for project in projects %}
         <li class="project_card">
             <a href="/project/{{ project.id }}/">
-                <img class="project_card_img" src="{{ project.banner_img.url }}">
+                <img class="project_card_img" src="{{ project.banner_img.url }}" width: 50%/>
             </a>
             <div class="project_card_text">
-                <div class="project_card_contents_title">{{ project.title }}</div>
+                <hr>
+                <h3 class="project_card_contents_title">{{ project.title }}</h3>
+                <hr>
                 <ul class="tags">
                     {% for tag in project.tags.all %}
                     <li class="tag">{{ tag.tag }}</li>

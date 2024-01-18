@@ -1,26 +1,30 @@
 {% load static %}
 <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
-<div class="project_detail">
-    <h1 class="project_detail_title">{{ project.title }}</h1>
-    <div class="project_detail_content">
-        {{ project.content|safe }}
+<div class="project_detail_page">
+    <div class="project_detail">
+        <h1 class="project_detail_title">{{ project.title }}</h1>
+        <hr>
+        <ul class="tags">
+            {% for tag in project.tags.all %}
+            <li class="tag">{{ tag.tag }}</li>
+            {% endfor %}
+        </ul>
+        <div class="project_detail_content">
+            {{ project.content|safe }}
+        </div>
     </div>
-    <ul class="tags">
-        {% for tag in project.tags.all %}
-        <li class="tag">{{ tag.tag }}</li>
+    <hr>
+    <h5>댓글 {{ project.project_comment_set.count }}</h5>
+    <div>
+        <ul>
+        {% for project_comment in project.project_comment_set.all %}
+            <li>{{ project_comment.content }}</li>
         {% endfor %}
-    </ul>
+        </ul>
+    </div>
+    <form action="{% url 'main:ProjectComment_create' project.id %}" method="post">
+        {% csrf_token %}
+        <textarea name="content" id="content" rows="1"></textarea>
+        <input type="submit" value="댓글등록">
+    </form>
 </div>
-<h5>{{ project.project_comment_set.count }}개의 답변이 있습니다.</h5>
-<div>
-    <ul>
-    {% for project_comment in project.project_comment_set.all %}
-        <li>{{ project_comment.content }}</li>
-    {% endfor %}
-    </ul>
-</div>
-<form action="{% url 'main:ProjectComment_create' project.id %}" method="post">
-    {% csrf_token %}
-    <textarea name="content" id="content" rows="1"></textarea>
-    <input type="submit" value="의견등록">
-</form>

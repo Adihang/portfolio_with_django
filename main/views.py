@@ -6,7 +6,7 @@ import markdown
 def main(request):
     context = dict()
     context['projects'] = Project.objects.all()
-    return render(request, 'main/Projects.html', context)
+    return render(request, 'main.html', context)
 
 def ProjectDetail(request, project_id):
     context = dict()
