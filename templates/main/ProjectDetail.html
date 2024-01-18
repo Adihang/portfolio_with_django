@@ -1,13 +1,26 @@
-<div class="project_card_contents">
-    <div class="project_card_contents_title">{{ project.title }}</div>
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+<div class="project_detail">
+    <h1 class="project_detail_title">{{ project.title }}</h1>
+    <div class="project_detail_content">
+        {{ project.content|safe }}
+    </div>
     <ul class="tags">
         {% for tag in project.tags.all %}
         <li class="tag">{{ tag.tag }}</li>
         {% endfor %}
     </ul>
 </div>
+<h5>{{ project.project_comment_set.count }}개의 답변이 있습니다.</h5>
+<div>
+    <ul>
+    {% for project_comment in project.project_comment_set.all %}
+        <li>{{ project_comment.content }}</li>
+    {% endfor %}
+    </ul>
+</div>
 <form action="{% url 'main:ProjectComment_create' project.id %}" method="post">
     {% csrf_token %}
-    <textarea name="content" id="content" rows="15"></textarea>
+    <textarea name="content" id="content" rows="1"></textarea>
     <input type="submit" value="의견등록">
 </form>
