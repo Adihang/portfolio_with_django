@@ -1,6 +1,20 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class = "main">
+    <div class = 'main_banner'>
+        <div class = "main_text">
+            <h4 class = 'main_title'>
+                움직이는 풀스택 개발자, <b>임한별</b> 입니다.
+            </h4>
+            <div class = "phone">
+                Phone: +82-10-7935-3599
+            </div>
+            <div class = "Email">
+                Email: limhan456@naver.com
+            </div>
+        </div>
+        <img class = "profile_img" src="/media/profile.jpg"/>
+    </div>
     <div class = "main_contents">
         <hr>
         <div class = 'main_subtitle'>
@@ -9,9 +23,11 @@
         </div>
         <hr>
         <div class="animation fade-up">
+            {% include "main/Careers.html" %}
+        </div>
+        <div class="animation fade-up">
             {% include "main/Projects.html" %}
         </div>
-        <hr>
     </div>
 </div>
 {% endblock %}

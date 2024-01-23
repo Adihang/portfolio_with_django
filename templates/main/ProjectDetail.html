@@ -1,3 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
 {% load static %}
 <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
 <div class="project_detail_page">
@@ -14,6 +16,7 @@
         </div>
     </div>
     <hr>
+    <!--
     <h5>댓글 {{ project.project_comment_set.count }}</h5>
     <div>
         <ul>
@@ -27,4 +30,6 @@
         <textarea name="content" id="content" rows="1"></textarea>
         <input type="submit" value="댓글등록">
     </form>
+    -->
 </div>
+{% endblock %}

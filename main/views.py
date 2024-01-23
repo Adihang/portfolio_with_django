@@ -1,10 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Project, Project_Comment
+from .models import Project, Career
 from django.utils import timezone
 import markdown
 
 def main(request):
     context = dict()
+    context['careers'] = Career.objects.all()
+    for i in range(len(context['careers'])):
+        context['careers'][i].content = markdown.markdown(context['careers'][i].content)
     context['projects'] = Project.objects.all()
     return render(request, 'main.html', context)
 

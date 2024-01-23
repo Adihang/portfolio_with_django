@@ -1,34 +1,45 @@
 {% load static %}
-<link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+
 <!doctype html>
 <html lang="ko">
-<link rel="icon" href="{% static 'favicon.png' %}">
+
+
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>hanbyel's portfolio</title>
-    <a class = 'base_banner'>
-        <div class = "base_text">
-            <h3 class = 'base_title'>
-                움직이는 풀스택 개발자, <b>임한별</b> 입니다.
-            </h3>
-            <i class="fa-solid fa-square-phone"></i>
-            <div class = "phone">
-                Phone: +82-10-7935-3599
-            </div>
-            <div class = "Email">
-                Email: limhan456@naver.com
-            </div>
-        </div>
-        <img class = "profile_img" src="/media/profile.jpg"/>
-    </a>
+    <link rel="icon" href="{% static 'favicon.png' %}">
+
+    <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+    
+    <title>
+        Hanbyel's Portfolio</title>
 </head>
 <body>
-    <div class="base_contents">
-        {% block content %}
-        {% endblock %}
-    </div>
+    <!-- 네비게이션바 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'main:main' %}">Hanbyel's Portfolio</a>
+            <button class="navbar-toggler" type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#navbarSupportedContent"
+                    aria-controls="navbarSupportedContent"
+                    aria-expanded="false"
+                    aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://github.com/Adihang">GitHub</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% block content %}
+    {% endblock %}
     <div class = 'foot'>
         <div>
             Made with Django

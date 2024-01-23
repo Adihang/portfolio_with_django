@@ -1,0 +1,27 @@
+{% load static %}
+<script src="{% static 'js/careers.js' %}" type="text/javascript"></script>
+<section class="careers">
+    <div class="careers_head">
+        <div class="careers_title">
+            <h3><b>경력 사항</b></h3>
+        </div>
+    </div>
+    <ul class="career_cards">
+        {% for career in careers %}
+        <hr>
+        <li class="career_card">
+            <div class="career_card_head">
+                <h5 class="career_card_title"><b>{{ career.company }}</b></h5>
+                <div class="career_card_date">
+                    <div>{{ career.join_date }} ~ {{ career.leave_date }}</div>
+                    <div>({{career.period}})</div>
+                </div>
+            </div>
+            <div class="career_card_text">
+                <div><b>{{ career.position }}</b></div>
+                <div>{{ career.content|safe }}</div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
