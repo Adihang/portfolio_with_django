@@ -1,9 +1,8 @@
 {% load static %}
-<link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
 <div class="project_detail_page">
     <div class="project_detail">
         <h1 class="project_detail_title">{{ project.title }}</h1>
-        <hr>
         <ul class="tags">
             {% for tag in project.tags.all %}
             <li class="tag">{{ tag.tag }}</li>
