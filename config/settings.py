@@ -36,7 +36,6 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
-    'easy_thumbnails',
     "main.apps.MainConfig",
     "django.contrib.admin",
     "django.contrib.auth",
