@@ -1,6 +1,5 @@
 {% load static %}
-<link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
-<script src="{% static 'js/projacts.js' %}" type="text/javascript"></script>
+<script src="{% static 'js/projact_card.js' %}" type="text/javascript"></script>
 <section class="projects">
     <div class="projects_head">
         <div class="projects_title">
@@ -13,7 +12,7 @@
         <li class="project_card">
             <div>
                 <a href="/project/{{ project.id }}/">
-                    <img class="project_card_img" src="{{ project.banner_img.url }}" id="hover-image"/>
+                    <img class="project_card_img hover-dark" src="{{ project.banner_img.url }}"/>
                 </a>
                 <div class="project_card_text">
                     <hr>

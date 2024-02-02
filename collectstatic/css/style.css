@@ -2,6 +2,9 @@ body {
     font-family: "Inter", 'NotoSansKR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
     color: inherit;
 }
+.ogimage{
+    padding-right: 30;
+}
 .main_contents{
     padding-left: 30px;
     padding-right: 30px;
@@ -131,8 +134,6 @@ section{
         justify-content: center; /* 수평 가운데 정렬 */
         align-items: center; /* 수직 가운데 정렬 */
         .project_card_img{
-            filter: blur(0); /* 초기 상태에서는 흐려지지 않음 */
-            transition: filter 0.3s ease; /* 트랜지션 효과 추가 */
             width: 300px; /* 원하는 너비 설정 */
             height: 300px;
             object-fit: fill;
