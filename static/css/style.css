@@ -5,20 +5,38 @@ body {
 .ogimage{
     padding-right: 30;
 }
-.main_contents{
-    padding-left: 30px;
-    padding-right: 30px;
-    text-align: center;
-    align-items: center;
-    justify-content: center;
+@media (min-width: 900px) {
+    .main_contents{
+        padding-left: 30px;
+        padding-right: 30px;
+        text-align: center;
+        align-items: center;
+        justify-content: center;
+    }
+    .main_banner {
+        padding-left: 30px;
+        padding-right: 30px;
+        display: flex;
+        align-items: center;
+    }
 }
-.main_banner {
-    padding-left: 30px;
-    padding-right: 30px;
-    display: flex;
-    align-items: center;
+
+@media (max-width: 899px){
+    .main_contents{
+        padding-left: 5px;
+        padding-right: 5px;
+        text-align: center;
+        align-items: center;
+        justify-content: center;
+    }
+    .main_banner {
+        padding-left: 5px;
+        padding-right: 5px;
+        display: flex;
+        align-items: center;
+    }
 }
-  
+
 .main_text {
 flex: 1; /* 남은 공간을 모두 차지하도록 설정하여 오른쪽 정렬됨 */
 margin-left: 10px;
@@ -111,12 +129,12 @@ section{
 }
 .career_card_date{
     color: #535353;
-    font-size: 14;
+    font-size: 14px;
     flex: 1;
     margin-left: 5px;
 }
 .career_card_text{
-    margin-top: 30;
+    margin-top: 30px;
     margin-left: auto;
 }
 .projects{
