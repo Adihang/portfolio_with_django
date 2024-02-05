@@ -39,6 +39,17 @@ body {
         padding-right: 30px;
         overflow: hidden;
     }
+    .main_text {
+        flex: 1; /* 남은 공간을 모두 차지하도록 설정하여 오른쪽 정렬됨 */
+        margin-left: 10px;
+        padding: 30px;
+        padding-top: 50px;
+    }
+    .profile_img {
+        margin-left: auto; /* 왼쪽 여백을 auto로 설정하여 오른쪽 정렬됨 */
+        max-height: 150px;
+        margin-right: 40px;
+    }
 }
 @media (max-width: 899px){
     .main_contents{
@@ -62,13 +73,17 @@ body {
         padding-right: 10px;
         overflow: hidden;
     }
-}
-
-.main_text {
-flex: 1; /* 남은 공간을 모두 차지하도록 설정하여 오른쪽 정렬됨 */
-margin-left: 10px;
-padding: 30px;
-padding-top: 50px;
+    .main_text {
+        flex: 1; /* 남은 공간을 모두 차지하도록 설정하여 오른쪽 정렬됨 */
+        margin-left: 20px;
+        padding-bottom: 30px;
+        padding-top: 50px;
+    }
+    .profile_img {
+        margin-left: auto; /* 왼쪽 여백을 auto로 설정하여 오른쪽 정렬됨 */
+        max-height: 150px;
+        margin-right: 20px;
+    }
 }
 
 .contact{
@@ -80,11 +95,6 @@ padding-top: 50px;
 .main_title{
     color: black;
     text-decoration: none;
-}
-.profile_img {
-margin-left: auto; /* 왼쪽 여백을 auto로 설정하여 오른쪽 정렬됨 */
-max-height: 150px;
-margin-right: 40px;
 }
 
 textarea {
