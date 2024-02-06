@@ -1,0 +1,20 @@
+<section class="hobbys">
+    <div class="head">
+        <div class="title">
+            <h3><b>취미생활</b></h3>
+            <div class = 'hobbys_subtitle'>건강한 신체에서 건강한 코드가 나옵니다.</div>
+        </div>
+    </div>
+    <cards class="hobby_cards">
+        {% for hobby in hobbys %}
+        <hr>
+        <li class="hobby_card">
+            <div class="hobby_card_head">
+                <h5 class="hobby_card_title"><b>{{ hobby.title }}</b></h5>
+            </div>
+            <img class="hobby_card_img" src="{{ hobby.banner_img.url }}"/>
+            <div class="hobby_card_text">{{ hobby.content }}</div>
+        </li>
+        {% endfor %}
+    </cards>
+</section>

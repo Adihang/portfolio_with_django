@@ -47,3 +47,11 @@ class Career(models.Model):
     leave_date = models.DateField('퇴사일')
     class Meta:
         ordering = ['order']
+        
+class Hobby(models.Model):
+    order = OrderField()
+    title = models.CharField('제목', max_length=200)
+    banner_img = models.ImageField("대표 이미지", upload_to=upload_to_project)
+    content = models.TextField('내용')
+    class Meta:
+        ordering = ['order']

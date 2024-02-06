@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Project, Career
+from .models import Project, Career, Hobby
 from django.utils import timezone
 import markdown
 
@@ -9,6 +9,7 @@ def main(request):
     for i in range(len(context['careers'])):
         context['careers'][i].content = markdown.markdown(context['careers'][i].content)
     context['projects'] = Project.objects.all()
+    context['hobbys'] = Hobby.objects.all()
     return render(request, 'main.html', context)
 
 def ProjectDetail(request, project_id):
