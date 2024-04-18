@@ -11,7 +11,7 @@
             <div class="career_card_head">
                 <h5 class="career_card_title"><b>{{ career.company }}</b></h5>
                 <div class="career_card_date">
-                    <div>{{ career.join_date }} ~ {{ career.leave_date }}</div>
+                    <div>{{ career.join_date }} ~ {% if career.order == 0 %}Now{% else %}{{ career.leave_date }}{% endif %}</div>
                     <div>({{career.period}})</div>
                 </div>
             </div>
