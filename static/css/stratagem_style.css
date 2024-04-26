@@ -36,9 +36,9 @@ body {
 }
 .stratagem_cards {
     max-height: 80vh;
+    width: 50vw;
     margin-left: 0;
     padding-left: 0;
-    overflow-x: auto;
     overflow-y: auto;
 }
 .stratagem_card {
