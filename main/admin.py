@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Project, Project_Tag, Career, Hobby
+from .models import Project, Project_Tag, Career, Hobby, Stratagem, Stratagem_Class
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
@@ -15,3 +15,9 @@ class CareerAdmin(admin.ModelAdmin):
 @admin.register(Hobby)
 class HobbyAdmin(admin.ModelAdmin):
     list_display = ['title']
+
+admin.site.register(Stratagem_Class)
+
+@admin.register(Stratagem)
+class StratagemAdmin(admin.ModelAdmin):
+    list_display = ['name']

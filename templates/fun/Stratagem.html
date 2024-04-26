@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static 'css/stratagem_style.css' %}">
+<div class="stratagem_page">
+    <div class="stratagem">
+        <div class="stratagem_content">
+            <div class="stratagem_container">
+                <div class="arrow arrow-top"></div>
+                <div class="arrow arrow-bottom"></div>
+                <div class="arrow arrow-left"></div>
+                <div class="arrow arrow-right"></div>
+                <div class="content">
+                    {% for stratagem in stratagems %}
+                    <hr>
+                    <li class="stratagem_card">
+                        <div class="stratagem_head">
+                            <h5 class="stratagem_name"><b>{{ stratagem.name }}</b></h5>
+                        </div>
+                        <div class="stratagem_card_commend">
+                            <div>{{ stratagem.commend|safe }}</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+            </div>  
+        </div>
+    </div>
+    <hr>
+</div>
+{% endblock %}
