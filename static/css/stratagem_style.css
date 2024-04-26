@@ -1,3 +1,8 @@
+body {
+    font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
+    color: inherit;
+}
+
 .stratagem_container {
     position: relative;
     padding-left: 10px;
@@ -9,19 +14,19 @@
     width: 100vw; 
 }  
   
-.arrow {position: absolute;width: 40px;height: 40px;background-color: #ccc;border-radius: 50%;transform: translate(-50%, -50%);  opacity: 0.5;
+.arrow {position: absolute; width: 60px;height: 60px; transform: translate(-50%, -50%);  opacity: 0.5; background-size: contain;
 }  
   
-.arrow-top {top: 10%;left: 50%;  
+.arrow-top {top: 2%;left: 50%; background-image: url('/media/icons/arrow5.png');
 }  
   
-.arrow-bottom {bottom: 0;left: 50%;  
+.arrow-bottom {bottom: 0;left: 50%; background-image: url('/media/icons/arrow2.png');
 }  
   
-.arrow-left {top: 50%;left: 5%;  
+.arrow-left {top: 50%;left: 5%; background-image: url('/media/icons/arrow1.png');
 }  
   
-.arrow-right {top: 50%;right: 0;  
+.arrow-right {top: 50%;right: 0; background-image: url('/media/icons/arrow3.png');
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
@@ -30,8 +35,11 @@
     background-color: white;
 }
 .stratagem_cards {
+    max-height: 80vh;
     margin-left: 0;
     padding-left: 0;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 .stratagem_card {
     height: 40;
@@ -55,3 +63,6 @@ ul{
     list-style-type: none;
     list-style: none;
     }
+h3{
+    margin: 10px;
+}
