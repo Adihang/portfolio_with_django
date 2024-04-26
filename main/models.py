@@ -69,12 +69,11 @@ def upload_stratagem(instace: "Project", filename: str) -> str:
         new_filename=str(uuid.uuid4().hex),
     )
     
-        
 class Stratagem(models.Model):
     order = OrderField()
     name = models.CharField('이름', max_length=200)
     icon = models.FileField("아이콘", upload_to=upload_stratagem)
     stratagem_class =  models.ManyToManyField(Stratagem_Class, verbose_name="스트라타잼 분류")
-    command = models.TextField('Command')
+    command = models.IntegerField('Command')
     class Meta:
         ordering = ['order']

@@ -176,9 +176,10 @@ input[type=submit] {
     display: flex; /* 가로로 나열하기 위해 플렉스 박스로 설정 */
     text-align: center;
     align-items: center; /* 수직 가운데 정렬 */
-    overflow-x: auto;
+    overflow-y: auto;
 }
 .project_card{
+    width: 600px;
     background-color: rgb(238, 238, 238);
     margin-right: 10px;
     display: inline-block;

@@ -12,7 +12,7 @@ def main(request):
     context['hobbys'] = Hobby.objects.all()
     return render(request, 'main.html', context)
 
-def Stratagem(request):
+def Stratagem_page(request):
     context = dict()
     context['stratagems'] = Stratagem.objects.all()
     return render(request, 'fun/Stratagem.html', context)
