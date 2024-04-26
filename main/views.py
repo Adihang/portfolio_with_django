@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Project, Career, Hobby
+from .models import Project, Career, Hobby, Stratagem
 from django.utils import timezone
 import markdown
 
@@ -11,6 +11,11 @@ def main(request):
     context['projects'] = Project.objects.all()
     context['hobbys'] = Hobby.objects.all()
     return render(request, 'main.html', context)
+
+def Stratagem(request):
+    context = dict()
+    context['stratagems'] = Stratagem.objects.all()
+    return render(request, 'fun/Stratagem.html', context)
 
 def ProjectDetail(request, project_id):
     context = dict()

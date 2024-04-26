@@ -55,3 +55,26 @@ class Hobby(models.Model):
     content = models.TextField('내용')
     class Meta:
         ordering = ['order']
+        
+class Stratagem_Class(models.Model):
+    gem_class = models.CharField("스트라타잼 분류", max_length=128)
+
+    def __str__(self):
+        return self.gem_class
+    
+def upload_stratagem(instace: "Project", filename: str) -> str:
+    return make_new_path(
+        path_ext=filename,
+        dirname=f"uploads/contents/stratagem",
+        new_filename=str(uuid.uuid4().hex),
+    )
+    
+        
+class Stratagem(models.Model):
+    order = OrderField()
+    name = models.CharField('이름', max_length=200)
+    icon = models.FileField("아이콘", upload_to=upload_stratagem)
+    stratagem_class =  models.ManyToManyField(Stratagem_Class, verbose_name="스트라타잼 분류")
+    command = models.TextField('Command')
+    class Meta:
+        ordering = ['order']
