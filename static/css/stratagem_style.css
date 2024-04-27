@@ -53,6 +53,19 @@ title{
 .end_score{
     color: yellow;
 }
+.discription{
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    height: 80vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgb(129, 129, 129);
+}
 .stratagem_cards {
     position: absolute;
     width: 100%;
