@@ -21,16 +21,16 @@ title{
 .arrow {position: absolute; width: 60px;height: 60px; transform: translate(-50%, -50%);  opacity: 0.5; background-size: contain;
 }  
   
-.arrow-top {top: 2%;left: 50%; background-image: url('/media/icons/arrow5.png');
+.arrow-top {top: 70%;left: 50%; background-image: url('/media/icon/arrow5.png');
 }  
   
-.arrow-bottom {bottom: 0;left: 50%; background-image: url('/media/icons/arrow2.png');
+.arrow-bottom {bottom: 0;left: 50%; background-image: url('/media/icon/arrow2.png');
 }  
   
-.arrow-left {top: 50%;left: 5%; background-image: url('/media/icons/arrow1.png');
+.arrow-left {top: 80%;left: 5%; background-image: url('/media/icon/arrow1.png');
 }  
   
-.arrow-right {top: 50%;right: 0; background-image: url('/media/icons/arrow3.png');
+.arrow-right {top: 80%;right: 0; background-image: url('/media/icon/arrow3.png');
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
