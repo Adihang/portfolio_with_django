@@ -3,6 +3,39 @@ body {
     color: white;
     background-color: rgb(54, 54, 54)
 }
+
+@media (min-width: 900px) {
+    .arrow { display: none;
+    } 
+    .stratagem_icon{
+        height: 40px;
+        width: 40px;
+        margin-right: 5px;
+        border-radius: 10%;
+    }
+    .stratagem_name {
+        font-size: 20px;
+        margin-right: 5px;
+    }  
+}
+@media (max-width: 899px) {
+    .arrow {position: absolute; width: 60px;height: 60px; transform: translate(-50%, -50%);  opacity: 0.5; background-size: contain;
+    } 
+    .stratagem_icon{
+        height: 30px;
+        width: 30px;
+        margin-right: 2px;
+        border-radius: 10%;
+    }
+    .stratagem_name {
+        font-size: 15px;
+        margin-right: 5px;
+    }  
+    .commend_arrow{
+        height: 22px;
+        width: 22px;
+    }
+}
 title{
     padding-left: 10px;
 }
@@ -18,9 +51,6 @@ title{
     border-width: 2px;
     color: white;
 }
-.arrow {position: absolute; width: 60px;height: 60px; transform: translate(-50%, -50%);  opacity: 0.5; background-size: contain;
-}  
-  
 .arrow-top {top: 70%;left: 50%; background-image: url('/media/icon/arrow5.png');
 }  
   
@@ -87,17 +117,8 @@ title{
     display: flex;
     align-items: center;
 }
-.stratagem_icon{
-    height: 40px;
-    width: 40px;
-    background-color: rgb(54, 54, 54);
-    margin-right: 5px;
-    border-radius: 10%;
-}
-.stratagem_name {
-    font-size: 20px;
-    margin-right: 5px;
-}  
+
+
 ul{
     list-style-type: none;
     list-style: none;
