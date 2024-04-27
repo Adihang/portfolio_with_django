@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const id = `${index}`; // ID 생성
             img.src = `/media/icon/arrow${digit}.png`;
             img.alt = `arrow ${digit}`;
+            img.classList.add('commend_arrow');
             img.setAttribute('id', id); // ID 설정
             commandDiv.appendChild(img);
         });
