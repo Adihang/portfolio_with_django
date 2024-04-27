@@ -16,7 +16,7 @@ def main(request):
 def Stratagem_Hero_page(request):
     context = dict()
     all_stratagems = list(Stratagem.objects.all())
-    context['stratagems'] = random.sample(all_stratagems, 12)
+    context['stratagems'] = random.sample(all_stratagems, 10)
     return render(request, 'fun/Stratagem_Hero.html', context)
 
 def ProjectDetail(request, project_id):
