@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         commandNumber.toString().split('').forEach(function(digit, index) {
             const img = document.createElement('img');
             const id = `${index}`; // ID 생성
-            img.src = `/media/icons/arrow${digit}.png`;
+            img.src = `/media/icon/arrow${digit}.png`;
             img.alt = `arrow ${digit}`;
             img.setAttribute('id', id); // ID 설정
             commandDiv.appendChild(img);
