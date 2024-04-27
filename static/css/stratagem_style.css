@@ -51,16 +51,16 @@ title{
     border-width: 2px;
     color: white;
 }
-.arrow-top {top: 70%;left: 50%; background-image: url('/media/icon/arrow5.png');
+.arrow-top {top: 78%;left: 47%; background-image: url('/media/icon/arrow5.png');
 }  
   
-.arrow-bottom {bottom: 0;left: 50%; background-image: url('/media/icon/arrow2.png');
+.arrow-bottom {bottom: 0;left: 47%; background-image: url('/media/icon/arrow2.png');
 }  
   
-.arrow-left {top: 80%;left: 5%; background-image: url('/media/icon/arrow1.png');
+.arrow-left {top: 85%;left: 50px; background-image: url('/media/icon/arrow1.png');
 }  
   
-.arrow-right {top: 80%;right: 0; background-image: url('/media/icon/arrow3.png');
+.arrow-right {top: 85%;right: 10px; background-image: url('/media/icon/arrow3.png');
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
