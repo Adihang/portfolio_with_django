@@ -52,7 +52,7 @@ document.addEventListener('keydown', async function(event) {
     soundSelect = 0;
     allCardsHidden = true
     const find_remove_cards = document.querySelectorAll('.stratagem_card');
-    if ((find_remove_cards.length == 12) && (typecommand == "")) {
+    if ((find_remove_cards.length == 10) && (typecommand == "")) {
         startTime = performance.now();
         console.log(startTime);
     }
@@ -75,7 +75,6 @@ document.addEventListener('keydown', async function(event) {
     }
     const stratagem_cards = document.querySelectorAll('.stratagem_card');
     if (typecommand != ""){
-        console.log(typecommand)
         stratagem_cards.forEach(function(card) {
             const commandDiv = card.querySelector('.stratagem_command');
             const command = commandDiv.dataset.command;
@@ -92,7 +91,6 @@ document.addEventListener('keydown', async function(event) {
             }
         });
         // 모든 카드가 숨겨진 상태인지 확인하고, 그렇다면 typecommand를 빈 문자열로 설정합니다.
-        console.log(allCardsHidden)
         if (allCardsHidden) { // 변수 이름 수정
             const randomOption = Math.floor(Math.random() * 2);
             if (randomOption === 0) {
@@ -152,6 +150,8 @@ document.addEventListener('keydown', async function(event) {
             timer.textContent = minutes + '분 ' + seconds + '초';
             const scoreboard = document.querySelector('.stratagem_scoreboard');
             scoreboard.style.display = 'flex';
+            const discription = document.querySelector('.discription');
+            discription.style.display = 'none';
             setTimeout(function() {
                 location.reload();
             }, 5000);
