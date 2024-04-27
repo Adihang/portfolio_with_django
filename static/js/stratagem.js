@@ -1,3 +1,8 @@
+async function playSound(soundURL) {
+    const soundEffect = new Audio(soundURL);
+    await soundEffect.play();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     //스트라타잼 아이콘 생성
     const stratagem_commands = document.querySelectorAll('.stratagem_command');
@@ -39,7 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 let typecommand = "";
-document.addEventListener('keydown', function(event) {
+let soundSelect = 0;
+document.addEventListener('keydown', async function(event) {
     const key = event.key; // 이벤트에서 키 값을 가져옵니다.
     
     switch (key) {
@@ -62,6 +68,7 @@ document.addEventListener('keydown', function(event) {
         default:
             typecommand = ""
             console.log(typecommand);
+            soundSelect = 0;
     }
     const stratagem_cards = document.querySelectorAll('.stratagem_card');
     let allCardsHidden = true; // 변수 이름 수정
@@ -69,10 +76,14 @@ document.addEventListener('keydown', function(event) {
         stratagem_cards.forEach(function(card) {
             const commandDiv = card.querySelector('.stratagem_command');
             const command = commandDiv.dataset.command;
-        
+            if (typecommand == command) {
+                playSound('/media/mp3/stratagem/stratagem4.mp3')
+            }
+
             if (!command.startsWith(typecommand)) {
                 card.style.display = 'none';
             } else {
+                soundSelect = 1
                 allCardsHidden = false;
             }
         });
@@ -87,16 +98,18 @@ document.addEventListener('keydown', function(event) {
     const imgs = document.querySelectorAll('img');
     const typecommandLength = typecommand.length;
     imgs.forEach(function(img) {
-        const id = parseInt(img.id); // 이미지의 id를 정수형으로 변환
-        // typecommand가 해당 이미지의 id보다 작거나 같을 때,
-        // 즉, typecommand가 1자리 이상이면서 해당 이미지에 반전을 적용할 때
+        const id = parseInt(img.id);
         if (typecommandLength-1 >= id) {
             // 이미지 색상 반전
             img.style.filter = 'invert(70%)';
-        } else {
+        } 
+        else {
             // 이미지 색상 원래대로 복구
             img.style.filter = 'none';
         }
     });
-
+    if (soundSelect == 1)
+    {
+        await playSound('/media/mp3/stratagem/stratagem1.mp3')
+    }
 });
