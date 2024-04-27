@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .models import Project, Career, Hobby, Stratagem
 from django.utils import timezone
 import markdown
+import random
 
 def main(request):
     context = dict()
@@ -14,7 +15,8 @@ def main(request):
 
 def Stratagem_page(request):
     context = dict()
-    context['stratagems'] = Stratagem.objects.all()
+    all_stratagems = list(Stratagem.objects.all())
+    context['stratagems'] = random.sample(all_stratagems, 12)
     return render(request, 'fun/Stratagem.html', context)
 
 def ProjectDetail(request, project_id):
