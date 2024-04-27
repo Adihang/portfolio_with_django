@@ -13,11 +13,11 @@ def main(request):
     context['hobbys'] = Hobby.objects.all()
     return render(request, 'main.html', context)
 
-def Stratagem_page(request):
+def Stratagem_Hero_page(request):
     context = dict()
     all_stratagems = list(Stratagem.objects.all())
     context['stratagems'] = random.sample(all_stratagems, 12)
-    return render(request, 'fun/Stratagem.html', context)
+    return render(request, 'fun/Stratagem_Hero.html', context)
 
 def ProjectDetail(request, project_id):
     context = dict()
