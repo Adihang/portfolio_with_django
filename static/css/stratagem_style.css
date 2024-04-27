@@ -1,6 +1,7 @@
 body {
     font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
-    color: inherit;
+    color: white;
+    background-color: rgb(54, 54, 54)
 }
 
 .stratagem_container {
@@ -30,9 +31,6 @@ body {
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
-}  
-.stratagem_page{
-    background-color: white;
 }
 .stratagem_cards {
     max-height: 80vh;
