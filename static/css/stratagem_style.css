@@ -3,18 +3,21 @@ body {
     color: white;
     background-color: rgb(54, 54, 54)
 }
-
+title{
+    padding-left: 10px;
+}
 .stratagem_container {
     position: relative;
-    padding-left: 10px;
-    padding-right: 10px;
     display: flex;
     align-items: flex-start;
     justify-content: flex-start;
     height: 80vh;
     width: 100vw; 
 }  
-  
+.stratagem_hr{
+    border-width: 2px;
+    color: white;
+}
 .arrow {position: absolute; width: 60px;height: 60px; transform: translate(-50%, -50%);  opacity: 0.5; background-size: contain;
 }  
   
@@ -32,19 +35,44 @@ body {
   
 .content {margin-top: 0px;margin-left: 0px;  
 }
-.stratagem_cards {
-    max-height: 80vh;
-    width: 50vw;
-    margin-left: 0;
-    padding-left: 0;
-    overflow-y: auto;
+.stratagem_content{
+    position: relative;
 }
-.stratagem_card {
-    height: 40;
-    padding: 5;
+.stratagem_scoreboard{
+    position: absolute;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    height: 80vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.end_score{
+    color: yellow;
+}
+.stratagem_cards {
+    position: absolute;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+.stratagem_card{
+    width: calc(100% - 20px);
+    padding: 5px;
     display: flex;
-    align-items: flex-end;
-    margin-bottom: 5px;
+    align-items: center;
+}
+.stratagem_card_title {
+    max-width: calc(100vw);
+    display: flex;
+    align-items: center;
 }
 .stratagem_icon{
     height: 40px;
@@ -61,6 +89,10 @@ ul{
     list-style-type: none;
     list-style: none;
     }
-h3{
+.title{
+    padding-left: 25px;
     margin: 10px;
+}
+.lowtext{
+    padding-left: 35px;
 }
