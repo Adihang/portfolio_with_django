@@ -90,8 +90,16 @@ ul{
     list-style: none;
     }
 .title{
-    padding-left: 25px;
+    display: flex;
     margin: 10px;
+    justify-content: center;
+    align-items: center;
+    align-content: center;;
+}
+.title_text{
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 .lowtext{
     padding-left: 35px;
