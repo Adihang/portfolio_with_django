@@ -7,6 +7,7 @@ from . import views
 app_name = 'main'
 
 urlpatterns = [
+    path('', views.none, name='none'),
     path('portfolio/', views.main, name='main'),
     path('project/<int:project_id>/', views.ProjectDetail, name='ProjectDetail'),
     path('Stratagem_Hero/', views.Stratagem_Hero_page, name='Stratagem_Hero'),

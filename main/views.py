@@ -4,6 +4,11 @@ from django.utils import timezone
 import markdown
 import random
 
+def none(request):
+    context = dict()
+    return render(request, 'none.html', context)
+    
+
 def main(request):
     context = dict()
     context['careers'] = Career.objects.all()
