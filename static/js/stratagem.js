@@ -144,10 +144,9 @@ document.addEventListener('keydown', async function(event) {
         if (scoreboard.length == 0) {
             const endTime = performance.now();
             const executionTime = endTime - startTime;
-            const minutes = Math.floor(executionTime / 60000);
-            const seconds = ((executionTime % 60000) / 1000).toFixed(2);
+            const seconds = (executionTime / 1000).toFixed(2);
             const timer = document.querySelector('.end_score');
-            timer.textContent = minutes + '분 ' + seconds + '초';
+            timer.textContent = seconds + 's';
             const scoreboard = document.querySelector('.stratagem_scoreboard');
             scoreboard.style.display = 'flex';
             const discription = document.querySelector('.discription');
