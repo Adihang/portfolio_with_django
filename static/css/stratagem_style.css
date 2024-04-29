@@ -57,10 +57,10 @@ title{
 .arrow-bottom {bottom: 0;left: 47%; background-image: url('/media/icon/arrow2.png');
 }  
   
-.arrow-left {top: 85%;left: 50px; background-image: url('/media/icon/arrow1.png');
+.arrow-left {top: 85%;left: 35%; background-image: url('/media/icon/arrow1.png');
 }  
   
-.arrow-right {top: 85%;right: 10px; background-image: url('/media/icon/arrow3.png');
+.arrow-right {top: 85%;right: 25%; background-image: url('/media/icon/arrow3.png');
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
