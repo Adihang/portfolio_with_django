@@ -70,6 +70,18 @@ document.addEventListener('keydown', async function(event) {
         case 'ArrowDown':
             typecommand += "2"
             break;
+        case 'a':
+            typecommand += "1"
+            break;
+        case 'w':
+            typecommand += "5"
+            break;
+        case 'd':
+            typecommand += "3"
+            break;
+        case 's':
+            typecommand += "2"
+            break;
         default:
             typecommand = ""
     }
