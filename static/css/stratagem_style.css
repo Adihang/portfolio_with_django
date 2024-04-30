@@ -66,7 +66,19 @@ title{
 .content {margin-top: 0px;margin-left: 0px;  
 }
 .stratagem_content{
+    height: 85vh;
     position: relative;
+}
+.global_score{
+    display: flex;
+    margin: 5px;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+}
+.global_score_time{
+    color: yellow;
+    margin-left: 5px;
 }
 .stratagem_score{
     z-index: 9999;
@@ -83,7 +95,7 @@ title{
 }
 .stratagem_scoreboard{
     position: absolute;
-    display: none;
+    display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
