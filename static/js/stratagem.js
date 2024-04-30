@@ -3,7 +3,13 @@ async function playSound(soundURL) {
     await soundEffect.play();
 }
 
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    const scoreboard = document.querySelector('.stratagem_scoreboard');
+    scoreboard.style.display = 'none';
     //스트라타잼 아이콘 생성
     const stratagem_commands = document.querySelectorAll('.stratagem_command');
     stratagem_commands.forEach(function(commandDiv) {
@@ -47,19 +53,28 @@ document.addEventListener('DOMContentLoaded', function() {
     var input_score_button = document.getElementById('input_score_button');
     if (input_score_button) {
         input_score_button.addEventListener('click', ()=>{
-            const score = document.querySelector('.stratagem_score');
-            score.style.display = 'none';
             const textInputValue = document.getElementById('input_score_name').value;
             const checkboxIsChecked = document.getElementById('input_score_checkbox').checked;
-            const scoreboard = document.querySelector('.stratagem_scoreboard');
-            scoreboard.style.display = 'flex';
-            scoreboard.innerHTML = `입력된 텍스트: ${textInputValue} <br> 체크박스 상태: ${checkboxIsChecked ? '체크됨' : '체크 안 됨'}`;
-            setTimeout(function() {
-                location.reload();
-            }, 5000);
+            if (textInputValue.length > 0){
+                fetch('add_score/', { // Django URL 경로에 맞게 수정하세요.
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ name: textInputValue, score: seconds })
+                }).then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            }
+            location.href = 'Scoreboard/';
         });
     } else {
-        console.error('Input score button not found');
+        console.log('Input score button not found');
     }
 });
 
@@ -182,7 +197,7 @@ document.addEventListener('keydown', async function(event) {
                 const executionTime = endTime - startTime;
                 seconds = (executionTime / 1000).toFixed(2);
                 const timer = document.querySelector('.score_time');
-                timer.textContent = seconds + 's';
+                timer.textContent = seconds + '초';
 
                 //도움말 표시 비활성화
                 const discription = document.querySelector('.discription');

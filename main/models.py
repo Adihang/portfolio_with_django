@@ -80,4 +80,15 @@ class Stratagem(models.Model):
         
 class Stratagem_Hero_Score(models.Model):
     name = models.CharField('이름', max_length=128)
-    score = models.CharField('점수', max_length=128)
+    score = models.FloatField('점수')
+    class Meta:
+        ordering = ['score']
+        
+    def save(self, *args, **kwargs):
+        if not self.pk:  # 객체가 아직 데이터베이스에 저장되지 않았을 경우
+            existing_score = Stratagem_Hero_Score.objects.filter(name=self.name).first()
+            if existing_score:
+                # name이 같은 기존 객체가 있다면 점수만 업데이트합니다.
+                existing_score.score = self.score
+                return existing_score.save(*args, **kwargs)
+        super(Stratagem_Hero_Score, self).save(*args, **kwargs)
