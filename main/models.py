@@ -77,3 +77,7 @@ class Stratagem(models.Model):
     command = models.IntegerField('Command')
     class Meta:
         ordering = ['order']
+        
+class Stratagem_Hero_Score(models.Model):
+    name = models.CharField('이름', max_length=128)
+    score = models.CharField('점수', max_length=128)

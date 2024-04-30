@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Project, Career, Hobby, Stratagem
+from .models import Project, Career, Hobby, Stratagem, Stratagem_Hero_Score
 from django.utils import timezone
 import markdown
 import random
@@ -20,6 +20,7 @@ def main(request):
 
 def Stratagem_Hero_page(request):
     context = dict()
+    context['score'] = Stratagem_Hero_Score.objects.all()
     all_stratagems = list(Stratagem.objects.all())
     context['stratagems'] = random.sample(all_stratagems, 10)
     return render(request, 'fun/Stratagem_Hero.html', context)
