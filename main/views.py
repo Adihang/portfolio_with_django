@@ -20,7 +20,7 @@ def main(request):
 
 def Stratagem_Hero_page(request):
     context = dict()
-    context['score'] = Stratagem_Hero_Score.objects.all()
+    context['scores'] = Stratagem_Hero_Score.objects.all()
     all_stratagems = list(Stratagem.objects.all())
     context['stratagems'] = random.sample(all_stratagems, 10)
     return render(request, 'fun/Stratagem_Hero.html', context)

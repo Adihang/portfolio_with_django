@@ -68,6 +68,19 @@ title{
 .stratagem_content{
     position: relative;
 }
+.stratagem_score{
+    z-index: 9999;
+    position: absolute;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    height: 80vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
 .stratagem_scoreboard{
     position: absolute;
     display: none;
@@ -80,7 +93,7 @@ title{
     left: 50%;
     transform: translate(-50%, -50%);
 }
-.end_score{
+.score_time{
     color: yellow;
 }
 .discription{

@@ -36,9 +36,26 @@
                 <h1 class="discription">
                     조작 : 방향키 or WASD<br>
                 </h1>
+                <div class="stratagem_score">
+                    <h1 class="score_text">Score</h1>
+                    <h3 class="score_time">error</h3>
+                    <div class="input_score">
+                        <div class="save_chack">
+                            <input class="input_score_checkbox" type="checkbox" id="input_score_checkbox" name="input_score_checkbox">
+                            <label for="input_score_checkbox">자동입력</label>
+                        </div>
+                        <div class="input_name">
+                            <input class="input_score_name" id="input_score_name" type="text" placeholder = "이름을 입력하세요">
+                            <button class="input_score_button" id="input_score_button" type="button">등록</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="stratagem_scoreboard">
-                    <h1 class="end_text">Score</h1>
-                    <h3 class="end_score">error</h3>
+                    <h1 class="scoreboard_text">Global Scores</h1>
+                    {% for score in scores %}
+                    <div class="global_score_name">{{ score.name }} </div>
+                    <div class="global_score_time">{{ score.score }} </div>
+                    {% endfor %}
                 </div>
                 <div class="stratagem_container">
                     <ul class="stratagem_cards">
