@@ -42,6 +42,25 @@ document.addEventListener('DOMContentLoaded', function() {
     function simulateKeyEvent(key) {
         document.dispatchEvent(new KeyboardEvent('keydown', {'key': key}));
     }
+
+    //input_score_button
+    var input_score_button = document.getElementById('input_score_button');
+    if (input_score_button) {
+        input_score_button.addEventListener('click', ()=>{
+            const score = document.querySelector('.stratagem_score');
+            score.style.display = 'none';
+            const textInputValue = document.getElementById('input_score_name').value;
+            const checkboxIsChecked = document.getElementById('input_score_checkbox').checked;
+            const scoreboard = document.querySelector('.stratagem_scoreboard');
+            scoreboard.style.display = 'flex';
+            etTimeout(function() {
+                location.reload();
+            }, 5000);
+            scoreboard.innerHTML = `입력된 텍스트: ${textInputValue} <br> 체크박스 상태: ${checkboxIsChecked ? '체크됨' : '체크 안 됨'}`;
+        });
+    } else {
+        console.error('Input score button not found');
+    }
 });
 
 let typecommand = "";
@@ -172,27 +191,8 @@ document.addEventListener('keydown', async function(event) {
                 //점수창 표시 활성화
                 const score = document.querySelector('.stratagem_score');
                 score.style.display = 'flex';
-                // setTimeout(function() {
-                //     location.reload();
-                // }, 5000);
             }
         }, 501);
     }
 });
 
-var input_score_button = document.getElementById('input_score_button');
-input_score_button.addEventListener('click', ()=>{
-    const score = document.querySelector('.stratagem_score');
-    score.style.display = 'none';
-    // 텍스트 입력 필드에서 값을 가져옵니다.
-    const textInputValue = document.getElementById('input_score_name').value;
-
-    // 체크박스의 상태를 확인합니다.
-    const checkboxIsChecked = document.getElementById('input_score_checkbox').checked;
-
-    const scoreboard = document.querySelector('.stratagem_scoreboard');
-    scoreboard.style.display = 'flex';
-
-    // 결과를 출력합니다.
-    scoreboard.innerHTML = `입력된 텍스트: ${textInputValue} <br> 체크박스 상태: ${checkboxIsChecked ? '체크됨' : '체크 안 됨'}`;
-});
