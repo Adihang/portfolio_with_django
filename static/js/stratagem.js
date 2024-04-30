@@ -53,10 +53,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const checkboxIsChecked = document.getElementById('input_score_checkbox').checked;
             const scoreboard = document.querySelector('.stratagem_scoreboard');
             scoreboard.style.display = 'flex';
-            etTimeout(function() {
+            scoreboard.innerHTML = `입력된 텍스트: ${textInputValue} <br> 체크박스 상태: ${checkboxIsChecked ? '체크됨' : '체크 안 됨'}`;
+            setTimeout(function() {
                 location.reload();
             }, 5000);
-            scoreboard.innerHTML = `입력된 텍스트: ${textInputValue} <br> 체크박스 상태: ${checkboxIsChecked ? '체크됨' : '체크 안 됨'}`;
         });
     } else {
         console.error('Input score button not found');
