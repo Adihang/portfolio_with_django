@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const textInputValue = document.getElementById('input_score_name').value;
             const checkboxIsChecked = document.getElementById('input_score_checkbox').checked;
             if (textInputValue.length > 0){
-                fetch('/add_score/', { // Django URL 경로에 맞게 수정하세요.
+                fetch('add_score/', { // Django URL 경로에 맞게 수정하세요.
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
