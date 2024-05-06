@@ -29,7 +29,9 @@ ALLOWED_HOSTS = [
     'www.hanplanet.com',
     'hanplanet.com',
     'localhost',
-    '127.0.0.1'
+    '127.0.0.1',
+    'ec2-3-36-38-48.ap-northeast-2.compute.amazonaws.com',
+    '3.36.38.48'
     ]
 
 
@@ -132,3 +134,5 @@ STATICFILES_DIRS = [BASE_DIR / 'static',]
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CSRF_COOKIE_SECURE = True
