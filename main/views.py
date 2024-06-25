@@ -32,6 +32,10 @@ def ProjectComment_create(request, project_id):
     project.project_comment_set.create(content=request.POST.get('content'), create_date=timezone.now())
     return redirect('main:ProjectDetail', project_id=project.id)
 
+def Salvations_Edge_4(request):
+    context = dict()
+    return render(request, 'fun/Salvations_Edge_4.html', context)
+
 def Stratagem_Hero_page(request):
     context = dict()
     all_stratagems = list(Stratagem.objects.all())

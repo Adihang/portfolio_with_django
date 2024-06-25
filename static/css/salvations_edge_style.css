@@ -1,0 +1,66 @@
+body {
+    font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
+    color: white;
+    background-color: rgb(54, 54, 54)
+}
+title{
+    padding-left: 10px;
+}
+ul{
+    list-style-type: none;
+    list-style: none;
+    }
+.title{
+    display: flex;
+    margin: 10px;
+    justify-content: center;
+    align-items: center;
+    align-content: center;;
+}
+.title_text{
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.content{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 85vh;
+    position: relative;
+    color: white;
+    text-align: center;
+    flex-direction: column;
+}
+.main_title{
+    color: white;
+}
+.lowtext{
+    padding-left: 35px;
+}
+hr{
+    border-width: 2px;
+    color: white;
+}
+.select_team{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.select_ico{
+    display: none;
+    align-items: center;
+}
+.select_num{
+    display: none;
+    align-items: center;
+}
+.select_bool{
+    display: none;
+    align-items: center;
+}
+.main_text{
+    text-align: center;
+    cursor: pointer;
+    color: yellow;
+}
