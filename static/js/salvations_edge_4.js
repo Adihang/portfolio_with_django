@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainTitle.textContent = '외부조 계산기로 이동합니다.';
                 setTimeout(function() {
                     window.location.href = 'https://verity.d2atlas.com/';
-                }, 2000);
+                }, 500);
             } else if (clickedId === 'team_in') {
                 select_team.style.display = 'none';
                 console.log('내부조');
