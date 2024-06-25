@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const select_ico = document.querySelector('.select_ico');
             const select_num = document.querySelector('.select_num');
             const select_bool = document.querySelector('.select_bool');
+            const description = document.querySelector('.description');
             const mainTitle = document.getElementById('main_title1');
             const mainTitle2 = document.getElementById('main_title2');
             // 클릭된 요소의 id에 따라 다른 동작을 수행합니다.
@@ -34,22 +35,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
             } else if (clickedId === 'ico_t') {
                 mainTitle.textContent = '잭팟인 팀원의 숫자는?';
-                mainTitle2.textContent= '잭팟은 본인의 ';
                 ico = "t";
                 select_ico.style.display = 'none';
                 select_num.style.display = 'flex';
+                description.style.display = 'flex';
                 console.log('세모');
             } else if (clickedId === 'ico_s') {
                 mainTitle.textContent = '잭팟인 팀원의 숫자는?';
                 ico = "s";
                 select_ico.style.display = 'none';
                 select_num.style.display = 'flex';
+                description.style.display = 'flex';
                 console.log('네모');
             } else if (clickedId === 'ico_r') {
                 mainTitle.textContent = '잭팟인 팀원의 숫자는?';
                 ico = "r";
                 select_ico.style.display = 'none';
                 select_num.style.display = 'flex';
+                description.style.display = 'flex';
                 console.log('동그라미');
 
 
@@ -66,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 jackpot_num = 0;
                 select_num.style.display = 'none';
+                description.style.display = 'none';
                 console.log('zero');
             } else if (clickedId === 'one') {
                 mainTitle.textContent = '나는 잭팟인가요?';
@@ -74,25 +78,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 select_bool.style.display = 'flex';
                 console.log('one');
             } else if (clickedId === 'three') {
-                mainTitle.textContent = '문양을 다른 팀원에게 하나씩 나누어 주세요';
+                mainTitle.textContent = '문양을 다른 팀원에게 하나씩 나누어 전달';
                 jackpot_num = 3;
                 select_num.style.display = 'none';
+                description.style.display = 'none';
                 console.log('three');
 
 
             } else if (clickedId === 'yes') {
-                mainTitle.textContent = '문양을 다른 팀원에게 하나씩 나누어 주세요';
+                mainTitle.textContent = '문양을 다른 팀원에게 하나씩 나누어 전달';
                 select_bool.style.display = 'none';
+                description.style.display = 'none';
                 console.log('네');
             } else if (clickedId === 'no') {
+                mainTitle2.textContent= '나머지 하나를 잭팟인 팀원에게 전달';
                 if(ico == "t"){
-                    mainTitle.textContent = '△를 잭팟이 아닌 팀원에게, 나머지 하나를 잭팟인 팀원에게 주세요';
+                    mainTitle.textContent = '△를 잭팟이 아닌 팀원에게,';
                 } else if(ico == "s"){
-                    mainTitle.textContent = '□를 잭팟이 아닌 팀원에게, 나머지 하나를 잭팟인 팀원에게 주세요';
+                    mainTitle.textContent = '□를 잭팟이 아닌 팀원에게,';
                 } else if(ico == "r"){
-                    mainTitle.textContent = '○를 잭팟이 아닌 팀원에게, 나머지 하나를 잭팟인 팀원에게 주세요';
+                    mainTitle.textContent = '○를 잭팟이 아닌 팀원에게,';
                 }
                 select_bool.style.display = 'none';
+                description.style.display = 'none';
                 console.log('아니오');
             }
         });

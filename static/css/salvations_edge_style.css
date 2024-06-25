@@ -64,3 +64,6 @@ hr{
     cursor: pointer;
     color: yellow;
 }
+.description{
+    display: none;
+}
