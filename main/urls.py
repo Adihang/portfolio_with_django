@@ -10,6 +10,7 @@ urlpatterns = [
     path('', views.none, name='none'),
     path('portfolio/', views.main, name='main'),
     path('project/<int:project_id>/', views.ProjectDetail, name='ProjectDetail'),
+    path('Salvations_Edge_4/', views.Salvations_Edge_4, name='Salvations_Edge_4'),
     path('Stratagem_Hero/', views.Stratagem_Hero_page, name='Stratagem_Hero'),
     path('Stratagem_Hero/Scoreboard/', views.Stratagem_Hero_Scoreboard_page, name='Stratagem_Hero_Scoreboard'),
     path('Stratagem_Hero/add_score/', views.add_score, name='add_score'),
