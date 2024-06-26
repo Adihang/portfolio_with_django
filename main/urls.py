@@ -15,5 +15,5 @@ urlpatterns = [
     path('Stratagem_Hero/Scoreboard/', views.Stratagem_Hero_Scoreboard_page, name='Stratagem_Hero_Scoreboard'),
     path('Stratagem_Hero/add_score/', views.add_score, name='add_score'),
     path('comment/create/<int:project_id>/', views.ProjectComment_create, name='ProjectComment_create')
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
 urlpatterns += staticfiles_urlpatterns()
