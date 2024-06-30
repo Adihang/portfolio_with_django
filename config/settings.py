@@ -39,11 +39,11 @@ ALLOWED_HOSTS = [
     ]
 
 CORS_ORIGIN_WHITELIST = [
-    'www.hanplanet.com',
-    'hanplanet.com',
-    'localhost',
-    '127.0.0.1',
-    'amazonaws.com'
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://amazonaws.com",
+    "https://hanplanet.com",
+    "https://www.hanplanet.com"
 ]
 # Application definition
 
