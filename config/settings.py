@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
 from pathlib import Path
+import string, random
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,8 +20,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
+
+# Get ascii Characters numbers and punctuation (minus quote characters as they could terminate string).
+chars = ''.join([string.ascii_letters, string.digits, string.punctuation]).replace('\'', '').replace('"', '').replace('\\', '')
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-+44y678!(-$11*x4^8$-)m(rx0yfkzernw!w^52q2y6s1c740i"
+SECRET_KEY = ''.join([random.SystemRandom().choice(chars) for i in range(50)])
+print(SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
