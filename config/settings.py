@@ -30,9 +30,7 @@ ALLOWED_HOSTS = [
     'hanplanet.com',
     'localhost',
     '127.0.0.1',
-    'ec2-3-36-38-48.ap-northeast-2.compute.amazonaws.com',
-    '.amazonaws.com',
-    '3.36.38.48'
+    'amazonaws.com'
     ]
 
 
