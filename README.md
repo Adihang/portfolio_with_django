@@ -15,4 +15,5 @@ DEBUG = False
 ```
 pip3 install -r requirements.txt
 ```
-### git push 되었을 경우, github action 을 통해 ec2 서버에 자동으로 git pull 이 작동합니다.
+***
+### When a push occurs, an automatic pull is executed on the EC2 server through GitHub Actions.
