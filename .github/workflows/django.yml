@@ -12,27 +12,45 @@ env:
   DEPLOYMENT_GROUP_NAME: github_action
   
 jobs:
-  build:
-
-    runs-on: ubuntu-22.04
-    strategy:
-      max-parallel: 4
-      matrix:
-        python-version: [3.11]
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest # 실행될 인스턴스 OS와 버전
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    - name: Run Tests
-      run: |
-        python manage.py test
+      - name: excuting remote ssh commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_IP }} # 인스턴스 IP
+          username: ${{ secrets.REMOTE_USER }} # 우분투 아이디
+          key: ${{ secrets.REMOTE_PRIVATE_KEY }} # ec2 instance pem key
+          port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
+          script: | # 실행할 스크립트
+            cd /srv/portfolio_with_django/
+            pkill -f "python3 manage.py runserver"
+            git reset --hard
+            git pull
+            nohup python3 manage.py runserver 0:8443 --insecure &
+  # build:
+
+  #   runs-on: ubuntu-22.04
+  #   strategy:
+  #     max-parallel: 4
+  #     matrix:
+  #       python-version: [3.11]
+
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #   - name: Set up Python ${{ matrix.python-version }}
+  #     uses: actions/setup-python@v3
+  #     with:
+  #       python-version: ${{ matrix.python-version }}
+  #   - name: Install Dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       pip install -r requirements.txt
+  #   - name: Run Tests
+  #     run: |
+  #       python manage.py test
 
         
     # - name: Make Zip File
