@@ -20,7 +20,7 @@ jobs:
       - name: excuting remote ssh commands
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.REMOTE_IP }} # 인스턴스 IP
+          host: ${{ secrets.REMOTE_IP }} # 인스턴스 IP test
           username: ${{ secrets.REMOTE_USER }} # 우분투 아이디
           key: ${{ secrets.REMOTE_PRIVATE_KEY }} # ec2 instance pem key
           port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
