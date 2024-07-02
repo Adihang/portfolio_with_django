@@ -37,14 +37,6 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'amazonaws.com'
     ]
-
-CORS_ORIGIN_WHITELIST = [
-    "http://127.0.0.1:8000",
-    "http://localhost:8000",
-    "http://amazonaws.com",
-    "https://hanplanet.com",
-    "https://www.hanplanet.com"
-]
 # Application definition
 
 INSTALLED_APPS = [
@@ -55,7 +47,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'corsheaders',
 ]
 
 MIDDLEWARE = [
@@ -66,9 +57,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'corsheaders.middleware.CorsMiddleware',
 ]
-CORS_ORIGIN_ALLOW_ALL = True
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
