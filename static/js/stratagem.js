@@ -8,8 +8,6 @@ function getCSRFToken() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const scoreboard = document.querySelector('.stratagem_scoreboard');
-    scoreboard.style.display = 'none';
     //스트라타잼 아이콘 생성
     const stratagem_commands = document.querySelectorAll('.stratagem_command');
     stratagem_commands.forEach(function(commandDiv) {

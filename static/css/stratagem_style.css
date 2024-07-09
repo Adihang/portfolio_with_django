@@ -4,9 +4,31 @@ body {
     background-color: rgb(54, 54, 54)
 }
 
+.stratagem_content{
+    height: 85vh;
+    position: relative;
+}
 @media (min-width: 900px) {
-    .arrow { display: none;
-    } 
+    .stratagem_container {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        height: 80vh;
+        width: 100vw; 
+    }  
+    .stratagem_cards {
+        position: absolute;
+        justify-content: center;
+        align-items: center;
+        align-content: center;
+        height: 80vh;
+        width: 100vw;
+        overflow-x: auto;
+    }
+    .arrow_keypad {
+        display: none;
+    }
     .stratagem_icon{
         height: 50px;
         width: 50px;
@@ -19,8 +41,36 @@ body {
     }  
 }
 @media (max-width: 899px) {
-    .arrow {position: absolute; width: 60px;height: 60px; transform: translate(-50%, -50%);  opacity: 0.5; background-size: contain;
-    } 
+    .stratagem_container {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        height: 50vh;
+        width: 100vw; 
+    }  
+    .stratagem_content{
+        height: 50vh;
+        position: relative;
+    }
+    .stratagem_cards {
+        position: absolute;
+        justify-content: center;
+        align-items: center;
+        align-content: center;
+        height: 50vh;
+        width: 100vw;
+        overflow-x: auto;
+    }
+    .arrow_keypad {
+        display: flex;
+        flex-direction: column; /* 자식 요소를 세로 방향으로 정렬 */
+        justify-content: center;
+        align-items: center;
+        align-content: center;
+        height: 20vh;
+        width: 100vw;
+    }
     .stratagem_icon{
         height: 30px;
         width: 30px;
@@ -39,36 +89,55 @@ body {
 title{
     padding-left: 10px;
 }
-.stratagem_container {
-    position: relative;
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-    height: 80vh;
-    width: 100vw; 
-}  
+
 .stratagem_hr{
     border-width: 2px;
     color: white;
 }
-.arrow-top {top: 78%;left: 47%; background-image: url('/media/icon/arrow5.png');
+.arrow {
+    margin: 10px;
+    width: 60px;
+    height: 60px;
+    background-size: contain;
+}
+.row {
+    display: flex; /* 각 행을 가로 방향으로 정렬 */
+    justify-content: center;
+    width: 100%; /* 부모 요소의 전체 너비 사용 */
+}
+.row-top {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+.row-bottom {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+} 
+.arrow-top {
+    order: -1;
+    background-image: url('/media/icon/arrow5.png');
 }  
   
-.arrow-bottom {bottom: 0;left: 47%; background-image: url('/media/icon/arrow2.png');
+.arrow-bottom {
+    order: 0;
+    background-image: url('/media/icon/arrow2.png');
 }  
   
-.arrow-left {top: 85%;left: 35%; background-image: url('/media/icon/arrow1.png');
+.arrow-left {
+    order: 0;
+    background-image: url('/media/icon/arrow1.png');
 }  
   
-.arrow-right {top: 85%;right: 25%; background-image: url('/media/icon/arrow3.png');
+.arrow-right {
+    order: 0;
+    background-image: url('/media/icon/arrow3.png');
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
 }
-.stratagem_content{
-    height: 85vh;
-    position: relative;
-}
+
 .global_score{
     display: flex;
     margin: 5px;
@@ -94,16 +163,9 @@ title{
     transform: translate(-50%, -50%);
 }
 .stratagem_scoreboard{
-    position: absolute;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    align-content: center;
     height: 80vh;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
 }
 .score_time{
     color: yellow;
@@ -115,21 +177,13 @@ title{
     justify-content: center;
     align-items: center;
     align-content: center;
-    height: 80vh;
+    height: 30vh;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     color: rgb(129, 129, 129);
 }
-.stratagem_cards {
-    position: absolute;
-    justify-content: center;
-    align-items: center;
-    align-content: center;
-    height: 80vh;
-    width: 100vw;
-    overflow-x: auto;
-}
+
 .stratagem_card{
     width: calc(100% - 20px);
     padding: 5px;

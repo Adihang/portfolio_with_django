@@ -51,13 +51,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="stratagem_scoreboard">
-                    <h1 class="scoreboard_text">Global Scores</h1>
-                    {% for score in scores %}
-                    <div class="global_score_name">{{ score.name }} </div>
-                    <div class="global_score_time">{{ score.score }} </div>
-                    {% endfor %}
-                </div>
                 <div class="stratagem_container">
                     <ul class="stratagem_cards">
                         {% for stratagem in stratagems %}
@@ -70,11 +63,18 @@
                         </li>
                         {% endfor %}
                     </ul>
+                    <hr class="stratagem_hr">
+                </div>
+            </div>
+            <div class="arrow_keypad">
+                <div class="row row-top">
                     <div class="arrow arrow-top"></div>
-                    <div class="arrow arrow-bottom"></div>
+                </div>
+                <div class="row row-bottom">
                     <div class="arrow arrow-left"></div>
+                    <div class="arrow arrow-bottom"></div>
                     <div class="arrow arrow-right"></div>
-                </div>  
+                </div>
             </div>
             <hr class="stratagem_hr">
         </div>
