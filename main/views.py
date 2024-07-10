@@ -36,6 +36,10 @@ def Salvations_Edge_4(request):
     context = dict()
     return render(request, 'fun/Salvations_Edge_4.html', context)
 
+def Vow_of_the_Disciple(request):
+    context = dict()
+    return render(request, 'fun/Vow_of_the_Disciple.html', context)
+
 def Stratagem_Hero_page(request):
     context = dict()
     all_stratagems = list(Stratagem.objects.all())

@@ -92,3 +92,16 @@ class Stratagem_Hero_Score(models.Model):
                 existing_score.score = self.score
                 return existing_score.save(*args, **kwargs)
         super(Stratagem_Hero_Score, self).save(*args, **kwargs)
+        
+        
+def upload_Disciple_icon(instace: "Project", filename: str) -> str:
+    return make_new_path(
+        path_ext=filename,
+        dirname=f"uploads/contents/disciple_icon",
+        new_filename=str(uuid.uuid4().hex),
+    )
+    
+class Disciple_icon(models.Model):
+    name = models.CharField('이름', max_length=200)
+    icon = models.FileField("아이콘", upload_to=upload_Disciple_icon)
+    name = models.CharField('오답', max_length=200)
