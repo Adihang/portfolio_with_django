@@ -28,6 +28,8 @@ jobs:
             cd /srv/portfolio_with_django/
             git reset --hard
             git pull
+            pkill -f "python3 manage.py runserver"
+            nohup python3 manage.py runserver 0:8443 --insecure &
   # build:
 
   #   runs-on: ubuntu-22.04
