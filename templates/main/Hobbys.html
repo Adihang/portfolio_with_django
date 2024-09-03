@@ -1,20 +1,13 @@
 <section class="hobbys">
     <div class="head">
         <div class="title">
-            <h3><b>취미생활</b></h3>
-            <div class = 'hobbys_subtitle'>건강한 신체에서 건강한 코드가 나옵니다.</div>
+            <h3><b>3D설계</b></h3>
+            <div class = 'hobbys_subtitle'>하드웨어 설계도 직접 해보면 재미있지요</div>
         </div>
     </div>
-    <cards class="hobby_cards">
-        {% for hobby in hobbys %}
-        <hr>
-        <li class="hobby_card">
-            <div class="hobby_card_head">
-                <h5 class="hobby_card_title"><b>{{ hobby.title }}</b></h5>
-            </div>
-            <img class="hobby_card_img" src="{{ hobby.banner_img.url }}"/>
-            <div class="hobby_card_text">{{ hobby.content }}</div>
-        </li>
-        {% endfor %}
-    </cards>
+    <div class="hobby_card">
+        <a href="www.thingiverse.com/hanbyel/designs">
+            <img class="hobby_card_img hover-dark" src="/media/hobbys_title_img.png">
+        </a>
+    </div>
 </section>
