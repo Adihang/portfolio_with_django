@@ -35,7 +35,8 @@ ALLOWED_HOSTS = [
     'hanplanet.com',
     'localhost',
     '127.0.0.1',
-    'amazonaws.com'
+    'amazonaws.com',
+    '52.79.71.20'
     ]
 # Application definition
 
