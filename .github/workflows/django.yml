@@ -30,6 +30,8 @@ jobs:
             cd ~/projects/portfolio_with_django
             git reset --hard
             git pull
+            pkill -9 gunicorn
+            nohup gunicorn --bind 0:8443 config.wsgi:application
   # build:
 
   #   runs-on: ubuntu-22.04
