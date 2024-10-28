@@ -1,0 +1,104 @@
+body {
+    font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
+    color: white;
+    background-color: rgb(54, 54, 54)
+}
+title{
+    padding-left: 10px;
+}
+ul{
+    list-style-type: none;
+    list-style: none;
+    }
+.title{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+}
+.title_text{
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.main_title{
+    color: white;
+}
+.lowtext{
+    padding-left: 35px;
+}
+hr{
+    border-width: 2px;
+    color: white;
+}
+.select_team{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.select_ico{
+    display: none;
+    align-items: center;
+}
+.select_num{
+    display: none;
+    align-items: center;
+}
+.select_bool{
+    display: none;
+    align-items: center;
+}
+.main_text{
+    text-align: center;
+    cursor: pointer;
+    color: yellow;
+}
+.description{
+    display: none;
+}
+@media (max-width: 899px) {
+    .title_img_big {
+        display: none; /* 기본 이미지를 숨김 */
+        width: 100%; /* 이미지 너비를 페이지의 너비에 맞춤 */
+        height: auto; /* 이미지 비율을 유지하여 높이를 자동 조절 */
+    }
+    .title_img_small {
+        display: block; /* 작은 화면용 이미지를 표시 */
+        width: 100%; /* 이미지 너비를 페이지의 너비에 맞춤 */
+        height: auto; /* 이미지 비율을 유지하여 높이를 자동 조절 */
+    }
+    .content{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 40vh;
+        position: relative;
+        color: white;
+        text-align: center;
+        flex-direction: column;
+    }
+}
+@media (min-width: 900px) {
+    .title_img_big {
+        display: block;
+        width: 100%; /* 이미지 너비를 페이지의 너비에 맞춤 */
+        height: auto; /* 이미지 비율을 유지하여 높이를 자동 조절 */
+    }
+    .title_img_small {
+        display: none;
+        width: 100%; /* 이미지 너비를 페이지의 너비에 맞춤 */
+        height: auto; /* 이미지 비율을 유지하여 높이를 자동 조절 */
+    }
+    .content{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 70vh;
+        position: relative;
+        color: white;
+        text-align: center;
+        flex-direction: column;
+    }
+}

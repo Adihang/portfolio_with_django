@@ -1,0 +1,220 @@
+body {
+    font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
+    color: white;
+    background-color: rgb(54, 54, 54)
+}
+
+.stratagem_content{
+    height: 85vh;
+    position: relative;
+}
+@media (min-width: 900px) {
+    .stratagem_container {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        height: 80vh;
+        width: 100vw; 
+    }  
+    .stratagem_cards {
+        position: absolute;
+        justify-content: center;
+        align-items: center;
+        align-content: center;
+        height: 80vh;
+        width: 100vw;
+        overflow-x: auto;
+    }
+    .arrow_keypad {
+        display: none;
+    }
+    .stratagem_icon{
+        height: 50px;
+        width: 50px;
+        margin-right: 5px;
+        border-radius: 10%;
+    }
+    .stratagem_name {
+        font-size: 20px;
+        margin-right: 5px;
+    }  
+}
+@media (max-width: 899px) {
+    .stratagem_container {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        height: 50vh;
+        width: 100vw; 
+    }  
+    .stratagem_content{
+        height: 50vh;
+        position: relative;
+    }
+    .stratagem_cards {
+        position: absolute;
+        justify-content: center;
+        align-items: center;
+        align-content: center;
+        height: 50vh;
+        width: 100vw;
+        overflow-x: auto;
+    }
+    .arrow_keypad {
+        display: flex;
+        flex-direction: column; /* 자식 요소를 세로 방향으로 정렬 */
+        justify-content: center;
+        align-items: center;
+        align-content: center;
+        height: 20vh;
+        width: 100vw;
+    }
+    .stratagem_icon{
+        height: 30px;
+        width: 30px;
+        margin-right: 2px;
+        border-radius: 10%;
+    }
+    .stratagem_name {
+        font-size: 15px;
+        margin-right: 5px;
+    }  
+    .commend_arrow{
+        height: 22px;
+        width: 22px;
+    }
+}
+title{
+    padding-left: 10px;
+}
+
+.stratagem_hr{
+    border-width: 2px;
+    color: white;
+}
+.arrow {
+    margin: 10px;
+    width: 60px;
+    height: 60px;
+    background-size: contain;
+}
+.row {
+    display: flex; /* 각 행을 가로 방향으로 정렬 */
+    justify-content: center;
+    width: 100%; /* 부모 요소의 전체 너비 사용 */
+}
+.row-top {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+.row-bottom {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+} 
+.arrow-top {
+    order: -1;
+    background-image: url('/media/icon/arrow5.png');
+}  
+  
+.arrow-bottom {
+    order: 0;
+    background-image: url('/media/icon/arrow2.png');
+}  
+  
+.arrow-left {
+    order: 0;
+    background-image: url('/media/icon/arrow1.png');
+}  
+  
+.arrow-right {
+    order: 0;
+    background-image: url('/media/icon/arrow3.png');
+}  
+  
+.content {margin-top: 0px;margin-left: 0px;  
+}
+
+.global_score{
+    display: flex;
+    margin: 5px;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+}
+.global_score_time{
+    color: yellow;
+    margin-left: 5px;
+}
+.stratagem_score{
+    z-index: 9999;
+    position: absolute;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    height: 80vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.stratagem_scoreboard{
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+}
+.score_time{
+    color: yellow;
+}
+.discription{
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    height: 30vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgb(129, 129, 129);
+}
+
+.stratagem_card{
+    width: calc(100% - 20px);
+    padding: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+}
+.stratagem_card_title {
+    max-width: calc(100vw);
+    display: flex;
+    align-items: center;
+}
+
+
+ul{
+    list-style-type: none;
+    list-style: none;
+    }
+.title{
+    display: flex;
+    margin: 10px;
+    justify-content: center;
+    align-items: center;
+    align-content: center;;
+}
+.title_text{
+    padding-top: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.lowtext{
+    padding-left: 35px;
+}
