@@ -39,6 +39,7 @@ body {
         padding-left: 30px;
         padding-right: 30px;
         overflow: hidden;
+        background-color: white;
     }
     .main_text {
         flex: 1; /* 남은 공간을 모두 차지하도록 설정하여 오른쪽 정렬됨 */
