@@ -16,7 +16,7 @@ def main(request):
     context['careers'] = Career.objects.all()
     for i in range(len(context['careers'])):
         context['careers'][i].content = markdown.markdown(context['careers'][i].content)
-    context['projects'] = Project.objects.all()
+    context['projects'] = Project.objects.all().order_by('-create_date')
     context['hobbys'] = Hobby.objects.all()
     return render(request, 'main.html', context)
 def ProjectDetail(request, project_id):
