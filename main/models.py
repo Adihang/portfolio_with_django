@@ -28,8 +28,12 @@ class Project(models.Model):
     tags =  models.ManyToManyField(Project_Tag, verbose_name="태그")
     content = models.TextField('내용')
     create_date = models.DateField('날짜')
+    
     class Meta:
         ordering = ['order']
+        
+    def get_absolute_url(self):
+        return f'/project/{self.id}/'
 
 
 class Project_Comment(models.Model):

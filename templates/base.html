@@ -21,8 +21,11 @@
     <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
     <script src="{% static 'js/bootstrap.min.js' %}" type="text/javascript"></script>
     <script src="{% static 'js/script.js' %}" type="text/javascript"></script>
-    <title>
-        Hanbyel's Portfolio</title>
+    <!-- 채팅 위젯 스타일 -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/chat_widget.css' %}">
+    <title>Hanbyel's Portfolio</title>
+    <!-- CSRF Token for AJAX -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
     <!-- 네비게이션바 -->
@@ -56,5 +59,7 @@
     </nav>
     {% block content %}
     {% endblock %}
+    <!-- 채팅 위젯 -->
+    <script src="{% static 'js/chat_widget.js' %}" type="text/javascript"></script>
 </body>
 </html>
