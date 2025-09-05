@@ -24,10 +24,14 @@ jobs:
           username: ${{ secrets.REMOTE_USER }} # 우분투 아이디
           key: ${{ secrets.REMOTE_PRIVATE_KEY }} # ec2 instance pem key
           port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
-          script: | # 실행할 스크립트
+          script: |
             cd ~/portfolio_with_django
-            git reset --hard
-            git pull
+            git reset --hard && git pull
+            source venv/bin/activate
+            pip install -r requirements.txt
+            python manage.py collectstatic --noinput
+            python manage.py migrate --noinput
+            sudo systemctl restart gunicorn
   # build:
 
   #   runs-on: ubuntu-22.04
