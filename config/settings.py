@@ -211,3 +211,18 @@ CSRF_COOKIE_SECURE = True
 #         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
 #     }
 # }
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+
+# config/settings.py
+
+# 1) HTTPS에서 CSRF 신뢰 도메인 지정 (Django 4+는 스킴 포함해야 함)
+CSRF_TRUSTED_ORIGINS = [
+    "https://hanplanet.com",
+    "https://www.hanplanet.com",
+]
+
+# 2) (선택) 루트/WWW를 모두 쓰는 경우 세션 쿠키를 상위 도메인으로 고정
+#    - www에서 로그인 후 hanplanet.com으로 이동해도 세션 유지
+SESSION_COOKIE_DOMAIN = ".hanplanet.com"
