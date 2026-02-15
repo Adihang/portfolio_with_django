@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
+    const initialBotMessage = '안녕하세요! 궁금하신 점이 있으시면 언제든지 물어보세요.';
+    const STORAGE_KEY = 'portfolio_chat_history_v1';
+    const conversationHistory = [];
+
     // 채팅 위젯 요소 생성
     const chatWidget = document.createElement('div');
     chatWidget.className = 'chat-widget';
@@ -8,13 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <button class="chat-toggle">−</button>
         </div>
         <div class="chat-body">
-            <div class="chat-messages" id="chat-messages">
-                <div class="message bot">
-                    <div class="message-content">
-                        안녕하세요! 궁금하신 점이 있으시면 언제든지 물어보세요.
-                    </div>
-                </div>
-            </div>
+            <div class="chat-messages" id="chat-messages"></div>
             <div class="chat-input">
                 <input type="text" id="user-input" placeholder="메시지를 입력하세요..." autocomplete="off">
                 <button id="send-button">
@@ -36,6 +34,49 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+
+    function loadConversationHistory() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+            return parsed
+                .filter(item =>
+                    item &&
+                    (item.role === 'user' || item.role === 'assistant') &&
+                    typeof item.content === 'string' &&
+                    item.content.trim().length > 0
+                )
+                .slice(-30);
+        } catch (error) {
+            console.warn('Failed to load chat history:', error);
+            return [];
+        }
+    }
+
+    function saveConversationHistory() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationHistory.slice(-30)));
+        } catch (error) {
+            console.warn('Failed to save chat history:', error);
+        }
+    }
+
+    function restoreConversationHistory() {
+        const saved = loadConversationHistory();
+        if (saved.length > 0) {
+            saved.forEach(item => {
+                conversationHistory.push(item);
+                addMessage(item.content, item.role === 'assistant' ? 'bot' : 'user', '', false);
+            });
+            return;
+        }
+
+        conversationHistory.push({ role: 'assistant', content: initialBotMessage });
+        addMessage(initialBotMessage, 'bot', '', false);
+        saveConversationHistory();
+    }
 
     // 채팅 토글 기능
     let isChatOpen = false;
@@ -81,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 메시지 추가 함수
-    function addMessage(text, sender, messageId = '') {
+    function addMessage(text, sender, messageId = '', trackHistory = true) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
         if (messageId) {
@@ -134,6 +175,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 메시지가 추가된 후 스크롤을 아래로 이동
         scrollToBottom();
+
+        if (trackHistory) {
+            if (sender === 'user') {
+                conversationHistory.push({ role: 'user', content: text });
+            } else if (sender === 'bot') {
+                conversationHistory.push({ role: 'assistant', content: text });
+            }
+            // Keep only recent history for request payload size.
+            if (conversationHistory.length > 30) {
+                conversationHistory.splice(0, conversationHistory.length - 30);
+            }
+            saveConversationHistory();
+        }
         
         return messageDiv;
     }
@@ -148,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // 로딩 메시지 표시
             const loadingMessageId = 'loading-' + Date.now();
-            addMessage('...', 'bot', loadingMessageId);
+            addMessage('...', 'bot', loadingMessageId, false);
             
             // CSRF 토큰 가져오기
             const csrfToken = getCSRFToken();
@@ -164,7 +218,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({ message: userMessage })
+                body: JSON.stringify({
+                    message: userMessage,
+                    history: conversationHistory.slice(-20)
+                })
             });
             
             if (!response.ok) {
@@ -225,6 +282,9 @@ document.addEventListener('DOMContentLoaded', function() {
             sendMessage();
         }
     });
+
+    // 저장된 대화 복원
+    restoreConversationHistory();
 
     // 채팅창이 닫힌 상태로 시작
 });

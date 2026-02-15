@@ -67,13 +67,6 @@ def add_score(request):
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_LATIN_TOKENS = {
-    "ai", "api", "aws", "bootstrap", "c", "css", "devops", "discord",
-    "django", "docker", "drf", "framework", "gcp", "git", "github",
-    "html", "http", "https", "id", "javascript", "llm", "ms", "ollama",
-    "postgresql", "python", "rest", "rooti", "sqlite", "url", "vscode"
-}
-
 def sanitize_text(text):
     """Remove potentially harmful characters and limit length"""
     if not text:
@@ -90,6 +83,43 @@ def is_valid_message(text):
     # Add more validation rules as needed
     return True
 
+def should_return_github_link(user_message):
+    """Return GitHub link for code-design/style questions."""
+    if not user_message:
+        return False
+    text = user_message.lower().replace(" ", "")
+    design_keywords = [
+        "코드설계", "코딩스타일", "코드스타일", "아키텍처",
+        "구현방식", "설계방식", "어떻게코드", "코드어떻게"
+    ]
+    return any(k in text for k in design_keywords)
+
+def normalize_chat_history(raw_history, current_user_message, max_items=20):
+    """Validate and sanitize client-provided chat history."""
+    normalized = []
+    if not isinstance(raw_history, list):
+        raw_history = []
+
+    for item in raw_history[-max_items:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = sanitize_text(item.get("content", ""))
+        if role == "bot":
+            role = "assistant"
+        if role not in ("user", "assistant"):
+            continue
+        if not is_valid_message(content):
+            continue
+        normalized.append({"role": role, "content": content})
+
+    # Ensure latest user message is included once.
+    if current_user_message:
+        if not normalized or normalized[-1].get("role") != "user" or normalized[-1].get("content") != current_user_message:
+            normalized.append({"role": "user", "content": current_user_message})
+
+    return normalized
+
 def has_excessive_foreign_text(text):
     """Detect responses that are not primarily Korean."""
     if not text:
@@ -98,10 +128,12 @@ def has_excessive_foreign_text(text):
     # Hangul and latin counts
     hangul_chars = re.findall(r'[가-힣]', text)
     latin_chars = re.findall(r'[A-Za-z]', text)
-    latin_tokens = [t.lower() for t in re.findall(r'[A-Za-z][A-Za-z+#.-]{1,}', text)]
 
-    # Common non-Korean scripts (Japanese, Chinese, Thai, Cyrillic, Arabic)
-    non_korean_scripts = re.findall(r'[\u3040-\u30FF\u3400-\u9FFF\u0E00-\u0E7F\u0400-\u04FF\u0600-\u06FF]', text)
+    # Common non-Korean scripts (Japanese, Chinese, Thai, Cyrillic, Arabic, Devanagari)
+    non_korean_scripts = re.findall(
+        r'[\u0900-\u097F\u3040-\u30FF\u3400-\u9FFF\u0E00-\u0E7F\u0400-\u04FF\u0600-\u06FF]',
+        text
+    )
 
     # If it contains non-Korean scripts at all, treat as drift.
     if len(non_korean_scripts) > 0:
@@ -111,24 +143,19 @@ def has_excessive_foreign_text(text):
     if len(hangul_chars) == 0 and len(latin_chars) > 0:
         return True
 
-    # Allow only known tech/domain terms. Other latin tokens indicate drift.
-    for token in latin_tokens:
-        if token not in ALLOWED_LATIN_TOKENS:
-            return True
+    # English is allowed in moderation. Detect only when it dominates.
+    if len(hangul_chars) > 0:
+        return len(latin_chars) >= max(120, len(hangul_chars) * 3)
 
-    # If latin text dominates, also treat as drift.
-    return len(latin_chars) >= max(20, len(hangul_chars) // 2)
+    return False
 
-def call_ollama(system_message, user_message):
+def call_ollama(system_message, messages):
     base_url = getattr(settings, "OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     model = getattr(settings, "OLLAMA_MODEL", "llama3.1")
     payload = {
         "model": model,
         "stream": False,
-        "messages": [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message},
-        ],
+        "messages": [{"role": "system", "content": system_message}] + messages,
         # Reduce multilingual drift and random style changes.
         "options": {
             "temperature": 0.2,
@@ -151,6 +178,7 @@ def chat_with_ai(request):
         try:
             data = json.loads(request.body)
             user_message = data.get('message', '')
+            raw_history = data.get('history', [])
             
             # Sanitize and validate user input
             user_message = sanitize_text(user_message)
@@ -161,6 +189,16 @@ def chat_with_ai(request):
             logger.error(f"Invalid request data: {str(e)}")
             return JsonResponse({'error': 'Invalid request data'}, status=400)
         logger.info(f"User message: {user_message}")
+
+        if should_return_github_link(user_message):
+            return JsonResponse({
+                'response': (
+                    "코드 설계/구현 방식은 GitHub 프로젝트에서 확인하실 수 있습니다.\n"
+                    "GitHub: https://github.com/Adihang"
+                )
+            })
+
+        chat_history = normalize_chat_history(raw_history, user_message)
         
         # 캐시에서 웹사이트 컨텍스트 가져오기
         website_context = cache.get('website_context')
@@ -264,7 +302,7 @@ def chat_with_ai(request):
         # Ollama API 호출
         logger.info("Calling AI API...")
         try:
-            bot_response = call_ollama(system_message, user_message)
+            bot_response = call_ollama(system_message, chat_history)
         except Exception as e:
             logger.error(f"Error calling AI API: {str(e)}")
             return JsonResponse({'error': 'Error communicating with AI service'}, status=500)
@@ -286,7 +324,12 @@ def chat_with_ai(request):
             """
             rewrite_user_message = f"아래 문장을 한국어로만 다시 작성하세요:\n\n{bot_response}"
             try:
-                rewritten_response = sanitize_text(call_ollama(rewrite_system_message, rewrite_user_message))
+                rewritten_response = sanitize_text(
+                    call_ollama(
+                        rewrite_system_message,
+                        [{"role": "user", "content": rewrite_user_message}]
+                    )
+                )
                 if rewritten_response:
                     bot_response = rewritten_response
                 if has_excessive_foreign_text(bot_response):
@@ -299,7 +342,12 @@ def chat_with_ai(request):
                     {website_context}
                     """
                     hard_user_message = f"사용자 질문: {user_message}\n한국어로만 간결하게 답변하세요."
-                    second_retry = sanitize_text(call_ollama(hard_system_message, hard_user_message))
+                    second_retry = sanitize_text(
+                        call_ollama(
+                            hard_system_message,
+                            [{"role": "user", "content": hard_user_message}]
+                        )
+                    )
                     if second_retry and not has_excessive_foreign_text(second_retry):
                         bot_response = second_retry
                     else:
