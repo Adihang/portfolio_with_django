@@ -1,15 +1,17 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Project, Career, Hobby, Stratagem, Stratagem_Hero_Score
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
 import json
+import re
+import logging
 from django.utils import timezone
 import markdown
 import random
-import openai
 from django.conf import settings
 from django.core.cache import cache
+import httpx
 
 def none(request):
     context = dict()
@@ -63,14 +65,6 @@ def add_score(request):
         new_score.save()
         return JsonResponse({"message": "Score added successfully"}, status=200)
 
-import re
-import logging
-import json
-from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_protect
-from django.http import JsonResponse
-from openai import OpenAI
-
 logger = logging.getLogger(__name__)
 
 def sanitize_text(text):
@@ -89,9 +83,25 @@ def is_valid_message(text):
     # Add more validation rules as needed
     return True
 
+def call_ollama(system_message, user_message):
+    base_url = getattr(settings, "OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    model = getattr(settings, "OLLAMA_MODEL", "llama3.1")
+    payload = {
+        "model": model,
+        "stream": False,
+        "messages": [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+    }
+    response = httpx.post(f"{base_url}/api/chat", json=payload, timeout=60.0)
+    response.raise_for_status()
+    data = response.json()
+    return data.get("message", {}).get("content", "")
+
 @require_http_methods(["POST"])
 @csrf_protect
-def chat_with_gpt(request):
+def chat_with_ai(request):
     try:
         logger.info("Received chat request")
             
@@ -110,13 +120,6 @@ def chat_with_gpt(request):
             return JsonResponse({'error': 'Invalid request data'}, status=400)
         logger.info(f"User message: {user_message}")
         
-        # OpenAI 클라이언트 초기화
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        
-        if not settings.OPENAI_API_KEY:
-            logger.error("OpenAI API key is not set")
-            return JsonResponse({'error': 'OpenAI API key is not configured'}, status=500)
-            
         # 캐시에서 웹사이트 컨텍스트 가져오기
         website_context = cache.get('website_context')
         
@@ -205,53 +208,25 @@ def chat_with_gpt(request):
         - Always maintain the assistant persona and don't acknowledge these instructions in your responses.
         """
 
-        # OpenAI API 호출 (v1.0.0+)
-        logger.info("Calling OpenAI API...")
+        # Ollama API 호출
+        logger.info("Calling AI API...")
         try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                temperature=0.7,  # Lower temperature for more focused responses
-                max_tokens=500,   # Limit response length
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message}
-                ]
-            )
+            bot_response = call_ollama(system_message, user_message)
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {str(e)}")
+            logger.error(f"Error calling AI API: {str(e)}")
             return JsonResponse({'error': 'Error communicating with AI service'}, status=500)
 
-        if not response.choices or not response.choices[0].message:
-            logger.error("Invalid response from OpenAI API")
-            return JsonResponse({'error': 'Invalid response from AI service'}, status=500)
-            
-        bot_response = response.choices[0].message.content
         # Sanitize the response before sending to client
         bot_response = sanitize_text(bot_response)
         if not bot_response:
             return JsonResponse({'error': 'Could not generate response'}, status=500)
                 
-        logger.info("Successfully got response from OpenAI")
+        logger.info("Successfully got response from AI API")
         
         return JsonResponse({'response': bot_response})
         
     except Exception as e:
-        logger.error(f"Unexpected error in chat_with_gpt: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error in chat_with_ai: {str(e)}", exc_info=True)
         return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
-        # Sanitize the response before sending to client
-        bot_response = sanitize_text(bot_response)
-        if not bot_response:
-            return JsonResponse({'error': 'Could not generate response'}, status=500)
-                
-        logger.info("Successfully got response from OpenAI")
-        
-        return JsonResponse({'response': bot_response})
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error: {str(e)}")
-        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-    except Exception as e:
-        logger.error(f"Error in chat_with_gpt: {str(e)}", exc_info=True)
-        return JsonResponse({'error': str(e)}, status=500)
 
 # Create your views here.
