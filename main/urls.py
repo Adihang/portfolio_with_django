@@ -16,6 +16,6 @@ urlpatterns = [
     path('Stratagem_Hero/Scoreboard/', views.Stratagem_Hero_Scoreboard_page, name='Stratagem_Hero_Scoreboard'),
     path('Stratagem_Hero/add_score/', views.add_score, name='add_score'),
     path('comment/create/<int:project_id>/', views.ProjectComment_create, name='ProjectComment_create'),
-    path('api/chat/', views.chat_with_gpt, name='chat_with_gpt')
+    path('api/chat/', views.chat_with_ai, name='chat_with_ai')
 ]
 urlpatterns += staticfiles_urlpatterns()

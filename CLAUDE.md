@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Django-based portfolio website for showcasing projects, career history, and interactive mini-games. The site includes an AI-powered chatbot for answering portfolio-related questions using OpenAI's GPT API.
+This is a Django-based portfolio website for showcasing projects, career history, and interactive mini-games. The site includes an AI-powered chatbot for answering portfolio-related questions using a local Ollama model.
 
 ## Development Commands
 
@@ -47,9 +47,7 @@ gunicorn config.wsgi:application
 
 ### Settings Management
 - Main settings: `config/settings.py`
-- **Secrets management**: The project uses `config/secrets.json` (git-ignored) for sensitive data
-- Required secrets: `SECRET_KEY`, `OPENAI_API_KEY`
-- `get_secret()` utility function loads from secrets.json with optional defaults
+- Core app settings (`SECRET_KEY`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`) are currently defined directly in code.
 - Set `DEBUG = False` in production (as configured in settings.py)
 
 ### URL Structure
@@ -59,7 +57,7 @@ gunicorn config.wsgi:application
   - `/portfolio/` - Main portfolio page
   - `/project/<id>/` - Project detail pages
   - `/Stratagem_Hero/` - Interactive game
-  - `/api/chat/` - GPT chatbot API endpoint
+  - `/api/chat/` - AI chatbot API endpoint
 
 ### Database Models (`main/models.py`)
 - **Project**: Portfolio projects with tags, markdown content, banner images
@@ -73,8 +71,8 @@ All models use custom upload paths via `config/utils.py:make_new_path()` which g
 
 ### Views and Features (`main/views.py`)
 - **Markdown rendering**: Project and career content is stored as markdown and rendered to HTML using the `markdown` library
-- **Caching**: Website context for GPT chatbot is cached for 24 hours using Django's cache framework
-- **GPT Integration**: `chat_with_gpt()` view provides AI assistant functionality with:
+- **Caching**: Website context for chatbot is cached for 24 hours using Django's cache framework
+- **Chat Integration**: `chat_with_ai()` view provides AI assistant functionality with:
   - Input sanitization (removes HTML/JS, limits to 500 chars)
   - Portfolio context injection (projects, skills, contact info)
   - Prompt injection protection
@@ -107,7 +105,7 @@ All models use custom upload paths via `config/utils.py:make_new_path()` which g
 - CSRF protection enabled
 - Trusted origins configured for HTTPS domains
 - Secure proxy SSL header for load balancer compatibility
-- Input sanitization in GPT chat endpoint
+- Input sanitization in chat endpoint
 - Prompt injection protection in chatbot system prompts
 
 ### Admin Interface
@@ -118,7 +116,7 @@ All models use custom upload paths via `config/utils.py:make_new_path()` which g
 ### Dependencies
 Key packages in requirements.txt:
 - Django 4.2.24
-- openai 1.106.1 (GPT integration)
+- httpx 0.28.1 (Ollama API calls)
 - gunicorn 23.0.0 (production server)
 - Markdown 3.9 (content rendering)
 - Pillow 11.3.0 (image handling)
@@ -130,7 +128,7 @@ When modifying this codebase:
 
 1. **Model changes**: Always run `makemigrations` and `migrate` after modifying models
 2. **Static files**: Run `collectstatic` before deploying if static files changed
-3. **Secrets**: Never commit `config/secrets.json` - use environment variables or secure storage
+3. **Secrets**: Keep production secrets outside the repository and rotate any hardcoded local values before deployment
 4. **Markdown content**: Project and Career content fields expect markdown syntax
 5. **Image uploads**: All uploaded files use UUID-based filenames via `make_new_path()`
 6. **Cache invalidation**: Website context cache persists 24 hours; clear manually if needed
@@ -141,4 +139,4 @@ When modifying this codebase:
 - The project uses a single Django app (`main`) for all functionality
 - GitHub Actions workflow requires EC2 SSH secrets configured in repository settings
 - Media files are served through Django (not recommended for high-traffic production)
-- The GPT chatbot has hardcoded context about the portfolio owner's skills and projects
+- The chatbot has hardcoded context about the portfolio owner's skills and projects

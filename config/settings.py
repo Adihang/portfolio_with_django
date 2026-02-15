@@ -10,49 +10,21 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import os
-import json
 from pathlib import Path
-import string
-import random
-from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Load secrets from secrets.json
-SECRETS_FILE = os.path.join(BASE_DIR, 'config', 'secrets.json')
-
-if os.path.exists(SECRETS_FILE):
-    with open(SECRETS_FILE) as f:
-        secrets = json.load(f)
-else:
-    secrets = {}
-
-def get_secret(setting, default=None):
-    """Get the secret variable or return explicit exception."""
-    try:
-        return secrets[setting]
-    except KeyError:
-        if default is not None:
-            return default
-        error_msg = f'Set the {setting} environment variable in config/secrets.json'
-        raise ImproperlyConfigured(error_msg)
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = get_secret('SECRET_KEY', ''.join(
-    random.SystemRandom().choice(
-        ''.join([string.ascii_letters, string.digits, string.punctuation])
-        .replace('\'', '').replace('"', '').replace('\\', '')
-    ) for _ in range(50)
-))
+SECRET_KEY = "django-insecure-portfolio-local-hardcoded-key-change-me"
 
-# OpenAI API Key
-OPENAI_API_KEY = get_secret('OPENAI_API_KEY')
+# Ollama (local LLM) settings
+OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_MODEL = "llama3.2:latest"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -63,7 +35,10 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     'amazonaws.com',
-    '52.79.71.20'
+    '52.79.71.20',
+    '112.187.212.49',
+    '112.187.212.140',
+    '.trycloudflare.com'
     ]
 # Application definition
 
@@ -202,7 +177,7 @@ LOGGING = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CSRF_COOKIE_SECURE = True
+
 
 # STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -212,8 +187,9 @@ CSRF_COOKIE_SECURE = True
 #     }
 # }
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True
 
 # config/settings.py
 
@@ -221,8 +197,6 @@ SESSION_COOKIE_SECURE = True
 CSRF_TRUSTED_ORIGINS = [
     "https://hanplanet.com",
     "https://www.hanplanet.com",
+    "http://112.187.212.49",
+    "https://112.187.212.49",
 ]
-
-# 2) (선택) 루트/WWW를 모두 쓰는 경우 세션 쿠키를 상위 도메인으로 고정
-#    - www에서 로그인 후 hanplanet.com으로 이동해도 세션 유지
-SESSION_COOKIE_DOMAIN = ".hanplanet.com"
