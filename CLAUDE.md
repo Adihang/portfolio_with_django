@@ -30,14 +30,6 @@ python manage.py createsuperuser
 ```
 
 ### Production Deployment
-The project uses GitHub Actions for automated deployment to EC2. On push to `main`, the workflow:
-1. SSHs into the EC2 instance
-2. Pulls latest code
-3. Installs dependencies
-4. Collects static files
-5. Runs migrations
-6. Restarts gunicorn
-
 Production is served via Gunicorn with the following command:
 ```bash
 gunicorn config.wsgi:application
@@ -137,6 +129,5 @@ When modifying this codebase:
 ## Notes
 
 - The project uses a single Django app (`main`) for all functionality
-- GitHub Actions workflow requires EC2 SSH secrets configured in repository settings
 - Media files are served through Django (not recommended for high-traffic production)
 - The chatbot has hardcoded context about the portfolio owner's skills and projects
