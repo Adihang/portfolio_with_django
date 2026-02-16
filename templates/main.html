@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class = "main">
+<div class="bubble-bg-layer" aria-hidden="true">
+    <canvas id="interactiveBubbleCanvas" class="bubble-bg-canvas"></canvas>
+</div>
+<div class="main main-has-bubble-bg">
     <div class = 'main_banner'>
         <div class = "main_text">
             <h4 class = 'main_title'>

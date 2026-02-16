@@ -28,6 +28,12 @@ def render_markdown_safely(text):
     return mark_safe(rendered_html)
 
 
+def render_markdown_with_raw_html(text):
+    """Render markdown for trusted project detail content while preserving raw HTML."""
+    rendered_html = markdown.markdown(text or "", extensions=MARKDOWN_EXTENSIONS)
+    return mark_safe(rendered_html)
+
+
 def get_client_ip(request):
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded_for:
@@ -76,7 +82,7 @@ def ProjectDetail(request, project_id):
     context = dict()
     context['project'] = get_object_or_404(Project, id=project_id)
     content_md = context['project'].content
-    content_html = render_markdown_safely(content_md)
+    content_html = render_markdown_with_raw_html(content_md)
     context['project'].content = content_html
     return render(request, 'main/ProjectDetail.html', context)
 
