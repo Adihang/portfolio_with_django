@@ -9,37 +9,79 @@ https://docs.djangoproject.com/en/5.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
+import json
 import os
+import sys
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_bool(name, default=False):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name, default_csv):
+    raw = os.environ.get(name, default_csv)
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = env_bool("DJANGO_DEBUG", default=False)
+RUNNING_TESTS = "test" in sys.argv
+DEFAULT_SECURE_TRANSPORT = not DEBUG and not RUNNING_TESTS
+
+
+def load_secret_key():
+    secret_key = os.environ.get("DJANGO_SECRET_KEY")
+    if secret_key:
+        return secret_key
+
+    secrets_path = BASE_DIR / "config" / "secrets.json"
+    if secrets_path.exists():
+        try:
+            with secrets_path.open("r", encoding="utf-8") as file:
+                secrets = json.load(file)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ImproperlyConfigured(
+                "config/secrets.json could not be parsed for SECRET_KEY."
+            ) from exc
+
+        secret_key = secrets.get("SECRET_KEY")
+        if secret_key:
+            return secret_key
+
+    if DEBUG:
+        return "local-development-only-secret-key-change-me-please-2026-rotate-this"
+
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY (or config/secrets.json SECRET_KEY) is required when DEBUG is False."
+    )
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-portfolio-local-hardcoded-key-change-me"
+SECRET_KEY = load_secret_key()
 
 # Ollama (local LLM) settings
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.2:latest"
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:latest")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+ALLOWED_HOSTS = env_list(
+    "DJANGO_ALLOWED_HOSTS",
+    "hanplanet.com,www.hanplanet.com,localhost,127.0.0.1,52.79.71.20,112.187.212.49,112.187.212.140",
+)
 
-ALLOWED_HOSTS = [
-    'www.hanplanet.com',
-    'hanplanet.com',
-    'localhost',
-    '127.0.0.1',
-    'amazonaws.com',
-    '52.79.71.20',
-    '112.187.212.49',
-    '112.187.212.140',
-    '.trycloudflare.com'
-    ]
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://hanplanet.com").rstrip("/")
+DJANGO_SERVE_FILES = env_bool("DJANGO_SERVE_FILES", default=True)
 # Application definition
 
 INSTALLED_APPS = [
@@ -137,7 +179,7 @@ CACHES = {
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 STATIC_URL = "/static/"
@@ -187,16 +229,25 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #     }
 # }
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=DEFAULT_SECURE_TRANSPORT)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", default=DEFAULT_SECURE_TRANSPORT)
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", default=DEFAULT_SECURE_TRANSPORT)
+SECURE_HSTS_SECONDS = int(
+    os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000" if DEFAULT_SECURE_TRANSPORT else "0")
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=(DEFAULT_SECURE_TRANSPORT and SECURE_HSTS_SECONDS > 0),
+)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = os.environ.get("DJANGO_SECURE_REFERRER_POLICY", "same-origin")
+X_FRAME_OPTIONS = "DENY"
 
 # config/settings.py
 
 # 1) HTTPS에서 CSRF 신뢰 도메인 지정 (Django 4+는 스킴 포함해야 함)
-CSRF_TRUSTED_ORIGINS = [
-    "https://hanplanet.com",
-    "https://www.hanplanet.com",
-    "http://112.187.212.49",
-    "https://112.187.212.49",
-]
+CSRF_TRUSTED_ORIGINS = env_list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    "https://hanplanet.com,https://www.hanplanet.com",
+)

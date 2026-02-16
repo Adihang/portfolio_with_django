@@ -1,7 +1,4 @@
-from django.urls import path, include
-from django.conf.urls.static import static
-from django.conf import settings
-from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from django.urls import path
 from . import views
 
 app_name = 'main'
@@ -18,4 +15,3 @@ urlpatterns = [
     path('comment/create/<int:project_id>/', views.ProjectComment_create, name='ProjectComment_create'),
     path('api/chat/', views.chat_with_ai, name='chat_with_ai')
 ]
-urlpatterns += staticfiles_urlpatterns()
