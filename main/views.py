@@ -6,12 +6,58 @@ from django.views.decorators.csrf import csrf_protect
 import json
 import re
 import logging
+import math
 from django.utils import timezone
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 import markdown
 import random
 from django.conf import settings
 from django.core.cache import cache
 import httpx
+
+MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists"]
+SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
+MAX_SCORE_SECONDS = 3600.0
+
+
+def render_markdown_safely(text):
+    """Render markdown while escaping raw HTML input to prevent script injection."""
+    escaped_text = escape(text or "")
+    rendered_html = markdown.markdown(escaped_text, extensions=MARKDOWN_EXTENSIONS)
+    return mark_safe(rendered_html)
+
+
+def get_client_ip(request):
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def is_score_submission_allowed(request, limit=20, window_seconds=60):
+    ip = get_client_ip(request)
+    cache_key = f"stratagem_score_rate:{ip}"
+    count = cache.get(cache_key, 0)
+
+    if count >= limit:
+        return False
+
+    if count == 0:
+        cache.set(cache_key, 1, timeout=window_seconds)
+        return True
+
+    try:
+        cache.incr(cache_key)
+    except ValueError:
+        cache.set(cache_key, count + 1, timeout=window_seconds)
+    return True
+
+
+def build_public_project_url(path):
+    base_url = getattr(settings, "PUBLIC_BASE_URL", "https://hanplanet.com").rstrip("/")
+    return f"{base_url}{path}"
+
 
 def none(request):
     context = dict()
@@ -20,9 +66,9 @@ def none(request):
 
 def main(request):
     context = dict()
-    context['careers'] = Career.objects.all()
-    for i in range(len(context['careers'])):
-        context['careers'][i].content = markdown.markdown(context['careers'][i].content)
+    context['careers'] = list(Career.objects.all())
+    for career in context['careers']:
+        career.content = render_markdown_safely(career.content)
     context['projects'] = Project.objects.all().order_by('-create_date')
     context['hobbys'] = Hobby.objects.all()
     return render(request, 'main.html', context)
@@ -30,7 +76,7 @@ def ProjectDetail(request, project_id):
     context = dict()
     context['project'] = get_object_or_404(Project, id=project_id)
     content_md = context['project'].content
-    content_html = markdown.markdown(content_md)
+    content_html = render_markdown_safely(content_md)
     context['project'].content = content_html
     return render(request, 'main/ProjectDetail.html', context)
 
@@ -58,12 +104,32 @@ def Stratagem_Hero_Scoreboard_page(request):
     context['scores'] = Stratagem_Hero_Score.objects.all()
     return render(request, 'fun/Stratagem_Hero_Scoreboard.html', context)
 
+@require_http_methods(["POST"])
+@csrf_protect
 def add_score(request):
-    if request.method == 'POST':
+    if not is_score_submission_allowed(request):
+        return JsonResponse({"error": "Too many requests. Try again later."}, status=429)
+
+    try:
         data = json.loads(request.body)
-        new_score = Stratagem_Hero_Score(name=data['name'], score=data['score'])
-        new_score.save()
-        return JsonResponse({"message": "Score added successfully"}, status=200)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    name = str(data.get("name", "")).strip()
+    if not SCORE_NAME_PATTERN.fullmatch(name):
+        return JsonResponse({"error": "Invalid name."}, status=400)
+
+    try:
+        score = float(data.get("score"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid score."}, status=400)
+
+    if not math.isfinite(score) or score < 0 or score > MAX_SCORE_SECONDS:
+        return JsonResponse({"error": "Score is out of allowed range."}, status=400)
+
+    new_score = Stratagem_Hero_Score(name=name, score=round(score, 2))
+    new_score.save()
+    return JsonResponse({"message": "Score added successfully"}, status=200)
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +276,13 @@ def chat_with_ai(request):
             try:
                 # 프로젝트 정보
                 projects = Project.objects.all()
-                project_list = '\n'.join([f"- {p.title} (ID: {p.id}): {p.content[:100]}... (자세히 보기: {request.scheme}://{request.get_host()}{p.get_absolute_url()})" for p in projects])
+                project_list_items = []
+                for p in projects:
+                    preview = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", "", p.content or "")).strip()
+                    project_list_items.append(
+                        f"- {p.title} (ID: {p.id}): {preview[:100]}... (자세히 보기: {build_public_project_url(p.get_absolute_url())})"
+                    )
+                project_list = '\n'.join(project_list_items) if project_list_items else "- 프로젝트 정보가 없습니다."
                 
                 # 경력 정보
                 careers = Career.objects.all()

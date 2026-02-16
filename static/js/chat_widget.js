@@ -121,6 +121,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function appendTextWithLinks(container, text) {
+        const urlRegex = /(https?:\/\/[^\s<>()"'`\[\]{}|\\^]+(?:\([^\s<>()"'`\[\]{}|\\^]*\))*[^\s<>()"'`\[\]{}|\\^.,;:!?])/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = urlRegex.exec(text)) !== null) {
+            const startIndex = match.index;
+            const endIndex = startIndex + match[0].length;
+
+            if (startIndex > lastIndex) {
+                container.appendChild(document.createTextNode(text.slice(lastIndex, startIndex)));
+            }
+
+            const link = document.createElement('a');
+            link.href = match[0];
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.style.color = '#007bff';
+            link.style.textDecoration = 'underline';
+            link.style.transition = 'opacity 0.2s';
+            link.textContent = match[0];
+            link.addEventListener('mouseover', () => {
+                link.style.opacity = '0.8';
+            });
+            link.addEventListener('mouseout', () => {
+                link.style.opacity = '1';
+            });
+            container.appendChild(link);
+
+            lastIndex = endIndex;
+        }
+
+        if (lastIndex < text.length) {
+            container.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+    }
+
     // 메시지 추가 함수
     function addMessage(text, sender, messageId = '', trackHistory = true) {
         const messageDiv = document.createElement('div');
@@ -131,47 +168,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
-        
-        // 메시지에 URL이 포함되어 있으면 클릭 가능한 링크로 변환
-        // URL 패턴: http(s)://로 시작하고, 공백이나 괄호, 따옴표, <> 등이 아닌 문자들로 구성
-        const urlRegex = /(https?:\/\/[^\s<>()"'`\[\]{}|\\^]+(?:\([^\s<>()"'`\[\]{}|\\^]*\))*[^\s<>()"'`\[\]{}|\\^.,;:!?])/g;
-        let html = text;
-        
-        // URL을 <a> 태그로 변환
-        html = html.replace(urlRegex, function(url) {
-            // URL이 이미 <a> 태그로 감싸져 있는지 확인
-            if (!/^<a\s/i.test(url)) {
-                // URL이 )로 끝나면 제거 (닫는 괄호가 URL에 속하지 않는 경우)
-                let cleanUrl = url;
-                if (url.endsWith(')') && (url.match(/\(/g) || []).length < (url.match(/\)/g) || []).length) {
-                    cleanUrl = url.slice(0, -1);
-                    html = cleanUrl + ')' + html.substring(html.indexOf(url) + url.length);
-                }
-                return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: underline;">' + cleanUrl + '</a>';
+
+        const normalizedText = typeof text === 'string' ? text : String(text ?? '');
+        const lines = normalizedText.split('\n');
+        lines.forEach((line, index) => {
+            appendTextWithLinks(contentDiv, line);
+            if (index < lines.length - 1) {
+                contentDiv.appendChild(document.createElement('br'));
             }
-            return url;
         });
-        
-        // 줄바꿈을 <br> 태그로 변환
-        html = html.replace(/\n/g, '<br>');
-        
-        contentDiv.innerHTML = html;
+
         messageDiv.appendChild(contentDiv);
         chatMessages.appendChild(messageDiv);
-        
-        // 링크에 호버 효과 추가
-        const links = messageDiv.getElementsByTagName('a');
-        for (let link of links) {
-            link.style.color = '#007bff';
-            link.style.textDecoration = 'underline';
-            link.style.transition = 'opacity 0.2s';
-            link.addEventListener('mouseover', () => {
-                link.style.opacity = '0.8';
-            });
-            link.addEventListener('mouseout', () => {
-                link.style.opacity = '1';
-            });
-        }
         
         // 메시지가 추가된 후 스크롤을 아래로 이동
         scrollToBottom();
