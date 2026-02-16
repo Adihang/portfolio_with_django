@@ -4,7 +4,7 @@ from django.core.cache import cache
 import json
 
 from .models import Stratagem_Hero_Score
-from .views import render_markdown_safely
+from .views import render_markdown_safely, render_markdown_with_raw_html
 
 
 class MarkdownSafetyTests(TestCase):
@@ -12,6 +12,11 @@ class MarkdownSafetyTests(TestCase):
         rendered = render_markdown_safely("<script>alert(1)</script> **bold**")
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", rendered)
         self.assertNotIn("<script>", rendered)
+        self.assertIn("<strong>bold</strong>", rendered)
+
+    def test_render_markdown_with_raw_html_keeps_html(self):
+        rendered = render_markdown_with_raw_html('<div class="embed">ok</div> **bold**')
+        self.assertIn('<div class="embed">ok</div>', rendered)
         self.assertIn("<strong>bold</strong>", rendered)
 
 
