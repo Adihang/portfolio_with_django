@@ -1,13 +1,16 @@
-# Django 운영 세팅 가이드 (Nginx + Gunicorn + Ollama)
+# Django 운영/배포 가이드 (Gunicorn + Cloudflare Tunnel + Ollama)
 
-이 문서는 현재 프로젝트 설정을 기준으로 운영 환경을 구성하는 방법을 정리합니다.
+이 문서는 현재 프로젝트 코드(`config/settings.py`) 기준의 운영 배포 방법을 정리합니다.
+
+현재 기본 구성은 아래와 같습니다.
 
 - Django 앱: `config.wsgi:application`
 - Gunicorn 바인드: `127.0.0.1:8000`
 - Ollama API: `http://127.0.0.1:11434`
-- Nginx 정적 파일 경로: `staticfiles/`, `media/`
+- Cloudflare Tunnel ingress: `hanplanet.com`, `www.hanplanet.com` -> `http://localhost:8000`
+- 정적/미디어: `DEBUG=False`에서도 `DJANGO_SERVE_FILES=True`일 때 Django가 직접 서빙
 
-## 1. 디렉터리/의존성 준비
+## 1. 필수 준비
 
 ```bash
 cd /Users/imhanbyeol/Desktop/Development/portfolio_with_django
@@ -16,14 +19,60 @@ cd /Users/imhanbyeol/Desktop/Development/portfolio_with_django
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Python 패키지 설치
+# 의존성 설치
 pip install -r requirements.txt
 
-# 정적 파일 수집
+# 정적 파일 수집 (권장)
 python manage.py collectstatic --noinput
 ```
 
-## 2. Gunicorn 서비스 등록 (systemd)
+## 2. 시크릿/환경변수 설정 (중요)
+
+현재 코드에서는 `DEBUG=False`일 때 `SECRET_KEY`가 반드시 필요합니다.
+우선순위는 아래 순서입니다.
+
+1. 환경변수 `DJANGO_SECRET_KEY`
+2. `config/secrets.json`의 `SECRET_KEY`
+
+### 2-1. `config/secrets.json` 방식 (권장)
+
+`config/secrets.json`은 `.gitignore` 대상입니다.
+
+```json
+{
+  "SECRET_KEY": "여기에_충분히_긴_랜덤_키"
+}
+```
+
+권한 권장:
+
+```bash
+chmod 600 config/secrets.json
+```
+
+### 2-2. 주요 환경변수
+
+- `DJANGO_DEBUG` (기본: `false`)
+- `DJANGO_SECRET_KEY`
+- `DJANGO_ALLOWED_HOSTS` (쉼표 구분)
+- `DJANGO_CSRF_TRUSTED_ORIGINS` (쉼표 구분, 스킴 포함)
+- `PUBLIC_BASE_URL` (예: `https://hanplanet.com`)
+- `DJANGO_SERVE_FILES` (기본: `true`)
+- `OLLAMA_BASE_URL` (기본: `http://localhost:11434`)
+- `OLLAMA_MODEL` (기본: `llama3.2:latest`)
+
+보안 관련(필요시 오버라이드):
+
+- `DJANGO_SECURE_SSL_REDIRECT`
+- `DJANGO_SESSION_COOKIE_SECURE`
+- `DJANGO_CSRF_COOKIE_SECURE`
+- `DJANGO_SECURE_HSTS_SECONDS`
+- `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`
+- `DJANGO_SECURE_HSTS_PRELOAD`
+
+## 3. Gunicorn 서비스 등록
+
+### 3-1. Linux systemd 예시
 
 `/etc/systemd/system/portfolio-gunicorn.service`
 
@@ -36,9 +85,12 @@ After=network.target
 User=ubuntu
 Group=www-data
 WorkingDirectory=/Users/imhanbyeol/Desktop/Development/portfolio_with_django
-ExecStart=/Users/imhanbyeol/Desktop/Development/portfolio_with_django/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000
+ExecStart=/Users/imhanbyeol/Desktop/Development/portfolio_with_django/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir /Users/imhanbyeol/Desktop/Development/portfolio_with_django
 Restart=always
 RestartSec=3
+
+# 환경변수로 운영 시크릿을 줄 경우
+# Environment="DJANGO_SECRET_KEY=..."
 
 [Install]
 WantedBy=multi-user.target
@@ -52,7 +104,27 @@ sudo systemctl enable --now portfolio-gunicorn
 sudo systemctl status portfolio-gunicorn
 ```
 
-## 3. Ollama 설치 및 서비스화
+### 3-2. macOS launchd (현재 로컬 운영 방식)
+
+현재 구성:
+
+- LaunchAgent: `~/Library/LaunchAgents/com.hanplanet.gunicorn.plist`
+- 실행 명령: `.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir ...`
+
+상태 확인:
+
+```bash
+launchctl print gui/$(id -u)/com.hanplanet.gunicorn
+launchctl list | rg com.hanplanet.gunicorn
+```
+
+재시작:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn
+```
+
+## 4. Ollama 서비스
 
 설치:
 
@@ -66,165 +138,100 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2:latest
 ```
 
-systemd 등록 (`/etc/systemd/system/ollama.service`):
-
-```ini
-[Unit]
-Description=Ollama Service
-After=network.target
-
-[Service]
-User=ubuntu
-ExecStart=/usr/local/bin/ollama serve
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-적용:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now ollama
-sudo systemctl status ollama
-curl http://127.0.0.1:11434/api/tags
-```
-
-## 4. Nginx 설정
-
-현재 프로젝트의 Nginx 설정 파일은 `nginx/portfolio.conf`입니다.
-운영 서버에서는 경로/유저에 맞게 조정 후 `/etc/nginx/sites-available/portfolio`로 배치하세요.
-
-핵심 포인트:
-
-- `/static/` -> `.../staticfiles/` alias
-- `/media/` -> `.../media/` alias
-- `/` -> `http://127.0.0.1:8000` 프록시
-
-적용:
-
-```bash
-sudo ln -sf /etc/nginx/sites-available/portfolio /etc/nginx/sites-enabled/portfolio
-sudo nginx -t
-sudo systemctl restart nginx
-sudo systemctl status nginx
-```
-
-## 5. Cloudflare + Cloudflare Tunnel 설정
-
-### 5-1. cloudflared 설치
-
-```bash
-# Ubuntu/Debian 예시
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
-sudo apt update
-sudo apt install -y cloudflared
-```
-
-### 5-2. 터널 생성 및 DNS 연결
-
-```bash
-# Cloudflare 로그인 (브라우저 인증)
-cloudflared tunnel login
-
-# 터널 생성
-cloudflared tunnel create portfolio-tunnel
-
-# DNS 라우팅 (도메인/서브도메인 연결)
-cloudflared tunnel route dns portfolio-tunnel hanplanet.com
-cloudflared tunnel route dns portfolio-tunnel www.hanplanet.com
-```
-
-### 5-3. 터널 설정 파일 작성
-
-`/etc/cloudflared/config.yml`
-
-```yaml
-tunnel: portfolio-tunnel
-credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
-
-ingress:
-  - hostname: hanplanet.com
-    service: http://localhost:80
-  - hostname: www.hanplanet.com
-    service: http://localhost:80
-  - service: http_status:404
-```
-
-참고:
-- 현재 가이드는 Nginx를 앞단으로 사용하므로 `service: http://localhost:80`을 권장합니다.
-- Nginx 없이 Gunicorn만 쓰면 `service: http://localhost:8000`으로 설정합니다.
-
-### 5-4. cloudflared 서비스 등록 (재부팅 자동실행)
-
-`/etc/systemd/system/cloudflared.service`
-
-```ini
-[Unit]
-Description=Cloudflare Tunnel
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/cloudflared --config /etc/cloudflared/config.yml tunnel run
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-적용:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now cloudflared
-sudo systemctl status cloudflared
-```
-
-## 6. Django/Ollama 연결 확인
-
-`config/settings.py` 기준값:
-
-- `OLLAMA_BASE_URL = "http://localhost:11434"`
-- `OLLAMA_MODEL = "llama3.2:latest"`
-
 확인:
 
 ```bash
-curl -I http://127.0.0.1:8000
-curl -I http://127.0.0.1
 curl http://127.0.0.1:11434/api/tags
 ```
 
-## 7. 운영 체크리스트
+## 5. Cloudflare Tunnel
 
-- `python manage.py collectstatic --noinput` 실행 여부
-- `portfolio-gunicorn`, `ollama`, `nginx`, `cloudflared` 서비스 모두 `active (running)`
-- `/static/...` CSS 응답 확인
-- `/api/chat/` 호출 시 정상 응답 확인
+`~/.cloudflared/config.yml` 예시:
 
-## 8. 자주 쓰는 명령
+```yaml
+tunnel: <TUNNEL_ID>
+credentials-file: /Users/<USER>/.cloudflared/<TUNNEL_ID>.json
 
-```bash
-# 서비스 재시작
-sudo systemctl restart portfolio-gunicorn
-sudo systemctl restart ollama
-sudo systemctl restart nginx
-sudo systemctl restart cloudflared
-
-# 로그 확인
-sudo journalctl -u portfolio-gunicorn -f
-sudo journalctl -u ollama -f
-sudo journalctl -u nginx -f
-sudo journalctl -u cloudflared -f
+ingress:
+  - hostname: www.hanplanet.com
+    service: http://localhost:8000
+  - hostname: hanplanet.com
+    service: http://localhost:8000
+  - service: http_status:404
 ```
 
-## 참고
+실행:
 
-현재 `SECRET_KEY`는 `config/settings.py`에 코드 고정값으로 들어가 있습니다.
-운영 배포 시에는 환경변수/비밀저장소 방식으로 분리하는 것을 권장합니다.
+```bash
+cloudflared tunnel run <TUNNEL_NAME>
+```
+
+자동실행 사용 시 LaunchAgent/systemd에 동일 명령을 등록합니다.
+
+## 6. 정적/미디어 서빙 정책
+
+현재 코드는 아래 정책입니다.
+
+- `DEBUG=True`: Django 개발용 static/media 서빙
+- `DEBUG=False` + `DJANGO_SERVE_FILES=true`: Django가 `/static/`, `/media/` 직접 서빙
+- `DEBUG=False` + `DJANGO_SERVE_FILES=false`: Django가 static/media 미서빙 (Nginx/CDN 필요)
+
+Nginx 앞단으로 운영한다면:
+
+1. Nginx에서 `/static/`, `/media/`를 alias로 직접 서빙
+2. 앱 환경변수 `DJANGO_SERVE_FILES=false` 권장
+
+## 7. 배포 검증 체크리스트
+
+```bash
+# Django 기본 점검
+.venv/bin/python manage.py check
+
+# 배포 점검 (SECRET_KEY 필요)
+DJANGO_SECRET_KEY='<YOUR_SECRET>' .venv/bin/python manage.py check --deploy
+
+# 로컬 앱 응답
+curl -I http://127.0.0.1:8000
+
+# HTTPS 오프로딩 환경 가정 응답 점검
+curl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/portfolio/
+curl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/static/css/style.css
+curl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/media/profile.jpg
+
+# 외부 도메인 확인
+curl -I https://hanplanet.com
+```
+
+## 8. 트러블슈팅
+
+### 8-1. Gunicorn 부팅 실패 (`ImproperlyConfigured: DJANGO_SECRET_KEY ... required`)
+
+- `config/secrets.json` 존재 여부 확인
+- 또는 서비스에 `DJANGO_SECRET_KEY` 환경변수 주입
+
+### 8-2. CSS/이미지 404
+
+- `DJANGO_SERVE_FILES` 값 확인 (`true` 필요)
+- `config/urls.py`에 `/static/`, `/media/` 라우트 반영 여부 확인
+- `collectstatic` 재실행
+
+### 8-3. 루트 URL 301 리다이렉트
+
+- `SECURE_SSL_REDIRECT=True` 정책으로 정상 동작
+- 프록시/터널 환경에서는 `X-Forwarded-Proto: https` 전달 필요
+
+## 9. 자주 쓰는 명령
+
+```bash
+# Gunicorn 프로세스 확인
+lsof -nP -iTCP:8000 -sTCP:LISTEN
+ps aux | rg 'gunicorn config.wsgi' | rg -v rg
+
+# launchd 로그
+tail -f ~/Library/Logs/gunicorn.err.log
+tail -f ~/Library/Logs/gunicorn.out.log
+
+# cloudflared 상태
+ps aux | rg cloudflared | rg -v rg
+curl -I https://hanplanet.com
+```
