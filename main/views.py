@@ -72,7 +72,7 @@ def none(request):
 
 def main(request):
     context = dict()
-    context['careers'] = list(Career.objects.all())
+    context['careers'] = list(Career.objects.all().order_by('-order', '-id'))
     for career in context['careers']:
         career.content = render_markdown_safely(career.content)
     context['projects'] = Project.objects.all().order_by('-create_date')

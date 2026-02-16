@@ -333,8 +333,12 @@ input[type=submit] {
     letter-spacing: -0.6px;
 }
 
-.md_img{
-    max-width: 80%;
+.project_detail_content .md_img{
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
 }
 .careers_head{
     padding-top: 25px;
