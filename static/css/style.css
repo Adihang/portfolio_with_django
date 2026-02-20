@@ -15,6 +15,42 @@ body.project-page {
     background-image: none !important;
 }
 
+body.portfolio-page,
+body.portfolio-page .bubble-bg-layer,
+body.portfolio-page #interactiveBubbleCanvas,
+body.portfolio-page .portfolio-nav,
+body.portfolio-page .portfolio-nav-links,
+body.portfolio-page .portfolio-nav-link,
+body.portfolio-page .portfolio-nav-toggler,
+body.portfolio-page section,
+body.portfolio-page hr,
+body.portfolio-page .main-has-bubble-bg,
+body.portfolio-page .main-has-bubble-bg h1,
+body.portfolio-page .main-has-bubble-bg h2,
+body.portfolio-page .main-has-bubble-bg h3,
+body.portfolio-page .main-has-bubble-bg h4,
+body.portfolio-page .main-has-bubble-bg h5,
+body.portfolio-page .main-has-bubble-bg p,
+body.portfolio-page .main-has-bubble-bg li,
+body.portfolio-page .main-has-bubble-bg span,
+body.portfolio-page .main-has-bubble-bg div,
+body.portfolio-page .main-has-bubble-bg b,
+body.portfolio-page .main-has-bubble-bg strong,
+body.portfolio-page .project_card,
+body.portfolio-page .career_card,
+body.portfolio-page .project_card_img,
+body.portfolio-page .hobby_card_img,
+body.portfolio-page .tag,
+body.portfolio-page .career_card_date,
+body.portfolio-page .contact,
+body.portfolio-page .foot {
+    transition:
+        background-color 0.62s cubic-bezier(0.22, 1, 0.36, 1),
+        color 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.62s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 body.portfolio-page.bubble-exhausted-dark {
     --theme-ink: #f1f1f1;
     --theme-subtle: #d7d7d7;
