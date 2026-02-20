@@ -80,19 +80,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 채팅 토글 기능
     let isChatOpen = false;
-    chatBody.style.display = 'none'; // 초기 상태에서 채팅 본문 숨기기
-    chatToggle.textContent = '+'; // 토글 버튼을 '+'로 설정
-    chatToggle.addEventListener('click', function() {
-        isChatOpen = !isChatOpen;
-        if (isChatOpen) {
-            chatBody.style.display = 'flex';
-            chatToggle.textContent = '−';
-            // 채팅창이 열릴 때 메시지 영역 스크롤을 가장 아래로
-            scrollToBottom();
-        } else {
-            chatBody.style.display = 'none';
-            chatToggle.textContent = '+';
+    chatWidget.classList.remove('is-open');
+    chatToggle.textContent = '+';
+
+    function setChatOpen(open) {
+        isChatOpen = open;
+        chatWidget.classList.toggle('is-open', open);
+        chatToggle.textContent = open ? '−' : '+';
+
+        if (open) {
+            // 애니메이션 프레임 이후 스크롤 보정
+            window.requestAnimationFrame(scrollToBottom);
         }
+    }
+
+    chatToggle.addEventListener('click', function() {
+        setChatOpen(!isChatOpen);
     });
 
     // 메시지 전송 함수
@@ -207,10 +210,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // GPT API를 호출하여 챗봇 응답 생성
     async function getBotResponse(userMessage) {
+        let loadingMessage = null;
+        let loadingAnimationIntervalId = null;
+
+        const startLoadingAnimation = function () {
+            const loadingMessageId = 'loading-' + Date.now();
+            loadingMessage = addMessage('.', 'bot', loadingMessageId, false);
+
+            if (!loadingMessage) {
+                return;
+            }
+
+            const loadingContent = loadingMessage.querySelector('.message-content');
+            let dotCount = 1;
+
+            loadingAnimationIntervalId = window.setInterval(function () {
+                if (!loadingContent) {
+                    return;
+                }
+
+                dotCount = (dotCount % 3) + 1;
+                loadingContent.textContent = '.'.repeat(dotCount);
+            }, 300);
+        };
+
+        const stopLoadingAnimation = function () {
+            if (loadingAnimationIntervalId !== null) {
+                window.clearInterval(loadingAnimationIntervalId);
+                loadingAnimationIntervalId = null;
+            }
+
+            if (loadingMessage) {
+                loadingMessage.remove();
+                loadingMessage = null;
+            }
+        };
+
         try {
             // 로딩 메시지 표시
-            const loadingMessageId = 'loading-' + Date.now();
-            addMessage('...', 'bot', loadingMessageId, false);
+            startLoadingAnimation();
             
             // CSRF 토큰 가져오기
             const csrfToken = getCSRFToken();
@@ -239,13 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const data = await response.json();
-            
-            // 로딩 메시지 제거
-            const loadingMessage = document.getElementById(loadingMessageId);
-            if (loadingMessage) {
-                loadingMessage.remove();
-            }
-            
+
             if (data.error) {
                 console.error('Error from server:', data.error);
                 return '죄송합니다. 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
@@ -256,6 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Error calling GPT API:', error);
             return '죄송합니다. 서버와의 통신 중 오류가 발생했습니다.';
+        } finally {
+            stopLoadingAnimation();
         }
     }
     

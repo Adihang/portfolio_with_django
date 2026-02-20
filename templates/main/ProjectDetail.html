@@ -1,7 +1,15 @@
 {% extends 'base.html' %}
+{% block body_class %}project-page{% endblock %}
 {% block content %}
 {% load static %}
-<link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}?v=20260216_nav_theme_21">
+<style>
+    html,
+    body {
+        background: #ffffff !important;
+        background-image: none !important;
+    }
+</style>
+<link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
 <div class="project_detail_page">
     <div class="project_detail">
         <h1 class="project_detail_title">{{ project.title }}</h1>

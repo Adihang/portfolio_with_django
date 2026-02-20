@@ -12,6 +12,29 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    const isLightBackgroundPage = document.body.classList.contains('portfolio-page') ||
+        document.body.classList.contains('project-page') ||
+        window.location.pathname === '/portfolio/' ||
+        window.location.pathname === '/portfolio' ||
+        window.location.pathname.startsWith('/project/');
+
+    if (isLightBackgroundPage) {
+        document.documentElement.style.backgroundColor = '#ffffff';
+        document.body.style.background = '#ffffff';
+        document.body.style.backgroundImage = 'none';
+
+        const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
+        if (portfolioMainLayer) {
+            portfolioMainLayer.style.backgroundColor = 'transparent';
+        }
+
+        const bubbleLayer = document.querySelector('.bubble-bg-layer');
+        if (bubbleLayer) {
+            bubbleLayer.style.display = 'block';
+            bubbleLayer.style.background = '#ffffff';
+        }
+    }
+
     const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
 
     const initInteractiveBubbleBackground = function (canvas) {
@@ -23,12 +46,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const pointer = { x: 0, y: 0, active: false };
-        const bubbleBaseColor = '108, 166, 133';
-        const bubbleGlowColor = '167, 212, 185';
+        const bubbleBaseColor = '112, 112, 112';
+        const bubbleGlowColor = '186, 186, 186';
         const bubbles = [];
+        const popEffects = [];
         let width = 0;
         let height = 0;
         let rafBubbleId = null;
+        let lastFrameTime = 0;
+        const wallPopSpeedThreshold = prefersReducedMotion ? 11.1925 : 9.68;
+        const bubblePopImpactThreshold = prefersReducedMotion ? 10.285 : 8.7725;
 
         const randomBetween = function (min, max) {
             return Math.random() * (max - min) + min;
@@ -38,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return {
                 x: randomBetween(0, width || window.innerWidth),
                 y: randomBetween(0, height || window.innerHeight),
-                radius: randomBetween(18, 42),
+                radius: randomBetween(50, 70),
                 vx: randomBetween(-0.18, 0.18),
                 vy: randomBetween(-0.12, 0.12),
                 alpha: randomBetween(0.55, 1),
@@ -56,7 +83,8 @@ document.addEventListener('DOMContentLoaded', function () {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             const density = prefersReducedMotion ? 95 : 70;
-            const nextCount = Math.max(10, Math.min(28, Math.round(width / density)));
+            const baseCount = Math.max(10, Math.min(28, Math.round(width / density)));
+            const nextCount = Math.max(7, Math.round(baseCount * 0.7));
 
             while (bubbles.length < nextCount) {
                 bubbles.push(createBubble());
@@ -67,18 +95,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const drawBubble = function (bubble, time) {
             const pulse = 1 + Math.sin((time * 0.0012) + bubble.phase) * 0.08;
-            const glowRadius = bubble.radius * 1.9 * pulse;
+            const shadowScale = 1.15 + (bubble.radius * 0.006);
+            const shadowOffset = bubble.radius * (0.12 + (bubble.radius * 0.0008));
+            const innerShadowRadius = bubble.radius * (0.1 + (bubble.radius * 0.0006));
+            const glowRadius = bubble.radius * shadowScale * pulse;
             const glow = ctx.createRadialGradient(
-                bubble.x - (bubble.radius * 0.25),
-                bubble.y - (bubble.radius * 0.25),
-                bubble.radius * 0.2,
+                bubble.x - shadowOffset,
+                bubble.y - shadowOffset,
+                innerShadowRadius,
                 bubble.x,
                 bubble.y,
                 glowRadius
             );
 
-            glow.addColorStop(0, 'rgba(' + bubbleGlowColor + ', ' + (0.34 * bubble.alpha) + ')');
-            glow.addColorStop(0.65, 'rgba(' + bubbleBaseColor + ', ' + (0.16 * bubble.alpha) + ')');
+            glow.addColorStop(0, 'rgba(' + bubbleGlowColor + ', ' + (0.46 * bubble.alpha) + ')');
+            glow.addColorStop(0.65, 'rgba(' + bubbleBaseColor + ', ' + (0.22 * bubble.alpha) + ')');
             glow.addColorStop(1, 'rgba(' + bubbleBaseColor + ', 0)');
 
             ctx.beginPath();
@@ -87,19 +118,140 @@ document.addEventListener('DOMContentLoaded', function () {
             ctx.fill();
 
             ctx.beginPath();
-            ctx.fillStyle = 'rgba(236, 248, 241, ' + (0.2 * bubble.alpha) + ')';
+            ctx.fillStyle = 'rgba(164, 164, 164, ' + (0.26 * bubble.alpha) + ')';
             ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
             ctx.fill();
+        };
+
+        const createPopEffect = function (bubble) {
+            const particleCount = prefersReducedMotion ? 4 : 12;
+            const particles = [];
+
+            for (let i = 0; i < particleCount; i += 1) {
+                const angle = randomBetween(0, Math.PI * 2);
+                const speed = randomBetween(0.5, 1.8) + (bubble.radius * 0.02);
+
+                particles.push({
+                    x: bubble.x,
+                    y: bubble.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: randomBetween(Math.max(1.6, bubble.radius * 0.08), Math.max(2.8, bubble.radius * 0.16)),
+                    alpha: randomBetween(0.55, 0.95) * bubble.alpha,
+                    life: randomBetween(180, 320),
+                    age: 0
+                });
+            }
+
+            popEffects.push({
+                x: bubble.x,
+                y: bubble.y,
+                age: 0,
+                duration: prefersReducedMotion ? 180 : 320,
+                innerRadius: Math.max(4, bubble.radius * 0.35),
+                outerRadius: bubble.radius * 1.9,
+                alpha: Math.min(1, bubble.alpha + 0.2),
+                particles: particles
+            });
+        };
+
+        const updatePopEffects = function (deltaMs) {
+            const frameScale = deltaMs / 16.666;
+
+            for (let i = popEffects.length - 1; i >= 0; i -= 1) {
+                const effect = popEffects[i];
+                effect.age += deltaMs;
+
+                for (let j = effect.particles.length - 1; j >= 0; j -= 1) {
+                    const particle = effect.particles[j];
+                    particle.age += deltaMs;
+
+                    if (particle.age >= particle.life) {
+                        effect.particles.splice(j, 1);
+                        continue;
+                    }
+
+                    particle.x += particle.vx * frameScale;
+                    particle.y += particle.vy * frameScale;
+                    particle.vx *= 0.965;
+                    particle.vy *= 0.965;
+                }
+
+                if (effect.age >= effect.duration && effect.particles.length === 0) {
+                    popEffects.splice(i, 1);
+                }
+            }
+        };
+
+        const drawPopEffects = function () {
+            popEffects.forEach(function (effect) {
+                const progress = Math.min(effect.age / effect.duration, 1);
+                const expansion = 1 - Math.pow(1 - progress, 3);
+                const ringRadius = effect.innerRadius + ((effect.outerRadius - effect.innerRadius) * expansion);
+                const ringAlpha = (1 - progress) * 0.46 * effect.alpha;
+
+                if (ringAlpha > 0.01) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(185, 185, 185, ' + ringAlpha + ')';
+                    ctx.lineWidth = Math.max(1.1, (1 - progress) * (effect.innerRadius * 0.5));
+                    ctx.arc(effect.x, effect.y, ringRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                const flashAlpha = (1 - progress) * (1 - progress) * 0.4 * effect.alpha;
+                if (flashAlpha > 0.01) {
+                    ctx.beginPath();
+                    ctx.fillStyle = 'rgba(220, 220, 220, ' + flashAlpha + ')';
+                    ctx.arc(effect.x, effect.y, effect.innerRadius * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                effect.particles.forEach(function (particle) {
+                    const particleProgress = particle.age / particle.life;
+                    const particleAlpha = (1 - particleProgress) * (1 - particleProgress) * 0.75 * particle.alpha;
+
+                    if (particleAlpha <= 0.01) {
+                        return;
+                    }
+
+                    ctx.beginPath();
+                    ctx.fillStyle = 'rgba(205, 205, 205, ' + particleAlpha + ')';
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            });
+        };
+
+        const removeBubbleAtPoint = function (x, y) {
+            for (let i = bubbles.length - 1; i >= 0; i -= 1) {
+                const bubble = bubbles[i];
+                const dx = x - bubble.x;
+                const dy = y - bubble.y;
+                const hitRadius = bubble.radius * 1.05;
+
+                if ((dx * dx) + (dy * dy) <= (hitRadius * hitRadius)) {
+                    createPopEffect(bubble);
+                    bubbles.splice(i, 1);
+                    return true;
+                }
+            }
+
+            return false;
         };
 
         const animate = function (time) {
             rafBubbleId = window.requestAnimationFrame(animate);
 
             if (document.hidden) {
+                lastFrameTime = time;
                 return;
             }
 
+            const deltaMs = lastFrameTime > 0 ? Math.min(40, Math.max(8, time - lastFrameTime)) : 16.67;
+            lastFrameTime = time;
+
             ctx.clearRect(0, 0, width, height);
+            const poppedBubbles = new Set();
 
             bubbles.forEach(function (bubble) {
                 bubble.vx += Math.sin((time * 0.0005 * bubble.drift) + bubble.phase) * 0.007;
@@ -109,13 +261,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     const dx = bubble.x - pointer.x;
                     const dy = bubble.y - pointer.y;
                     const distanceSquared = (dx * dx) + (dy * dy);
-                    const reactionRadius = bubble.radius + 66;
+                    const reactionRadius = bubble.radius + 180;
                     const reactionRadiusSquared = reactionRadius * reactionRadius;
 
-                    if (distanceSquared < reactionRadiusSquared && distanceSquared > 9) {
-                        const distance = Math.sqrt(distanceSquared);
+                    if (distanceSquared < reactionRadiusSquared) {
+                        const distance = Math.max(Math.sqrt(distanceSquared), 0.0001);
                         const proximity = 1 - (distance / reactionRadius);
-                        const force = proximity * proximity * 0.28;
+                        const force = 0.42 + (proximity * proximity * 0.72);
                         bubble.vx += (dx / distance) * force;
                         bubble.vy += (dy / distance) * force;
                     }
@@ -126,28 +278,186 @@ document.addEventListener('DOMContentLoaded', function () {
                 bubble.vx *= 0.986;
                 bubble.vy *= 0.986;
 
-                const margin = bubble.radius * 2.2;
+                if (!prefersReducedMotion && pointer.active) {
+                    const dxAfterMove = bubble.x - pointer.x;
+                    const dyAfterMove = bubble.y - pointer.y;
+                    const distanceAfterMove = Math.max(Math.sqrt((dxAfterMove * dxAfterMove) + (dyAfterMove * dyAfterMove)), 0.0001);
+                    const keepOutRadius = bubble.radius + 32;
 
-                if (bubble.x < -margin) {
-                    bubble.x = width + margin;
-                } else if (bubble.x > width + margin) {
-                    bubble.x = -margin;
+                    if (distanceAfterMove < keepOutRadius) {
+                        const nx = dxAfterMove / distanceAfterMove;
+                        const ny = dyAfterMove / distanceAfterMove;
+                        const pushOut = keepOutRadius - distanceAfterMove;
+                        bubble.x += nx * pushOut;
+                        bubble.y += ny * pushOut;
+                        bubble.vx += nx * 1.55;
+                        bubble.vy += ny * 1.55;
+                    }
+                }
+            });
+
+            for (let i = 0; i < bubbles.length; i += 1) {
+                const bubbleA = bubbles[i];
+
+                if (poppedBubbles.has(bubbleA)) {
+                    continue;
                 }
 
-                if (bubble.y < -margin) {
-                    bubble.y = height + margin;
-                } else if (bubble.y > height + margin) {
-                    bubble.y = -margin;
+                for (let j = i + 1; j < bubbles.length; j += 1) {
+                    const bubbleB = bubbles[j];
+
+                    if (poppedBubbles.has(bubbleB)) {
+                        continue;
+                    }
+                    let dx = bubbleB.x - bubbleA.x;
+                    let dy = bubbleB.y - bubbleA.y;
+                    let distanceSquared = (dx * dx) + (dy * dy);
+                    const minDistance = bubbleA.radius + bubbleB.radius + 2;
+                    const minDistanceSquared = minDistance * minDistance;
+
+                    if (distanceSquared >= minDistanceSquared) {
+                        continue;
+                    }
+
+                    if (distanceSquared < 0.0001) {
+                        const angle = (i + j + 1) * 0.61803398875;
+                        dx = Math.cos(angle);
+                        dy = Math.sin(angle);
+                        distanceSquared = 1;
+                    }
+
+                    const distance = Math.sqrt(distanceSquared);
+                    const nx = dx / distance;
+                    const ny = dy / distance;
+                    const overlap = minDistance - distance;
+                    const separation = overlap * 0.5;
+
+                    bubbleA.x -= nx * separation;
+                    bubbleA.y -= ny * separation;
+                    bubbleB.x += nx * separation;
+                    bubbleB.y += ny * separation;
+
+                    const relativeVelocityX = bubbleB.vx - bubbleA.vx;
+                    const relativeVelocityY = bubbleB.vy - bubbleA.vy;
+                    const normalVelocity = (relativeVelocityX * nx) + (relativeVelocityY * ny);
+                    const impactSpeed = -normalVelocity;
+
+                    if (impactSpeed > bubblePopImpactThreshold) {
+                        poppedBubbles.add(bubbleA);
+                        poppedBubbles.add(bubbleB);
+                        continue;
+                    }
+
+                    if (normalVelocity < 0) {
+                        const restitution = 0.84;
+                        const impulse = -((1 + restitution) * normalVelocity) / 2;
+                        bubbleA.vx -= nx * impulse;
+                        bubbleA.vy -= ny * impulse;
+                        bubbleB.vx += nx * impulse;
+                        bubbleB.vy += ny * impulse;
+                    }
+                }
+            }
+
+            bubbles.forEach(function (bubble) {
+                if (poppedBubbles.has(bubble)) {
+                    return;
+                }
+
+                const minX = bubble.radius;
+                const maxX = Math.max(minX, width - bubble.radius);
+                const minY = bubble.radius;
+                const maxY = Math.max(minY, height - bubble.radius);
+
+                if (bubble.x < minX) {
+                    const impactSpeed = Math.abs(bubble.vx);
+                    bubble.x = minX;
+                    bubble.vx = Math.abs(bubble.vx) * 0.92;
+
+                    if (impactSpeed > wallPopSpeedThreshold) {
+                        poppedBubbles.add(bubble);
+                        return;
+                    }
+                } else if (bubble.x > maxX) {
+                    const impactSpeed = Math.abs(bubble.vx);
+                    bubble.x = maxX;
+                    bubble.vx = -Math.abs(bubble.vx) * 0.92;
+
+                    if (impactSpeed > wallPopSpeedThreshold) {
+                        poppedBubbles.add(bubble);
+                        return;
+                    }
+                }
+
+                if (bubble.y < minY) {
+                    const impactSpeed = Math.abs(bubble.vy);
+                    bubble.y = minY;
+                    bubble.vy = Math.abs(bubble.vy) * 0.92;
+
+                    if (impactSpeed > wallPopSpeedThreshold) {
+                        poppedBubbles.add(bubble);
+                        return;
+                    }
+                } else if (bubble.y > maxY) {
+                    const impactSpeed = Math.abs(bubble.vy);
+                    bubble.y = maxY;
+                    bubble.vy = -Math.abs(bubble.vy) * 0.92;
+
+                    if (impactSpeed > wallPopSpeedThreshold) {
+                        poppedBubbles.add(bubble);
+                        return;
+                    }
+                }
+
+                if (poppedBubbles.has(bubble)) {
+                    return;
                 }
 
                 drawBubble(bubble, time);
             });
+
+            if (poppedBubbles.size > 0) {
+                for (let i = bubbles.length - 1; i >= 0; i -= 1) {
+                    const bubble = bubbles[i];
+
+                    if (!poppedBubbles.has(bubble)) {
+                        continue;
+                    }
+
+                    createPopEffect(bubble);
+                    bubbles.splice(i, 1);
+                }
+            }
+
+            updatePopEffects(deltaMs);
+            drawPopEffects();
         };
 
         window.addEventListener('pointermove', function (event) {
             pointer.x = event.clientX;
             pointer.y = event.clientY;
             pointer.active = true;
+        }, { passive: true });
+
+        window.addEventListener('pointerdown', function (event) {
+            if (!event.isPrimary || event.button !== 0) {
+                return;
+            }
+
+            const target = event.target;
+            if (target && target.closest && target.closest('a, button, input, textarea, select, label, [role="button"], .portfolio-nav, .chatbot-container, .chatbot-toggle-btn')) {
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const localX = event.clientX - rect.left;
+            const localY = event.clientY - rect.top;
+
+            if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) {
+                return;
+            }
+
+            removeBubbleAtPoint(localX, localY);
         }, { passive: true });
 
         window.addEventListener('pointerleave', function () {
@@ -190,7 +500,33 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    const navItemsMeasure = navLinks.cloneNode(true);
+    navItemsMeasure.setAttribute('aria-hidden', 'true');
+    Object.assign(navItemsMeasure.style, {
+        position: 'fixed',
+        left: '-99999px',
+        top: '-99999px',
+        visibility: 'hidden',
+        pointerEvents: 'none',
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        width: 'auto',
+        maxWidth: 'none',
+        margin: '0',
+        padding: '0',
+        listStyle: 'none'
+    });
+    Array.from(navItemsMeasure.children).forEach(function (item) {
+        item.style.flex = '0 0 auto';
+    });
+    document.body.appendChild(navItemsMeasure);
+
     let rafId = null;
+
+    const getMeasuredNavItemsWidth = function () {
+        return Math.ceil(navItemsMeasure.getBoundingClientRect().width);
+    };
 
     const forceCloseNavMenu = function () {
         if (window.bootstrap && window.bootstrap.Collapse) {
@@ -210,17 +546,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const updateNavMode = function () {
         rafId = null;
 
-        const wasCollapsed = nav.classList.contains('nav-auto-collapsed');
         nav.classList.remove('nav-auto-collapsed');
         forceCloseNavMenu();
 
         const availableWidth = navContainer.getBoundingClientRect().width;
         const brandWidth = navBrand.getBoundingClientRect().width;
-        const linksWidth = navLinks.scrollWidth;
-        const requiredWidth = brandWidth + linksWidth;
-        const hysteresis = wasCollapsed ? 10 : -20;
+        const navItemsBlockWidth = getMeasuredNavItemsWidth();
+        const navItemsBlockLimit = window.innerWidth * 0.6;
+        const requiredWidth = brandWidth + navItemsBlockWidth;
+        const shouldCollapseByItemsBlock = navItemsBlockWidth > navItemsBlockLimit;
+        const shouldCollapseByOverlap = requiredWidth >= availableWidth;
 
-        if (requiredWidth + hysteresis >= availableWidth) {
+        if (shouldCollapseByItemsBlock || shouldCollapseByOverlap) {
             nav.classList.add('nav-auto-collapsed');
             forceCloseNavMenu();
         }

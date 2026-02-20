@@ -13,7 +13,7 @@
 ## 1. 필수 준비
 
 ```bash
-cd /Users/imhanbyeol/Desktop/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/portfolio_with_django
 
 # 가상환경 (이미 있으면 생략)
 python3 -m venv .venv
@@ -84,8 +84,8 @@ After=network.target
 [Service]
 User=ubuntu
 Group=www-data
-WorkingDirectory=/Users/imhanbyeol/Desktop/Development/portfolio_with_django
-ExecStart=/Users/imhanbyeol/Desktop/Development/portfolio_with_django/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir /Users/imhanbyeol/Desktop/Development/portfolio_with_django
+WorkingDirectory=/Users/imhanbyeol/Development/portfolio_with_django
+ExecStart=/Users/imhanbyeol/Development/portfolio_with_django/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir /Users/imhanbyeol/Development/portfolio_with_django
 Restart=always
 RestartSec=3
 

@@ -18,8 +18,8 @@
 .chat-header {
     background: #616161; /* 중간 회색 */
     color: white;
-    padding: 15px;
-    cursor: pointer;
+    padding: 13.5px 15px;
+    cursor: default;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -34,15 +34,40 @@
     background: none;
     border: none;
     color: white;
-    font-size: 1.2em;
+    width: 36px;
+    height: 36px;
+    font-size: 1.8em;
+    line-height: 1;
+    border-radius: 50%;
     cursor: pointer;
+    font-weight: 700;
+    text-shadow: none;
+    filter: none;
+    transition: text-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.chat-toggle:hover {
+    text-shadow: 0 0 18px rgba(0, 0, 0, 1);
+    filter: none;
 }
 
 .chat-body {
     display: flex;
     flex-direction: column;
     height: 400px;
-    transition: all 0.3s ease;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(8px);
+    overflow: hidden;
+    pointer-events: none;
+    transition: max-height 0.28s ease, opacity 0.24s ease, transform 0.24s ease;
+}
+
+.chat-widget.is-open .chat-body {
+    max-height: 400px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .chat-messages {
