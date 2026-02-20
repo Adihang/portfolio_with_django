@@ -17,25 +17,45 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.pathname === '/portfolio/' ||
         window.location.pathname === '/portfolio' ||
         window.location.pathname.startsWith('/project/');
+    const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
+    const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
+    const bubbleLayer = document.querySelector('.bubble-bg-layer');
 
-    if (isLightBackgroundPage) {
-        document.documentElement.style.backgroundColor = '#ffffff';
-        document.body.style.background = '#ffffff';
+    let currentSurfaceMode = null;
+
+    const applyPageSurfaceMode = function (useDarkTheme) {
+        if (!isLightBackgroundPage) {
+            return;
+        }
+
+        if (currentSurfaceMode === useDarkTheme) {
+            return;
+        }
+
+        currentSurfaceMode = useDarkTheme;
+        const surfaceColor = useDarkTheme ? '#0f1012' : '#ffffff';
+        document.body.classList.toggle('bubble-exhausted-dark', useDarkTheme);
+        document.documentElement.style.backgroundColor = surfaceColor;
+        document.body.style.background = surfaceColor;
         document.body.style.backgroundImage = 'none';
 
-        const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
         if (portfolioMainLayer) {
             portfolioMainLayer.style.backgroundColor = 'transparent';
         }
 
-        const bubbleLayer = document.querySelector('.bubble-bg-layer');
         if (bubbleLayer) {
             bubbleLayer.style.display = 'block';
-            bubbleLayer.style.background = '#ffffff';
+            bubbleLayer.style.background = surfaceColor;
         }
-    }
 
-    const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
+        if (bubbleCanvas) {
+            bubbleCanvas.style.setProperty('background', surfaceColor, 'important');
+        }
+    };
+
+    if (isLightBackgroundPage) {
+        applyPageSurfaceMode(false);
+    }
 
     const initInteractiveBubbleBackground = function (canvas) {
         const ctx = canvas.getContext('2d');
@@ -52,20 +72,40 @@ document.addEventListener('DOMContentLoaded', function () {
         const popEffects = [];
         let width = 0;
         let height = 0;
+        let topInset = 0;
         let rafBubbleId = null;
         let lastFrameTime = 0;
-        const wallPopSpeedThreshold = prefersReducedMotion ? 11.1925 : 9.68;
-        const bubblePopImpactThreshold = prefersReducedMotion ? 10.285 : 8.7725;
+        let bubblesExhausted = false;
+        let hasInitializedBubbles = false;
+        const wallPopSpeedThreshold = prefersReducedMotion ? 12.31 : 10.65;
+        const bubblePopImpactThreshold = prefersReducedMotion ? 11.31 : 9.65;
 
         const randomBetween = function (min, max) {
             return Math.random() * (max - min) + min;
         };
 
+        const getTopInset = function () {
+            const navElement = document.querySelector('.portfolio-nav');
+
+            if (!navElement) {
+                return 0;
+            }
+
+            const navRect = navElement.getBoundingClientRect();
+            return Math.max(0, Math.ceil(navRect.bottom + 4));
+        };
+
         const createBubble = function () {
+            const radius = randomBetween(50, 70);
+            const minX = radius;
+            const maxX = Math.max(minX, (width || window.innerWidth) - radius);
+            const minY = radius + topInset;
+            const maxY = Math.max(minY, (height || window.innerHeight) - radius);
+
             return {
-                x: randomBetween(0, width || window.innerWidth),
-                y: randomBetween(0, height || window.innerHeight),
-                radius: randomBetween(50, 70),
+                x: randomBetween(minX, maxX),
+                y: randomBetween(minY, maxY),
+                radius: radius,
                 vx: randomBetween(-0.18, 0.18),
                 vy: randomBetween(-0.12, 0.12),
                 alpha: randomBetween(0.55, 1),
@@ -78,19 +118,39 @@ document.addEventListener('DOMContentLoaded', function () {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             width = window.innerWidth;
             height = window.innerHeight;
+            topInset = getTopInset();
             canvas.width = Math.max(1, Math.floor(width * dpr));
             canvas.height = Math.max(1, Math.floor(height * dpr));
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-            const density = prefersReducedMotion ? 95 : 70;
-            const baseCount = Math.max(10, Math.min(28, Math.round(width / density)));
-            const nextCount = Math.max(7, Math.round(baseCount * 0.7));
-
-            while (bubbles.length < nextCount) {
-                bubbles.push(createBubble());
+            if (bubblesExhausted) {
+                bubbles.length = 0;
+                applyPageSurfaceMode(true);
+                return;
             }
 
-            bubbles.length = nextCount;
+            if (!hasInitializedBubbles) {
+                const density = prefersReducedMotion ? 95 : 70;
+                const baseCount = Math.max(10, Math.min(28, Math.round(width / density)));
+                const nextCount = Math.max(7, Math.round(baseCount * 0.7));
+
+                while (bubbles.length < nextCount) {
+                    bubbles.push(createBubble());
+                }
+
+                bubbles.length = nextCount;
+                hasInitializedBubbles = true;
+            }
+
+            bubbles.forEach(function (bubble) {
+                const minX = bubble.radius;
+                const maxX = Math.max(minX, width - bubble.radius);
+                const minY = topInset + bubble.radius;
+                const maxY = Math.max(minY, height - bubble.radius);
+                bubble.x = Math.min(maxX, Math.max(minX, bubble.x));
+                bubble.y = Math.min(maxY, Math.max(minY, bubble.y));
+            });
+            applyPageSurfaceMode(bubbles.length === 0);
         };
 
         const drawBubble = function (bubble, time) {
@@ -232,6 +292,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 if ((dx * dx) + (dy * dy) <= (hitRadius * hitRadius)) {
                     createPopEffect(bubble);
                     bubbles.splice(i, 1);
+                    if (bubbles.length === 0) {
+                        bubblesExhausted = true;
+                        applyPageSurfaceMode(true);
+                    }
                     return true;
                 }
             }
@@ -249,6 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const deltaMs = lastFrameTime > 0 ? Math.min(40, Math.max(8, time - lastFrameTime)) : 16.67;
             lastFrameTime = time;
+            topInset = getTopInset();
 
             ctx.clearRect(0, 0, width, height);
             const poppedBubbles = new Set();
@@ -366,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const minX = bubble.radius;
                 const maxX = Math.max(minX, width - bubble.radius);
-                const minY = bubble.radius;
+                const minY = topInset + bubble.radius;
                 const maxY = Math.max(minY, height - bubble.radius);
 
                 if (bubble.x < minX) {
@@ -429,6 +494,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
+            if (bubbles.length === 0) {
+                bubblesExhausted = true;
+            }
+
+            applyPageSurfaceMode(bubblesExhausted || bubbles.length === 0);
             updatePopEffects(deltaMs);
             drawPopEffects();
         };
@@ -445,7 +515,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const target = event.target;
-            if (target && target.closest && target.closest('a, button, input, textarea, select, label, [role="button"], .portfolio-nav, .chatbot-container, .chatbot-toggle-btn')) {
+            if (target && target.closest && target.closest('a, button, input, textarea, select, label, [role="button"], .chat-widget, .chatbot-container, .chatbot-toggle-btn')) {
                 return;
             }
 

@@ -15,6 +15,121 @@ body.project-page {
     background-image: none !important;
 }
 
+body.portfolio-page.bubble-exhausted-dark {
+    --theme-ink: #f1f1f1;
+    --theme-subtle: #d7d7d7;
+    --theme-accent: #ffffff;
+    --theme-accent-strong: #ffffff;
+    --theme-border: rgba(255, 255, 255, 0.24);
+    --theme-surface: rgba(20, 20, 24, 0.9);
+    --theme-glow: rgba(255, 255, 255, 0.16);
+    color: #e8e8e8;
+    background: #0f1012 !important;
+    background-image: none !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark .bubble-bg-layer {
+    background: #0f1012 !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark section {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark hr {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    opacity: 1;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav-link:hover,
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav-link:focus-visible {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav-toggler {
+    background: rgba(24, 24, 28, 0.94);
+    border-color: rgba(255, 255, 255, 0.24) !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav-toggler:hover {
+    box-shadow: 0 0 0 0.18rem rgba(255, 255, 255, 0.2) !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23f2f2f2' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
+    background: rgba(22, 22, 26, 0.96);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav {
+    background: rgba(20, 20, 24, 0.94);
+    background-image: none;
+}
+
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h1,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h2,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h3,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h4,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h5,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg p,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg li,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg span,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg div,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg b,
+body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg strong {
+    color: #ececef !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_card {
+    background-color: rgba(32, 32, 38, 0.92) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45) !important;
+    border-radius: 14px;
+}
+
+body.portfolio-page.bubble-exhausted-dark .career_card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 0;
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_card_text hr,
+body.portfolio-page.bubble-exhausted-dark .career_cards hr {
+    border-color: rgba(255, 255, 255, 0.22);
+    opacity: 1;
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_card_img,
+body.portfolio-page.bubble-exhausted-dark .hobby_card_img {
+    background-color: rgba(22, 22, 26, 0.92) !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42) !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark .tag {
+    background-color: rgba(95, 95, 104, 0.9) !important;
+    color: #f3f3f5 !important;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35) !important;
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_card *,
+body.portfolio-page.bubble-exhausted-dark .career_card *,
+body.portfolio-page.bubble-exhausted-dark .hobby_card *,
+body.portfolio-page.bubble-exhausted-dark .main_title,
+body.portfolio-page.bubble-exhausted-dark .contact,
+body.portfolio-page.bubble-exhausted-dark .career_card_date,
+body.portfolio-page.bubble-exhausted-dark .hobbys_subtitle,
+body.portfolio-page.bubble-exhausted-dark .foot {
+    color: #e7e7ea !important;
+}
+
 body.portfolio-page .bubble-bg-layer {
     display: block !important;
 }
