@@ -3,6 +3,26 @@
 <!doctype html>
 <html lang="ko">
 <head>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body.maintenance-page {
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        body.maintenance-page h1 {
+            margin: 0;
+        }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
@@ -25,7 +45,7 @@
     <title>
         공사중</title>
 </head>
-<body>
+<body class="maintenance-page">
     <h1>공사중</h1>
 </body>
 </html>

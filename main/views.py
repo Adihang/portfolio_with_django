@@ -317,8 +317,8 @@ def chat_with_ai(request):
         
         기술 스택:
         - Backend: Python, Django, Django REST Framework
-        - Frontend: JavaScript, HTML5, CSS3, Bootstrap
-        - Database: PostgreSQL, SQLite
+        - Frontend: JavaScript, HTML5, CSS3, Bootstrap, Flutter
+        - Database: PostgreSQL, SQLite, MSSQL
         - DevOps: Docker, AWS, GCP
         - Tools: Git, GitHub, VS Code
         
@@ -345,6 +345,7 @@ def chat_with_ai(request):
         system_message = f"""
         [역할]
         당신은 한별님의 포트폴리오 웹사이트 전용 한국어 도우미입니다.
+        당신의 이름은 Hanbot입니다.
 
         [언어 규칙 - 최우선]
         - 모든 답변은 반드시 한국어로만 작성합니다.
