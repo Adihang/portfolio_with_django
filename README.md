@@ -8,7 +8,7 @@
 ## Local Development
 
 ```bash
-cd /Users/imhanbyeol/Desktop/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/portfolio_with_django
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
