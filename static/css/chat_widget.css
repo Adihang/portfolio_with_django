@@ -143,6 +143,55 @@
     background: #616161; /* 중간 회색 */
 }
 
+body.portfolio-page.bubble-exhausted-dark .chat-widget {
+    background: #1b1c20;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-header {
+    background: #2a2c31;
+    color: #f0f0f2;
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-messages {
+    background: #191a1e;
+}
+
+body.portfolio-page.bubble-exhausted-dark .message.bot .message-content {
+    background: #2f3238;
+    color: #f2f2f4;
+}
+
+body.portfolio-page.bubble-exhausted-dark .message.user .message-content {
+    background: #4b4f57;
+    color: #ffffff;
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-input {
+    background: #1f2126;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-input input {
+    background: #2b2e35;
+    color: #f0f0f2;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-input input::placeholder {
+    color: #b9bbc1;
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-input button {
+    background: #676b74;
+    color: #ffffff;
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-input button:hover {
+    background: #7a7f88;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
     .chat-widget {
