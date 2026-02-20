@@ -143,6 +143,21 @@
     background: #616161; /* 중간 회색 */
 }
 
+body.portfolio-page .chat-widget,
+body.portfolio-page .chat-header,
+body.portfolio-page .chat-header h3,
+body.portfolio-page .chat-messages,
+body.portfolio-page .message-content,
+body.portfolio-page .chat-input,
+body.portfolio-page .chat-input input,
+body.portfolio-page .chat-input button {
+    transition:
+        background-color 0.62s cubic-bezier(0.22, 1, 0.36, 1),
+        color 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.62s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 body.portfolio-page.bubble-exhausted-dark .chat-widget {
     background: #1b1c20;
     border: 1px solid rgba(255, 255, 255, 0.14);
@@ -152,6 +167,11 @@ body.portfolio-page.bubble-exhausted-dark .chat-widget {
 body.portfolio-page.bubble-exhausted-dark .chat-header {
     background: #2a2c31;
     color: #f0f0f2;
+}
+
+body.portfolio-page.bubble-exhausted-dark .chat-toggle:hover,
+body.portfolio-page.bubble-exhausted-dark .chat-toggle:focus-visible {
+    text-shadow: 0 0 18px rgba(255, 255, 255, 0.95);
 }
 
 body.portfolio-page.bubble-exhausted-dark .chat-messages {

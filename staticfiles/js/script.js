@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const surfaceColor = useDarkTheme ? '#0f1012' : '#ffffff';
         document.body.classList.toggle('bubble-exhausted-dark', useDarkTheme);
         document.documentElement.style.backgroundColor = surfaceColor;
-        document.body.style.background = surfaceColor;
+        document.body.style.backgroundColor = surfaceColor;
         document.body.style.backgroundImage = 'none';
 
         if (portfolioMainLayer) {
@@ -45,11 +45,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (bubbleLayer) {
             bubbleLayer.style.display = 'block';
-            bubbleLayer.style.background = surfaceColor;
+            bubbleLayer.style.backgroundColor = surfaceColor;
         }
 
         if (bubbleCanvas) {
-            bubbleCanvas.style.setProperty('background', surfaceColor, 'important');
+            bubbleCanvas.style.setProperty('background-color', surfaceColor, 'important');
         }
     };
 
