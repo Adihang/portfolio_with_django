@@ -1,33 +1,33 @@
-name: Django CI
+# name: Django CI
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-env:
-  PROJECT_NAME: portfolio_with_django
-  BUCKET_NAME: django-github-action
-  CODE_DEPLOY_APP_NAME: django_github_action
-  DEPLOYMENT_GROUP_NAME: github_action
+# on:
+#   push:
+#     branches: [ "main" ]
+#   pull_request:
+#     branches: [ "main" ]
+# env:
+#   PROJECT_NAME: portfolio_with_django
+#   BUCKET_NAME: django-github-action
+#   CODE_DEPLOY_APP_NAME: django_github_action
+#   DEPLOYMENT_GROUP_NAME: github_action
   
-jobs:
-  deploy:
-    name: deploy
-    runs-on: ubuntu-latest # 실행될 인스턴스 OS와 버전
+# jobs:
+#   deploy:
+#     name: deploy
+#     runs-on: ubuntu-latest # 실행될 인스턴스 OS와 버전
 
-    steps:
-      - name: excuting remote ssh commands
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.REMOTE_IP }} # 인스턴스 IP test
-          username: ${{ secrets.REMOTE_USER }} # 우분투 아이디
-          key: ${{ secrets.REMOTE_PRIVATE_KEY }} # ec2 instance pem key
-          port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
-          script: | # 실행할 스크립트
-            cd ~/portfolio_with_django
-            git reset --hard
-            git pull
+#     steps:
+#       - name: excuting remote ssh commands
+#         uses: appleboy/ssh-action@v1.0.3
+#         with:
+#           host: ${{ secrets.REMOTE_IP }} # 인스턴스 IP test
+#           username: ${{ secrets.REMOTE_USER }} # 우분투 아이디
+#           key: ${{ secrets.REMOTE_PRIVATE_KEY }} # ec2 instance pem key
+#           port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
+#           script: | # 실행할 스크립트
+#             cd ~/portfolio_with_django
+#             git reset --hard
+#             git pull
   # build:
 
   #   runs-on: ubuntu-22.04
