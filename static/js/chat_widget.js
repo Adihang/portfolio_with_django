@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
 
-        const normalizedText = typeof text === 'string' ? text : String(text ?? '');
+        const normalizedText = typeof text === 'string' ? text : String(text == null ? '' : text);
         const lines = normalizedText.split('\n');
         lines.forEach((line, index) => {
             appendTextWithLinks(contentDiv, line);

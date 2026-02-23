@@ -57,3 +57,16 @@
 - Django Admin log page is file-read mode: `/admin/main/accesslog/`.
 - Admin index includes a direct link: `/admin/` -> `운영 로그` -> `접속 로그 (파일 직접 조회)`.
 - Logs are not imported into DB. `AccessLog` model/table and `import_access_logs` command are removed.
+
+## Browser JS Load Incident Notes
+- Observed symptom: private mode works, but normal profile sometimes fails to apply navbar style, mobile nav toggle, chatbot toggle, and bubble animation at the same time.
+- This pattern indicates stale/blocked JS in a specific browser profile (cache/extension/privacy setting), not a server-only outage.
+- Mitigations applied in this repo:
+- `main/templatetags/static_versioned.py` adds `static_v` tag to append `?v=<mtime>` for static assets.
+- Main templates now use `static_v` for CSS/JS (`templates/base.html`, `templates/none.html`, `templates/fun/*.html`, `templates/main/ProjectDetail.html`).
+- `templates/partials/static_script_fallback.html` adds `window.__reloadStaticScript` and `onerror` retry with cache-buster query.
+- `config/settings.py` forces JS MIME mapping to `application/javascript`.
+- `static/js/chat_widget.js` and `staticfiles/js/chat_widget.js` replaced `??` with older-compatible expression to reduce parser compatibility risk.
+- Quick verify:
+- `curl -s https://hanplanet.com/portfolio/ | rg "script.js\\?v=|chat_widget.js\\?v=|style.css\\?v="`
+- `curl -I https://hanplanet.com/static/js/script.js` should return `content-type: application/javascript`.

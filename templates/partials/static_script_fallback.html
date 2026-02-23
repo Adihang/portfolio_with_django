@@ -1,0 +1,39 @@
+<script>
+    (function () {
+        if (window.__reloadStaticScript) {
+            return;
+        }
+
+        window.__reloadStaticScript = function (scriptEl) {
+            if (!scriptEl) {
+                return;
+            }
+
+            if (scriptEl.dataset && scriptEl.dataset.retryOnce === '1') {
+                return;
+            }
+
+            var src = scriptEl.getAttribute('src');
+            if (!src) {
+                return;
+            }
+
+            if (scriptEl.dataset) {
+                scriptEl.dataset.retryOnce = '1';
+            }
+
+            var retryScript = document.createElement('script');
+            var cacheBuster = 'v=' + Date.now();
+            retryScript.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + cacheBuster;
+            retryScript.type = scriptEl.type || 'text/javascript';
+            retryScript.defer = scriptEl.defer;
+            retryScript.async = scriptEl.async;
+            retryScript.onerror = function () {
+                console.error('[static-js] retry failed:', retryScript.src);
+            };
+
+            scriptEl.parentNode.insertBefore(retryScript, scriptEl.nextSibling);
+            console.warn('[static-js] initial load failed, retrying:', src);
+        };
+    })();
+</script>
