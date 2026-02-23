@@ -235,3 +235,112 @@ tail -f ~/Library/Logs/gunicorn.out.log
 ps aux | rg cloudflared | rg -v rg
 curl -I https://hanplanet.com
 ```
+
+## 10. Docker Compose 운영 (Cloudflare Tunnel + Nginx + Gunicorn + Django)
+
+현재 로컬/운영 구조를 컨테이너로 동일하게 구성할 수 있습니다.
+
+- Django + Gunicorn: `Dockerfile`, `docker/entrypoint.sh`
+- Nginx: `docker/nginx/default.conf`
+- Cloudflare Tunnel: `docker/cloudflared/config.yml`
+- 오케스트레이션: `docker-compose.yml`
+
+### 10-1. 준비
+
+```bash
+cd /Users/imhanbyeol/Development/portfolio_with_django
+
+cp .env.docker.example .env.docker
+cp docker/cloudflared/config.yml.example docker/cloudflared/config.yml
+touch db.sqlite3
+```
+
+`docker/cloudflared/config.yml`의 `<TUNNEL_ID>`를 실제 값으로 바꾼 뒤,
+같은 이름의 credentials 파일을 배치합니다.
+
+```bash
+cp ~/.cloudflared/<TUNNEL_ID>.json docker/cloudflared/<TUNNEL_ID>.json
+```
+
+### 10-2. 실행
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+### 10-3. 동작 확인
+
+```bash
+# nginx(80) -> django(gunicorn) 확인
+curl -I http://127.0.0.1/portfolio/
+
+# 컨테이너 로그 확인
+docker compose logs -f django nginx cloudflared
+```
+
+### 10-4. 중지/재시작
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+## 11. 접속 로그 30일 보관 (Nginx JSON Access Log)
+
+현재 저장소에는 접속 로그를 JSON 형태로 남기고 30일 보관하는 설정이 포함되어 있습니다.
+
+- Nginx 로그 포맷: `nginx/nginx.autorun.conf` (`access_json`)
+- 로그 파일: `/opt/homebrew/var/log/nginx/access_json.log`
+- 회전/정리 스크립트: `scripts/rotate-nginx-access-json.sh`
+- macOS launchd 에이전트 템플릿: `deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist`
+- 로그 조회 URL: `/admin/main/accesslog/` (파일 직접 조회)
+
+### 11-1. Nginx 재적용
+
+```bash
+/opt/homebrew/opt/nginx/bin/nginx -t -c /Users/imhanbyeol/Development/portfolio_with_django/nginx/nginx.autorun.conf
+launchctl kickstart -k gui/$(id -u)/homebrew.mxcl.nginx
+```
+
+### 11-2. 수동 회전 테스트
+
+```bash
+cd /Users/imhanbyeol/Development/portfolio_with_django
+./scripts/rotate-nginx-access-json.sh
+ls -lh /opt/homebrew/var/log/nginx/access_json*
+```
+
+### 11-3. 매일 자동 실행(00:05) 등록
+
+```bash
+cp /Users/imhanbyeol/Development/portfolio_with_django/deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist \
+  ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
+
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.nginx-accesslog-rotate
+launchctl print gui/$(id -u)/com.hanplanet.nginx-accesslog-rotate
+```
+
+삭제하려면:
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
+rm -f ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
+```
+
+### 11-4. Django Admin에서 조회
+
+관리자 페이지는 DB 적재 없이 Nginx 로그 파일을 직접 읽어 보여줍니다.
+
+- URL: `/admin/main/accesslog/`
+- 관리자 메인(`/admin/`)의 `운영 로그` 섹션 링크로 이동 가능
+- 접속할 때마다 파일을 다시 읽어 최신 로그를 표시
+- 조회 대상: `access_json.log`, `access_json_*.log`, `access_json_*.log.gz`
+- 조회 화면은 커스텀 URL/템플릿 기반이며 DB 모델을 사용하지 않음
+
+### 11-5. 데이터 적재 관련 현재 상태
+
+- `AccessLog` 모델/테이블은 삭제됨 (DB에 로그 미적재 정책)
+- `import_access_logs` 관리 명령어는 제거됨
+- 보관 정책은 파일 회전 + 30일 삭제로만 관리
