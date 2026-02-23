@@ -37,3 +37,23 @@
 ## Security & Configuration Notes
 - Secrets are expected in `config/secrets.json` (git-ignored). Do not commit API keys.
 - Production uses `DEBUG = False` and deploys via GitHub Actions to EC2; static files must be collected.
+
+## Docker Runtime Stack (for later testing)
+- Container chain: `cloudflared -> nginx -> gunicorn(django)`.
+- Key files: `docker-compose.yml`, `Dockerfile`, `docker/entrypoint.sh`, `docker/nginx/default.conf`, `docker/cloudflared/config.yml.example`, `.env.docker.example`.
+
+## Docker Test Quickstart
+- Prepare env and tunnel config: `cp .env.docker.example .env.docker` and `cp docker/cloudflared/config.yml.example docker/cloudflared/config.yml`.
+- Replace `<TUNNEL_ID>` in `docker/cloudflared/config.yml`.
+- Copy tunnel credentials: `cp ~/.cloudflared/<TUNNEL_ID>.json docker/cloudflared/<TUNNEL_ID>.json`.
+- Ensure DB file exists: `touch db.sqlite3`.
+- Start stack: `docker compose up -d --build`.
+- Check status/logs: `docker compose ps` and `docker compose logs -f django nginx cloudflared`.
+- Smoke test: `curl -I http://127.0.0.1/portfolio/`.
+
+## Access Log Operation Notes
+- Nginx access log is JSON format (`access_json`) and written to `/opt/homebrew/var/log/nginx/access_json.log`.
+- Rotation and retention are file-based only: `scripts/rotate-nginx-access-json.sh` keeps 30 days.
+- Django Admin log page is file-read mode: `/admin/main/accesslog/`.
+- Admin index includes a direct link: `/admin/` -> `운영 로그` -> `접속 로그 (파일 직접 조회)`.
+- Logs are not imported into DB. `AccessLog` model/table and `import_access_logs` command are removed.

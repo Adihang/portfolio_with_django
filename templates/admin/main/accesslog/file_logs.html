@@ -1,0 +1,76 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <p>로그 디렉토리: <code>{{ log_dir }}</code></p>
+    <p>
+        최근 {{ days }}일 / 표시 가능 로그 {{ total_count }}건 / 스캔 파일 {{ scanned_files }}개
+        {% if parse_errors %}/ 파싱 실패 {{ parse_errors }}건{% endif %}
+    </p>
+
+    <form method="get" style="margin: 12px 0 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <label>
+            최근 일수
+            <input type="number" name="days" min="1" max="30" value="{{ days }}">
+        </label>
+        <label>
+            페이지 크기
+            <input type="number" name="per_page" min="20" max="500" value="{{ per_page }}">
+        </label>
+        <button type="submit" class="button">적용</button>
+    </form>
+
+    <div class="results">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th>시각</th>
+                    <th>상태</th>
+                    <th>메서드</th>
+                    <th>호스트</th>
+                    <th>경로</th>
+                    <th>처리시간(초)</th>
+                    <th>IP</th>
+                    <th>User-Agent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in file_logs %}
+                <tr>
+                    <td>{{ row.logged_at }}</td>
+                    <td>{{ row.status }}</td>
+                    <td>{{ row.method }}</td>
+                    <td>{{ row.host }}</td>
+                    <td>{{ row.path }}</td>
+                    <td>{{ row.request_time_s }}</td>
+                    <td>{{ row.client_ip }}</td>
+                    <td>{{ row.user_agent|truncatechars:80 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8">표시할 로그가 없습니다.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <p style="margin-top: 12px;">
+        페이지 {{ page_obj.number }} / {{ paginator.num_pages }}
+        {% if page_obj.has_previous %}
+            <a href="?p={{ page_obj.previous_page_number }}{% if base_query %}&{{ base_query }}{% endif %}">이전</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+            <a href="?p={{ page_obj.next_page_number }}{% if base_query %}&{{ base_query }}{% endif %}">다음</a>
+        {% endif %}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}
