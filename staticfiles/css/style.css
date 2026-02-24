@@ -6,13 +6,13 @@ body {
 }
 
 body.portfolio-page {
-    background: #ffffff !important;
-    background-image: none !important;
+    background: #ffffff;
+    background-image: none;
 }
 
 body.project-page {
-    background: #ffffff !important;
-    background-image: none !important;
+    background: #ffffff;
+    background-image: none;
 }
 
 body.portfolio-page,
@@ -60,20 +60,29 @@ body.portfolio-page.bubble-exhausted-dark {
     --theme-surface: rgba(20, 20, 24, 0.9);
     --theme-glow: rgba(255, 255, 255, 0.16);
     color: #e8e8e8;
-    background: #0f1012 !important;
-    background-image: none !important;
+    background: #0f1012;
+    background-image: none;
+}
+
+html.preload-light-bg body.portfolio-page.bubble-exhausted-dark {
+    background: #0f1012;
+    background-image: none;
 }
 
 body.portfolio-page.bubble-exhausted-dark .bubble-bg-layer {
-    background: #0f1012 !important;
+    background: #0f1012;
+}
+
+body.portfolio-page.bubble-exhausted-dark #interactiveBubbleCanvas {
+    background: #0f1012;
 }
 
 body.portfolio-page.bubble-exhausted-dark section {
-    border-color: rgba(255, 255, 255, 0.28) !important;
+    border-color: rgba(255, 255, 255, 0.28);
 }
 
 body.portfolio-page.bubble-exhausted-dark hr {
-    border-color: rgba(255, 255, 255, 0.28) !important;
+    border-color: rgba(255, 255, 255, 0.28);
     opacity: 1;
 }
 
@@ -85,11 +94,11 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav-link:focus-visible {
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav-toggler {
     background: rgba(24, 24, 28, 0.94);
-    border-color: rgba(255, 255, 255, 0.24) !important;
+    border-color: rgba(255, 255, 255, 0.24);
 }
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav-toggler:hover {
-    box-shadow: 0 0 0 0.18rem rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 0 0 0.18rem rgba(255, 255, 255, 0.2);
 }
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav .navbar-toggler-icon {
@@ -98,12 +107,17 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav .navbar-toggler-icon {
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
     background: rgba(22, 22, 26, 0.96);
-    border-color: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    outline: none;
+    box-shadow: none;
 }
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav {
     background: rgba(20, 20, 24, 0.94);
     background-image: none;
+    box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.58),
+        0 12px 26px rgba(255, 255, 255, 0.16);
 }
 
 body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg,
@@ -118,20 +132,20 @@ body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg span,
 body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg div,
 body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg b,
 body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg strong {
-    color: #ececef !important;
+    color: #ececef;
 }
 
 body.portfolio-page.bubble-exhausted-dark .project_card {
-    background-color: rgba(32, 32, 38, 0.92) !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45) !important;
+    background-color: rgba(32, 32, 38, 0.92);
+    border: none;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
     border-radius: 14px;
 }
 
 body.portfolio-page.bubble-exhausted-dark .career_card {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+    background: transparent;
+    border: none;
+    box-shadow: none;
     border-radius: 0;
     padding: 0;
     margin-bottom: 0;
@@ -145,14 +159,14 @@ body.portfolio-page.bubble-exhausted-dark .career_cards hr {
 
 body.portfolio-page.bubble-exhausted-dark .project_card_img,
 body.portfolio-page.bubble-exhausted-dark .hobby_card_img {
-    background-color: rgba(22, 22, 26, 0.92) !important;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42) !important;
+    background-color: rgba(22, 22, 26, 0.92);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42);
 }
 
 body.portfolio-page.bubble-exhausted-dark .tag {
-    background-color: rgba(95, 95, 104, 0.9) !important;
-    color: #f3f3f5 !important;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35) !important;
+    background-color: rgba(95, 95, 104, 0.9);
+    color: #f3f3f5;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
 }
 
 body.portfolio-page.bubble-exhausted-dark .project_card *,
@@ -163,11 +177,11 @@ body.portfolio-page.bubble-exhausted-dark .contact,
 body.portfolio-page.bubble-exhausted-dark .career_card_date,
 body.portfolio-page.bubble-exhausted-dark .hobbys_subtitle,
 body.portfolio-page.bubble-exhausted-dark .foot {
-    color: #e7e7ea !important;
+    color: #e7e7ea;
 }
 
 body.portfolio-page .bubble-bg-layer {
-    display: block !important;
+    display: block;
 }
 
 .bubble-bg-layer {
@@ -189,12 +203,12 @@ body.portfolio-page .bubble-bg-layer {
     position: relative;
     z-index: 1;
     min-height: 100vh;
-    background-color: transparent !important;
+    background-color: transparent;
 }
 
 body.portfolio-page section {
-    background: transparent !important;
-    background-color: transparent !important;
+    background: transparent;
+    background-color: transparent;
 }
 
 :root {
@@ -217,18 +231,35 @@ body.portfolio-page section {
     top: 0;
     z-index: 1030;
     padding: 9.6px 18px;
-    border-bottom: 1px solid var(--theme-border);
+    border-bottom: none;
     background: linear-gradient(90deg, var(--theme-surface), rgba(243, 243, 243, 0.97));
     backdrop-filter: blur(8px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .portfolio-nav::after {
     content: "";
+    display: none;
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    height: 3px;
+    height: 2px;
+    background-image: repeating-linear-gradient(
+        90deg,
+        #eeeeee 0px,
+        #eeeeee 180px,
+        #b3b3b3 360px,
+        #656565 540px,
+        #eeeeee 720px
+    );
+    background-size: 720px 100%;
+    background-position: 0 0;
+    opacity: 0.86;
+    animation: nav-underline-flow-right 4.2s linear infinite;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     background-image: repeating-linear-gradient(
         90deg,
         #111111 0px,
@@ -237,10 +268,6 @@ body.portfolio-page section {
         #9a9a9a 540px,
         #111111 720px
     );
-    background-size: 720px 100%;
-    background-position: 0 0;
-    opacity: 0.86;
-    animation: nav-underline-flow-right 4.2s linear infinite;
 }
 
 @keyframes nav-underline-flow-right {
@@ -257,6 +284,9 @@ body.portfolio-page section {
     max-width: 1200px;
     padding-left: 0;
     padding-right: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
 }
 
 .portfolio-brand {
@@ -266,25 +296,101 @@ body.portfolio-page section {
     gap: 0;
     margin-right: 16px;
     text-align: left;
-    color: var(--theme-ink) !important;
+    color: var(--theme-ink);
     font-weight: 750;
     letter-spacing: -0.2px;
+    text-decoration: none;
 }
 
 .portfolio-brand-text {
     font-size: 20px;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.portfolio-brand:visited,
+.portfolio-brand:hover,
+.portfolio-brand:focus-visible,
+.portfolio-brand:active {
+    color: var(--theme-ink);
+    text-decoration: none;
+}
+
+.portfolio-brand:hover .portfolio-brand-text,
+.portfolio-brand:focus-visible .portfolio-brand-text {
+    transform: scale(1.06);
+}
+
+.portfolio-nav .portfolio-nav-collapse {
+    display: flex;
+    flex-grow: 1;
+    flex-basis: auto;
+    align-items: center;
+    min-width: 0;
 }
 
 .portfolio-nav-links {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin: 0 0 0 auto;
+    padding: 0;
+    list-style: none;
     gap: 8px;
     flex-wrap: nowrap;
+    border: none;
+    outline: none;
+    outline-offset: 0;
+    outline-color: transparent;
+    outline-style: none;
+    outline-width: 0;
+    box-shadow: none;
+}
+
+.portfolio-nav .container-fluid,
+.portfolio-nav .nav-item,
+.portfolio-nav .collapse,
+.portfolio-nav .collapse.show,
+.portfolio-nav .collapse.collapsing,
+.portfolio-nav .portfolio-nav-collapse,
+.portfolio-nav .portfolio-nav-collapse.show,
+.portfolio-nav .portfolio-nav-collapse.collapsing,
+.portfolio-nav .portfolio-nav-links {
+    border: none;
+    outline: none;
+    outline-offset: 0;
+    outline-color: transparent;
+    outline-style: none;
+    outline-width: 0;
+    box-shadow: none;
+    list-style: none;
+}
+
+.portfolio-nav .container-fluid:focus,
+.portfolio-nav .container-fluid:focus-visible,
+.portfolio-nav .container-fluid:focus-within,
+.portfolio-nav .nav-item:focus,
+.portfolio-nav .nav-item:focus-visible,
+.portfolio-nav .nav-item:focus-within,
+.portfolio-nav .collapse:focus,
+.portfolio-nav .collapse:focus-visible,
+.portfolio-nav .collapse:focus-within,
+.portfolio-nav .portfolio-nav-links:focus,
+.portfolio-nav .portfolio-nav-links:focus-visible,
+.portfolio-nav .portfolio-nav-links:focus-within,
+.portfolio-nav .portfolio-nav-collapse:focus,
+.portfolio-nav .portfolio-nav-collapse:focus-visible,
+.portfolio-nav .portfolio-nav-collapse:focus-within {
+    border: none;
+    outline: none;
+    box-shadow: none;
 }
 
 .portfolio-nav-link {
-    padding: 6.4px 14px !important;
+    padding: 6.4px 14px;
     border-radius: 999px;
     border: 1px solid transparent;
-    color: var(--theme-subtle) !important;
+    color: var(--theme-subtle);
     font-weight: 600;
     transition: all 0.2s ease;
     white-space: nowrap;
@@ -292,14 +398,15 @@ body.portfolio-page section {
 
 .portfolio-nav-link:hover,
 .portfolio-nav-link:focus-visible {
-    color: var(--theme-accent-strong) !important;
+    color: var(--theme-accent-strong);
     background-color: rgba(0, 0, 0, 0.06);
     border-color: rgba(0, 0, 0, 0.24);
     transform: translateY(-1px);
 }
 
 .portfolio-nav-toggler {
-    border: 1px solid var(--theme-border) !important;
+    display: none;
+    border: 1px solid var(--theme-border);
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.95);
     padding: 6px 10px;
@@ -307,12 +414,12 @@ body.portfolio-page section {
 }
 
 .portfolio-nav-toggler:hover {
-    border-color: var(--theme-border) !important;
-    box-shadow: 0 0 0 0.18rem rgba(0, 0, 0, 0.12) !important;
+    border-color: var(--theme-border);
+    box-shadow: 0 0 0 0.18rem rgba(0, 0, 0, 0.12);
 }
 
 .portfolio-nav-toggler:focus:not(:hover) {
-    box-shadow: none !important;
+    box-shadow: none;
 }
 
 .portfolio-nav .navbar-toggler-icon {
@@ -335,45 +442,80 @@ body.portfolio-page section {
 }
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-toggler {
-    display: block !important;
+    display: block;
     margin-left: auto;
 }
 
-.portfolio-nav.nav-auto-collapsed .navbar-collapse {
-    display: none !important;
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-collapse {
+    display: none;
     order: 3;
     width: 100%;
     flex-basis: 100%;
     margin-top: 8px;
 }
 
-.portfolio-nav.nav-auto-collapsed .navbar-collapse.show {
-    display: block !important;
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-collapse.show {
+    display: block;
 }
 
-.portfolio-nav.nav-auto-collapsed .navbar-collapse.collapsing {
-    display: block !important;
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-collapse.collapsing {
+    display: block;
     margin-top: 8px;
     overflow: hidden;
 }
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
     margin-top: 0;
-    margin-left: 0 !important;
+    margin-left: 0;
     padding: 8px;
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.98);
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(0, 0, 0, 0.14);
     width: 100%;
-    gap: 6px;
+    gap: 0;
+    box-shadow: none;
 }
 
-.portfolio-nav.nav-auto-collapsed .navbar-nav {
+@media (forced-colors: active) {
+    .portfolio-nav,
+    .portfolio-nav .container-fluid,
+    .portfolio-nav .nav-item,
+    .portfolio-nav .collapse,
+    .portfolio-nav .collapse.show,
+    .portfolio-nav .collapse.collapsing,
+    .portfolio-nav-links,
+    .portfolio-nav .portfolio-nav-collapse,
+    .portfolio-nav .portfolio-nav-collapse.show,
+    .portfolio-nav .portfolio-nav-collapse.collapsing,
+    .portfolio-nav.nav-auto-collapsed .portfolio-nav-links,
+    body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
+        forced-color-adjust: none;
+        border: none;
+        outline: none;
+        box-shadow: none;
+    }
+}
+
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
     flex-direction: column;
 }
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-link {
     display: block;
+}
+
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item {
+    width: 100%;
+}
+
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item + .nav-item {
+    border-top: 1px solid rgba(0, 0, 0, 0.16);
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item + .nav-item {
+    border-top-color: rgba(255, 255, 255, 0.2);
 }
 .ogimage{
     padding-right: 30;
@@ -660,10 +802,15 @@ input[type=submit] {
 }
 
 .foot{
-    display: inline-block;
+    display: inline-flex;
+    align-items: flex-end;
     padding-left: 30px;
     padding-right: 30px;
-    padding-bottom: 30px;
+    padding-top: 4px;
+    padding-bottom: 14px;
+    line-height: 1.2;
+    font-weight: 300;
+    font-size: 0.9rem;
 }
 .hobby_card {
     margin-bottom: 10px;
@@ -678,4 +825,20 @@ input[type=submit] {
     border-radius: 15px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     background-color: white;
+}
+
+.portfolio-nav .container-fluid::before,
+.portfolio-nav .container-fluid::after,
+.portfolio-nav .nav-item::before,
+.portfolio-nav .nav-item::after,
+.portfolio-nav .collapse::before,
+.portfolio-nav .collapse::after,
+.portfolio-nav .portfolio-nav-collapse::before,
+.portfolio-nav .portfolio-nav-collapse::after,
+.portfolio-nav .portfolio-nav-links::before,
+.portfolio-nav .portfolio-nav-links::after {
+    content: none;
+    border: none;
+    outline: none;
+    box-shadow: none;
 }

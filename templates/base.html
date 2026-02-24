@@ -3,11 +3,11 @@
 <!doctype html>
 <html lang="ko">
 <head>
-    <style>
+    <style data-surface-light="base-preload">
         html.preload-light-bg,
         html.preload-light-bg body {
-            background: #ffffff !important;
-            background-image: none !important;
+            background: #ffffff;
+            background-image: none;
         }
     </style>
     <script>
@@ -50,7 +50,7 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
     <!-- 네비게이션바 -->
-    <nav class="navbar navbar-expand portfolio-nav">
+    <nav class="navbar portfolio-nav">
         <div class="container-fluid">
             <a class="navbar-brand portfolio-brand" href="{% url 'main:main' %}">
                 <span class="portfolio-brand-text">Hanbyel's Portfolio</span>
@@ -63,8 +63,8 @@
                     aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav ms-auto mb-0 portfolio-nav-links">
+            <div class="collapse portfolio-nav-collapse" id="navbarSupportedContent">
+                <ul class="portfolio-nav-links">
                     <li class="nav-item">
                         <a class="nav-link portfolio-nav-link" href="https://github.com/Adihang">GitHub</a>
                     </li>
