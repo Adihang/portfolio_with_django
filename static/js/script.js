@@ -86,6 +86,122 @@ document.addEventListener('DOMContentLoaded', function () {
         applyPageSurfaceMode(false);
     }
 
+    const enableNestedScrollPriority = function () {
+        const canUseOverflowScroll = function (overflowValue) {
+            return overflowValue === 'auto' || overflowValue === 'scroll' || overflowValue === 'overlay';
+        };
+
+        const hasScrollableY = function (element, style) {
+            return canUseOverflowScroll(style.overflowY) && (element.scrollHeight - element.clientHeight) > 1;
+        };
+
+        const hasScrollableX = function (element, style) {
+            return canUseOverflowScroll(style.overflowX) && (element.scrollWidth - element.clientWidth) > 1;
+        };
+
+        const canConsumeY = function (element, deltaY) {
+            if (deltaY < 0) {
+                return element.scrollTop > 0;
+            }
+
+            if (deltaY > 0) {
+                const maxScrollTop = element.scrollHeight - element.clientHeight;
+                return element.scrollTop < maxScrollTop - 1;
+            }
+
+            return false;
+        };
+
+        const canConsumeX = function (element, deltaX) {
+            if (deltaX < 0) {
+                return element.scrollLeft > 0;
+            }
+
+            if (deltaX > 0) {
+                const maxScrollLeft = element.scrollWidth - element.clientWidth;
+                return element.scrollLeft < maxScrollLeft - 1;
+            }
+
+            return false;
+        };
+
+        const normalizeWheelDelta = function (delta, deltaMode) {
+            if (deltaMode === 1) {
+                return delta * 16;
+            }
+
+            if (deltaMode === 2) {
+                return delta * window.innerHeight;
+            }
+
+            return delta;
+        };
+
+        const isEditableElement = function (element) {
+            if (!element || !element.closest) {
+                return false;
+            }
+
+            return Boolean(element.closest('input, textarea, select, option, [contenteditable="true"]'));
+        };
+
+        document.addEventListener('wheel', function (event) {
+            if (event.defaultPrevented || event.ctrlKey) {
+                return;
+            }
+
+            const eventTarget = event.target;
+            if (!(eventTarget instanceof Element) || isEditableElement(eventTarget)) {
+                return;
+            }
+
+            let deltaX = normalizeWheelDelta(event.deltaX, event.deltaMode);
+            let deltaY = normalizeWheelDelta(event.deltaY, event.deltaMode);
+
+            if (Math.abs(deltaX) < 0.01 && Math.abs(deltaY) < 0.01) {
+                return;
+            }
+
+            let current = eventTarget;
+            while (current && current !== document.body && current !== document.documentElement) {
+                if (!(current instanceof HTMLElement)) {
+                    current = current.parentElement;
+                    continue;
+                }
+
+                const style = window.getComputedStyle(current);
+                const canScrollY = hasScrollableY(current, style);
+                const canScrollX = hasScrollableX(current, style);
+
+                if (!canScrollX && !canScrollY) {
+                    current = current.parentElement;
+                    continue;
+                }
+
+                if (canScrollY && canConsumeY(current, deltaY)) {
+                    current.scrollTop += deltaY;
+                    event.preventDefault();
+                    return;
+                }
+
+                let horizontalDelta = deltaX;
+                if (Math.abs(horizontalDelta) < 0.01 && Math.abs(deltaY) > 0.01) {
+                    horizontalDelta = deltaY;
+                }
+
+                if (canScrollX && canConsumeX(current, horizontalDelta)) {
+                    current.scrollLeft += horizontalDelta;
+                    event.preventDefault();
+                    return;
+                }
+
+                current = current.parentElement;
+            }
+        }, { passive: false });
+    };
+
+    enableNestedScrollPriority();
+
     const initInteractiveBubbleBackground = function (canvas) {
         const ctx = canvas.getContext('2d');
 
@@ -99,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const popEffects = [];
         let width = 0;
         let height = 0;
+        let viewportMinDimension = 0;
         let topInset = 0;
         let rafBubbleId = null;
         let lastFrameTime = 0;
@@ -106,9 +223,29 @@ document.addEventListener('DOMContentLoaded', function () {
         let hasInitializedBubbles = false;
         const wallPopSpeedThreshold = prefersReducedMotion ? 12.31 : 10.65;
         const bubblePopImpactThreshold = prefersReducedMotion ? 11.31 : 9.65;
+        const fixedBubbleCount = 7;
 
         const randomBetween = function (min, max) {
             return Math.random() * (max - min) + min;
+        };
+
+        const clamp = function (value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        };
+
+        const getViewportMinDimension = function () {
+            const viewportWidth = width || window.innerWidth;
+            const viewportHeight = height || window.innerHeight;
+            return Math.max(320, Math.min(viewportWidth, viewportHeight));
+        };
+
+        const getBubbleRadiusRange = function () {
+            const base = getViewportMinDimension();
+            const baseMinRadius = Math.max(26, Math.round(base * 0.045));
+            const baseMaxRadius = Math.max(baseMinRadius + 8, Math.round(base * 0.063));
+            const minRadius = baseMinRadius * 2;
+            const maxRadius = Math.max(minRadius + 16, baseMaxRadius * 2);
+            return { min: minRadius, max: maxRadius };
         };
 
         const getTopInset = function () {
@@ -123,7 +260,8 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const createBubble = function () {
-            const radius = randomBetween(50, 70);
+            const radiusRange = getBubbleRadiusRange();
+            const radius = randomBetween(radiusRange.min, radiusRange.max);
             const minX = radius;
             const maxX = Math.max(minX, (width || window.innerWidth) - radius);
             const minY = radius + topInset;
@@ -143,31 +281,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const resizeCanvas = function () {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const previousViewportMinDimension = viewportMinDimension || getViewportMinDimension();
             width = window.innerWidth;
             height = window.innerHeight;
             topInset = getTopInset();
             canvas.width = Math.max(1, Math.floor(width * dpr));
             canvas.height = Math.max(1, Math.floor(height * dpr));
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const nextViewportMinDimension = getViewportMinDimension();
 
             if (bubblesExhausted) {
                 bubbles.length = 0;
                 applyPageSurfaceMode(true);
+                viewportMinDimension = nextViewportMinDimension;
                 return;
             }
 
             if (!hasInitializedBubbles) {
-                const density = prefersReducedMotion ? 95 : 70;
-                const baseCount = Math.max(10, Math.min(28, Math.round(width / density)));
-                const nextCount = Math.max(7, Math.round(baseCount * 0.7));
-
-                while (bubbles.length < nextCount) {
+                while (bubbles.length < fixedBubbleCount) {
                     bubbles.push(createBubble());
                 }
 
-                bubbles.length = nextCount;
+                bubbles.length = fixedBubbleCount;
                 hasInitializedBubbles = true;
+            } else if (previousViewportMinDimension > 0 && nextViewportMinDimension > 0) {
+                const resizeScale = nextViewportMinDimension / previousViewportMinDimension;
+                const radiusRange = getBubbleRadiusRange();
+
+                bubbles.forEach(function (bubble) {
+                    bubble.radius = clamp(bubble.radius * resizeScale, radiusRange.min, radiusRange.max);
+                });
             }
+
+            viewportMinDimension = nextViewportMinDimension;
 
             bubbles.forEach(function (bubble) {
                 const minX = bubble.radius;
