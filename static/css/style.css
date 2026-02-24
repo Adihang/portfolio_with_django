@@ -15,6 +15,21 @@ body.project-page {
     background-image: none;
 }
 
+body.portfolio-page ::-webkit-scrollbar,
+body.project-page ::-webkit-scrollbar {
+    background: transparent;
+}
+
+body.portfolio-page ::-webkit-scrollbar-track,
+body.project-page ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+body.portfolio-page ::-webkit-scrollbar-corner,
+body.project-page ::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
 body.portfolio-page,
 body.portfolio-page .bubble-bg-layer,
 body.portfolio-page #interactiveBubbleCanvas,
@@ -737,6 +752,65 @@ input[type=submit] {
     align-items: stretch; /* 카드 높이를 같은 라인에서 맞춤 */
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(120, 120, 128, 0.45) transparent;
+}
+
+.project_cards::-webkit-scrollbar {
+    height: 10px;
+}
+
+.project_cards::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 999px;
+}
+
+.project_cards::-webkit-scrollbar-thumb {
+    background: rgba(120, 120, 128, 0.45);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_cards {
+    scrollbar-color: rgba(198, 198, 205, 0.58) transparent;
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_cards::-webkit-scrollbar-thumb {
+    background: rgba(198, 198, 205, 0.52);
+}
+
+.project_cards::-webkit-scrollbar-thumb:hover {
+    background: rgba(95, 95, 103, 0.58);
+}
+
+body.portfolio-page.bubble-exhausted-dark .project_cards::-webkit-scrollbar-thumb:hover {
+    background: rgba(224, 224, 232, 0.68);
+}
+
+body.project-page .project_detail_content [style*="overflow-x: auto"],
+body.project-page .project_detail_content [style*="overflow-x:auto"] {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(120, 120, 128, 0.45) transparent;
+}
+
+body.project-page .project_detail_content [style*="overflow-x: auto"]::-webkit-scrollbar,
+body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-scrollbar {
+    height: 10px;
+    background: transparent;
+}
+
+body.project-page .project_detail_content [style*="overflow-x: auto"]::-webkit-scrollbar-track,
+body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+body.project-page .project_detail_content [style*="overflow-x: auto"]::-webkit-scrollbar-thumb,
+body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-scrollbar-thumb {
+    background: rgba(120, 120, 128, 0.45);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
 }
 .project_card{
     width: clamp(270px, calc(100vw - 120px), 600px);
