@@ -1,26 +1,25 @@
 {% extends 'base.html' %}
 {% block body_class %}portfolio-page{% endblock %}
 {% block content %}
-<style>
+<style data-surface-light="portfolio-main">
     body {
-        background: #ffffff !important;
-        background-image: none !important;
+        background: #ffffff;
+        background-image: none;
     }
 
     .bubble-bg-layer,
     #interactiveBubbleCanvas {
-        display: block !important;
-        background: #ffffff !important;
+        display: block;
     }
 
     .main-has-bubble-bg {
         min-height: 100vh;
-        background-color: transparent !important;
+        background-color: transparent;
     }
 
     .main-has-bubble-bg section {
-        background: transparent !important;
-        background-color: transparent !important;
+        background: transparent;
+        background-color: transparent;
     }
 </style>
 <div class="bubble-bg-layer" aria-hidden="true">

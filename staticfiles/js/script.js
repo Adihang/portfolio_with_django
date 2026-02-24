@@ -23,19 +23,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let currentSurfaceMode = null;
 
+    const setLightSurfaceStylesEnabled = function (enabled) {
+        const mediaValue = enabled ? 'all' : 'not all';
+        const taggedStyles = document.querySelectorAll('style[data-surface-light]');
+
+        taggedStyles.forEach(function (styleElement) {
+            styleElement.media = mediaValue;
+        });
+
+        const legacyStyles = document.querySelectorAll('style:not([data-surface-light])');
+        legacyStyles.forEach(function (styleElement) {
+            const cssText = styleElement.textContent || '';
+            const isLegacySurfaceStyle = cssText.includes('preload-light-bg') ||
+                (cssText.includes('interactiveBubbleCanvas') && cssText.includes('#ffffff')) ||
+                (cssText.includes('body') && cssText.includes('#ffffff') && cssText.includes('background'));
+
+            if (!isLegacySurfaceStyle) {
+                return;
+            }
+
+            styleElement.media = mediaValue;
+        });
+    };
+
     const applyPageSurfaceMode = function (useDarkTheme) {
         if (!isLightBackgroundPage) {
             return;
         }
-
-        if (currentSurfaceMode === useDarkTheme) {
-            return;
-        }
-
-        currentSurfaceMode = useDarkTheme;
         const surfaceColor = useDarkTheme ? '#0f1012' : '#ffffff';
+        currentSurfaceMode = useDarkTheme;
+        if (useDarkTheme) {
+            document.documentElement.classList.remove('preload-light-bg');
+        } else {
+            document.documentElement.classList.add('preload-light-bg');
+        }
+        setLightSurfaceStylesEnabled(!useDarkTheme);
         document.body.classList.toggle('bubble-exhausted-dark', useDarkTheme);
+        document.documentElement.style.background = surfaceColor;
         document.documentElement.style.backgroundColor = surfaceColor;
+        document.documentElement.style.backgroundImage = 'none';
+        document.body.style.background = surfaceColor;
         document.body.style.backgroundColor = surfaceColor;
         document.body.style.backgroundImage = 'none';
 
@@ -45,11 +72,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (bubbleLayer) {
             bubbleLayer.style.display = 'block';
+            bubbleLayer.style.background = surfaceColor;
             bubbleLayer.style.backgroundColor = surfaceColor;
         }
 
         if (bubbleCanvas) {
-            bubbleCanvas.style.setProperty('background-color', surfaceColor, 'important');
+            bubbleCanvas.style.background = surfaceColor;
+            bubbleCanvas.style.backgroundColor = surfaceColor;
         }
     };
 
@@ -66,8 +95,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const pointer = { x: 0, y: 0, active: false };
-        const bubbleBaseColor = '112, 112, 112';
-        const bubbleGlowColor = '186, 186, 186';
         const bubbles = [];
         const popEffects = [];
         let width = 0;
@@ -108,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 radius: radius,
                 vx: randomBetween(-0.18, 0.18),
                 vy: randomBetween(-0.12, 0.12),
-                alpha: randomBetween(0.55, 1),
+                alpha: randomBetween(0.35, 0.72),
                 phase: randomBetween(0, Math.PI * 2),
                 drift: randomBetween(0.85, 1.2)
             };
@@ -154,33 +181,73 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const drawBubble = function (bubble, time) {
-            const pulse = 1 + Math.sin((time * 0.0012) + bubble.phase) * 0.08;
-            const shadowScale = 1.15 + (bubble.radius * 0.006);
-            const shadowOffset = bubble.radius * (0.12 + (bubble.radius * 0.0008));
-            const innerShadowRadius = bubble.radius * (0.1 + (bubble.radius * 0.0006));
-            const glowRadius = bubble.radius * shadowScale * pulse;
-            const glow = ctx.createRadialGradient(
-                bubble.x - shadowOffset,
-                bubble.y - shadowOffset,
-                innerShadowRadius,
+            const pulse = 1 + Math.sin((time * 0.0012) + bubble.phase) * 0.03;
+            const radius = bubble.radius * pulse;
+            const bodyGradient = ctx.createRadialGradient(
+                bubble.x - (radius * 0.28),
+                bubble.y - (radius * 0.32),
+                radius * 0.14,
                 bubble.x,
                 bubble.y,
-                glowRadius
+                radius
             );
 
-            glow.addColorStop(0, 'rgba(' + bubbleGlowColor + ', ' + (0.46 * bubble.alpha) + ')');
-            glow.addColorStop(0.65, 'rgba(' + bubbleBaseColor + ', ' + (0.22 * bubble.alpha) + ')');
-            glow.addColorStop(1, 'rgba(' + bubbleBaseColor + ', 0)');
+            bodyGradient.addColorStop(0, 'rgba(244, 244, 244, 0)');
+            bodyGradient.addColorStop(0.45, 'rgba(240, 240, 240, ' + (0.025 * bubble.alpha) + ')');
+            bodyGradient.addColorStop(0.8, 'rgba(230, 230, 230, ' + (0.065 * bubble.alpha) + ')');
+            bodyGradient.addColorStop(1, 'rgba(214, 214, 214, ' + (0.11 * bubble.alpha) + ')');
 
             ctx.beginPath();
-            ctx.fillStyle = glow;
-            ctx.arc(bubble.x, bubble.y, glowRadius, 0, Math.PI * 2);
+            ctx.fillStyle = bodyGradient;
+            ctx.arc(bubble.x, bubble.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner shadow clipped inside the bubble to avoid outer glow.
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(bubble.x, bubble.y, radius, 0, Math.PI * 2);
+            ctx.clip();
+            const innerShadow = ctx.createRadialGradient(
+                bubble.x + (radius * 0.34),
+                bubble.y + (radius * 0.38),
+                radius * 0.06,
+                bubble.x,
+                bubble.y,
+                radius * 0.92
+            );
+            innerShadow.addColorStop(0, 'rgba(8, 8, 8, 0)');
+            innerShadow.addColorStop(0.72, 'rgba(8, 8, 8, ' + (0.05 * bubble.alpha) + ')');
+            innerShadow.addColorStop(1, 'rgba(8, 8, 8, ' + (0.11 * bubble.alpha) + ')');
+            ctx.fillStyle = innerShadow;
+            ctx.fillRect(
+                bubble.x - radius,
+                bubble.y - radius,
+                radius * 2,
+                radius * 2
+            );
+            ctx.restore();
+
+            const highlight = ctx.createRadialGradient(
+                bubble.x - (radius * 0.22),
+                bubble.y - (radius * 0.24),
+                radius * 0.05,
+                bubble.x - (radius * 0.08),
+                bubble.y - (radius * 0.1),
+                radius * 0.82
+            );
+            highlight.addColorStop(0, 'rgba(244, 244, 244, 0)');
+            highlight.addColorStop(0.42, 'rgba(242, 242, 242, ' + (0.025 * bubble.alpha) + ')');
+            highlight.addColorStop(1, 'rgba(232, 232, 232, 0)');
+            ctx.beginPath();
+            ctx.fillStyle = highlight;
+            ctx.arc(bubble.x, bubble.y, radius, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.beginPath();
-            ctx.fillStyle = 'rgba(164, 164, 164, ' + (0.26 * bubble.alpha) + ')';
-            ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.strokeStyle = 'rgba(188, 188, 188, ' + (0.03 * bubble.alpha) + ')';
+            ctx.lineWidth = Math.max(0.8, radius * 0.018);
+            ctx.arc(bubble.x, bubble.y, Math.max(0, radius - (ctx.lineWidth * 0.5)), 0, Math.PI * 2);
+            ctx.stroke();
         };
 
         const createPopEffect = function (bubble) {
@@ -539,7 +606,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         window.addEventListener('resize', resizeCanvas, { passive: true });
-        window.addEventListener('orientationchange', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas, { passive: true });
 
         resizeCanvas();
 
@@ -551,7 +618,28 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     if (bubbleCanvas) {
-        initInteractiveBubbleBackground(bubbleCanvas);
+        const initBubbleWhenIdle = function () {
+            if (document.visibilityState === 'hidden') {
+                const startWhenVisible = function () {
+                    if (document.visibilityState !== 'visible') {
+                        return;
+                    }
+
+                    document.removeEventListener('visibilitychange', startWhenVisible);
+                    initInteractiveBubbleBackground(bubbleCanvas);
+                };
+                document.addEventListener('visibilitychange', startWhenVisible, { passive: true });
+                return;
+            }
+
+            initInteractiveBubbleBackground(bubbleCanvas);
+        };
+
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(initBubbleWhenIdle, { timeout: 650 });
+        } else {
+            window.setTimeout(initBubbleWhenIdle, 140);
+        }
     }
 
     const nav = document.querySelector('.portfolio-nav');
@@ -563,12 +651,50 @@ document.addEventListener('DOMContentLoaded', function () {
     const navContainer = nav.querySelector('.container-fluid');
     const navBrand = nav.querySelector('.portfolio-brand');
     const navLinks = nav.querySelector('.portfolio-nav-links');
-    const navCollapse = nav.querySelector('.navbar-collapse');
+    const navCollapse = nav.querySelector('.portfolio-nav-collapse');
     const navToggler = nav.querySelector('.portfolio-nav-toggler');
 
     if (!navContainer || !navBrand || !navLinks || !navCollapse || !navToggler) {
         return;
     }
+
+    const forceClearNavContainerDecorations = function () {
+        const resetTargets = [
+            navContainer,
+            navCollapse,
+            navLinks,
+            navCollapse.querySelector('.portfolio-nav-links')
+        ];
+        const navItems = nav.querySelectorAll('.nav-item');
+
+        navItems.forEach(function (item) {
+            resetTargets.push(item);
+        });
+
+        resetTargets.forEach(function (target) {
+            if (!target || !target.style || !target.style.setProperty) {
+                return;
+            }
+
+            if (target === navLinks) {
+                target.style.removeProperty('border');
+                target.style.removeProperty('border-color');
+            } else {
+                target.style.border = 'none';
+                target.style.borderColor = 'transparent';
+            }
+            target.style.outline = 'none';
+            target.style.outlineColor = 'transparent';
+            target.style.outlineStyle = 'none';
+            target.style.outlineWidth = '0';
+            if (target === navLinks) {
+                target.style.removeProperty('box-shadow');
+            } else {
+                target.style.boxShadow = 'none';
+            }
+            target.style.listStyle = 'none';
+        });
+    };
 
     const navItemsMeasure = navLinks.cloneNode(true);
     navItemsMeasure.setAttribute('aria-hidden', 'true');
@@ -611,6 +737,7 @@ document.addEventListener('DOMContentLoaded', function () {
         navCollapse.style.height = '';
         navToggler.classList.add('collapsed');
         navToggler.setAttribute('aria-expanded', 'false');
+        forceClearNavContainerDecorations();
     };
 
     const updateNavMode = function () {
@@ -631,6 +758,8 @@ document.addEventListener('DOMContentLoaded', function () {
             nav.classList.add('nav-auto-collapsed');
             forceCloseNavMenu();
         }
+
+        forceClearNavContainerDecorations();
     };
 
     const scheduleNavModeUpdate = function () {
@@ -642,7 +771,26 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     window.addEventListener('resize', scheduleNavModeUpdate, { passive: true });
-    window.addEventListener('orientationchange', scheduleNavModeUpdate);
+    window.addEventListener('orientationchange', scheduleNavModeUpdate, { passive: true });
+    navToggler.addEventListener('click', function () {
+        window.requestAnimationFrame(forceClearNavContainerDecorations);
+    });
+    navCollapse.addEventListener('transitionend', forceClearNavContainerDecorations);
+
+    let scrollCleanupTimerId = null;
+    window.addEventListener('scroll', function () {
+        forceClearNavContainerDecorations();
+
+        if (scrollCleanupTimerId !== null) {
+            window.clearTimeout(scrollCleanupTimerId);
+        }
+
+        scrollCleanupTimerId = window.setTimeout(function () {
+            forceClearNavContainerDecorations();
+            scrollCleanupTimerId = null;
+        }, 140);
+    }, { passive: true });
+    forceClearNavContainerDecorations();
     scheduleNavModeUpdate();
 
     if (document.fonts && document.fonts.ready) {
