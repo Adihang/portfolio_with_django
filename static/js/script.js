@@ -23,8 +23,75 @@ document.addEventListener('DOMContentLoaded', function () {
     const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
     const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
     const bubbleLayer = document.querySelector('.bubble-bg-layer');
+    const printSurfaceSnapshot = {
+        active: false,
+        htmlStyle: null,
+        bodyStyle: null,
+        bubbleLayerStyle: null,
+        bubbleCanvasStyle: null
+    };
 
     let currentSurfaceMode = null;
+
+    const restoreStyleAttribute = function (element, styleText) {
+        if (!element) {
+            return;
+        }
+
+        if (styleText === null || typeof styleText === 'undefined') {
+            element.removeAttribute('style');
+            return;
+        }
+
+        element.setAttribute('style', styleText);
+    };
+
+    const applyPrintSurfaceOverride = function () {
+        if (!isLightBackgroundPage || printSurfaceSnapshot.active) {
+            return;
+        }
+
+        printSurfaceSnapshot.active = true;
+        printSurfaceSnapshot.htmlStyle = document.documentElement.getAttribute('style');
+        printSurfaceSnapshot.bodyStyle = document.body.getAttribute('style');
+        printSurfaceSnapshot.bubbleLayerStyle = bubbleLayer ? bubbleLayer.getAttribute('style') : null;
+        printSurfaceSnapshot.bubbleCanvasStyle = bubbleCanvas ? bubbleCanvas.getAttribute('style') : null;
+
+        document.documentElement.style.background = '#ffffff';
+        document.documentElement.style.backgroundColor = '#ffffff';
+        document.documentElement.style.backgroundImage = 'none';
+        document.body.style.background = '#ffffff';
+        document.body.style.backgroundColor = '#ffffff';
+        document.body.style.backgroundImage = 'none';
+
+        if (bubbleLayer) {
+            bubbleLayer.style.display = 'block';
+            bubbleLayer.style.visibility = 'visible';
+            bubbleLayer.style.background = 'transparent';
+            bubbleLayer.style.backgroundColor = 'transparent';
+        }
+
+        if (bubbleCanvas) {
+            bubbleCanvas.style.display = 'none';
+            bubbleCanvas.style.visibility = 'hidden';
+        }
+    };
+
+    const clearPrintSurfaceOverride = function () {
+        if (!printSurfaceSnapshot.active) {
+            return;
+        }
+
+        restoreStyleAttribute(document.documentElement, printSurfaceSnapshot.htmlStyle);
+        restoreStyleAttribute(document.body, printSurfaceSnapshot.bodyStyle);
+        restoreStyleAttribute(bubbleLayer, printSurfaceSnapshot.bubbleLayerStyle);
+        restoreStyleAttribute(bubbleCanvas, printSurfaceSnapshot.bubbleCanvasStyle);
+
+        printSurfaceSnapshot.active = false;
+    };
+
+    window.addEventListener('beforeprint', applyPrintSurfaceOverride);
+    window.addEventListener('afterprint', clearPrintSurfaceOverride);
 
     const setLightSurfaceStylesEnabled = function (enabled) {
         const mediaValue = enabled ? 'all' : 'not all';
@@ -791,6 +858,1027 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    const pageLang = (document.documentElement.getAttribute('lang') || 'ko').toLowerCase();
+    const isEnglishPage = pageLang.startsWith('en');
+    const printText = isEnglishPage ? {
+        dialogTitle: 'Select Projects to Print',
+        dialogDescription: 'Checked project detail pages will be printed with the summary.\nIf none are selected, only the summary will be printed.',
+        selectAll: 'Select All',
+        clearAll: 'Clear',
+        cancel: 'Cancel',
+        print: 'Print',
+        noProjects: 'No project pages available. Summary only will be printed.',
+        loading: 'Preparing print document...',
+        popupBlocked: 'Popup was blocked. Allow popups and try again.',
+        loadFailed: 'Failed to load this project page.'
+    } : {
+        dialogTitle: '프로젝트 선택',
+        dialogDescription: '체크한 프로젝트 상세 페이지를 요약과 함께 인쇄합니다.\n선택이 없으면 요약만 인쇄됩니다.',
+        selectAll: '전체 선택',
+        clearAll: '선택 해제',
+        cancel: '취소',
+        print: '인쇄',
+        noProjects: '선택 가능한 프로젝트가 없습니다. 요약만 인쇄됩니다.',
+        loading: '인쇄 문서를 준비하고 있습니다...',
+        popupBlocked: '팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도해 주세요.',
+        loadFailed: '프로젝트 페이지를 불러오지 못했습니다.'
+    };
+
+    const escapeHtml = function (value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    };
+
+    const extractYouTubeVideoId = function (rawUrl) {
+        if (!rawUrl) {
+            return '';
+        }
+
+        try {
+            const parsedUrl = new URL(rawUrl, window.location.origin);
+            const host = parsedUrl.hostname.toLowerCase();
+            let videoId = '';
+
+            if (host === 'youtu.be' || host.endsWith('.youtu.be')) {
+                videoId = parsedUrl.pathname.split('/').filter(Boolean)[0] || '';
+            } else if (host.includes('youtube.com') || host.includes('youtube-nocookie.com')) {
+                const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+                const embedIndex = pathSegments.indexOf('embed');
+
+                if (embedIndex >= 0 && pathSegments[embedIndex + 1]) {
+                    videoId = pathSegments[embedIndex + 1];
+                }
+
+                if (!videoId && pathSegments[0] === 'shorts' && pathSegments[1]) {
+                    videoId = pathSegments[1];
+                }
+
+                if (!videoId) {
+                    videoId = parsedUrl.searchParams.get('v') || '';
+                }
+            }
+
+            videoId = (videoId || '').split('&')[0].split('?')[0].trim();
+            return /^[A-Za-z0-9_-]{6,20}$/.test(videoId) ? videoId : '';
+        } catch (error) {
+            return '';
+        }
+    };
+
+    const toAbsoluteUrl = function (rawUrl) {
+        if (!rawUrl) {
+            return '';
+        }
+
+        try {
+            return new URL(rawUrl, window.location.origin).toString();
+        } catch (error) {
+            return '';
+        }
+    };
+
+    const resolveEmbeddedMediaTitle = function (rawTitle, projectTitle) {
+        const title = (rawTitle || '').trim();
+        const lowered = title.toLowerCase();
+        const genericTitle = !title ||
+            lowered === 'youtube video player' ||
+            lowered === 'video player' ||
+            lowered === 'youtube' ||
+            (lowered.includes('youtube') && lowered.includes('player')) ||
+            title.includes('동영상 플레이어');
+
+        if (!genericTitle) {
+            return title;
+        }
+
+        const normalizedProjectTitle = (projectTitle || '').trim();
+        if (normalizedProjectTitle) {
+            return isEnglishPage ? (normalizedProjectTitle + ' video') : (normalizedProjectTitle + ' 영상');
+        }
+
+        return isEnglishPage ? 'Project video' : '프로젝트 영상';
+    };
+
+    const buildEmbeddedMediaFallbackNode = function (embedUrl, mediaTitle) {
+        const absoluteUrl = toAbsoluteUrl(embedUrl);
+        if (!absoluteUrl) {
+            return null;
+        }
+
+        const paragraph = document.createElement('p');
+        paragraph.className = 'print-embed-link';
+
+        const anchor = document.createElement('a');
+        anchor.href = absoluteUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.textContent = (mediaTitle || '').trim() || (isEnglishPage ? 'Embedded media link' : '임베드 미디어 링크');
+
+        paragraph.appendChild(anchor);
+        return paragraph;
+    };
+
+    const buildYouTubeThumbnailNode = function (embedUrl, mediaTitle) {
+        const videoId = extractYouTubeVideoId(embedUrl);
+        if (!videoId) {
+            return null;
+        }
+
+        const watchUrl = 'https://www.youtube.com/watch?v=' + videoId;
+        const thumbnailUrl = 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg';
+
+        const figure = document.createElement('figure');
+        figure.className = 'print-video-thumb';
+
+        const link = document.createElement('a');
+        link.href = watchUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.className = 'print-video-thumb-link';
+
+        const image = document.createElement('img');
+        image.src = thumbnailUrl;
+        image.alt = mediaTitle || (isEnglishPage ? 'YouTube video thumbnail' : '유튜브 영상 썸네일');
+        image.loading = 'eager';
+        image.decoding = 'sync';
+        link.appendChild(image);
+
+        const caption = document.createElement('figcaption');
+        const captionLink = document.createElement('a');
+        captionLink.href = watchUrl;
+        captionLink.target = '_blank';
+        captionLink.rel = 'noopener noreferrer';
+        captionLink.textContent = mediaTitle || (isEnglishPage ? 'YouTube video link' : '유튜브 영상 링크');
+        caption.appendChild(captionLink);
+
+        figure.appendChild(link);
+        figure.appendChild(caption);
+        return figure;
+    };
+
+    const absolutizeResourceUrls = function (container, baseUrl) {
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('[src]').forEach(function (element) {
+            const rawSrc = element.getAttribute('src');
+            if (!rawSrc) {
+                return;
+            }
+
+            try {
+                element.setAttribute('src', new URL(rawSrc, baseUrl).toString());
+            } catch (error) {}
+        });
+
+        container.querySelectorAll('a[href]').forEach(function (element) {
+            const rawHref = element.getAttribute('href');
+            if (!rawHref || rawHref.startsWith('#')) {
+                return;
+            }
+
+            try {
+                element.setAttribute('href', new URL(rawHref, baseUrl).toString());
+            } catch (error) {}
+        });
+    };
+
+    const mmToPx = function (mm) {
+        return mm * (96 / 25.4);
+    };
+
+    const PRINT_IMAGE_LAYOUT = {
+        landscapePerRow: 2,
+        squarePerRow: 3,
+        portraitPerRow: 4,
+        defaultGapPx: 10,
+        sidePaddingReservePx: 14,
+        rowSafetyScale: 0.88,
+        fallbackContainerWidthPx: mmToPx(186),
+        landscapeMaxHeightPx: mmToPx(84),
+        squareMaxHeightPx: mmToPx(90),
+        portraitMaxHeightPx: mmToPx(106),
+        portraitMaxWidthMm: 45.6,
+        landscapeWidthByPortraitMultiplier: 2.0,
+        minWidthPx: 72
+    };
+
+    const getPrintTargetWidthByRow = function (availableWidth, perRow) {
+        return Math.max(
+            Math.floor(
+                (
+                    (availableWidth - (PRINT_IMAGE_LAYOUT.defaultGapPx * (perRow - 1))) /
+                    perRow
+                ) * PRINT_IMAGE_LAYOUT.rowSafetyScale
+            ),
+            PRINT_IMAGE_LAYOUT.minWidthPx
+        );
+    };
+
+    const getPrintImageLayoutForRatio = function (ratio) {
+        if (!ratio || !Number.isFinite(ratio)) {
+            return {
+                perRow: PRINT_IMAGE_LAYOUT.squarePerRow,
+                maxHeightPx: PRINT_IMAGE_LAYOUT.squareMaxHeightPx
+            };
+        }
+
+        if (ratio >= 1.15) {
+            return {
+                perRow: PRINT_IMAGE_LAYOUT.landscapePerRow,
+                maxHeightPx: PRINT_IMAGE_LAYOUT.landscapeMaxHeightPx
+            };
+        }
+
+        if (ratio <= 0.85) {
+            return {
+                perRow: PRINT_IMAGE_LAYOUT.portraitPerRow,
+                maxHeightPx: PRINT_IMAGE_LAYOUT.portraitMaxHeightPx
+            };
+        }
+
+        return {
+            perRow: PRINT_IMAGE_LAYOUT.squarePerRow,
+            maxHeightPx: PRINT_IMAGE_LAYOUT.squareMaxHeightPx
+        };
+    };
+
+    const applyPrintImageSizeConstraints = function (image) {
+        if (!image) {
+            return;
+        }
+
+        const naturalWidth = image.naturalWidth || 0;
+        const naturalHeight = image.naturalHeight || 0;
+
+        if (!naturalWidth || !naturalHeight) {
+            image.style.width = 'auto';
+            image.style.height = 'auto';
+            image.style.maxWidth = 'min(100%, ' + (PRINT_IMAGE_LAYOUT.portraitMaxWidthMm * PRINT_IMAGE_LAYOUT.landscapeWidthByPortraitMultiplier) + 'mm)';
+            image.style.maxHeight = '136mm';
+            image.style.objectFit = 'contain';
+            return;
+        }
+
+        const ratio = naturalWidth / naturalHeight;
+        const layoutRule = getPrintImageLayoutForRatio(ratio);
+        const parentWidth = image.parentElement && image.parentElement.clientWidth
+            ? image.parentElement.clientWidth
+            : PRINT_IMAGE_LAYOUT.fallbackContainerWidthPx;
+        const availableWidth = Math.max(
+            parentWidth - PRINT_IMAGE_LAYOUT.sidePaddingReservePx,
+            PRINT_IMAGE_LAYOUT.minWidthPx * layoutRule.perRow
+        );
+        const targetWidthByRow = getPrintTargetWidthByRow(availableWidth, layoutRule.perRow);
+        const portraitWidthByRow = getPrintTargetWidthByRow(availableWidth, PRINT_IMAGE_LAYOUT.portraitPerRow);
+        const portraitMaxWidthPx = Math.max(
+            PRINT_IMAGE_LAYOUT.minWidthPx,
+            Math.min(portraitWidthByRow, mmToPx(PRINT_IMAGE_LAYOUT.portraitMaxWidthMm))
+        );
+        const landscapeMaxWidthPx = portraitMaxWidthPx * PRINT_IMAGE_LAYOUT.landscapeWidthByPortraitMultiplier;
+        const scale = Math.min(
+            targetWidthByRow / naturalWidth,
+            layoutRule.maxHeightPx / naturalHeight,
+            ratio >= 1.15 ? (landscapeMaxWidthPx / naturalWidth) : 1,
+            1
+        );
+
+        image.style.width = Math.round(naturalWidth * scale) + 'px';
+        image.style.height = Math.round(naturalHeight * scale) + 'px';
+        image.style.maxWidth = 'none';
+        image.style.maxHeight = 'none';
+        image.style.objectFit = 'contain';
+    };
+
+    const normalizeProjectPrintMediaLayout = function (container, projectTitle) {
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('iframe[src]').forEach(function (iframeNode) {
+            const src = iframeNode.getAttribute('src') || '';
+            const iframeTitle = iframeNode.getAttribute('title') || '';
+            const mediaTitle = resolveEmbeddedMediaTitle(iframeTitle, projectTitle);
+            const replacementNode = buildYouTubeThumbnailNode(src, mediaTitle) || buildEmbeddedMediaFallbackNode(src, mediaTitle);
+            const wrapperNode = iframeNode.parentElement;
+            const isResponsiveWrapper = wrapperNode &&
+                wrapperNode.classList &&
+                wrapperNode.classList.contains('responsive-iframe') &&
+                wrapperNode.children.length === 1;
+
+            if (replacementNode) {
+                if (isResponsiveWrapper) {
+                    wrapperNode.replaceWith(replacementNode);
+                } else {
+                    iframeNode.replaceWith(replacementNode);
+                }
+            } else {
+                if (isResponsiveWrapper) {
+                    wrapperNode.remove();
+                } else {
+                    iframeNode.remove();
+                }
+            }
+        });
+
+        container.querySelectorAll('img').forEach(function (image) {
+            const dataSrc = image.getAttribute('data-src');
+            if (dataSrc && !image.getAttribute('src')) {
+                image.setAttribute('src', dataSrc);
+            }
+
+            const dataSrcset = image.getAttribute('data-srcset');
+            if (dataSrcset && !image.getAttribute('srcset')) {
+                image.setAttribute('srcset', dataSrcset);
+            }
+
+            image.setAttribute('loading', 'eager');
+            image.setAttribute('decoding', 'sync');
+            image.setAttribute('data-print-project-image', '1');
+            applyPrintImageSizeConstraints(image);
+        });
+
+        container.querySelectorAll('[style*="overflow-x: auto"],[style*="overflow-x:auto"]').forEach(function (node) {
+            node.style.overflowX = 'visible';
+            node.style.overflow = 'visible';
+            node.style.whiteSpace = 'normal';
+
+            const displayValue = (node.style.display || '').toLowerCase();
+            if (displayValue === 'flex' || displayValue === 'inline-flex') {
+                node.style.flexWrap = 'wrap';
+                if (!node.style.justifyContent) {
+                    node.style.justifyContent = 'center';
+                }
+            }
+        });
+    };
+
+    const waitForImagesReady = function (doc, timeoutMs) {
+        const images = Array.from(doc.querySelectorAll('img[src]'));
+        if (images.length === 0) {
+            return Promise.resolve();
+        }
+
+        return new Promise(function (resolve) {
+            let pending = 0;
+            let finished = false;
+
+            const finish = function () {
+                if (finished) {
+                    return;
+                }
+                finished = true;
+                resolve();
+            };
+
+            const markDone = function () {
+                pending -= 1;
+                if (pending <= 0) {
+                    finish();
+                }
+            };
+
+            images.forEach(function (image) {
+                image.setAttribute('loading', 'eager');
+                image.setAttribute('decoding', 'sync');
+                const shouldApplyPrintConstraint = image.closest('.print-project') || image.getAttribute('data-print-project-image') === '1';
+                if (shouldApplyPrintConstraint) {
+                    applyPrintImageSizeConstraints(image);
+                }
+
+                if (image.complete && image.naturalWidth > 0) {
+                    if (shouldApplyPrintConstraint) {
+                        applyPrintImageSizeConstraints(image);
+                    }
+                    return;
+                }
+
+                pending += 1;
+                const onDone = function () {
+                    image.removeEventListener('load', onDone);
+                    image.removeEventListener('error', onDone);
+                    if (shouldApplyPrintConstraint) {
+                        applyPrintImageSizeConstraints(image);
+                    }
+                    markDone();
+                };
+
+                image.addEventListener('load', onDone, { once: true });
+                image.addEventListener('error', onDone, { once: true });
+            });
+
+            if (pending === 0) {
+                finish();
+                return;
+            }
+
+            window.setTimeout(finish, timeoutMs || 4000);
+        });
+    };
+
+    const collectProjectPrintOptions = function () {
+        const projectMap = new Map();
+        const projectAnchors = document.querySelectorAll('.main_projects .project_card a[href*="/project/"]');
+
+        projectAnchors.forEach(function (anchor) {
+            const href = anchor.getAttribute('href');
+            if (!href) {
+                return;
+            }
+
+            let absoluteUrl = '';
+            try {
+                absoluteUrl = new URL(href, window.location.origin).toString();
+            } catch (error) {
+                return;
+            }
+
+            if (projectMap.has(absoluteUrl)) {
+                return;
+            }
+
+            const projectCard = anchor.closest('.project_card');
+            const titleElement = projectCard ? projectCard.querySelector('.project_card_contents_title') : null;
+            const title = (titleElement ? titleElement.textContent : anchor.textContent || '').trim() || absoluteUrl;
+            projectMap.set(absoluteUrl, title);
+        });
+
+        return Array.from(projectMap.entries()).map(function (entry) {
+            return { url: entry[0], title: entry[1] };
+        });
+    };
+
+    const buildSummaryPrintHtml = function () {
+        const container = document.createElement('section');
+        container.className = 'print-summary';
+
+        const banner = document.querySelector('.main_banner');
+        if (banner) {
+            container.appendChild(banner.cloneNode(true));
+        }
+
+        const mainContents = document.querySelector('.main_contents');
+        if (mainContents) {
+            const contentsClone = mainContents.cloneNode(true);
+            const projectsSection = contentsClone.querySelector('.main_projects');
+            const hobbysSection = contentsClone.querySelector('.main_hobbys');
+
+            if (projectsSection) {
+                projectsSection.remove();
+            }
+            if (hobbysSection) {
+                hobbysSection.remove();
+            }
+
+            container.appendChild(contentsClone);
+        }
+
+        return container.outerHTML;
+    };
+
+    const fetchProjectPrintSectionHtml = async function (projectUrl, projectTitle) {
+        const response = await fetch(projectUrl, { credentials: 'same-origin' });
+        if (!response.ok) {
+            throw new Error('Failed to fetch project page');
+        }
+
+        const html = await response.text();
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        const detailNode = parsed.querySelector('.project_detail_page') || parsed.querySelector('.project_detail');
+
+        if (!detailNode) {
+            throw new Error('Project detail content not found');
+        }
+
+        const contentNode = detailNode.cloneNode(true);
+        contentNode.querySelectorAll('script').forEach(function (scriptNode) {
+            scriptNode.remove();
+        });
+        normalizeProjectPrintMediaLayout(contentNode, projectTitle);
+        absolutizeResourceUrls(contentNode, response.url || projectUrl);
+
+        return '<section class="print-project">' + contentNode.outerHTML + '</section>';
+    };
+
+    const openProjectPrintSelector = function (projectOptions) {
+        return new Promise(function (resolve) {
+            const bindDialogButtonInteraction = function (button, styleSet) {
+                if (!button) {
+                    return;
+                }
+
+                const baseBackground = styleSet.baseBackground || 'transparent';
+                const baseBorder = styleSet.baseBorder || 'transparent';
+                const baseColor = styleSet.baseColor || 'var(--theme-subtle)';
+                const hoverBackground = styleSet.hoverBackground || 'rgba(0, 0, 0, 0.06)';
+                const hoverBorder = styleSet.hoverBorder || 'rgba(0, 0, 0, 0.24)';
+                const hoverColor = styleSet.hoverColor || baseColor;
+
+                button.style.transition = 'all 0.2s ease';
+
+                const setBaseStyle = function () {
+                    button.style.background = baseBackground;
+                    button.style.borderColor = baseBorder;
+                    button.style.color = baseColor;
+                    button.style.boxShadow = 'none';
+                    button.style.transform = 'translateY(0)';
+                };
+
+                const setHoverStyle = function () {
+                    button.style.background = hoverBackground;
+                    button.style.borderColor = hoverBorder;
+                    button.style.color = hoverColor;
+                    button.style.boxShadow = 'none';
+                    button.style.transform = 'translateY(-1px)';
+                };
+
+                setBaseStyle();
+
+                button.addEventListener('mouseenter', setHoverStyle);
+                button.addEventListener('mouseleave', setBaseStyle);
+                button.addEventListener('focus', setHoverStyle);
+                button.addEventListener('blur', setBaseStyle);
+            };
+
+            const applyDialogNavLinkButtonStyle = function (button, options) {
+                if (!button) {
+                    return;
+                }
+
+                const resolved = options || {};
+                Object.assign(button.style, {
+                    padding: resolved.padding || '6.4px 14px',
+                    borderRadius: '999px',
+                    border: '1px solid transparent',
+                    background: 'transparent',
+                    color: 'var(--theme-subtle)',
+                    fontWeight: resolved.fontWeight || '600',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer'
+                });
+
+                if (resolved.fontSize) {
+                    button.style.fontSize = resolved.fontSize;
+                }
+
+                bindDialogButtonInteraction(
+                    button,
+                    resolved.interactionStyle || {
+                        baseBackground: 'transparent',
+                        baseBorder: 'transparent',
+                        baseColor: 'var(--theme-subtle)',
+                        hoverBackground: 'rgba(0, 0, 0, 0.06)',
+                        hoverBorder: 'rgba(0, 0, 0, 0.24)',
+                        hoverColor: 'var(--theme-accent-strong)'
+                    }
+                );
+            };
+
+            const overlayFadeMs = 210;
+            const overlay = document.createElement('div');
+            Object.assign(overlay.style, {
+                position: 'fixed',
+                inset: '0',
+                zIndex: '2100',
+                background: 'rgba(0, 0, 0, 0)',
+                opacity: '0',
+                transition: 'background-color ' + overlayFadeMs + 'ms ease, opacity ' + overlayFadeMs + 'ms ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+            });
+
+            const panel = document.createElement('div');
+            Object.assign(panel.style, {
+                width: 'fit-content',
+                minWidth: '360px',
+                maxWidth: 'calc(100vw - 28px)',
+                maxHeight: '82vh',
+                overflow: 'hidden',
+                background: '#ffffff',
+                border: '1px solid rgba(0, 0, 0, 0.14)',
+                borderRadius: '14px',
+                boxShadow: '0 16px 34px rgba(0, 0, 0, 0.24)',
+                display: 'flex',
+                flexDirection: 'column'
+            });
+
+            const title = document.createElement('h4');
+            title.textContent = printText.dialogTitle;
+            Object.assign(title.style, {
+                margin: '0',
+                padding: '16px 18px 4px 18px',
+                fontSize: '1.12rem',
+                fontWeight: '700',
+                color: '#161616',
+                textAlign: 'center'
+            });
+
+            const description = document.createElement('p');
+            description.textContent = printText.dialogDescription;
+            Object.assign(description.style, {
+                margin: '0',
+                padding: '0 18px 10px 18px',
+                fontSize: '0.9rem',
+                lineHeight: '1.5',
+                whiteSpace: 'pre-line',
+                color: '#535353'
+            });
+
+            const listArea = document.createElement('div');
+            Object.assign(listArea.style, {
+                overflowY: 'auto',
+                maxHeight: '48vh',
+                borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+                padding: '8px 12px',
+                boxShadow: 'inset 0 12px 12px -12px rgba(0, 0, 0, 0.24), inset 0 -12px 12px -12px rgba(0, 0, 0, 0.24)'
+            });
+
+            const checkboxes = [];
+            if (projectOptions.length === 0) {
+                const emptyMessage = document.createElement('div');
+                emptyMessage.textContent = printText.noProjects;
+                Object.assign(emptyMessage.style, {
+                    padding: '10px 8px',
+                    color: '#555555',
+                    fontSize: '0.9rem'
+                });
+                listArea.appendChild(emptyMessage);
+            } else {
+                projectOptions.forEach(function (project) {
+                    const label = document.createElement('label');
+                    Object.assign(label.style, {
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        padding: '9px 8px',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                    });
+                    label.addEventListener('mouseover', function () {
+                        label.style.background = 'rgba(0, 0, 0, 0.04)';
+                    });
+                    label.addEventListener('mouseout', function () {
+                        label.style.background = 'transparent';
+                    });
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = project.url;
+                    checkbox.style.marginTop = '2px';
+
+                    const text = document.createElement('span');
+                    text.textContent = project.title;
+                    Object.assign(text.style, {
+                        color: '#202020',
+                        fontSize: '0.92rem',
+                        lineHeight: '1.4'
+                    });
+
+                    label.appendChild(checkbox);
+                    label.appendChild(text);
+                    listArea.appendChild(label);
+                    checkboxes.push(checkbox);
+                });
+            }
+
+            const footer = document.createElement('div');
+            Object.assign(footer.style, {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                padding: '12px 14px'
+            });
+
+            const leftButtons = document.createElement('div');
+            Object.assign(leftButtons.style, {
+                display: 'flex',
+                gap: '8px'
+            });
+
+            const selectAllButton = document.createElement('button');
+            selectAllButton.type = 'button';
+            selectAllButton.textContent = printText.selectAll;
+            applyDialogNavLinkButtonStyle(selectAllButton, {
+                fontSize: '0.9rem',
+                padding: '6px 10px'
+            });
+
+            const clearButton = document.createElement('button');
+            clearButton.type = 'button';
+            clearButton.textContent = printText.clearAll;
+            applyDialogNavLinkButtonStyle(clearButton, {
+                fontSize: '0.9rem',
+                padding: '6px 10px'
+            });
+
+            leftButtons.appendChild(selectAllButton);
+            leftButtons.appendChild(clearButton);
+
+            const rightButtons = document.createElement('div');
+            Object.assign(rightButtons.style, {
+                display: 'flex',
+                gap: '8px'
+            });
+
+            const cancelButton = document.createElement('button');
+            cancelButton.type = 'button';
+            cancelButton.textContent = printText.cancel;
+            applyDialogNavLinkButtonStyle(cancelButton, {
+                fontSize: '0.95rem',
+                padding: '7px 14px'
+            });
+
+            const printButtonInDialog = document.createElement('button');
+            printButtonInDialog.type = 'button';
+            printButtonInDialog.textContent = printText.print;
+            applyDialogNavLinkButtonStyle(printButtonInDialog, {
+                fontSize: '0.95rem',
+                padding: '7px 14px',
+                fontWeight: '600',
+                interactionStyle: {
+                    baseBackground: 'rgb(65, 141, 65)',
+                    baseBorder: 'rgb(52, 114, 52)',
+                    baseColor: '#ffffff',
+                    hoverBackground: 'rgb(57, 124, 57)',
+                    hoverBorder: 'rgb(45, 95, 45)',
+                    hoverColor: '#ffffff'
+                }
+            });
+
+            rightButtons.appendChild(cancelButton);
+            rightButtons.appendChild(printButtonInDialog);
+
+            footer.appendChild(leftButtons);
+            footer.appendChild(rightButtons);
+
+            panel.appendChild(title);
+            panel.appendChild(description);
+            panel.appendChild(listArea);
+            panel.appendChild(footer);
+            overlay.appendChild(panel);
+            document.body.appendChild(overlay);
+
+            window.requestAnimationFrame(function () {
+                overlay.style.background = 'rgba(0, 0, 0, 0.34)';
+                overlay.style.opacity = '1';
+            });
+
+            let isClosing = false;
+            const close = function (result) {
+                if (isClosing) {
+                    return;
+                }
+                isClosing = true;
+                document.removeEventListener('keydown', onKeydown);
+                overlay.style.pointerEvents = 'none';
+                overlay.style.background = 'rgba(0, 0, 0, 0)';
+                overlay.style.opacity = '0';
+                window.setTimeout(function () {
+                    overlay.remove();
+                    resolve(result);
+                }, overlayFadeMs + 20);
+            };
+
+            const onKeydown = function (event) {
+                if (event.key === 'Escape') {
+                    close(null);
+                }
+            };
+
+            document.addEventListener('keydown', onKeydown);
+
+            overlay.addEventListener('click', function (event) {
+                if (event.target === overlay) {
+                    close(null);
+                }
+            });
+
+            selectAllButton.addEventListener('click', function () {
+                checkboxes.forEach(function (checkbox) {
+                    checkbox.checked = true;
+                });
+            });
+
+            clearButton.addEventListener('click', function () {
+                checkboxes.forEach(function (checkbox) {
+                    checkbox.checked = false;
+                });
+            });
+
+            cancelButton.addEventListener('click', function () {
+                close(null);
+            });
+
+            printButtonInDialog.addEventListener('click', function () {
+                const selectedUrls = checkboxes
+                    .filter(function (checkbox) {
+                        return checkbox.checked;
+                    })
+                    .map(function (checkbox) {
+                        return checkbox.value;
+                    });
+                close(selectedUrls);
+            });
+        });
+    };
+
+    const collectPrintStylesheetTags = function () {
+        return Array.from(document.querySelectorAll('link[rel="stylesheet"][href]'))
+            .map(function (linkNode) {
+                const href = linkNode.getAttribute('href');
+                if (!href) {
+                    return '';
+                }
+
+                try {
+                    const absoluteHref = new URL(href, window.location.origin).toString();
+                    return '<link rel="stylesheet" href="' + escapeHtml(absoluteHref) + '">';
+                } catch (error) {
+                    return '';
+                }
+            })
+            .filter(Boolean)
+            .join('');
+    };
+
+    const openPrintPopupWindow = function () {
+        const width = Math.max(900, Math.min(1240, window.screen.availWidth - 80));
+        const height = Math.max(760, Math.min(980, window.screen.availHeight - 80));
+        const left = Math.max(0, Math.round(window.screenX + ((window.outerWidth - width) / 2)));
+        const top = Math.max(0, Math.round(window.screenY + ((window.outerHeight - height) / 2)));
+        const features = [
+            'popup=yes',
+            'resizable=yes',
+            'scrollbars=yes',
+            'toolbar=no',
+            'menubar=no',
+            'location=no',
+            'status=no',
+            'width=' + width,
+            'height=' + height,
+            'left=' + left,
+            'top=' + top
+        ].join(',');
+
+        let popupWindow = null;
+        try {
+            popupWindow = window.open('about:blank', 'portfolioPrintPopup', features);
+        } catch (error) {}
+
+        if (!popupWindow) {
+            try {
+                popupWindow = window.open('', '_blank');
+            } catch (error) {}
+        }
+
+        return popupWindow;
+    };
+
+    const buildPrintDocumentHtml = function (summaryHtml, projectSectionsHtml) {
+        const stylesheetTags = collectPrintStylesheetTags();
+
+        return '<!doctype html>' +
+            '<html lang="' + (isEnglishPage ? 'en' : 'ko') + '">' +
+            '<head>' +
+            '<meta charset="utf-8">' +
+            '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+            '<meta name="color-scheme" content="light">' +
+            '<title>Portfolio Print</title>' +
+            stylesheetTags +
+            '<style>' +
+            '@page{margin:0;}' +
+            'html,body{margin:0;padding:0;background:#fff;color:#111;}' +
+            'body{font-family:"Inter","KakaoBigFont","Noto Sans KR","Helvetica Neue",Arial,sans-serif;line-height:1.45;}' +
+            'body::before{content:"www.hanplanet.com/portfolio/";position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-45deg);font-weight:900;font-size:clamp(24px,4.8vw,62px);letter-spacing:.06em;color:rgba(0,0,0,.11);pointer-events:none;z-index:0;white-space:nowrap;}' +
+            '.print-root{position:relative;z-index:1;padding:3mm;box-sizing:border-box;}' +
+            '.print-summary,.print-project{padding-top:8mm;padding-bottom:8mm;padding-left:0;padding-right:0;box-sizing:border-box;border:none;border-radius:0;background:transparent;overflow:visible;}' +
+            '.print-summary .main_projects,.print-summary .main_hobbys,.print-summary .foot,.print-summary .portfolio-print-btn,.print-summary .chat-widget,.print-summary .portfolio-nav{display:none;}' +
+            '.print-summary .main_banner,.print-summary .main_contents{width:100%;max-width:none;margin:0 auto;padding-left:0;padding-right:0;box-sizing:border-box;}' +
+            '.print-project{margin-top:12mm;break-before:page;page-break-before:always;}' +
+            '.print-project .project_detail_page,.print-project .project_detail{margin-top:0;}' +
+            '.print-project .project_detail_title{margin-top:0;}' +
+            '.print-summary .tag,.print-project .tag{box-shadow:none;background:#d6d6d6;color:#111;border:1px solid #bdbdbd;}' +
+            '.print-summary .tag *,.print-project .tag *{color:inherit;}' +
+            '.print-project .project_detail_content{padding-left:4px;padding-right:4px;}' +
+            '.print-project .project_detail_content [style*="overflow-x: auto"],.print-project .project_detail_content [style*="overflow-x:auto"]{overflow:visible;white-space:normal;}' +
+            '.print-project .project_detail_content img{display:block;margin:6px auto 10px;max-width:min(100%,' + (PRINT_IMAGE_LAYOUT.portraitMaxWidthMm * PRINT_IMAGE_LAYOUT.landscapeWidthByPortraitMultiplier) + 'mm);max-height:136mm;width:auto;height:auto;break-inside:avoid;page-break-inside:avoid;}' +
+            '.print-project .responsive-iframe{position:static;width:100%;padding-bottom:0;}' +
+            '.print-project iframe{display:none;}' +
+            '.print-video-thumb{margin:6px auto 8px;max-width:520px;text-align:center;}' +
+            '.print-video-thumb-link{display:block;border:1px solid rgba(0,0,0,.18);border-radius:10px;overflow:hidden;background:#f7f7f7;}' +
+            '.print-video-thumb img{display:block;width:100%;height:auto;}' +
+            '.print-video-thumb figcaption{margin-top:6px;font-size:12px;color:#444;}' +
+            '.print-video-thumb figcaption a{color:inherit;text-decoration:underline;}' +
+            '.print-embed-link{margin:8px 0 12px;font-size:12px;}' +
+            '.print-embed-link a{color:#333;text-decoration:underline;word-break:break-all;}' +
+            '.print-project-error{padding:10px 12px;border:1px solid rgba(0,0,0,.14);border-radius:8px;background:#fafafa;color:#333;}' +
+            'hr{display:block;opacity:.25;height:0;border:0;border-top:1px solid #000;background:transparent;}' +
+            'img,video,iframe{max-width:100%;height:auto;}' +
+            '.bubble-bg-layer,#interactiveBubbleCanvas,.bubble-bg-canvas{display:none;visibility:hidden;}' +
+            '</style>' +
+            '</head>' +
+            '<body class="portfolio-page project-page"><div class="print-root">' +
+            summaryHtml +
+            projectSectionsHtml.join('') +
+            '</div></body></html>';
+    };
+
+    const printSummaryWithProjects = async function (selectedProjects) {
+        const printWindow = openPrintPopupWindow();
+        if (!printWindow) {
+            window.alert(printText.popupBlocked);
+            return;
+        }
+
+        printWindow.document.open();
+        printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparing...</title></head><body style="font-family:Inter,KakaoBigFont,\'Noto Sans KR\',\'Helvetica Neue\',Arial,sans-serif;padding:24px;">' + escapeHtml(printText.loading) + '</body></html>');
+        printWindow.document.close();
+
+        const summaryHtml = buildSummaryPrintHtml();
+        const projectSectionHtmlList = [];
+        for (const project of selectedProjects) {
+            try {
+                const sectionHtml = await fetchProjectPrintSectionHtml(project.url, project.title);
+                projectSectionHtmlList.push(sectionHtml);
+            } catch (error) {
+                projectSectionHtmlList.push(
+                    '<section class="print-project">' +
+                    '<h2>' + escapeHtml(project.title) + '</h2>' +
+                    '<p class="print-project-error">' + escapeHtml(printText.loadFailed) + '</p>' +
+                    '</section>'
+                );
+            }
+        }
+
+        const printDocumentHtml = buildPrintDocumentHtml(summaryHtml, projectSectionHtmlList);
+        printWindow.document.open();
+        printWindow.document.write(printDocumentHtml);
+        printWindow.document.close();
+
+        let printed = false;
+        const triggerPrint = function () {
+            if (printed) {
+                return;
+            }
+            printed = true;
+            printWindow.focus();
+            printWindow.print();
+        };
+
+        const triggerPrintWhenReady = function () {
+            waitForImagesReady(printWindow.document, 4200)
+                .then(function () {
+                    triggerPrint();
+                })
+                .catch(function () {
+                    triggerPrint();
+                });
+        };
+
+        printWindow.addEventListener('load', function () {
+            window.setTimeout(triggerPrintWhenReady, 160);
+        }, { once: true });
+
+        window.setTimeout(triggerPrintWhenReady, 1300);
+        printWindow.addEventListener('afterprint', function () {
+            try {
+                printWindow.close();
+            } catch (error) {}
+        });
+    };
+
+    const printButton = document.querySelector('[data-portfolio-print]');
+    if (printButton) {
+        printButton.addEventListener('click', async function () {
+            const projectOptions = collectProjectPrintOptions();
+            const selectedUrls = await openProjectPrintSelector(projectOptions);
+            if (selectedUrls === null) {
+                return;
+            }
+
+            const selectedProjects = selectedUrls.map(function (url) {
+                const matched = projectOptions.find(function (project) {
+                    return project.url === url;
+                });
+                return {
+                    url: url,
+                    title: matched ? matched.title : url
+                };
+            });
+
+            await printSummaryWithProjects(selectedProjects);
+        });
+    }
+
     const nav = document.querySelector('.portfolio-nav');
 
     if (!nav) {
@@ -928,16 +2016,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let scrollCleanupTimerId = null;
     window.addEventListener('scroll', function () {
-        forceClearNavContainerDecorations();
-
         if (scrollCleanupTimerId !== null) {
             window.clearTimeout(scrollCleanupTimerId);
         }
 
         scrollCleanupTimerId = window.setTimeout(function () {
-            forceClearNavContainerDecorations();
+            window.requestAnimationFrame(forceClearNavContainerDecorations);
             scrollCleanupTimerId = null;
-        }, 140);
+        }, 180);
     }, { passive: true });
     forceClearNavContainerDecorations();
     scheduleNavModeUpdate();

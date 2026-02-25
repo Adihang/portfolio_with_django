@@ -14,10 +14,8 @@
     <cards class="project_cards">
         {% for project in projects %}
         <li class="project_card">
-            <div>
-                <a href="{% url 'main:ProjectDetail_lang' ui_lang=ui_lang project_id=project.id %}">
-                    <img class="project_card_img hover-dark" src="{{ project.banner_img.url }}"/>
-                </a>
+            <a class="project_card_link" href="{% url 'main:ProjectDetail_lang' ui_lang=ui_lang project_id=project.id %}">
+                <img class="project_card_img" src="{{ project.banner_img.url }}"/>
                 <div class="project_card_text">
                     <hr>
                     <h5 class="project_card_contents_title"><b>{{ project.display_title }}</b></h5>
@@ -28,7 +26,7 @@
                         {% endfor %}
                     </ul>
                 </div>
-            </div>
+            </a>
         </li>
         {% endfor %}
     </cards>

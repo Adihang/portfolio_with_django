@@ -61,6 +61,109 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+    const footer = document.querySelector('.foot');
+    const printButton = document.querySelector('[data-portfolio-print]');
+    const footerClearance = 0;
+    const printButtonGap = -6;
+    const printButtonLeftOffset = 5;
+    const computedBottom = parseFloat(window.getComputedStyle(chatWidget).bottom || '20');
+    const widgetBaseBottom = Number.isNaN(computedBottom) ? 20 : computedBottom;
+    const widgetMotionFollowDurationMs = 420;
+    let footerOffsetRafId = null;
+    let printButtonAnchorRafId = null;
+    let widgetMotionFollowRafId = null;
+    let widgetMotionFollowUntil = 0;
+
+    function updatePrintButtonAnchor() {
+        printButtonAnchorRafId = null;
+
+        if (!printButton) {
+            return;
+        }
+
+        printButton.classList.add('is-chat-widget-anchor');
+
+        const widgetRect = chatWidget.getBoundingClientRect();
+        const buttonRect = printButton.getBoundingClientRect();
+        const minViewportInset = 8;
+        const maxLeft = window.innerWidth - buttonRect.width - minViewportInset;
+        const targetLeft = Math.min(
+            Math.max(minViewportInset, widgetRect.left),
+            Math.max(minViewportInset, maxLeft)
+        );
+        const targetTop = Math.max(minViewportInset, widgetRect.top - buttonRect.height - printButtonGap);
+
+        printButton.style.left = `${targetLeft + printButtonLeftOffset}px`;
+        printButton.style.top = `${targetTop}px`;
+    }
+
+    function schedulePrintButtonAnchorUpdate() {
+        if (!printButton || printButtonAnchorRafId !== null) {
+            return;
+        }
+
+        printButtonAnchorRafId = window.requestAnimationFrame(updatePrintButtonAnchor);
+    }
+
+    function updateChatWidgetBottomOffset() {
+        footerOffsetRafId = null;
+
+        if (!footer) {
+            chatWidget.style.bottom = `${widgetBaseBottom}px`;
+            schedulePrintButtonAnchorUpdate();
+            return;
+        }
+
+        const footerRect = footer.getBoundingClientRect();
+        const visibleFooterHeight = Math.max(0, window.innerHeight - footerRect.top);
+        const scrollTop = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+        const viewportBottom = scrollTop + window.innerHeight;
+        const pageBottom = Math.max(
+            document.documentElement.scrollHeight,
+            document.body ? document.body.scrollHeight : 0
+        );
+        const isAtPageBottom = viewportBottom >= (pageBottom - 2);
+        const footerDrivenBottom = Math.max(0, visibleFooterHeight + footerClearance);
+        const targetBottom = isAtPageBottom
+            ? footerDrivenBottom
+            : Math.max(widgetBaseBottom, footerDrivenBottom);
+
+        chatWidget.style.bottom = `${Math.round(targetBottom)}px`;
+        schedulePrintButtonAnchorUpdate();
+    }
+
+    function scheduleChatWidgetBottomOffsetUpdate() {
+        if (footerOffsetRafId !== null) {
+            return;
+        }
+        footerOffsetRafId = window.requestAnimationFrame(updateChatWidgetBottomOffset);
+        schedulePrintButtonAnchorUpdate();
+    }
+
+    function followChatWidgetMotion(durationMs = widgetMotionFollowDurationMs) {
+        const now = (window.performance && typeof window.performance.now === 'function')
+            ? window.performance.now()
+            : Date.now();
+        widgetMotionFollowUntil = Math.max(widgetMotionFollowUntil, now + durationMs);
+
+        if (widgetMotionFollowRafId !== null) {
+            return;
+        }
+
+        const step = function(timestamp) {
+            scheduleChatWidgetBottomOffsetUpdate();
+
+            if (timestamp < widgetMotionFollowUntil) {
+                widgetMotionFollowRafId = window.requestAnimationFrame(step);
+                return;
+            }
+
+            widgetMotionFollowRafId = null;
+            scheduleChatWidgetBottomOffsetUpdate();
+        };
+
+        widgetMotionFollowRafId = window.requestAnimationFrame(step);
+    }
 
     function loadConversationHistory() {
         try {
@@ -119,11 +222,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // 애니메이션 프레임 이후 스크롤 보정
             window.requestAnimationFrame(scrollToBottom);
         }
+
+        scheduleChatWidgetBottomOffsetUpdate();
+        followChatWidgetMotion();
     }
 
     chatToggle.addEventListener('click', function() {
         setChatOpen(!isChatOpen);
     });
+
+    const handleChatBodyTransitionEvent = function(event) {
+        if (event.target !== chatBody) {
+            return;
+        }
+        followChatWidgetMotion();
+    };
+    chatBody.addEventListener('transitionstart', handleChatBodyTransitionEvent);
+    chatBody.addEventListener('transitionend', handleChatBodyTransitionEvent);
+    chatBody.addEventListener('transitioncancel', handleChatBodyTransitionEvent);
 
     // 메시지 전송 함수
     async function sendMessage() {
@@ -351,9 +467,15 @@ document.addEventListener('DOMContentLoaded', function() {
             sendMessage();
         }
     });
+    window.addEventListener('scroll', scheduleChatWidgetBottomOffsetUpdate, { passive: true });
+    window.addEventListener('resize', scheduleChatWidgetBottomOffsetUpdate, { passive: true });
+    window.addEventListener('orientationchange', scheduleChatWidgetBottomOffsetUpdate, { passive: true });
 
     // 저장된 대화 복원
     restoreConversationHistory();
+
+    scheduleChatWidgetBottomOffsetUpdate();
+    schedulePrintButtonAnchorUpdate();
 
     // 채팅창이 닫힌 상태로 시작
 });
