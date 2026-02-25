@@ -221,6 +221,15 @@ body.portfolio-page .bubble-bg-layer {
     background-color: transparent;
 }
 
+body.portfolio-page .main_banner,
+body.portfolio-page .main_contents {
+    width: 100%;
+    max-width: 1300px;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
 body.portfolio-page section {
     background: transparent;
     background-color: transparent;
@@ -296,7 +305,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 }
 
 .portfolio-nav .container-fluid {
-    max-width: 1200px;
+    max-width: 1220px;
     padding-left: 0;
     padding-right: 0;
     display: flex;

@@ -16,6 +16,8 @@
 - `python manage.py migrate`: Apply database migrations.
 - `python manage.py makemigrations`: Generate migrations after model changes.
 - `python manage.py collectstatic`: Collect static assets into `staticfiles/`.
+- After changing static assets in production-like runtime, run `collectstatic` and then restart gunicorn to apply immediately.
+- Local autorun example: `/bin/zsh -lc "launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn"`.
 - `python manage.py createsuperuser`: Create an admin account for `/admin/`.
 
 ## Coding Style & Naming Conventions
@@ -37,6 +39,7 @@
 ## Security & Configuration Notes
 - Secrets are expected in `config/secrets.json` (git-ignored). Do not commit API keys.
 - Production uses `DEBUG = False` and deploys via GitHub Actions to EC2; static files must be collected.
+- Static change rollout rule: `collectstatic` first, then app process restart (gunicorn) to avoid stale served assets.
 
 ## Docker Runtime Stack (for later testing)
 - Container chain: `cloudflared -> nginx -> gunicorn(django)`.
@@ -56,6 +59,11 @@
 - Rotation and retention are file-based only: `scripts/rotate-nginx-access-json.sh` keeps 30 days.
 - Django Admin log page is file-read mode: `/admin/main/accesslog/`.
 - Admin index includes a direct link: `/admin/` -> `운영 로그` -> `접속 로그 (파일 직접 조회)`.
+- Daily summary command: `.venv/bin/python manage.py summarize_access_logs --date YYYY-MM-DD`.
+- Daily summary files: `/opt/homebrew/var/log/nginx/summaries/access_summary_YYYY-MM-DD.(json|md)`.
+- Daily summary admin page: `/admin/main/accesslog-summary/` (also linked from `/admin/` 운영 로그 section).
+- Default scheduler: in-process Django scheduler (00:05 local time, summarizes previous day).
+- Optional external scheduler template: `deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist`.
 - Logs are not imported into DB. `AccessLog` model/table and `import_access_logs` command are removed.
 
 ## Browser JS Load Incident Notes

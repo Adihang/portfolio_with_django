@@ -8,10 +8,15 @@
 
 {% block content %}
 <div id="content-main">
+    <p style="margin: 0 0 10px;">
+        <a class="button" href="{% url 'admin:main_accesslog_changelist' %}">접속 로그</a>
+        <a class="button" href="{% url 'admin:main_accesslog_summary_changelist' %}">일일 요약</a>
+    </p>
     <p>로그 디렉토리: <code>{{ log_dir }}</code></p>
     <p>
         최근 {{ days }}일 / 표시 가능 로그 {{ total_count }}건 / 스캔 파일 {{ scanned_files }}개
         {% if parse_errors %}/ 파싱 실패 {{ parse_errors }}건{% endif %}
+        {% if exclude_bots %}/ 봇 추정 제외 {{ filtered_bot_rows }}건{% endif %}
     </p>
 
     <form method="get" style="margin: 12px 0 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -22,6 +27,10 @@
         <label>
             페이지 크기
             <input type="number" name="per_page" min="20" max="500" value="{{ per_page }}">
+        </label>
+        <label style="display: inline-flex; align-items: center; gap: 4px;">
+            <input type="checkbox" name="exclude_bots" value="1" {% if exclude_bots %}checked{% endif %}>
+            봇 추정 제외
         </label>
         <button type="submit" class="button">적용</button>
     </form>
