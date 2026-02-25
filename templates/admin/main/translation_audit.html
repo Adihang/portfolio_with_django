@@ -1,0 +1,78 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; 번역 누락 점검
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <p style="margin: 0 0 12px;">
+        <a class="button" href="{% url 'admin:main_translation_audit' %}">번역 누락 점검</a>
+        <a class="button" href="{% url 'admin:main_project_changelist' %}">Project 목록</a>
+        <a class="button" href="{% url 'admin:main_career_changelist' %}">Career 목록</a>
+    </p>
+
+    <p>Project 누락: {{ missing_project_count }}건 / Career 누락: {{ missing_career_count }}건</p>
+
+    <h2>Project 번역 누락</h2>
+    <div class="results">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>제목</th>
+                    <th>누락 필드</th>
+                    <th>편집</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in missing_projects %}
+                <tr>
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.title }}</td>
+                    <td>{{ row.missing_fields }}</td>
+                    <td><a class="changelink" href="{{ row.change_url }}">수정</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">누락된 Project 번역이 없습니다.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2 style="margin-top: 18px;">Career 번역 누락</h2>
+    <div class="results">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>회사</th>
+                    <th>직책</th>
+                    <th>누락 필드</th>
+                    <th>편집</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in missing_careers %}
+                <tr>
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.company }}</td>
+                    <td>{{ row.position }}</td>
+                    <td>{{ row.missing_fields }}</td>
+                    <td><a class="changelink" href="{{ row.change_url }}">수정</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">누락된 Career 번역이 없습니다.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

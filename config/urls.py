@@ -14,6 +14,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from functools import partial
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -26,15 +28,31 @@ urlpatterns = [
     path('', include('main.urls')),
 ]
 
+
+def serve_with_cache(request, path, *, document_root, cache_control):
+    response = serve(request, path, document_root=document_root)
+    response["Cache-Control"] = cache_control
+    return response
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 elif getattr(settings, "DJANGO_SERVE_FILES", False):
     urlpatterns += [
-        re_path(r'^media/(?P<path>.*)$', serve, {
-            'document_root': settings.MEDIA_ROOT,
-        }),
-        re_path(r'^static/(?P<path>.*)$', serve, {
-            'document_root': settings.STATIC_ROOT,
-        }),
+        re_path(
+            r'^media/(?P<path>.*)$',
+            partial(
+                serve_with_cache,
+                document_root=settings.MEDIA_ROOT,
+                cache_control="public, max-age=604800",
+            ),
+        ),
+        re_path(
+            r'^static/(?P<path>.*)$',
+            partial(
+                serve_with_cache,
+                document_root=settings.STATIC_ROOT,
+                cache_control="public, max-age=2592000, s-maxage=2592000, immutable",
+            ),
+        ),
     ]

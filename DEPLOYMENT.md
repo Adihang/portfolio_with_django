@@ -295,6 +295,11 @@ docker compose up -d
 - 회전/정리 스크립트: `scripts/rotate-nginx-access-json.sh`
 - macOS launchd 에이전트 템플릿: `deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist`
 - 로그 조회 URL: `/admin/main/accesslog/` (파일 직접 조회)
+- 일일 요약 명령어: `python manage.py summarize_access_logs --date YYYY-MM-DD`
+- 요약 파일: `/opt/homebrew/var/log/nginx/summaries/access_summary_YYYY-MM-DD.(json|md)`
+- 요약 조회 URL: `/admin/main/accesslog-summary/`
+- 기본 자동 요약: Django 서버 내부 스케줄러(매일 00:05, 전날 날짜)
+- (옵션) OS 스케줄러 템플릿: `deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist`
 
 ### 11-1. Nginx 재적용
 
@@ -344,3 +349,32 @@ rm -f ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
 - `AccessLog` 모델/테이블은 삭제됨 (DB에 로그 미적재 정책)
 - `import_access_logs` 관리 명령어는 제거됨
 - 보관 정책은 파일 회전 + 30일 삭제로만 관리
+
+### 11-6. 일일 요약 생성(수동)
+
+```bash
+cd /Users/imhanbyeol/Development/portfolio_with_django
+.venv/bin/python manage.py summarize_access_logs --date "$(date -v-1d '+%Y-%m-%d')"
+ls -lh /opt/homebrew/var/log/nginx/summaries/access_summary_*
+```
+
+### 11-7. 매일 00:05 자동 요약 등록 (전날 날짜)
+
+기본 권장 방식은 **Django 내부 스케줄러** 사용입니다.  
+아래 launchd 등록은 서버 프로세스 외부에서 별도로 돌리고 싶을 때만 사용하세요.
+
+```bash
+cp /Users/imhanbyeol/Development/portfolio_with_django/deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist \
+  ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
+
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.nginx-accesslog-summary
+launchctl print gui/$(id -u)/com.hanplanet.nginx-accesslog-summary
+```
+
+삭제하려면:
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
+rm -f ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
+```

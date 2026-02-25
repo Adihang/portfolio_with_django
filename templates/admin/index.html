@@ -20,10 +20,26 @@
       </caption>
       <tr class="model-accesslog">
         <th scope="row">
-          <a href="{% url 'admin:main_accesslog_changelist' %}">접속 로그 (파일 직접 조회)</a>
+          <a href="{% url 'admin:main_accesslog_changelist' %}">접속 로그</a>
         </th>
         <td>
           <a href="{% url 'admin:main_accesslog_changelist' %}" class="viewlink">{% translate "View" %}</a>
+        </td>
+      </tr>
+      <tr class="model-accesslog-summary">
+        <th scope="row">
+          <a href="{% url 'admin:main_accesslog_summary_changelist' %}">일일 요약</a>
+        </th>
+        <td>
+          <a href="{% url 'admin:main_accesslog_summary_changelist' %}" class="viewlink">{% translate "View" %}</a>
+        </td>
+      </tr>
+      <tr class="model-translation-audit">
+        <th scope="row">
+          <a href="{% url 'admin:main_translation_audit' %}">번역 누락 점검</a>
+        </th>
+        <td>
+          <a href="{% url 'admin:main_translation_audit' %}" class="viewlink">{% translate "View" %}</a>
         </td>
       </tr>
     </table>

@@ -12,11 +12,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    const currentPath = window.location.pathname;
+    const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?)$/;
     const isLightBackgroundPage = document.body.classList.contains('portfolio-page') ||
         document.body.classList.contains('project-page') ||
-        window.location.pathname === '/portfolio/' ||
-        window.location.pathname === '/portfolio' ||
-        window.location.pathname.startsWith('/project/');
+        currentPath === '/portfolio/' ||
+        currentPath === '/portfolio' ||
+        currentPath.startsWith('/project/') ||
+        localizedLightBgPattern.test(currentPath);
     const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
     const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
     const bubbleLayer = document.querySelector('.bubble-bg-layer');

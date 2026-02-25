@@ -70,6 +70,11 @@ Nginx 접속 로그는 JSON 포맷(`access_json.log`)으로 기록하고, `scrip
 - Django DB로 적재하지 않습니다. (`AccessLog` 모델/테이블 없음)
 - 관리자에서 `/admin/main/accesslog/` 접속 시 파일을 직접 읽어 화면에 표시합니다.
 - 관리자 메인(`/admin/`)에 `운영 로그 -> 접속 로그 (파일 직접 조회)` 링크가 추가되어 있습니다.
+- 일일 요약 생성 명령어: `python manage.py summarize_access_logs --date YYYY-MM-DD`
+- 요약 파일: `/opt/homebrew/var/log/nginx/summaries/access_summary_YYYY-MM-DD.(json|md)`
+- 관리자 요약 화면: `/admin/main/accesslog-summary/`
+- 자동 스케줄: Django 서버 프로세스 내부에서 매일 00:05에 전날 요약 자동 생성
+- (옵션) OS 스케줄러 템플릿: `deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist`
 
 ## Docker Deployment (Cloudflare Tunnel + Nginx + Gunicorn + Django)
 

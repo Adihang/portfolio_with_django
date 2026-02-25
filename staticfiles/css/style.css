@@ -195,6 +195,28 @@ body.portfolio-page.bubble-exhausted-dark .foot {
     color: #e7e7ea;
 }
 
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_position {
+    color: #f1f2f6;
+}
+
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_work,
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_work *,
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_work strong {
+    color: #b9bec8;
+}
+
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_date {
+    color: #c4c9d2;
+}
+
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_date > div:first-child {
+    color: #d8dce4;
+}
+
+body.portfolio-page.bubble-exhausted-dark .career_card .career_card_date > div:last-child {
+    color: #aeb4bf;
+}
+
 body.portfolio-page .bubble-bg-layer {
     display: block;
 }
@@ -428,6 +450,47 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     transform: translateY(-1px);
 }
 
+.portfolio-lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 6px;
+}
+
+.portfolio-lang-link {
+    display: inline-block;
+    text-decoration: none;
+    color: var(--theme-subtle);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    line-height: 1;
+    padding: 4px 2px;
+    border-bottom: 1.5px solid transparent;
+    opacity: 0.8;
+    transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.portfolio-lang-link:hover,
+.portfolio-lang-link:focus-visible {
+    color: var(--theme-accent-strong);
+    opacity: 1;
+}
+
+.portfolio-lang-link.is-active {
+    color: var(--theme-ink);
+    border-bottom-color: currentColor;
+    opacity: 1;
+}
+
+.portfolio-lang-divider {
+    color: var(--theme-subtle);
+    opacity: 0.6;
+    font-size: 11px;
+    line-height: 1;
+}
+
 .portfolio-nav-toggler {
     display: none;
     border: 1px solid var(--theme-border);
@@ -526,6 +589,16 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-link {
     display: block;
+}
+
+.portfolio-nav.nav-auto-collapsed .portfolio-lang-toggle {
+    width: 100%;
+    padding: 8px 0 4px;
+}
+
+.portfolio-nav.nav-auto-collapsed .portfolio-lang-link {
+    font-size: 13px;
+    padding: 6px 4px;
 }
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item {
@@ -735,6 +808,11 @@ input[type=submit] {
 .career_card{
     display: flex;
 }
+.career_card_title{
+    font-size: 1.35rem;
+    line-height: 1.25;
+    margin-bottom: 0;
+}
 .career_card_date{
     color: #535353;
     font-size: 14px;
@@ -744,6 +822,34 @@ input[type=submit] {
 .career_card_text{
     margin-top: 30px;
     margin-left: auto;
+}
+.career_card_position{
+    font-size: 1.25rem;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #111111;
+    margin-bottom: 10px;
+}
+.career_card_work{
+    font-size: 1.1rem;
+    line-height: 1.5;
+    font-weight: 400;
+    color: #3f3f3f;
+}
+.career_card_work *{
+    color: inherit;
+}
+.career_card_work p,
+.career_card_work li{
+    font-size: 1em;
+    line-height: inherit;
+}
+.career_card_work > :first-child{
+    margin-top: 0;
+}
+.career_card_work strong{
+    font-size: 1em;
+    font-weight: 600;
 }
 .projects{
     text-align: center;

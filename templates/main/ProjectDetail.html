@@ -12,7 +12,7 @@
 <link rel="stylesheet" type="text/css" href="{% static_v 'css/style.css' %}">
 <div class="project_detail_page">
     <div class="project_detail">
-        <h1 class="project_detail_title">{{ project.title }}</h1>
+        <h1 class="project_detail_title">{{ project.display_title }}</h1>
         <ul class="tags">
             {% for tag in project.tags.all %}
             <li class="tag">{{ tag.tag }}</li>

@@ -1,7 +1,7 @@
 <section class="careers">
     <div class="careers_head">
         <div class="careers_title">
-            <h3><b>경력 사항</b></h3>
+            <h3><b>{% if ui_lang == 'en' %}Career{% else %}경력 사항{% endif %}</b></h3>
         </div>
     </div>
     <cards class="career_cards">
@@ -9,15 +9,15 @@
         <hr>
         <li class="career_card">
             <div class="career_card_head">
-                <h5 class="career_card_title"><b>{{ career.company }}</b></h5>
+                <h5 class="career_card_title"><b>{{ career.display_company }}</b></h5>
                 <div class="career_card_date">
-                    <div>{{ career.join_date }} ~ {% if career.order == 0 %}Now{% else %}{{ career.leave_date }}{% endif %}</div>
-                    <div>({{career.period}})</div>
+                    <div>{{ career.display_date_range }}</div>
+                    <div>({{ career.display_period_text }})</div>
                 </div>
             </div>
             <div class="career_card_text">
-                <div><b>{{ career.position }}</b></div>
-                <div>{{ career.content }}</div>
+                <div class="career_card_position">{{ career.position }}</div>
+                <div class="career_card_work">{{ career.display_content }}</div>
             </div>
         </li>
         {% endfor %}

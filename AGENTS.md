@@ -16,6 +16,7 @@
 - `python manage.py migrate`: Apply database migrations.
 - `python manage.py makemigrations`: Generate migrations after model changes.
 - `python manage.py collectstatic`: Collect static assets into `staticfiles/`.
+- Style update rule: when `static/css/*`, `static/js/*`, or templates using those assets change, always run `collectstatic` and then restart gunicorn.
 - After changing static assets in production-like runtime, run `collectstatic` and then restart gunicorn to apply immediately.
 - Local autorun example: `/bin/zsh -lc "launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn"`.
 - `python manage.py createsuperuser`: Create an admin account for `/admin/`.
