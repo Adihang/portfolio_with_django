@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
 from django.template.response import TemplateResponse
-from django.urls import path
+from django.urls import path, reverse
 from django.utils import timezone
 
 from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_markdown
@@ -17,13 +17,37 @@ from .models import Career, Hobby, Project, Project_Tag, Stratagem, Stratagem_Cl
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ['title']
+    list_display = ["title", "title_en", "create_date"]
+    fields = [
+        "order",
+        "title",
+        "title_en",
+        "banner_img",
+        "tags",
+        "content",
+        "content_en",
+        "create_date",
+    ]
 
 admin.site.register(Project_Tag)
 
 @admin.register(Career)
 class CareerAdmin(admin.ModelAdmin):
-    list_display = ['company']
+    list_display = ["company", "company_en", "calculated_period", "join_date", "leave_date"]
+    fields = [
+        "order",
+        "company",
+        "company_en",
+        "position",
+        "content",
+        "content_en",
+        "join_date",
+        "leave_date",
+    ]
+
+    @admin.display(description="기간(자동 계산)")
+    def calculated_period(self, obj):
+        return obj.display_period
 
 @admin.register(Hobby)
 class HobbyAdmin(admin.ModelAdmin):
@@ -428,6 +452,59 @@ def access_log_summary_download_view(request, summary_date, file_type):
     return response
 
 
+def _is_blank(value):
+    return not str(value or "").strip()
+
+
+def translation_audit_view(request):
+    missing_projects = []
+    missing_careers = []
+
+    for project in Project.objects.all().order_by("id"):
+        missing_fields = []
+        if _is_blank(project.title_en):
+            missing_fields.append("title_en")
+        if _is_blank(project.content_en):
+            missing_fields.append("content_en")
+        if missing_fields:
+            missing_projects.append(
+                {
+                    "id": project.id,
+                    "title": project.title,
+                    "missing_fields": ", ".join(missing_fields),
+                    "change_url": reverse("admin:main_project_change", args=[project.id]),
+                }
+            )
+
+    for career in Career.objects.all().order_by("id"):
+        missing_fields = []
+        if _is_blank(career.company_en):
+            missing_fields.append("company_en")
+        if _is_blank(career.content_en):
+            missing_fields.append("content_en")
+        if missing_fields:
+            missing_careers.append(
+                {
+                    "id": career.id,
+                    "company": career.company,
+                    "position": career.position,
+                    "missing_fields": ", ".join(missing_fields),
+                    "change_url": reverse("admin:main_career_change", args=[career.id]),
+                }
+            )
+
+    context = {
+        **admin.site.each_context(request),
+        "title": "번역 누락 점검",
+        "subtitle": None,
+        "missing_projects": missing_projects,
+        "missing_careers": missing_careers,
+        "missing_project_count": len(missing_projects),
+        "missing_career_count": len(missing_careers),
+    }
+    return TemplateResponse(request, "admin/main/translation_audit.html", context)
+
+
 _original_admin_get_urls = admin.site.get_urls
 
 
@@ -458,6 +535,11 @@ def _get_admin_urls():
             "main/accesslog-summary/<str:summary_date>/",
             admin.site.admin_view(access_log_summary_view),
             name="main_accesslog_summary_detail",
+        ),
+        path(
+            "main/translation-audit/",
+            admin.site.admin_view(translation_audit_view),
+            name="main_translation_audit",
         ),
     ]
     return custom_urls + urls

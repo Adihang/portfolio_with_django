@@ -1,8 +1,14 @@
 <section class="hobbys">
     <div class="head">
         <div class="title">
-            <h3><b>3D설계</b></h3>
-            <div class = 'hobbys_subtitle'>하드웨어 설계도 직접 해보면 재미있지요</div>
+            <h3><b>{% if ui_lang == 'en' %}3D Design{% else %}3D설계{% endif %}</b></h3>
+            <div class = 'hobbys_subtitle'>
+                {% if ui_lang == 'en' %}
+                Hardware design is fun when you build it yourself.
+                {% else %}
+                하드웨어 설계도 직접 해보면 재미있지요
+                {% endif %}
+            </div>
         </div>
     </div>
     <div class="hobby_card">

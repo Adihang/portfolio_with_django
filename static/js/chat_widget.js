@@ -1,5 +1,32 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const initialBotMessage = '안녕하세요! 궁금하신 점이 있으시면 언제든지 물어보세요.';
+    const htmlLang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+    const uiLang = htmlLang.startsWith('en') ? 'en' : 'ko';
+    const pathLangMatch = (window.location.pathname || '').match(/^\/(ko|en)(\/|$)/);
+    const chatApiUrl = pathLangMatch ? `/${pathLangMatch[1]}/api/chat/` : '/api/chat/';
+    const i18nByLang = {
+        ko: {
+            initialBotMessage: '안녕하세요! 궁금하신 점이 있으시면 언제든지 물어보세요.',
+            chatTitle: '챗봇과 대화하기',
+            inputPlaceholder: '메시지를 입력하세요...',
+            responseProcessingError: '응답을 처리하는 중 오류가 발생했습니다.',
+            csrfMissingError: '오류: CSRF 토큰을 찾을 수 없습니다. 페이지를 새로고침 해주세요.',
+            genericError: '죄송합니다. 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+            serverCommunicationError: '죄송합니다. 서버와의 통신 중 오류가 발생했습니다.',
+            apiRequestFailed: 'API 요청 실패'
+        },
+        en: {
+            initialBotMessage: 'Hello! Feel free to ask me anything.',
+            chatTitle: 'Chat with Chatbot',
+            inputPlaceholder: 'Type your message...',
+            responseProcessingError: 'An error occurred while processing the response.',
+            csrfMissingError: 'Error: CSRF token not found. Please refresh the page.',
+            genericError: 'Sorry, an error occurred. Please try again shortly.',
+            serverCommunicationError: 'Sorry, a communication error occurred with the server.',
+            apiRequestFailed: 'API request failed'
+        }
+    };
+    const i18n = i18nByLang[uiLang];
+    const initialBotMessage = i18n.initialBotMessage;
     const STORAGE_KEY = 'portfolio_chat_history_v1';
     const conversationHistory = [];
 
@@ -8,13 +35,13 @@ document.addEventListener('DOMContentLoaded', function() {
     chatWidget.className = 'chat-widget';
     chatWidget.innerHTML = `
         <div class="chat-header">
-            <h3>챗봇과 대화하기</h3>
+            <h3>${i18n.chatTitle}</h3>
             <button class="chat-toggle">−</button>
         </div>
         <div class="chat-body">
             <div class="chat-messages" id="chat-messages"></div>
             <div class="chat-input">
-                <input type="text" id="user-input" placeholder="메시지를 입력하세요..." autocomplete="off">
+                <input type="text" id="user-input" placeholder="${i18n.inputPlaceholder}" autocomplete="off">
                 <button id="send-button">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -116,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage(botResponse, 'bot');
         } catch (error) {
             console.error('Error in sendMessage:', error);
-            addMessage('응답을 처리하는 중 오류가 발생했습니다.', 'bot');
+            addMessage(i18n.responseProcessingError, 'bot');
         } finally {
             // 입력 필드 다시 활성화
             userInput.disabled = false;
@@ -254,11 +281,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const csrfToken = getCSRFToken();
             if (!csrfToken) {
                 console.error('CSRF token not found');
-                return '오류: CSRF 토큰을 찾을 수 없습니다. 페이지를 새로고침 해주세요.';
+                return i18n.csrfMissingError;
             }
 
             // GPT API 호출
-            const response = await fetch('/api/chat/', {
+            const response = await fetch(chatApiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -273,21 +300,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 console.error('API Error:', response.status, errorData);
-                throw new Error(`API 요청 실패: ${response.status} ${response.statusText}`);
+                throw new Error(`${i18n.apiRequestFailed}: ${response.status} ${response.statusText}`);
             }
             
             const data = await response.json();
 
             if (data.error) {
                 console.error('Error from server:', data.error);
-                return '죄송합니다. 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+                return i18n.genericError;
             }
             
-            return data.response || '죄송합니다. 응답을 처리하는 중 오류가 발생했습니다.';
+            return data.response || i18n.responseProcessingError;
             
         } catch (error) {
             console.error('Error calling GPT API:', error);
-            return '죄송합니다. 서버와의 통신 중 오류가 발생했습니다.';
+            return i18n.serverCommunicationError;
         } finally {
             stopLoadingAnimation();
         }
