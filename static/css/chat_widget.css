@@ -5,7 +5,7 @@
     right: 20px;
     width: 350px;
     z-index: 1000;
-    font-family: 'Arial', sans-serif;
+    font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     box-shadow:
         0 14px 30px rgba(0, 0, 0, 0.28),
         0 4px 10px rgba(0, 0, 0, 0.18);
@@ -15,6 +15,7 @@
     flex-direction: column;
     background: white;
     max-height: 70vh;
+    box-sizing: border-box;
 }
 
 .chat-header {
@@ -163,9 +164,7 @@ body.portfolio-page .chat-input button {
 body.portfolio-page.bubble-exhausted-dark .chat-widget {
     background: #1b1c20;
     border: none;
-    box-shadow:
-        0 16px 34px rgba(0, 0, 0, 0.62),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.62);
 }
 
 body.portfolio-page.bubble-exhausted-dark .chat-header {

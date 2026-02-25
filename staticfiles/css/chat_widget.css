@@ -4,8 +4,9 @@
     bottom: 20px;
     right: 20px;
     width: 350px;
+    max-width: calc(100% - 20px);
     z-index: 1000;
-    font-family: 'Arial', sans-serif;
+    font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     box-shadow:
         0 14px 30px rgba(0, 0, 0, 0.28),
         0 4px 10px rgba(0, 0, 0, 0.18);
@@ -15,6 +16,7 @@
     flex-direction: column;
     background: white;
     max-height: 70vh;
+    box-sizing: border-box;
 }
 
 .chat-header {
@@ -163,9 +165,7 @@ body.portfolio-page .chat-input button {
 body.portfolio-page.bubble-exhausted-dark .chat-widget {
     background: #1b1c20;
     border: none;
-    box-shadow:
-        0 16px 34px rgba(0, 0, 0, 0.62),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.62);
 }
 
 body.portfolio-page.bubble-exhausted-dark .chat-header {
@@ -219,7 +219,9 @@ body.portfolio-page.bubble-exhausted-dark .chat-input button:hover {
 /* 반응형 디자인 */
 @media (max-width: 768px) {
     .chat-widget {
-        width: 90%;
-        right: 5%;
+        width: min(350px, calc(100% - 20px));
+        max-width: calc(100% - 20px);
+        right: 10px;
+        left: auto;
     }
 }

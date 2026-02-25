@@ -23,6 +23,7 @@
     }
 </style>
 <div class="bubble-bg-layer" aria-hidden="true">
+    <div class="portfolio-watermark-layer">www.hanplanet.com/portfolio/</div>
     <canvas id="interactiveBubbleCanvas" class="bubble-bg-canvas"></canvas>
 </div>
 <div class="main main-has-bubble-bg">
@@ -72,6 +73,20 @@
         <div>
             Made with Django, Ollama, Cloudflare Tunnel
         </div>
+        <button
+            type="button"
+            class="portfolio-print-btn portfolio-nav-link"
+            data-portfolio-print
+            aria-label="{% if ui_lang == 'en' %}Print Summary{% else %}요약 인쇄{% endif %}"
+            title="{% if ui_lang == 'en' %}Print Summary{% else %}요약 인쇄{% endif %}"
+        >
+            <svg class="portfolio-print-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 9V4h10v5"/>
+                <rect x="4" y="9" width="16" height="8" rx="2"/>
+                <rect x="8" y="15" width="8" height="5"/>
+                <line x1="9" y1="18" x2="15" y2="18"/>
+            </svg>
+        </button>
     </div>
 </div>
 {% endblock %}

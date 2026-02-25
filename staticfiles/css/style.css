@@ -1,5 +1,32 @@
+@font-face {
+    font-family: 'KakaoBigFont';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2503@1.0/KakaoBigSans-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}
+
+@font-face {
+    font-family: 'KakaoBigFont';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2503@1.0/KakaoBigSans-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}
+
+@font-face {
+    font-family: 'KakaoBigFont';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2503@1.0/KakaoBigSans-ExtraBold.woff2') format('woff2');
+    font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}
+
 body {
-    font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
+    font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
     color: inherit;
     min-height: 100vh;
     background: linear-gradient(180deg, #171717 0%, #232323 50%, #171717 100%);
@@ -128,7 +155,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .por
 }
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav {
-    background: rgba(20, 20, 24, 0.94);
+    background: rgba(20, 20, 24, 0.8);
     background-image: none;
     box-shadow:
         0 10px 22px rgba(0, 0, 0, 0.58),
@@ -181,7 +208,7 @@ body.portfolio-page.bubble-exhausted-dark .hobby_card_img {
 body.portfolio-page.bubble-exhausted-dark .tag {
     background-color: rgba(95, 95, 104, 0.9);
     color: #f3f3f5;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    box-shadow: none;
 }
 
 body.portfolio-page.bubble-exhausted-dark .project_card *,
@@ -229,11 +256,35 @@ body.portfolio-page .bubble-bg-layer {
     overflow: hidden;
 }
 
+.portfolio-watermark-layer {
+    display: none;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    z-index: 0;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+    font-weight: 900;
+    font-size: clamp(24px, 4.8vw, 62px);
+    letter-spacing: 0.06em;
+    color: rgba(0, 0, 0, 0.11);
+}
+
 .bubble-bg-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
     width: 100%;
     height: 100%;
     display: block;
     opacity: 0.78;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-watermark-layer {
+    color: rgba(255, 255, 255, 0.16);
 }
 
 .main-has-bubble-bg {
@@ -244,7 +295,8 @@ body.portfolio-page .bubble-bg-layer {
 }
 
 body.portfolio-page .main_banner,
-body.portfolio-page .main_contents {
+body.portfolio-page .main_contents,
+body.portfolio-page .foot {
     width: 100%;
     max-width: 1300px;
     margin-left: auto;
@@ -278,7 +330,7 @@ body.portfolio-page section {
     z-index: 1030;
     padding: 9.6px 18px;
     border-bottom: none;
-    background: linear-gradient(90deg, var(--theme-surface), rgba(243, 243, 243, 0.97));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(243, 243, 243, 0.8));
     backdrop-filter: blur(8px);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
@@ -436,9 +488,10 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     padding: 6.4px 14px;
     border-radius: 999px;
     border: 1px solid transparent;
+    background-color: transparent;
     color: var(--theme-subtle);
     font-weight: 600;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     white-space: nowrap;
 }
 
@@ -710,7 +763,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .por
     }
 
     .projects .project_cards {
-        padding: 10px;
+        padding: 23px 10px 24px;
         gap: 7px;
         overflow-x: auto;
     }
@@ -784,7 +837,7 @@ input[type=submit] {
     line-height: 1.2;
     color: white;
     text-align: center;
-    font-family: Pretendard, sans-serif;
+    font-family: inherit;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: -0.6px;
@@ -858,9 +911,12 @@ input[type=submit] {
     padding-top: 25px;
     padding-bottom: 25px;
 }
+.projects .head{
+    padding-bottom: 12px;
+}
 .project_cards{
     list-style-type: none; /* 리스트 마커 제거 */
-    padding: 10px;
+    padding: 23px 10px 24px;
     display: flex; /* 가로로 나열하기 위해 플렉스 박스로 설정 */
     gap: var(--project-card-gap);
     text-align: center;
@@ -941,19 +997,44 @@ body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-sc
     border-radius: 15px;
     justify-content: center; /* 수평 가운데 정렬 */
     align-items: center; /* 수직 가운데 정렬 */
+    filter: brightness(1);
+    transform: scale(1);
+    transform-origin: center center;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.project_card > div {
+body.portfolio-page .projects .project_card {
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body.portfolio-page .projects .project_card:hover,
+body.portfolio-page .projects .project_card:focus-within {
+    transform: scale(1.06);
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
+    filter: brightness(0.96);
+}
+
+.project_card_link {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     gap: var(--project-content-gap);
+    color: inherit;
+    text-decoration: none;
 }
 
-.project_card > div > a {
-    display: block;
+.project_card_link:visited,
+.project_card_link:hover,
+.project_card_link:focus-visible {
+    color: inherit;
+    text-decoration: none;
+}
+
+.project_card > .project_card_link {
+    width: 100%;
+    height: 100%;
 }
 
 .project_card_img{
@@ -991,15 +1072,168 @@ body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-sc
 }
 
 .foot{
-    display: inline-flex;
+    display: flex;
+    justify-content: space-between;
     align-items: flex-end;
+    width: 100%;
+    gap: 12px;
     padding-left: 30px;
     padding-right: 30px;
     padding-top: 4px;
-    padding-bottom: 14px;
+    padding-bottom: 8px;
     line-height: 1.2;
     font-weight: 300;
     font-size: 0.9rem;
+}
+
+.foot > div:first-child {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    color: #535353;
+}
+
+.portfolio-print-btn {
+    position: relative;
+    top: 0;
+    margin-left: auto;
+    align-self: flex-end;
+    appearance: none;
+    cursor: pointer;
+    box-shadow: none;
+    border: none;
+    border-radius: 7px;
+    background-color: rgb(65, 141, 65);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 18px;
+    line-height: 1.2;
+    min-height: 34px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.6px;
+    white-space: nowrap;
+}
+
+.portfolio-print-btn.portfolio-nav-link {
+    transform: translateY(0);
+    transition-property: color, background-color, border-color, transform;
+    transition-duration: 0.2s, 0.2s, 0.2s, 0.5s;
+    transition-timing-function: ease;
+}
+
+.portfolio-print-btn.is-chat-widget-anchor {
+    position: fixed;
+    top: auto;
+    left: auto;
+    right: auto;
+    margin-left: 0;
+    align-self: auto;
+    z-index: 1001;
+}
+
+.portfolio-print-btn.portfolio-nav-link:hover,
+.portfolio-print-btn.portfolio-nav-link:focus-visible {
+    box-shadow: none;
+    border: none;
+    color: #ffffff;
+    background-color: rgb(65, 141, 65);
+    transform: translateY(-4px);
+}
+
+.portfolio-print-btn-icon {
+    width: 24px;
+    height: 24px;
+    display: block;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn {
+    display: none;
+    box-shadow: none;
+}
+
+@media (max-width: 768px) {
+    .foot {
+        padding-left: 10px;
+        padding-right: 10px;
+        gap: 10px;
+    }
+}
+
+@media print {
+    @page {
+        margin: 12mm;
+    }
+
+    html,
+    body,
+    body.portfolio-page {
+        background: #ffffff;
+        background-image: none;
+        color: #111111;
+        margin: 0;
+        padding: 0;
+    }
+
+    body.portfolio-page #interactiveBubbleCanvas,
+    body.portfolio-page .bubble-bg-canvas {
+        display: none;
+        visibility: hidden;
+    }
+
+    body.portfolio-page .portfolio-nav,
+    body.portfolio-page .chat-widget,
+    body.portfolio-page .portfolio-print-btn,
+    body.portfolio-page .main_projects,
+    body.portfolio-page .main_hobbys,
+    body.portfolio-page .foot {
+        display: none;
+    }
+
+    body.portfolio-page .main.main-has-bubble-bg {
+        min-height: auto;
+        background: #ffffff;
+        background-image: none;
+        box-sizing: border-box;
+    }
+
+    body.portfolio-page .main_banner,
+    body.portfolio-page .main_contents {
+        width: calc(100% - 6mm);
+        max-width: none;
+        margin: 0 auto;
+        box-sizing: border-box;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    body.portfolio-page .bubble-bg-layer {
+        display: block;
+        visibility: visible;
+        background: transparent;
+    }
+
+    body.portfolio-page .portfolio-watermark-layer {
+        display: block;
+    }
+
+    body.portfolio-page hr,
+    body.portfolio-page .main_contents hr,
+    body.portfolio-page .main_banner hr {
+        display: block;
+        opacity: 0.25;
+        height: 0;
+        border: 0;
+        border-top: 1px solid #000000;
+        background: transparent;
+    }
+
+    body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg,
+    body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg * {
+        color: #111111;
+    }
 }
 .hobby_card {
     margin-bottom: 10px;
