@@ -1,0 +1,193 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <p style="margin: 0 0 10px;">
+        <a class="button" href="{% url 'admin:main_accesslog_changelist' %}">접속 로그</a>
+        <a class="button" href="{% url 'admin:main_accesslog_summary_changelist' %}">일일 요약</a>
+    </p>
+    <p>요약 디렉토리: <code>{{ summary_dir }}</code></p>
+    <p>표시 가능한 일일 요약: {{ summary_count }}건</p>
+
+    <form method="get" style="margin: 12px 0 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <label>
+            페이지 크기
+            <input type="number" name="per_page" min="10" max="200" value="{{ per_page }}">
+        </label>
+        <button type="submit" class="button">적용</button>
+    </form>
+    <div class="results">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th>날짜</th>
+                    <th>총 요청</th>
+                    <th>고유 IP</th>
+                    <th>오류율(%)</th>
+                    <th>파싱 실패</th>
+                    <th>생성 시각</th>
+                    <th>다운로드</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in summary_rows %}
+                <tr>
+                    <td>
+                        <a href="{% url 'admin:main_accesslog_summary_detail' row.date %}">
+                            {{ row.date }}
+                        </a>
+                    </td>
+                    <td>{{ row.total_requests }}</td>
+                    <td>{{ row.unique_ips }}</td>
+                    <td>{{ row.error_rate_pct }}</td>
+                    <td>{{ row.parse_errors }}</td>
+                    <td>{{ row.generated_at }}</td>
+                    <td style="white-space: nowrap;">
+                        <a class="button" href="{% url 'admin:main_accesslog_download' row.date %}">로그</a>
+                        <a class="button" href="{% url 'admin:main_accesslog_summary_download' row.date 'json' %}">JSON</a>
+                        <a class="button" href="{% url 'admin:main_accesslog_summary_download' row.date 'md' %}">MD</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">표시할 요약이 없습니다.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <p style="margin-top: 12px;">
+        페이지 {{ page_obj.number }} / {{ paginator.num_pages }}
+        {% if page_obj.has_previous %}
+            <a href="?p={{ page_obj.previous_page_number }}{% if base_query %}&{{ base_query }}{% endif %}">이전</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+            <a href="?p={{ page_obj.next_page_number }}{% if base_query %}&{{ base_query }}{% endif %}">다음</a>
+        {% endif %}
+    </p>
+    {% endif %}
+
+    <hr>
+    <h2>상세 요약</h2>
+    {% if auto_selected_date %}
+    <p>최신 요약 날짜(<strong>{{ selected_date }}</strong>)를 자동으로 선택해 표시 중입니다.</p>
+    {% endif %}
+
+    {% if selected_missing %}
+    <p>선택한 날짜의 요약 파일이 없습니다: <code>{{ selected_date }}</code></p>
+    {% elif selected_summary %}
+    <p>
+        날짜: <strong>{{ selected_summary.date }}</strong> /
+        총 요청 {{ selected_summary.total_requests }}건 /
+        고유 IP {{ selected_summary.unique_ips }}개 /
+        오류율 {{ selected_summary.error_rate_pct }}%
+    </p>
+    <p style="margin: 8px 0 12px; white-space: nowrap;">
+        <a class="button" href="{% url 'admin:main_accesslog_download' selected_summary.date %}">원본 로그 다운로드</a>
+        <a class="button" href="{% url 'admin:main_accesslog_summary_download' selected_summary.date 'json' %}">요약 JSON 다운로드</a>
+        <a class="button" href="{% url 'admin:main_accesslog_summary_download' selected_summary.date 'md' %}">요약 MD 다운로드</a>
+    </p>
+
+    {% if selected_summary.anomalies %}
+    <h3>특이사항</h3>
+    <ul>
+        {% for issue in selected_summary.anomalies %}
+        <li>{{ issue }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <h3>Top Path</h3>
+    <table id="result_list">
+        <thead>
+            <tr>
+                <th>Path</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in selected_summary.top_paths %}
+            <tr>
+                <td>{{ row.path }}</td>
+                <td>{{ row.count }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">데이터 없음</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>IP 접속률 순위</h3>
+    <table id="result_list">
+        <thead>
+            <tr>
+                <th>순위</th>
+                <th>IP</th>
+                <th>요청수</th>
+                <th>접속률(%)</th>
+                <th>대표 User-Agent</th>
+                <th>최다 시도 경로</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in selected_summary.ip_rankings %}
+            <tr>
+                <td>{{ row.rank }}</td>
+                <td>{{ row.client_ip }}</td>
+                <td>{{ row.count }}</td>
+                <td>{{ row.share_pct }}</td>
+                <td>{{ row.top_user_agent|truncatechars:120 }}</td>
+                <td>{{ row.top_path }} ({{ row.top_path_count }})</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">데이터 없음</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not selected_summary.ip_rankings and selected_summary.total_requests %}
+    <p>이 날짜 요약은 구버전 형식일 수 있습니다. 해당 날짜 요약을 다시 생성하면 IP별 User-Agent/최다 경로가 채워집니다.</p>
+    {% endif %}
+
+    <h3>느린 요청 Top</h3>
+    <table id="result_list">
+        <thead>
+            <tr>
+                <th>시각</th>
+                <th>처리시간(초)</th>
+                <th>상태</th>
+                <th>메서드</th>
+                <th>경로</th>
+                <th>IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in selected_summary.slow_requests %}
+            <tr>
+                <td>{{ row.logged_at }}</td>
+                <td>{{ row.request_time_s }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.method }}</td>
+                <td>{{ row.path }}</td>
+                <td>{{ row.client_ip }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">데이터 없음</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>Markdown</h3>
+    <pre style="white-space: pre-wrap;">{{ selected_markdown }}</pre>
+    {% else %}
+    <p>상세를 보려면 날짜를 선택하세요.</p>
+    {% endif %}
+</div>
+{% endblock %}
