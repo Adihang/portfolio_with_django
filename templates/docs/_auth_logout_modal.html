@@ -1,0 +1,13 @@
+{% if user.is_authenticated %}
+<div id="docs-auth-logout-modal" class="docs-rename-modal" hidden>
+    <div class="docs-rename-modal-backdrop" id="docs-auth-logout-modal-backdrop"></div>
+    <div class="docs-rename-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-auth-logout-title" aria-describedby="docs-auth-logout-message">
+        <h3 id="docs-auth-logout-title" class="docs-rename-title">{{ docs_text.auth_logout_button }}</h3>
+        <p id="docs-auth-logout-message" class="docs-auth-logout-message">{{ docs_text.auth_logout_confirm }}</p>
+        <div class="docs-rename-actions">
+            <button type="button" class="docs-btn" id="docs-auth-logout-cancel-btn">{{ docs_text.cancel }}</button>
+            <button type="button" class="docs-btn docs-btn-primary" id="docs-auth-logout-confirm-btn">{{ docs_text.auth_logout_button }}</button>
+        </div>
+    </div>
+</div>
+{% endif %}

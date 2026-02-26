@@ -18,6 +18,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.csrf import csrf_failure as default_csrf_failure
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
@@ -32,6 +33,7 @@ from .models import DocsAccessRule
 
 DOCS_FILE_EXTENSION = ".md"
 INVALID_NAME_PATTERN = re.compile(r"[\\/]")
+DOCS_LOGOUT_PATH_PATTERN = re.compile(r"^/(?:(ko|en)/)?docs/logout/?$")
 MARKDOWN_HELP_FILENAME_KO = "Markdown description.ko.md"
 MARKDOWN_HELP_FILENAME_EN = "Markdown description.en.md"
 MARKDOWN_HELP_FILENAME_LEGACY = "Markdown description.md"
@@ -46,7 +48,7 @@ DOCS_TEXT = {
         "menu_open": "열기",
         "menu_rename": "이름 바꾸기",
         "menu_permissions": "권한",
-        "menu_edit": "편집",
+        "menu_edit": "수정",
         "menu_delete": "삭제",
         "menu_new_folder": "새 폴더",
         "menu_new_document": "새 문서",
@@ -55,10 +57,10 @@ DOCS_TEXT = {
         "rename_new_name_placeholder": "새 이름",
         "cancel": "취소",
         "apply": "변경",
-        "edit_button": "편집",
+        "edit_button": "수정",
         "delete_button": "삭제",
         "download_button": "다운로드",
-        "write_title_edit": "문서 편집",
+        "write_title_edit": "문서 수정",
         "write_title_create": "문서 작성",
         "markdown_guide_button": "문법 가이드",
         "save_button": "저장",
@@ -101,6 +103,7 @@ DOCS_TEXT = {
         "js_confirm_delete_entry": "정말 삭제할까요?\n{path}",
         "js_empty_documents": "문서가 없습니다.",
         "js_confirm_delete_doc": "이 문서를 삭제할까요?",
+        "js_current_folder_label": "현재 폴더",
         "js_docs_root_label": "docs 루트",
         "js_no_child_folders": "하위 폴더가 없습니다.",
         "js_filename_required": "파일명을 입력해주세요.",
@@ -116,6 +119,8 @@ DOCS_TEXT = {
         "auth_password_label": "비밀번호",
         "auth_login_submit": "로그인",
         "auth_login_error": "아이디 또는 비밀번호를 확인해주세요.",
+        "auth_logout_confirm": "로그아웃 하시겠습니까?",
+        "auth_profile_label": "프로필",
     },
     "en": {
         "list_title": "Documents",
@@ -179,6 +184,7 @@ DOCS_TEXT = {
         "js_confirm_delete_entry": "Delete this item?\n{path}",
         "js_empty_documents": "No documents found.",
         "js_confirm_delete_doc": "Delete this document?",
+        "js_current_folder_label": "Current folder",
         "js_docs_root_label": "docs root",
         "js_no_child_folders": "No subfolders.",
         "js_filename_required": "Please enter a file name.",
@@ -194,6 +200,8 @@ DOCS_TEXT = {
         "auth_password_label": "Password",
         "auth_login_submit": "Login",
         "auth_login_error": "Please check your username or password.",
+        "auth_logout_confirm": "Do you want to log out?",
+        "auth_profile_label": "Profile",
     },
 }
 
@@ -533,7 +541,7 @@ def build_docs_list_url(base_url: str, relative_path: str) -> str:
 
 
 def build_docs_breadcrumbs(base_url: str, current_dir: str) -> list[dict]:
-    breadcrumbs = [{"label": "docs", "url": base_url, "is_current": current_dir == ""}]
+    breadcrumbs = [{"label": "docs", "url": base_url, "is_current": current_dir == "", "path": ""}]
     if not current_dir:
         return breadcrumbs
 
@@ -545,6 +553,7 @@ def build_docs_breadcrumbs(base_url: str, current_dir: str) -> list[dict]:
                 "label": part,
                 "url": build_docs_list_url(base_url, parent_path),
                 "is_current": index == len(parts) - 1,
+                "path": parent_path,
             }
         )
     return breadcrumbs
@@ -570,7 +579,7 @@ def require_docs_editor_json(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         if not is_docs_editor(request):
-            return json_error("문서 편집 권한이 필요합니다.", status=403)
+            return json_error("문서 수정 권한이 필요합니다.", status=403)
         return view_func(request, *args, **kwargs)
 
     return _wrapped
@@ -619,11 +628,13 @@ def docs_common_context(request, ui_lang):
             "docs_login_url": docs_login_url,
             "docs_logout_url": docs_logout_url,
             "docs_auth_next": request.get_full_path(),
+            "docs_logout_next": docs_base_url,
             "docs_api_list_url": reverse("main:docs_api_list"),
             "docs_api_save_url": reverse("main:docs_api_save"),
             "docs_api_rename_url": reverse("main:docs_api_rename"),
             "docs_api_delete_url": reverse("main:docs_api_delete"),
             "docs_api_mkdir_url": reverse("main:docs_api_mkdir"),
+            "docs_api_move_url": reverse("main:docs_api_move"),
             "docs_api_download_url": reverse("main:docs_api_download"),
             "docs_api_acl_url": reverse("main:docs_api_acl"),
             "docs_api_acl_options_url": reverse("main:docs_api_acl_options"),
@@ -633,6 +644,17 @@ def docs_common_context(request, ui_lang):
         }
     )
     return context
+
+
+def docs_csrf_failure(request, reason="", template_name="403_csrf.html"):
+    path = request.path or ""
+    logout_match = DOCS_LOGOUT_PATH_PATTERN.match(path)
+    if logout_match:
+        matched_lang = (logout_match.group(1) or "").strip().lower()
+        if matched_lang in SUPPORTED_UI_LANGS:
+            return redirect(reverse("main:docs_root_lang", kwargs={"ui_lang": matched_lang}))
+        return redirect_to_localized_route(request, "main:docs_root_lang")
+    return default_csrf_failure(request, reason=reason, template_name=template_name)
 
 
 def docs_root(request, ui_lang=None):
@@ -762,7 +784,7 @@ def docs_write(request, ui_lang=None):
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
     if not context["docs_can_edit"]:
-        raise PermissionDenied("문서 편집 권한이 필요합니다.")
+        raise PermissionDenied("문서 수정 권한이 필요합니다.")
 
     requested_path = request.GET.get("path", "")
     requested_dir = request.GET.get("dir", "")
@@ -780,7 +802,7 @@ def docs_write(request, ui_lang=None):
         except (ValueError, FileNotFoundError):
             raise Http404("수정할 문서를 찾을 수 없습니다.")
         if not has_docs_write_access(request, original_relative_path):
-            raise PermissionDenied("문서를 편집할 권한이 없습니다.")
+            raise PermissionDenied("문서를 수정할 권한이 없습니다.")
 
         mode = "edit"
         initial_filename = file_path.stem
@@ -794,10 +816,10 @@ def docs_write(request, ui_lang=None):
         if not target_dir.is_dir():
             raise Http404("대상 폴더를 찾을 수 없습니다.")
         if not has_docs_write_access(request, initial_dir):
-            raise PermissionDenied("문서를 편집할 권한이 없습니다.")
+            raise PermissionDenied("문서를 수정할 권한이 없습니다.")
     else:
         if not has_docs_write_access(request, ""):
-            raise PermissionDenied("문서를 편집할 권한이 없습니다.")
+            raise PermissionDenied("문서를 수정할 권한이 없습니다.")
 
     docs_root = docs_root_dir()
     markdown_help_candidates = []
@@ -1020,7 +1042,7 @@ def docs_api_rename(request):
     if source_relative == "":
         return json_error("루트 폴더는 이름을 바꿀 수 없습니다.", status=400)
     if not has_docs_write_access(request, source_relative):
-        return json_error("문서를 편집할 권한이 없습니다.", status=403)
+        return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
     parent = source_path.parent
     if source_path.is_file():
@@ -1063,7 +1085,7 @@ def docs_api_delete(request):
     if target_relative == "":
         return json_error("루트 폴더는 삭제할 수 없습니다.", status=400)
     if not has_docs_write_access(request, target_relative):
-        return json_error("문서를 편집할 권한이 없습니다.", status=403)
+        return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
     if target_path.is_dir():
         shutil.rmtree(target_path)
@@ -1091,7 +1113,7 @@ def docs_api_mkdir(request):
     if not parent_path.is_dir():
         return json_error("폴더 생성 위치가 올바르지 않습니다.", status=400)
     if not has_docs_write_access(request, parent_dir):
-        return json_error("문서를 편집할 권한이 없습니다.", status=403)
+        return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
     target_path = parent_path / folder_name
     if target_path.exists():
@@ -1099,6 +1121,68 @@ def docs_api_mkdir(request):
 
     target_path.mkdir(parents=False, exist_ok=False)
     return JsonResponse({"ok": True, "path": relative_from_root(target_path)})
+
+
+@require_http_methods(["POST"])
+@csrf_protect
+@require_docs_editor_json
+def docs_api_move(request):
+    try:
+        payload = parse_json_body(request)
+        source_path_value = normalize_relative_path(payload.get("source_path"), allow_empty=False)
+        target_dir_value = normalize_relative_path(payload.get("target_dir"), allow_empty=True)
+        source_path, source_relative = resolve_path(source_path_value, must_exist=True)
+        target_dir_path, target_dir_relative = resolve_path(target_dir_value, must_exist=True)
+    except (ValueError, FileNotFoundError) as exc:
+        return json_error(str(exc), status=400)
+
+    if source_relative == "":
+        return json_error("루트 폴더는 이동할 수 없습니다.", status=400)
+    if not target_dir_path.is_dir():
+        return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
+    if not has_docs_write_access(request, source_relative):
+        return json_error("문서를 수정할 권한이 없습니다.", status=403)
+    if not has_docs_write_access(request, target_dir_relative):
+        return json_error("문서를 수정할 권한이 없습니다.", status=403)
+
+    source_parent_relative = normalize_relative_path(
+        str(Path(source_relative).parent).replace("\\", "/"),
+        allow_empty=True,
+    )
+    if source_parent_relative == ".":
+        source_parent_relative = ""
+    if source_parent_relative == target_dir_relative:
+        response = {
+            "ok": True,
+            "path": source_relative,
+            "type": "dir" if source_path.is_dir() else "file",
+        }
+        if source_path.is_file():
+            response["slug_path"] = markdown_slug_from_relative(source_relative)
+        return JsonResponse(response)
+
+    destination_path = target_dir_path / source_path.name
+    if destination_path.exists():
+        return json_error("같은 이름의 항목이 이미 존재합니다.", status=409)
+
+    if source_path.is_dir():
+        source_resolved = source_path.resolve()
+        target_resolved = target_dir_path.resolve()
+        if target_resolved == source_resolved or source_resolved in target_resolved.parents:
+            return json_error("폴더를 자기 자신 또는 하위 폴더로 이동할 수 없습니다.", status=400)
+
+    source_path.rename(destination_path)
+    destination_relative = relative_from_root(destination_path)
+    move_docs_acl_rules(source_relative, destination_relative)
+
+    response = {
+        "ok": True,
+        "path": destination_relative,
+        "type": "dir" if destination_path.is_dir() else "file",
+    }
+    if destination_path.is_file():
+        response["slug_path"] = markdown_slug_from_relative(destination_relative)
+    return JsonResponse(response)
 
 
 @require_http_methods(["POST"])
@@ -1118,7 +1202,7 @@ def docs_api_save(request):
         if not target_dir_path.is_dir():
             raise ValueError("저장 위치가 폴더가 아닙니다.")
         if not has_docs_write_access(request, target_dir_rel):
-            return json_error("문서를 편집할 권한이 없습니다.", status=403)
+            return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
         destination = target_dir_path / f"{filename}{DOCS_FILE_EXTENSION}"
 
@@ -1129,7 +1213,7 @@ def docs_api_save(request):
                 original_relative_path, must_exist=True
             )
             if not has_docs_write_access(request, source_relative):
-                return json_error("문서를 편집할 권한이 없습니다.", status=403)
+                return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
         if destination.exists():
             if source_path is None or destination.resolve() != source_path.resolve():

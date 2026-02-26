@@ -1,0 +1,17 @@
+{% if user.is_authenticated %}
+<div class="docs-auth-account-floating" data-docs-auth-account>
+    <button
+        type="button"
+        class="docs-auth-account-trigger"
+        data-docs-logout-trigger
+        data-confirm-message="{{ docs_text.auth_logout_confirm }}"
+    >
+        <span class="docs-auth-account-avatar" aria-hidden="true"></span>
+        <span class="docs-auth-account-name">{{ user.get_username }}</span>
+    </button>
+    <form method="post" action="{{ docs_logout_url }}" class="docs-auth-form docs-auth-form-hidden" id="docs-auth-logout-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ docs_logout_next|default:docs_base_url }}">
+    </form>
+</div>
+{% endif %}

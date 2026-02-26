@@ -5,7 +5,7 @@
 
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
-        <div>
+        <div class="docs-toolbar-left">
             <div class="docs-title-row">
                 <h1 class="docs-title">{{ docs_text.list_title }}</h1>
             </div>
@@ -13,22 +13,25 @@
                 {% for crumb in breadcrumbs %}
                     {% if not forloop.first %}<span class="docs-path-sep">/</span>{% endif %}
                     {% if crumb.is_current %}
-                        <span class="docs-path-current">{{ crumb.label }}</span>
+                        <span class="docs-path-current" data-docs-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</span>
                     {% else %}
-                        <a class="docs-path-link" href="{{ crumb.url }}">{{ crumb.label }}</a>
+                        <a class="docs-path-link" href="{{ crumb.url }}" data-docs-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</a>
                     {% endif %}
                 {% endfor %}
             </div>
         </div>
-        <div class="docs-toolbar-actions">
-            {% include "docs/_auth_button.html" %}
-            {% if docs_can_edit %}
-                <a
-                    class="docs-btn docs-btn-primary"
-                    href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
-                    id="docs-write-btn"
-                >{{ docs_text.write_button }}</a>
-            {% endif %}
+        <div class="docs-toolbar-right">
+            {% include "docs/_auth_account.html" %}
+            <div class="docs-toolbar-actions">
+                {% include "docs/_auth_button.html" %}
+                {% if docs_can_edit %}
+                    <a
+                        class="docs-btn docs-btn-primary"
+                        href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
+                        id="docs-write-btn"
+                    >{{ docs_text.write_button }}</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -42,6 +45,7 @@
     data-rename-api-url="{{ docs_api_rename_url }}"
     data-delete-api-url="{{ docs_api_delete_url }}"
     data-mkdir-api-url="{{ docs_api_mkdir_url }}"
+    data-move-api-url="{{ docs_api_move_url }}"
     data-acl-api-url="{{ docs_api_acl_url }}"
     data-acl-options-api-url="{{ docs_api_acl_options_url }}"
     data-write-url="{{ docs_write_url }}"
@@ -135,6 +139,8 @@
         </div>
     </div>
 {% endif %}
+
+{% include "docs/_auth_logout_modal.html" %}
 
 {{ docs_text|json_script:"docs-i18n" }}
 {{ initial_entries|json_script:"docs-initial-entries" }}

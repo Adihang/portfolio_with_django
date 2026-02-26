@@ -146,18 +146,201 @@
         );
     }
 
+    function initializeDocsAuthInteraction() {
+        const logoutTrigger = document.querySelector("[data-docs-logout-trigger]");
+        const logoutForm = document.getElementById("docs-auth-logout-form");
+        if (!logoutTrigger || !logoutForm) {
+            return;
+        }
+
+        const logoutModal = document.getElementById("docs-auth-logout-modal");
+        const logoutModalBackdrop = document.getElementById("docs-auth-logout-modal-backdrop");
+        const logoutCancelButton = document.getElementById("docs-auth-logout-cancel-btn");
+        const logoutConfirmButton = document.getElementById("docs-auth-logout-confirm-btn");
+        const logoutMessage = document.getElementById("docs-auth-logout-message");
+
+        let lastFocusedElement = null;
+
+        function setLogoutModalOpen(opened) {
+            if (!logoutModal) {
+                return;
+            }
+            logoutModal.hidden = !opened;
+            if (opened) {
+                if (logoutCancelButton) {
+                    logoutCancelButton.focus();
+                }
+                return;
+            }
+            if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+                lastFocusedElement.focus();
+            }
+        }
+
+        logoutTrigger.addEventListener("click", function () {
+            const message =
+                logoutTrigger.getAttribute("data-confirm-message") ||
+                t("auth_logout_confirm", "로그아웃 하시겠습니까?");
+            if (!logoutModal || !logoutModalBackdrop || !logoutCancelButton || !logoutConfirmButton || !logoutMessage) {
+                if (!window.confirm(message)) {
+                    return;
+                }
+                logoutForm.submit();
+                return;
+            }
+
+            lastFocusedElement = document.activeElement;
+            logoutMessage.textContent = message;
+            setLogoutModalOpen(true);
+        });
+
+        if (logoutModalBackdrop) {
+            logoutModalBackdrop.addEventListener("click", function () {
+                setLogoutModalOpen(false);
+            });
+        }
+
+        if (logoutCancelButton) {
+            logoutCancelButton.addEventListener("click", function () {
+                setLogoutModalOpen(false);
+            });
+        }
+
+        if (logoutConfirmButton) {
+            logoutConfirmButton.addEventListener("click", function () {
+                logoutForm.submit();
+            });
+        }
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key !== "Escape" || !logoutModal || logoutModal.hidden) {
+                return;
+            }
+            event.preventDefault();
+            setLogoutModalOpen(false);
+        });
+    }
+
+    function initializeDocsToolbarAutoCollapse() {
+        const toolbar = document.querySelector(".docs-toolbar-wrap .docs-toolbar");
+        if (!toolbar) {
+            return;
+        }
+
+        const toolbarChildren = Array.from(toolbar.children).filter(function (child) {
+            return child && child.nodeType === 1 && !child.hasAttribute("data-docs-auth-account");
+        });
+        if (toolbarChildren.length < 2) {
+            toolbar.classList.remove("docs-toolbar-auto-collapsed");
+            return;
+        }
+
+        let rafId = null;
+
+        const toolbarItemsMeasure = document.createElement("div");
+        toolbarItemsMeasure.setAttribute("aria-hidden", "true");
+        Object.assign(toolbarItemsMeasure.style, {
+            position: "fixed",
+            left: "-99999px",
+            top: "-99999px",
+            visibility: "hidden",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "nowrap",
+            width: "auto",
+            maxWidth: "none",
+            margin: "0",
+            padding: "0"
+        });
+
+        toolbarChildren.forEach(function (child) {
+            const clone = child.cloneNode(true);
+            Object.assign(clone.style, {
+                flex: "0 0 auto",
+                width: "max-content",
+                minWidth: "max-content",
+                maxWidth: "none",
+                margin: "0",
+                whiteSpace: "nowrap"
+            });
+
+            clone.querySelectorAll("*").forEach(function (node) {
+                if (!(node instanceof window.HTMLElement)) {
+                    return;
+                }
+                node.style.whiteSpace = "nowrap";
+                node.style.flexWrap = "nowrap";
+            });
+
+            toolbarItemsMeasure.appendChild(clone);
+        });
+
+        document.body.appendChild(toolbarItemsMeasure);
+
+        const updateToolbarMode = function () {
+            rafId = null;
+
+            toolbar.classList.remove("docs-toolbar-auto-collapsed");
+
+            const toolbarStyle = window.getComputedStyle(toolbar);
+            const gapValue = parseFloat(toolbarStyle.columnGap || toolbarStyle.gap || "0");
+            const horizontalGap = Number.isFinite(gapValue) ? gapValue : 0;
+            toolbarItemsMeasure.style.gap = horizontalGap + "px";
+
+            const paddingLeftValue = parseFloat(toolbarStyle.paddingLeft || "0");
+            const paddingRightValue = parseFloat(toolbarStyle.paddingRight || "0");
+            const horizontalPadding =
+                (Number.isFinite(paddingLeftValue) ? paddingLeftValue : 0) +
+                (Number.isFinite(paddingRightValue) ? paddingRightValue : 0);
+            const requiredWidth = Math.ceil(toolbarItemsMeasure.getBoundingClientRect().width);
+            const availableWidth = Math.max(0, toolbar.clientWidth - horizontalPadding);
+            const shouldCollapse = requiredWidth > availableWidth;
+
+            toolbar.classList.toggle("docs-toolbar-auto-collapsed", shouldCollapse);
+        };
+
+        const scheduleToolbarModeUpdate = function () {
+            if (rafId !== null) {
+                return;
+            }
+            rafId = window.requestAnimationFrame(updateToolbarMode);
+        };
+
+        window.addEventListener("resize", scheduleToolbarModeUpdate, { passive: true });
+        window.addEventListener("orientationchange", scheduleToolbarModeUpdate, { passive: true });
+
+        if (window.ResizeObserver) {
+            const observer = new ResizeObserver(scheduleToolbarModeUpdate);
+            observer.observe(toolbar);
+            toolbarChildren.forEach(function (child) {
+                observer.observe(child);
+            });
+        }
+
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(scheduleToolbarModeUpdate).catch(function () {});
+        }
+
+        scheduleToolbarModeUpdate();
+    }
+
     function initializeListPage() {
         const docsBaseUrl = root.dataset.docsBaseUrl || "/docs";
         const listApiUrl = root.dataset.listApiUrl;
         const renameApiUrl = root.dataset.renameApiUrl;
         const deleteApiUrl = root.dataset.deleteApiUrl;
         const mkdirApiUrl = root.dataset.mkdirApiUrl;
+        const moveApiUrl = root.dataset.moveApiUrl;
         const aclApiUrl = root.dataset.aclApiUrl;
         const aclOptionsApiUrl = root.dataset.aclOptionsApiUrl;
         const writeUrl = root.dataset.writeUrl || "/docs/write";
         const listContainer = document.getElementById("docs-list");
         const contextMenu = document.getElementById("docs-context-menu");
+        const contextOpenButton = contextMenu ? contextMenu.querySelector('button[data-action="open"]') : null;
         const contextEditButton = contextMenu ? contextMenu.querySelector('button[data-action="edit"]') : null;
+        const contextRenameButton = contextMenu ? contextMenu.querySelector('button[data-action="rename"]') : null;
+        const contextDeleteButton = contextMenu ? contextMenu.querySelector('button[data-action="delete"]') : null;
         const contextNewFolderButton = contextMenu ? contextMenu.querySelector('button[data-action="new-folder"]') : null;
         const contextNewDocButton = contextMenu ? contextMenu.querySelector('button[data-action="new-doc"]') : null;
         const contextPermissionsButton = contextMenu ? contextMenu.querySelector('button[data-action="permissions"]') : null;
@@ -198,7 +381,9 @@
             aclOptions: {
                 users: [],
                 groups: [],
-            }
+            },
+            draggingEntry: null,
+            dragOverElement: null,
         };
 
         state.directoryCache.set(currentDir, initialEntries);
@@ -220,7 +405,11 @@
 
         function syncContextMenuByEntry(entry) {
             const isDirectory = Boolean(entry && entry.type === "dir");
+            const isCurrentFolder = Boolean(entry && entry.isCurrentFolder);
+            setContextButtonVisible(contextOpenButton, !isCurrentFolder);
             setContextButtonVisible(contextEditButton, !isDirectory);
+            setContextButtonVisible(contextRenameButton, !isCurrentFolder);
+            setContextButtonVisible(contextDeleteButton, !isCurrentFolder);
             setContextButtonVisible(contextNewFolderButton, isDirectory);
             setContextButtonVisible(contextNewDocButton, isDirectory);
             setContextButtonVisible(contextPermissionsButton, true);
@@ -293,6 +482,169 @@
         function getDocsPathLabel(pathValue) {
             const normalized = normalizePath(pathValue, true);
             return normalized ? "/docs/" + normalized : "/docs";
+        }
+
+        function getParentDirectory(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!normalized) {
+                return "";
+            }
+            const parts = normalized.split("/");
+            parts.pop();
+            return parts.join("/");
+        }
+
+        function clearDragOverTarget() {
+            if (state.dragOverElement) {
+                state.dragOverElement.classList.remove("is-drop-target");
+                state.dragOverElement = null;
+            }
+        }
+
+        function setDragOverTarget(element) {
+            if (!element || state.dragOverElement === element) {
+                return;
+            }
+            clearDragOverTarget();
+            state.dragOverElement = element;
+            state.dragOverElement.classList.add("is-drop-target");
+        }
+
+        function canDropToDirectory(targetDirPath) {
+            if (!moveApiUrl || !state.draggingEntry) {
+                return false;
+            }
+
+            const sourcePath = normalizePath(state.draggingEntry.path, false);
+            const sourceType = state.draggingEntry.type;
+            const targetPath = normalizePath(targetDirPath, true);
+
+            if (!sourcePath || sourcePath === targetPath) {
+                return false;
+            }
+            if (getParentDirectory(sourcePath) === targetPath) {
+                return false;
+            }
+            if (sourceType === "dir" && targetPath && targetPath.startsWith(sourcePath + "/")) {
+                return false;
+            }
+            return true;
+        }
+
+        async function moveEntryToDirectory(sourceEntry, targetDirPath) {
+            if (!sourceEntry || !moveApiUrl) {
+                return;
+            }
+
+            const data = await requestJson(
+                moveApiUrl,
+                buildPostOptions({
+                    source_path: sourceEntry.path,
+                    target_dir: targetDirPath
+                })
+            );
+            state.selectedPath = data && data.path ? data.path : "";
+            await refreshCurrentDirectory();
+        }
+
+        function bindDropTarget(targetElement, targetDirPath) {
+            if (!targetElement || !moveApiUrl) {
+                return;
+            }
+
+            targetElement.addEventListener("dragenter", function (event) {
+                if (!canDropToDirectory(targetDirPath)) {
+                    return;
+                }
+                event.preventDefault();
+                setDragOverTarget(targetElement);
+            });
+
+            targetElement.addEventListener("dragover", function (event) {
+                if (!canDropToDirectory(targetDirPath)) {
+                    return;
+                }
+                event.preventDefault();
+                if (event.dataTransfer) {
+                    event.dataTransfer.dropEffect = "move";
+                }
+                setDragOverTarget(targetElement);
+            });
+
+            targetElement.addEventListener("dragleave", function (event) {
+                if (!state.dragOverElement || state.dragOverElement !== targetElement) {
+                    return;
+                }
+                if (event.relatedTarget && targetElement.contains(event.relatedTarget)) {
+                    return;
+                }
+                clearDragOverTarget();
+            });
+
+            targetElement.addEventListener("drop", function (event) {
+                if (!canDropToDirectory(targetDirPath)) {
+                    return;
+                }
+                event.preventDefault();
+                clearDragOverTarget();
+                moveEntryToDirectory(state.draggingEntry, targetDirPath).catch(alertError);
+            });
+        }
+
+        function getCurrentFolderName(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!normalized) {
+                return "docs";
+            }
+            const parts = normalized.split("/");
+            return parts[parts.length - 1] || "docs";
+        }
+
+        function addCurrentDirectoryNode(fragment) {
+            const currentFolderEntry = {
+                path: currentDir,
+                type: "dir",
+                isCurrentFolder: true
+            };
+
+            const item = document.createElement("li");
+            item.className = "docs-item docs-current-dir-item";
+
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "docs-item-row docs-current-dir-row";
+            row.draggable = false;
+            if (state.selectedPath === currentFolderEntry.path) {
+                row.classList.add("is-selected");
+            }
+
+            const typeMarker = document.createElement("span");
+            typeMarker.className = "docs-item-type-icon is-dir";
+            typeMarker.setAttribute("aria-hidden", "true");
+
+            const name = document.createElement("span");
+            name.className = "docs-item-name docs-current-dir-name";
+            name.textContent = getCurrentFolderName(currentDir);
+
+            row.appendChild(typeMarker);
+            row.appendChild(name);
+
+            row.addEventListener("click", function (event) {
+                event.preventDefault();
+                closeContextMenu();
+                if (state.selectedPath !== currentFolderEntry.path) {
+                    selectEntry(currentFolderEntry.path);
+                }
+            });
+
+            row.addEventListener("contextmenu", function (event) {
+                event.preventDefault();
+                selectEntry(currentFolderEntry.path);
+                openContextMenuAt(currentFolderEntry, event.clientX, event.clientY);
+            });
+
+            item.appendChild(row);
+            fragment.appendChild(item);
         }
 
         function setRenameModalOpen(opened, entry) {
@@ -633,6 +985,7 @@
             const row = document.createElement("button");
             row.type = "button";
             row.className = "docs-item-row";
+            row.draggable = Boolean(moveApiUrl);
             if (state.selectedPath === entry.path) {
                 row.classList.add("is-selected");
             }
@@ -659,12 +1012,17 @@
                 if (state.selectedPath !== entry.path) {
                     selectEntry(entry.path);
                 }
+                if (entry.type === "dir") {
+                    if (event.detail === 1) {
+                        toggleFolderExpansion(entry).catch(alertError);
+                    }
+                    return;
+                }
             });
 
             row.addEventListener("dblclick", function (event) {
                 event.preventDefault();
                 if (entry.type === "dir") {
-                    toggleFolderExpansion(entry).catch(alertError);
                     return;
                 }
                 openEntry(entry);
@@ -675,6 +1033,32 @@
                 selectEntry(entry.path);
                 openContextMenuAt(entry, event.clientX, event.clientY);
             });
+
+            if (moveApiUrl) {
+                row.addEventListener("dragstart", function (event) {
+                    state.draggingEntry = {
+                        path: entry.path,
+                        type: entry.type
+                    };
+                    row.classList.add("is-dragging");
+                    clearDragOverTarget();
+                    closeContextMenu();
+                    if (event.dataTransfer) {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", entry.path);
+                    }
+                });
+
+                row.addEventListener("dragend", function () {
+                    row.classList.remove("is-dragging");
+                    state.draggingEntry = null;
+                    clearDragOverTarget();
+                });
+            }
+
+            if (entry.type === "dir") {
+                bindDropTarget(row, entry.path);
+            }
 
             item.appendChild(row);
             fragment.appendChild(item);
@@ -694,6 +1078,7 @@
             listContainer.innerHTML = "";
             const fragment = document.createDocumentFragment();
             const entries = getCachedEntries(currentDir);
+            addCurrentDirectoryNode(fragment);
             if (entries.length === 0) {
                 const emptyItem = document.createElement("li");
                 emptyItem.className = "docs-item";
@@ -709,6 +1094,17 @@
                 addEntryNode(entry, 0, fragment);
             });
             listContainer.appendChild(fragment);
+        }
+
+        function bindDocsPathDropTargets() {
+            if (!moveApiUrl) {
+                return;
+            }
+            const pathTargets = document.querySelectorAll(".docs-path-link[data-docs-dir], .docs-path-current[data-docs-dir]");
+            pathTargets.forEach(function (target) {
+                const targetDirPath = normalizePath(target.getAttribute("data-docs-dir") || "", true);
+                bindDropTarget(target, targetDirPath);
+            });
         }
 
         if (contextMenu) {
@@ -860,6 +1256,7 @@
         window.addEventListener("scroll", closeContextMenu, { passive: true });
         window.addEventListener("resize", closeContextMenu, { passive: true });
 
+        bindDocsPathDropTargets();
         renderList();
     }
 
@@ -927,6 +1324,36 @@
             browserDir: "",
             selectedDir: "",
         };
+        let contentHeightRafId = null;
+
+        function updateContentInputAutoHeight() {
+            contentHeightRafId = null;
+            if (!contentInput) {
+                return;
+            }
+
+            const rootStyle = window.getComputedStyle(root);
+            const rootBottomPadding = parseFloat(rootStyle.paddingBottom || "0");
+            const paddingBottom = Number.isFinite(rootBottomPadding) ? rootBottomPadding : 0;
+            const viewport = window.visualViewport;
+            const viewportHeight = viewport ? viewport.height : window.innerHeight;
+            const viewportOffsetTop = viewport ? viewport.offsetTop : 0;
+            const inputRect = contentInput.getBoundingClientRect();
+            const inputStyle = window.getComputedStyle(contentInput);
+            const minHeightValue = parseFloat(inputStyle.minHeight || "0");
+            const minHeight = Number.isFinite(minHeightValue) ? minHeightValue : 0;
+            const availableHeight = viewportHeight + viewportOffsetTop - inputRect.top - paddingBottom;
+            const targetHeight = Math.max(minHeight, Math.floor(availableHeight));
+
+            contentInput.style.height = Math.max(0, targetHeight) + "px";
+        }
+
+        function scheduleContentInputAutoHeight() {
+            if (contentHeightRafId !== null) {
+                return;
+            }
+            contentHeightRafId = window.requestAnimationFrame(updateContentInputAutoHeight);
+        }
 
         function upsertDirectory(pathValue) {
             const normalized = normalizePath(pathValue, true);
@@ -1424,7 +1851,33 @@
                 return;
             }
         });
+
+        window.addEventListener("resize", scheduleContentInputAutoHeight, { passive: true });
+        window.addEventListener("orientationchange", scheduleContentInputAutoHeight, { passive: true });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener("resize", scheduleContentInputAutoHeight, { passive: true });
+            window.visualViewport.addEventListener("scroll", scheduleContentInputAutoHeight, { passive: true });
+        }
+
+        if (window.ResizeObserver) {
+            const autoHeightObserver = new ResizeObserver(scheduleContentInputAutoHeight);
+            autoHeightObserver.observe(root);
+            const toolbarWrap = document.querySelector(".docs-toolbar-wrap");
+            if (toolbarWrap) {
+                autoHeightObserver.observe(toolbarWrap);
+            }
+        }
+
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(scheduleContentInputAutoHeight).catch(function () {});
+        }
+
+        scheduleContentInputAutoHeight();
     }
+
+    initializeDocsAuthInteraction();
+    initializeDocsToolbarAutoCollapse();
 
     if (pageType === "list") {
         initializeListPage();
