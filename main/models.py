@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.contrib.auth.models import Group
 from django.db import models
 from django.utils import timezone
 from config.utils import make_new_path
@@ -179,6 +181,66 @@ class Hobby(models.Model):
     content = models.TextField('내용')
     class Meta:
         ordering = ['order']
+
+
+class NavLink(models.Model):
+    order = models.IntegerField("순서", default=0)
+    name = models.CharField("표시이름", max_length=100)
+    url = models.CharField("이동 경로", max_length=500)
+
+    class Meta:
+        ordering = ["order", "id"]
+        permissions = [
+            ("can_edit_docs", "Can edit docs content"),
+        ]
+
+    def __str__(self):
+        return f"{self.order}. {self.name}"
+
+
+class DocsAccessRule(models.Model):
+    path = models.CharField(
+        "경로",
+        max_length=1024,
+        unique=True,
+        blank=True,
+        default="",
+        help_text="/docs 기준 상대 경로. 비우면 /docs 루트",
+    )
+    read_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        verbose_name="읽기 허용 사용자",
+        blank=True,
+        related_name="docs_read_access_rules",
+    )
+    read_groups = models.ManyToManyField(
+        Group,
+        verbose_name="읽기 허용 그룹",
+        blank=True,
+        related_name="docs_read_access_rules",
+    )
+    write_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        verbose_name="쓰기 허용 사용자",
+        blank=True,
+        related_name="docs_write_access_rules",
+    )
+    write_groups = models.ManyToManyField(
+        Group,
+        verbose_name="쓰기 허용 그룹",
+        blank=True,
+        related_name="docs_write_access_rules",
+    )
+    created_at = models.DateTimeField("생성일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        ordering = ["path"]
+        verbose_name = "문서 접근 규칙"
+        verbose_name_plural = "문서 접근 규칙"
+
+    def __str__(self):
+        return self.path or "/docs"
         
 class Stratagem_Class(models.Model):
     gem_class = models.CharField("스트라타잼 분류", max_length=128)

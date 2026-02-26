@@ -3,19 +3,206 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from functools import wraps
 from pathlib import Path
+from urllib.parse import quote
 
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.contrib.auth.forms import AuthenticationForm
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from .views import apply_ui_context, render_markdown_safely, resolve_ui_lang
+from .views import (
+    SUPPORTED_UI_LANGS,
+    apply_ui_context,
+    redirect_to_localized_route,
+    render_markdown_safely,
+    resolve_ui_lang,
+)
+from .models import DocsAccessRule
 
 DOCS_FILE_EXTENSION = ".md"
 INVALID_NAME_PATTERN = re.compile(r"[\\/]")
+MARKDOWN_HELP_FILENAME_KO = "Markdown description.ko.md"
+MARKDOWN_HELP_FILENAME_EN = "Markdown description.en.md"
+MARKDOWN_HELP_FILENAME_LEGACY = "Markdown description.md"
+DOCS_EDITOR_GROUP_NAME = "DocsEditors"
+DOCS_EDIT_PERMISSION_CODE = "main.can_edit_docs"
+
+DOCS_TEXT = {
+    "ko": {
+        "list_title": "문서 목록",
+        "write_button": "작성",
+        "list_aria_label": "문서 목록",
+        "menu_open": "열기",
+        "menu_rename": "이름 바꾸기",
+        "menu_permissions": "권한",
+        "menu_edit": "편집",
+        "menu_delete": "삭제",
+        "menu_new_folder": "새 폴더",
+        "menu_new_document": "새 문서",
+        "rename_title": "이름 바꾸기",
+        "rename_new_name": "새 이름",
+        "rename_new_name_placeholder": "새 이름",
+        "cancel": "취소",
+        "apply": "변경",
+        "edit_button": "편집",
+        "delete_button": "삭제",
+        "download_button": "다운로드",
+        "write_title_edit": "문서 편집",
+        "write_title_create": "문서 작성",
+        "markdown_guide_button": "문법 가이드",
+        "save_button": "저장",
+        "list_button": "목록",
+        "filename_label": "파일명 (.md 제외)",
+        "filename_placeholder": "예: hover",
+        "content_label": "내용",
+        "save_location_title": "저장 위치 선택",
+        "close_label": "닫기",
+        "up_button": "상위",
+        "quick_paths_title": "빠른 경로",
+        "folder_title": "폴더",
+        "selected_path_label": "선택 경로",
+        "selected_path_placeholder": "예: JavaScript",
+        "create_folder_button": "폴더 생성",
+        "save_confirm_button": "저장",
+        "folder_modal_title": "새 폴더 생성",
+        "folder_name_label": "폴더 이름",
+        "folder_name_placeholder": "예: JavaScript",
+        "create_button": "생성",
+        "create_folder_in_label": "생성 위치",
+        "permission_title": "권한 설정",
+        "permission_read_users": "읽기 사용자",
+        "permission_read_groups": "읽기 그룹",
+        "permission_write_users": "쓰기 사용자",
+        "permission_write_groups": "쓰기 그룹",
+        "permission_help": "읽기/쓰기 권한을 각각 설정합니다. 쓰기 권한이 있으면 읽기도 가능합니다. 모두 비우면 제한이 해제됩니다.",
+        "permission_save_button": "저장",
+        "permission_loading": "불러오는 중...",
+        "permission_empty_users": "표시할 사용자가 없습니다.",
+        "permission_empty_groups": "표시할 그룹이 없습니다.",
+        "markdown_help_aria": "마크다운 문법 안내",
+        "markdown_help_fallback_title": "마크다운 문법",
+        "markdown_help_fallback_missing": "문법 안내 파일을 찾을 수 없습니다.",
+        "markdown_help_fallback_read_error": "문법 안내 파일을 읽을 수 없습니다.",
+        "js_error_path_required": "경로를 입력해주세요.",
+        "js_error_parent_path_not_allowed": "상위 경로(..)는 사용할 수 없습니다.",
+        "js_error_request_failed": "요청 처리 중 오류가 발생했습니다.",
+        "js_error_processing_failed": "처리 중 오류가 발생했습니다.",
+        "js_confirm_delete_entry": "정말 삭제할까요?\n{path}",
+        "js_empty_documents": "문서가 없습니다.",
+        "js_confirm_delete_doc": "이 문서를 삭제할까요?",
+        "js_docs_root_label": "docs 루트",
+        "js_no_child_folders": "하위 폴더가 없습니다.",
+        "js_filename_required": "파일명을 입력해주세요.",
+        "js_select_or_create_folder": "저장 위치를 선택하거나 폴더를 먼저 생성해주세요.",
+        "js_folder_name_required": "폴더 이름을 입력해주세요.",
+        "js_invalid_selected_path": "선택 경로가 유효하지 않습니다. 목록에서 폴더를 선택해주세요.",
+        "js_folder_create_requires_folder": "폴더에서만 새 폴더를 만들 수 있습니다.",
+        "js_permission_save_failed": "권한 저장 중 오류가 발생했습니다.",
+        "auth_login_button": "로그인",
+        "auth_logout_button": "로그아웃",
+        "auth_login_title": "Docs 로그인",
+        "auth_username_label": "아이디",
+        "auth_password_label": "비밀번호",
+        "auth_login_submit": "로그인",
+        "auth_login_error": "아이디 또는 비밀번호를 확인해주세요.",
+    },
+    "en": {
+        "list_title": "Documents",
+        "write_button": "Write",
+        "list_aria_label": "Document list",
+        "menu_open": "Open",
+        "menu_rename": "Rename",
+        "menu_permissions": "Permissions",
+        "menu_edit": "Edit",
+        "menu_delete": "Delete",
+        "menu_new_folder": "New Folder",
+        "menu_new_document": "New Document",
+        "rename_title": "Rename",
+        "rename_new_name": "New name",
+        "rename_new_name_placeholder": "New name",
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "edit_button": "Edit",
+        "delete_button": "Delete",
+        "download_button": "Download",
+        "write_title_edit": "Edit Document",
+        "write_title_create": "New Document",
+        "markdown_guide_button": "Markdown Guide",
+        "save_button": "Save",
+        "list_button": "List",
+        "filename_label": "File name (without .md)",
+        "filename_placeholder": "e.g. hover",
+        "content_label": "Content",
+        "save_location_title": "Choose Save Location",
+        "close_label": "Close",
+        "up_button": "Up",
+        "quick_paths_title": "Quick Paths",
+        "folder_title": "Folders",
+        "selected_path_label": "Selected Path",
+        "selected_path_placeholder": "e.g. JavaScript",
+        "create_folder_button": "Create Folder",
+        "save_confirm_button": "Save",
+        "folder_modal_title": "Create Folder",
+        "folder_name_label": "Folder name",
+        "folder_name_placeholder": "e.g. JavaScript",
+        "create_button": "Create",
+        "create_folder_in_label": "Create in",
+        "permission_title": "Access Control",
+        "permission_read_users": "Read Users",
+        "permission_read_groups": "Read Groups",
+        "permission_write_users": "Write Users",
+        "permission_write_groups": "Write Groups",
+        "permission_help": "Configure read and write separately. Write access also grants read access. Leave all unchecked to clear restrictions.",
+        "permission_save_button": "Save",
+        "permission_loading": "Loading...",
+        "permission_empty_users": "No users to display.",
+        "permission_empty_groups": "No groups to display.",
+        "markdown_help_aria": "Markdown syntax guide",
+        "markdown_help_fallback_title": "Markdown Guide",
+        "markdown_help_fallback_missing": "Guide file not found.",
+        "markdown_help_fallback_read_error": "Failed to read the guide file.",
+        "js_error_path_required": "Please enter a path.",
+        "js_error_parent_path_not_allowed": "Parent path (..) is not allowed.",
+        "js_error_request_failed": "Request failed while processing the request.",
+        "js_error_processing_failed": "An error occurred while processing.",
+        "js_confirm_delete_entry": "Delete this item?\n{path}",
+        "js_empty_documents": "No documents found.",
+        "js_confirm_delete_doc": "Delete this document?",
+        "js_docs_root_label": "docs root",
+        "js_no_child_folders": "No subfolders.",
+        "js_filename_required": "Please enter a file name.",
+        "js_select_or_create_folder": "Select a save location or create a folder first.",
+        "js_folder_name_required": "Please enter a folder name.",
+        "js_invalid_selected_path": "Selected path is invalid. Please choose a folder from the list.",
+        "js_folder_create_requires_folder": "New folders can only be created inside a folder.",
+        "js_permission_save_failed": "Failed to save permissions.",
+        "auth_login_button": "Login",
+        "auth_logout_button": "Logout",
+        "auth_login_title": "Docs Login",
+        "auth_username_label": "Username",
+        "auth_password_label": "Password",
+        "auth_login_submit": "Login",
+        "auth_login_error": "Please check your username or password.",
+    },
+}
+
+
+def get_docs_text(ui_lang: str | None) -> dict:
+    lang = (ui_lang or "").strip().lower()
+    if lang not in DOCS_TEXT:
+        lang = "ko"
+    return DOCS_TEXT[lang].copy()
 
 
 def docs_root_dir() -> Path:
@@ -122,38 +309,327 @@ def build_entry(path_obj: Path) -> dict:
     return data
 
 
-def list_directory_entries(directory: Path) -> list[dict]:
+def build_acl_candidate_paths(path_value: str | None) -> list[str]:
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+    if not normalized:
+        return [""]
+
+    candidates = [normalized]
+    parts = normalized.split("/")
+    while len(parts) > 1:
+        parts = parts[:-1]
+        candidates.append("/".join(parts))
+    candidates.append("")
+    return candidates
+
+
+def get_docs_acl_rule_map(request) -> dict[str, DocsAccessRule]:
+    rule_map = getattr(request, "_docs_acl_rule_map", None)
+    if rule_map is None:
+        rules = DocsAccessRule.objects.prefetch_related(
+            "read_users",
+            "read_groups",
+            "write_users",
+            "write_groups",
+        ).all()
+        rule_map = {rule.path: rule for rule in rules}
+        setattr(request, "_docs_acl_rule_map", rule_map)
+    return rule_map
+
+
+def get_effective_docs_acl_rule(request, path_value: str | None) -> tuple[DocsAccessRule | None, str]:
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+    cache = getattr(request, "_docs_acl_effective_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(request, "_docs_acl_effective_cache", cache)
+    if normalized in cache:
+        return cache[normalized]
+
+    rule_map = get_docs_acl_rule_map(request)
+    for candidate in build_acl_candidate_paths(normalized):
+        rule = rule_map.get(candidate)
+        if rule is not None:
+            cache[normalized] = (rule, candidate)
+            return rule, candidate
+
+    cache[normalized] = (None, "")
+    return None, ""
+
+
+def get_request_user_group_ids(request) -> set[int]:
+    cached = getattr(request, "_docs_acl_user_group_ids", None)
+    if cached is not None:
+        return cached
+
+    user = getattr(request, "user", None)
+    if not (user and user.is_authenticated):
+        cached = set()
+    else:
+        cached = set(user.groups.values_list("id", flat=True))
+    setattr(request, "_docs_acl_user_group_ids", cached)
+    return cached
+
+
+def user_matches_docs_acl_rule(
+    request,
+    rule: DocsAccessRule,
+    *,
+    user_relation: str,
+    group_relation: str,
+) -> bool:
+    user = getattr(request, "user", None)
+    if user and user.is_superuser:
+        return True
+    if not (user and user.is_authenticated):
+        return False
+
+    user_id = getattr(user, "id", None)
+    allowed_users = getattr(rule, user_relation).all()
+    if user_id and any(allowed_user.id == user_id for allowed_user in allowed_users):
+        return True
+
+    user_group_ids = get_request_user_group_ids(request)
+    if not user_group_ids:
+        return False
+
+    allowed_groups = getattr(rule, group_relation).all()
+    rule_group_ids = {group.id for group in allowed_groups}
+    return bool(user_group_ids & rule_group_ids)
+
+
+def has_docs_read_access(request, path_value: str | None) -> bool:
+    if is_docs_acl_admin(request):
+        return True
+
+    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    if rule is None:
+        return True
+
+    return user_matches_docs_acl_rule(
+        request,
+        rule,
+        user_relation="read_users",
+        group_relation="read_groups",
+    ) or user_matches_docs_acl_rule(
+        request,
+        rule,
+        user_relation="write_users",
+        group_relation="write_groups",
+    )
+
+
+def has_docs_write_access(request, path_value: str | None) -> bool:
+    user = getattr(request, "user", None)
+    if user and user.is_superuser:
+        return True
+    if not is_docs_editor(request):
+        return False
+
+    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    if rule is None:
+        return True
+
+    return user_matches_docs_acl_rule(
+        request,
+        rule,
+        user_relation="write_users",
+        group_relation="write_groups",
+    )
+
+
+def move_docs_acl_rules(source_path: str, destination_path: str) -> None:
+    source_normalized = normalize_relative_path(source_path, allow_empty=True)
+    destination_normalized = normalize_relative_path(destination_path, allow_empty=True)
+    if source_normalized == destination_normalized:
+        return
+
+    rules = list(DocsAccessRule.objects.filter(path=source_normalized))
+    if source_normalized:
+        rules += list(
+            DocsAccessRule.objects.filter(path__startswith=source_normalized + "/").exclude(
+                path=source_normalized
+            )
+        )
+
+    for rule in rules:
+        old_path = rule.path
+        suffix = old_path[len(source_normalized):] if source_normalized else old_path
+        new_path = destination_normalized + suffix
+        if not destination_normalized:
+            new_path = suffix.lstrip("/")
+
+        target_rule = DocsAccessRule.objects.filter(path=new_path).exclude(pk=rule.pk).first()
+        if target_rule:
+            merged_read_user_ids = set(target_rule.read_users.values_list("id", flat=True)) | set(
+                rule.read_users.values_list("id", flat=True)
+            )
+            merged_read_group_ids = set(target_rule.read_groups.values_list("id", flat=True)) | set(
+                rule.read_groups.values_list("id", flat=True)
+            )
+            merged_write_user_ids = set(target_rule.write_users.values_list("id", flat=True)) | set(
+                rule.write_users.values_list("id", flat=True)
+            )
+            merged_write_group_ids = set(target_rule.write_groups.values_list("id", flat=True)) | set(
+                rule.write_groups.values_list("id", flat=True)
+            )
+            target_rule.read_users.set(merged_read_user_ids)
+            target_rule.read_groups.set(merged_read_group_ids)
+            target_rule.write_users.set(merged_write_user_ids)
+            target_rule.write_groups.set(merged_write_group_ids)
+            rule.delete()
+            continue
+
+        rule.path = new_path
+        rule.save(update_fields=["path", "updated_at"])
+
+
+def delete_docs_acl_rules_for_path(path_value: str) -> None:
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+    if not normalized:
+        DocsAccessRule.objects.filter(path="").delete()
+        return
+
+    DocsAccessRule.objects.filter(path=normalized).delete()
+    DocsAccessRule.objects.filter(path__startswith=normalized + "/").delete()
+
+
+def list_directory_entries(directory: Path, request=None) -> list[dict]:
     entries = []
     for child in sorted(directory.iterdir(), key=lambda p: (0 if p.is_dir() else 1, p.name.lower())):
         if child.is_dir():
-            entries.append(build_entry(child))
+            entry = build_entry(child)
+            if request is not None and not has_docs_read_access(request, entry["path"]):
+                continue
+            entries.append(entry)
             continue
         if child.is_file() and child.suffix.lower() == DOCS_FILE_EXTENSION:
-            entries.append(build_entry(child))
+            entry = build_entry(child)
+            if request is not None and not has_docs_read_access(request, entry["path"]):
+                continue
+            entries.append(entry)
     return entries
 
 
-def list_all_directories() -> list[str]:
+def list_all_directories(request=None) -> list[str]:
     root = docs_root_dir()
-    directories = [""]
+    directories = []
+    if request is None or has_docs_write_access(request, ""):
+        directories.append("")
     for directory in sorted([p for p in root.rglob("*") if p.is_dir()], key=lambda p: p.as_posix().lower()):
-        directories.append(relative_from_root(directory))
+        rel_path = relative_from_root(directory)
+        if request is not None and not has_docs_write_access(request, rel_path):
+            continue
+        directories.append(rel_path)
     return directories
+
+
+def build_docs_list_url(base_url: str, relative_path: str) -> str:
+    normalized = normalize_relative_path(relative_path, allow_empty=True)
+    if not normalized:
+        return base_url
+    encoded = "/".join(quote(segment, safe="") for segment in normalized.split("/"))
+    return f"{base_url}/{encoded}/list"
+
+
+def build_docs_breadcrumbs(base_url: str, current_dir: str) -> list[dict]:
+    breadcrumbs = [{"label": "docs", "url": base_url, "is_current": current_dir == ""}]
+    if not current_dir:
+        return breadcrumbs
+
+    parts = [part for part in current_dir.split("/") if part]
+    for index, part in enumerate(parts):
+        parent_path = "/".join(parts[: index + 1])
+        breadcrumbs.append(
+            {
+                "label": part,
+                "url": build_docs_list_url(base_url, parent_path),
+                "is_current": index == len(parts) - 1,
+            }
+        )
+    return breadcrumbs
+
+
+def is_docs_editor(request) -> bool:
+    user = getattr(request, "user", None)
+    if not (user and user.is_authenticated):
+        return False
+    if user.is_superuser:
+        return True
+    return user.has_perm(DOCS_EDIT_PERMISSION_CODE)
+
+
+def is_docs_acl_admin(request) -> bool:
+    user = getattr(request, "user", None)
+    if not (user and user.is_authenticated):
+        return False
+    return bool(user.is_staff or user.is_superuser)
+
+
+def require_docs_editor_json(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not is_docs_editor(request):
+            return json_error("문서 편집 권한이 필요합니다.", status=403)
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def require_docs_acl_admin_json(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not is_docs_acl_admin(request):
+            return json_error("권한 관리는 관리자만 사용할 수 있습니다.", status=403)
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+def resolve_next_url(request, fallback_url: str) -> str:
+    candidate = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    if candidate and url_has_allowed_host_and_scheme(
+        url=candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return fallback_url
 
 
 def docs_common_context(request, ui_lang):
     context = {}
     apply_ui_context(request, context, ui_lang)
+
+    if ui_lang in SUPPORTED_UI_LANGS:
+        docs_base_url = reverse("main:docs_root_lang", kwargs={"ui_lang": ui_lang})
+        docs_write_url = reverse("main:docs_write_lang", kwargs={"ui_lang": ui_lang})
+        docs_login_url = reverse("main:docs_login_lang", kwargs={"ui_lang": ui_lang})
+        docs_logout_url = reverse("main:docs_logout_lang", kwargs={"ui_lang": ui_lang})
+    else:
+        docs_base_url = reverse("main:docs_root")
+        docs_write_url = reverse("main:docs_write")
+        docs_login_url = reverse("main:docs_login")
+        docs_logout_url = reverse("main:docs_logout")
+
     context.update(
         {
-            "docs_base_url": reverse("main:docs_root"),
-            "docs_write_url": reverse("main:docs_write"),
+            "docs_base_url": docs_base_url,
+            "docs_write_url": docs_write_url,
+            "docs_login_url": docs_login_url,
+            "docs_logout_url": docs_logout_url,
+            "docs_auth_next": request.get_full_path(),
             "docs_api_list_url": reverse("main:docs_api_list"),
             "docs_api_save_url": reverse("main:docs_api_save"),
             "docs_api_rename_url": reverse("main:docs_api_rename"),
             "docs_api_delete_url": reverse("main:docs_api_delete"),
             "docs_api_mkdir_url": reverse("main:docs_api_mkdir"),
             "docs_api_download_url": reverse("main:docs_api_download"),
+            "docs_api_acl_url": reverse("main:docs_api_acl"),
+            "docs_api_acl_options_url": reverse("main:docs_api_acl_options"),
+            "docs_can_edit": has_docs_write_access(request, ""),
+            "docs_can_manage_acl": is_docs_acl_admin(request),
+            "docs_text": get_docs_text(ui_lang),
         }
     )
     return context
@@ -161,6 +637,67 @@ def docs_common_context(request, ui_lang):
 
 def docs_root(request, ui_lang=None):
     return docs_list(request, folder_path="", ui_lang=ui_lang)
+
+
+def docs_root_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:docs_root_lang")
+
+
+def docs_list_root_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:docs_root_lang")
+
+
+def docs_write_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:docs_write_lang")
+
+
+def docs_login_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:docs_login_lang")
+
+
+def docs_logout_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:docs_logout_lang")
+
+
+def docs_list_legacy_redirect(request, folder_path):
+    return redirect_to_localized_route(request, "main:docs_list_lang", folder_path=folder_path)
+
+
+def docs_view_legacy_redirect(request, doc_path):
+    return redirect_to_localized_route(request, "main:docs_view_lang", doc_path=doc_path)
+
+
+@require_http_methods(["GET", "POST"])
+def docs_login(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    context = docs_common_context(request, resolved_lang)
+    next_url = resolve_next_url(request, context["docs_base_url"])
+
+    if request.user.is_authenticated:
+        return redirect(next_url)
+
+    form = AuthenticationForm(request, data=request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        auth_login(request, form.get_user())
+        return redirect(next_url)
+
+    context.update(
+        {
+            "docs_login_form": form,
+            "docs_login_next": next_url,
+        }
+    )
+    return render(request, "docs/login.html", context)
+
+
+@require_http_methods(["POST"])
+@csrf_protect
+def docs_logout(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    context = docs_common_context(request, resolved_lang)
+    next_url = resolve_next_url(request, context["docs_base_url"])
+    auth_logout(request)
+    return redirect(next_url)
 
 
 def docs_list(request, folder_path="", ui_lang=None):
@@ -174,13 +711,16 @@ def docs_list(request, folder_path="", ui_lang=None):
 
     if not directory.is_dir():
         raise Http404("폴더를 찾을 수 없습니다.")
+    if not has_docs_read_access(request, current_dir):
+        raise PermissionDenied("문서를 볼 권한이 없습니다.")
 
     context.update(
         {
             "current_dir": current_dir,
             "current_dir_display": current_dir or "/",
-            "current_path_label": f"/media/docs/{current_dir}" if current_dir else "/media/docs",
-            "initial_entries": list_directory_entries(directory),
+            "current_path_label": f"/docs/{current_dir}" if current_dir else "/docs",
+            "breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], current_dir),
+            "initial_entries": list_directory_entries(directory, request=request),
         }
     )
     return render(request, "docs/list.html", context)
@@ -194,6 +734,8 @@ def docs_view(request, doc_path, ui_lang=None):
         file_path, relative_file_path = normalize_markdown_relative_path(doc_path, must_exist=True)
     except (ValueError, FileNotFoundError):
         raise Http404("문서를 찾을 수 없습니다.")
+    if not has_docs_read_access(request, relative_file_path):
+        raise PermissionDenied("문서를 볼 권한이 없습니다.")
 
     content = file_path.read_text(encoding="utf-8")
     slug_path = markdown_slug_from_relative(relative_file_path)
@@ -208,6 +750,8 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_slug_path": slug_path,
             "doc_parent_dir": parent_dir,
             "doc_content_html": render_markdown_safely(content),
+            "view_breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], parent_dir),
+            "view_current_file_name": file_path.name,
         }
     )
     return render(request, "docs/view.html", context)
@@ -216,6 +760,9 @@ def docs_view(request, doc_path, ui_lang=None):
 def docs_write(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
+    docs_text = context["docs_text"]
+    if not context["docs_can_edit"]:
+        raise PermissionDenied("문서 편집 권한이 필요합니다.")
 
     requested_path = request.GET.get("path", "")
     requested_dir = request.GET.get("dir", "")
@@ -225,15 +772,19 @@ def docs_write(request, ui_lang=None):
     initial_filename = ""
     initial_dir = ""
     initial_content = ""
+    write_current_file_name = ""
 
     if requested_path:
         try:
             file_path, original_relative_path = normalize_markdown_relative_path(requested_path, must_exist=True)
         except (ValueError, FileNotFoundError):
             raise Http404("수정할 문서를 찾을 수 없습니다.")
+        if not has_docs_write_access(request, original_relative_path):
+            raise PermissionDenied("문서를 편집할 권한이 없습니다.")
 
         mode = "edit"
         initial_filename = file_path.stem
+        write_current_file_name = file_path.name
         parent_dir = str(Path(original_relative_path).parent).replace("\\", "/")
         initial_dir = "" if parent_dir == "." else parent_dir
         initial_content = file_path.read_text(encoding="utf-8")
@@ -242,6 +793,39 @@ def docs_write(request, ui_lang=None):
         target_dir, _ = resolve_path(initial_dir, must_exist=True)
         if not target_dir.is_dir():
             raise Http404("대상 폴더를 찾을 수 없습니다.")
+        if not has_docs_write_access(request, initial_dir):
+            raise PermissionDenied("문서를 편집할 권한이 없습니다.")
+    else:
+        if not has_docs_write_access(request, ""):
+            raise PermissionDenied("문서를 편집할 권한이 없습니다.")
+
+    docs_root = docs_root_dir()
+    markdown_help_candidates = []
+    if resolved_lang == "en":
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
+    else:
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
+    markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_LEGACY)
+
+    try:
+        markdown_help_content = ""
+        for markdown_help_path in markdown_help_candidates:
+            if markdown_help_path.exists() and markdown_help_path.is_file():
+                markdown_help_content = markdown_help_path.read_text(encoding="utf-8")
+                break
+
+        if not markdown_help_content:
+            markdown_help_content = (
+                f"# {docs_text['markdown_help_fallback_title']}\n\n"
+                f"{docs_text['markdown_help_fallback_missing']}"
+            )
+    except OSError:
+        markdown_help_content = (
+            f"# {docs_text['markdown_help_fallback_title']}\n\n"
+            f"{docs_text['markdown_help_fallback_read_error']}"
+        )
 
     context.update(
         {
@@ -250,7 +834,10 @@ def docs_write(request, ui_lang=None):
             "initial_filename": initial_filename,
             "initial_dir": initial_dir,
             "initial_content": initial_content,
-            "available_directories": list_all_directories(),
+            "available_directories": list_all_directories(request=request),
+            "markdown_help_html": render_markdown_safely(markdown_help_content),
+            "write_breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], initial_dir),
+            "write_current_file_name": write_current_file_name,
         }
     )
     return render(request, "docs/write.html", context)
@@ -267,6 +854,134 @@ def json_error(message, status=400):
     return JsonResponse({"ok": False, "error": message}, status=status)
 
 
+def parse_id_list(raw_value, field_name: str) -> list[int]:
+    if raw_value in (None, ""):
+        return []
+    if not isinstance(raw_value, list):
+        raise ValueError(f"{field_name} 형식이 올바르지 않습니다.")
+
+    parsed_ids = []
+    for item in raw_value:
+        try:
+            parsed = int(item)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field_name} 형식이 올바르지 않습니다.")
+        if parsed <= 0:
+            continue
+        parsed_ids.append(parsed)
+    return sorted(set(parsed_ids))
+
+
+@require_http_methods(["GET"])
+@require_docs_acl_admin_json
+def docs_api_acl_options(request):
+    User = get_user_model()
+    users = [
+        {
+            "id": user.id,
+            "username": user.get_username(),
+        }
+        for user in User.objects.filter(is_active=True).order_by("username")
+    ]
+    groups = [
+        {
+            "id": group.id,
+            "name": group.name,
+        }
+        for group in Group.objects.order_by("name")
+    ]
+    return JsonResponse({"ok": True, "users": users, "groups": groups})
+
+
+@require_http_methods(["GET", "POST"])
+@csrf_protect
+@require_docs_acl_admin_json
+def docs_api_acl(request):
+    if request.method == "GET":
+        rel_path_raw = request.GET.get("path", "")
+    else:
+        try:
+            payload = parse_json_body(request)
+        except ValueError as exc:
+            return json_error(str(exc), status=400)
+        rel_path_raw = payload.get("path")
+
+    try:
+        rel_path = normalize_relative_path(rel_path_raw, allow_empty=True)
+        _, rel_path = resolve_path(rel_path, must_exist=True)
+    except (ValueError, FileNotFoundError) as exc:
+        return json_error(str(exc), status=404)
+
+    if request.method == "GET":
+        rule = DocsAccessRule.objects.filter(path=rel_path).prefetch_related(
+            "read_users",
+            "read_groups",
+            "write_users",
+            "write_groups",
+        ).first()
+        read_user_ids = sorted([user.id for user in rule.read_users.all()]) if rule else []
+        read_group_ids = sorted([group.id for group in rule.read_groups.all()]) if rule else []
+        write_user_ids = sorted([user.id for user in rule.write_users.all()]) if rule else []
+        write_group_ids = sorted([group.id for group in rule.write_groups.all()]) if rule else []
+        return JsonResponse(
+            {
+                "ok": True,
+                "path": rel_path,
+                "read_user_ids": read_user_ids,
+                "read_group_ids": read_group_ids,
+                "write_user_ids": write_user_ids,
+                "write_group_ids": write_group_ids,
+            }
+        )
+
+    try:
+        read_user_ids = parse_id_list(payload.get("read_user_ids"), "read_user_ids")
+        read_group_ids = parse_id_list(payload.get("read_group_ids"), "read_group_ids")
+        write_user_ids = parse_id_list(payload.get("write_user_ids"), "write_user_ids")
+        write_group_ids = parse_id_list(payload.get("write_group_ids"), "write_group_ids")
+    except ValueError as exc:
+        return json_error(str(exc), status=400)
+
+    all_user_ids = sorted(set(read_user_ids) | set(write_user_ids))
+    all_group_ids = sorted(set(read_group_ids) | set(write_group_ids))
+
+    User = get_user_model()
+    valid_user_ids = set(User.objects.filter(id__in=all_user_ids, is_active=True).values_list("id", flat=True))
+    valid_group_ids = set(Group.objects.filter(id__in=all_group_ids).values_list("id", flat=True))
+    if len(valid_user_ids) != len(all_user_ids) or len(valid_group_ids) != len(all_group_ids):
+        return json_error("존재하지 않는 사용자 또는 그룹이 포함되어 있습니다.", status=400)
+
+    if not all_user_ids and not all_group_ids:
+        DocsAccessRule.objects.filter(path=rel_path).delete()
+        return JsonResponse(
+            {
+                "ok": True,
+                "path": rel_path,
+                "read_user_ids": [],
+                "read_group_ids": [],
+                "write_user_ids": [],
+                "write_group_ids": [],
+            }
+        )
+
+    rule, _ = DocsAccessRule.objects.get_or_create(path=rel_path)
+    rule.read_users.set(User.objects.filter(id__in=read_user_ids))
+    rule.read_groups.set(Group.objects.filter(id__in=read_group_ids))
+    rule.write_users.set(User.objects.filter(id__in=write_user_ids))
+    rule.write_groups.set(Group.objects.filter(id__in=write_group_ids))
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "path": rel_path,
+            "read_user_ids": read_user_ids,
+            "read_group_ids": read_group_ids,
+            "write_user_ids": write_user_ids,
+            "write_group_ids": write_group_ids,
+        }
+    )
+
+
 @require_http_methods(["GET"])
 def docs_api_list(request):
     rel_path = request.GET.get("path", "")
@@ -278,18 +993,21 @@ def docs_api_list(request):
 
     if not target_dir.is_dir():
         return json_error("폴더 경로가 아닙니다.", status=400)
+    if not has_docs_read_access(request, normalized):
+        return json_error("문서를 볼 권한이 없습니다.", status=403)
 
     return JsonResponse(
         {
             "ok": True,
             "path": normalized,
-            "entries": list_directory_entries(target_dir),
+            "entries": list_directory_entries(target_dir, request=request),
         }
     )
 
 
 @require_http_methods(["POST"])
 @csrf_protect
+@require_docs_editor_json
 def docs_api_rename(request):
     try:
         payload = parse_json_body(request)
@@ -301,6 +1019,8 @@ def docs_api_rename(request):
 
     if source_relative == "":
         return json_error("루트 폴더는 이름을 바꿀 수 없습니다.", status=400)
+    if not has_docs_write_access(request, source_relative):
+        return json_error("문서를 편집할 권한이 없습니다.", status=403)
 
     parent = source_path.parent
     if source_path.is_file():
@@ -316,6 +1036,7 @@ def docs_api_rename(request):
 
     source_path.rename(destination)
     relative_destination = relative_from_root(destination)
+    move_docs_acl_rules(source_relative, relative_destination)
 
     response = {
         "ok": True,
@@ -330,6 +1051,7 @@ def docs_api_rename(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@require_docs_editor_json
 def docs_api_delete(request):
     try:
         payload = parse_json_body(request)
@@ -340,6 +1062,8 @@ def docs_api_delete(request):
 
     if target_relative == "":
         return json_error("루트 폴더는 삭제할 수 없습니다.", status=400)
+    if not has_docs_write_access(request, target_relative):
+        return json_error("문서를 편집할 권한이 없습니다.", status=403)
 
     if target_path.is_dir():
         shutil.rmtree(target_path)
@@ -347,12 +1071,14 @@ def docs_api_delete(request):
         if target_path.suffix.lower() != DOCS_FILE_EXTENSION:
             return json_error("마크다운 파일만 삭제할 수 있습니다.", status=400)
         target_path.unlink()
+    delete_docs_acl_rules_for_path(target_relative)
 
     return JsonResponse({"ok": True})
 
 
 @require_http_methods(["POST"])
 @csrf_protect
+@require_docs_editor_json
 def docs_api_mkdir(request):
     try:
         payload = parse_json_body(request)
@@ -364,6 +1090,8 @@ def docs_api_mkdir(request):
 
     if not parent_path.is_dir():
         return json_error("폴더 생성 위치가 올바르지 않습니다.", status=400)
+    if not has_docs_write_access(request, parent_dir):
+        return json_error("문서를 편집할 권한이 없습니다.", status=403)
 
     target_path = parent_path / folder_name
     if target_path.exists():
@@ -375,6 +1103,7 @@ def docs_api_mkdir(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@require_docs_editor_json
 def docs_api_save(request):
     try:
         payload = parse_json_body(request)
@@ -388,6 +1117,8 @@ def docs_api_save(request):
         target_dir_path, target_dir_rel = resolve_path(target_dir, must_exist=True)
         if not target_dir_path.is_dir():
             raise ValueError("저장 위치가 폴더가 아닙니다.")
+        if not has_docs_write_access(request, target_dir_rel):
+            return json_error("문서를 편집할 권한이 없습니다.", status=403)
 
         destination = target_dir_path / f"{filename}{DOCS_FILE_EXTENSION}"
 
@@ -397,6 +1128,8 @@ def docs_api_save(request):
             source_path, source_relative = normalize_markdown_relative_path(
                 original_relative_path, must_exist=True
             )
+            if not has_docs_write_access(request, source_relative):
+                return json_error("문서를 편집할 권한이 없습니다.", status=403)
 
         if destination.exists():
             if source_path is None or destination.resolve() != source_path.resolve():
@@ -408,6 +1141,7 @@ def docs_api_save(request):
     destination.write_text(content, encoding="utf-8")
 
     if source_path is not None and destination.resolve() != source_path.resolve():
+        move_docs_acl_rules(source_relative, relative_from_root(destination))
         source_path.unlink(missing_ok=True)
 
     destination_relative = relative_from_root(destination)
@@ -437,8 +1171,10 @@ def docs_api_save(request):
 @require_http_methods(["GET"])
 def docs_api_download(request):
     try:
-        file_path, _ = normalize_markdown_relative_path(request.GET.get("path"), must_exist=True)
+        file_path, rel_path = normalize_markdown_relative_path(request.GET.get("path"), must_exist=True)
     except (ValueError, FileNotFoundError):
         raise Http404("다운로드할 파일을 찾을 수 없습니다.")
+    if not has_docs_read_access(request, rel_path):
+        raise PermissionDenied("문서를 볼 권한이 없습니다.")
 
     return FileResponse(file_path.open("rb"), as_attachment=True, filename=file_path.name)

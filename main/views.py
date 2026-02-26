@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Project, Career, Hobby, Stratagem, Stratagem_Hero_Score
+from .models import Career, Hobby, NavLink, Project, Stratagem, Stratagem_Hero_Score
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
@@ -16,8 +16,9 @@ import random
 from django.conf import settings
 from django.core.cache import cache
 import httpx
+from django.db.utils import OperationalError, ProgrammingError
 
-MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists"]
+MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists", "tables"]
 SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
 MAX_SCORE_SECONDS = 3600.0
 SUPPORTED_UI_LANGS = {"ko", "en"}
@@ -142,6 +143,15 @@ def apply_ui_context(request, context, ui_lang):
     context["ui_lang"] = ui_lang
     context["lang_switch_ko_url"] = build_lang_switch_url(request, "ko")
     context["lang_switch_en_url"] = build_lang_switch_url(request, "en")
+    try:
+        context["nav_links"] = list(NavLink.objects.all())
+    except (OperationalError, ProgrammingError):
+        context["nav_links"] = [
+            {"name": "GitHub", "url": "https://github.com/Adihang"},
+            {"name": "Thingiverse", "url": "https://www.thingiverse.com/hanbyel/designs"},
+            {"name": "Docs", "url": "/docs/list"},
+            {"name": "Mini Game", "url": "/Stratagem_Hero/"},
+        ]
 
 
 def build_localized_url(request, route_name, **kwargs):
@@ -175,16 +185,67 @@ def salvations_edge_legacy_redirect(request):
     return redirect_to_localized_route(request, "main:Salvations_Edge_4_lang")
 
 
-def vow_of_the_disciple_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:Vow_of_the_Disciple_lang")
-
-
 def stratagem_hero_legacy_redirect(request):
     return redirect_to_localized_route(request, "main:Stratagem_Hero_lang")
 
 
 def stratagem_hero_scoreboard_legacy_redirect(request):
     return redirect_to_localized_route(request, "main:Stratagem_Hero_Scoreboard_lang")
+
+
+def minigame_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:minigame_lang")
+
+
+def bubble_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:bubble_lang")
+
+
+def minigame_page(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    is_english = resolved_lang == "en"
+
+    links = [
+        {
+            "title": "Salvation's Edge 4",
+            "url": reverse("main:Salvations_Edge_4_lang", kwargs={"ui_lang": resolved_lang}),
+        },
+        {
+            "title": "Stratagem Hero",
+            "url": reverse("main:Stratagem_Hero_lang", kwargs={"ui_lang": resolved_lang}),
+        },
+        {
+            "title": "Bubble",
+            "url": reverse("main:bubble_lang", kwargs={"ui_lang": resolved_lang}),
+        },
+    ]
+
+    context = {
+        "ui_lang": resolved_lang,
+        "page_title": "Mini Game" if is_english else "미니게임",
+        "minigame_links": links,
+    }
+    response = render(request, "fun/minigame.html", context)
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
+
+
+def bubble_page(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    is_english = resolved_lang == "en"
+    context = {
+        "ui_lang": resolved_lang,
+        "page_title": "Bubble" if is_english else "버블",
+        "bubble_title": "Bubble Playground" if is_english else "버블 플레이그라운드",
+        "bubble_description": (
+            "Pop all bubbles to roll a random background color."
+            if is_english
+            else "버블을 전부 터뜨리면 배경색이 랜덤으로 바뀝니다."
+        ),
+        "back_to_minigame_text": "Back to Mini Game" if is_english else "미니게임으로 돌아가기",
+    }
+    return render(request, "fun/bubble.html", context)
 
 
 def none(request, ui_lang=None):
@@ -254,12 +315,6 @@ def Salvations_Edge_4(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
     return render(request, 'fun/Salvations_Edge_4.html', context)
-
-def Vow_of_the_Disciple(request, ui_lang=None):
-    context = dict()
-    resolved_lang = resolve_ui_lang(request, ui_lang)
-    apply_ui_context(request, context, resolved_lang)
-    return render(request, 'fun/Vow_of_the_Disciple.html', context)
 
 def Stratagem_Hero_page(request, ui_lang=None):
     context = dict()

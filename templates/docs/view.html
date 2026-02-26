@@ -6,15 +6,25 @@
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
         <div>
-            <h1 class="docs-title">{{ doc_title }}</h1>
-            <div class="docs-subtitle">/docs/{{ doc_relative_path }}</div>
+            <div class="docs-title-row">
+                <h1 class="docs-title">{{ doc_title }}</h1>
+            </div>
+            <div class="docs-subtitle docs-path-breadcrumbs">
+                {% for crumb in view_breadcrumbs %}
+                    {% if not forloop.first %}<span class="docs-path-sep">/</span>{% endif %}
+                    <a class="docs-path-link" href="{{ crumb.url }}">{{ crumb.label }}</a>
+                {% endfor %}
+                <span class="docs-path-sep">/</span>
+                <span class="docs-path-current">{{ view_current_file_name }}</span>
+            </div>
         </div>
         <div class="docs-toolbar-actions">
+            {% include "docs/_auth_button.html" %}
             {% if docs_can_edit %}
-                <a class="docs-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">편집</a>
-                <button class="docs-btn" type="button" id="docs-delete-btn">삭제</button>
+                <a class="docs-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
+                <button class="docs-btn" type="button" id="docs-delete-btn">{{ docs_text.delete_button }}</button>
             {% endif %}
-            <a class="docs-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">다운로드</a>
+            <a class="docs-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
         </div>
     </div>
 </div>
@@ -26,9 +36,11 @@
     data-delete-api-url="{{ docs_api_delete_url }}"
     data-doc-path="{{ doc_relative_path }}"
     data-parent-dir="{{ doc_parent_dir }}"
+    data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
     <article class="docs-markdown">{{ doc_content_html }}</article>
 </main>
 
+{{ docs_text|json_script:"docs-i18n" }}
 {% include 'docs/_assets_script.html' %}
 {% endblock %}

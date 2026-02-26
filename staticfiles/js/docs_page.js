@@ -23,7 +23,7 @@
             if (allowEmpty) {
                 return "";
             }
-            throw new Error("경로를 입력해주세요.");
+            throw new Error(t("js_error_path_required", "경로를 입력해주세요."));
         }
         const parts = trimmed
             .split("/")
@@ -37,7 +37,7 @@
         if (parts.some(function (part) {
             return part === "..";
         })) {
-            throw new Error("상위 경로(..)는 사용할 수 없습니다.");
+            throw new Error(t("js_error_parent_path_not_allowed", "상위 경로(..)는 사용할 수 없습니다."));
         }
 
         return parts.join("/");
@@ -88,7 +88,9 @@
         }
 
         if (!response.ok) {
-            const message = payload && payload.error ? payload.error : "요청 처리 중 오류가 발생했습니다.";
+            const message = payload && payload.error
+                ? payload.error
+                : t("js_error_request_failed", "요청 처리 중 오류가 발생했습니다.");
             throw new Error(message);
         }
 
@@ -118,8 +120,30 @@
         }
     }
 
+    const i18n = getJsonScriptData("docs-i18n", {});
+
+    function t(key, fallbackValue) {
+        if (Object.prototype.hasOwnProperty.call(i18n, key) && typeof i18n[key] === "string") {
+            return i18n[key];
+        }
+        return fallbackValue;
+    }
+
+    function formatTemplate(template, values) {
+        return String(template || "").replace(/\{(\w+)\}/g, function (_, token) {
+            if (values && Object.prototype.hasOwnProperty.call(values, token)) {
+                return String(values[token]);
+            }
+            return "";
+        });
+    }
+
     function alertError(error) {
-        window.alert(error && error.message ? error.message : "처리 중 오류가 발생했습니다.");
+        window.alert(
+            error && error.message
+                ? error.message
+                : t("js_error_processing_failed", "처리 중 오류가 발생했습니다.")
+        );
     }
 
     function initializeListPage() {
@@ -127,15 +151,37 @@
         const listApiUrl = root.dataset.listApiUrl;
         const renameApiUrl = root.dataset.renameApiUrl;
         const deleteApiUrl = root.dataset.deleteApiUrl;
+        const mkdirApiUrl = root.dataset.mkdirApiUrl;
+        const aclApiUrl = root.dataset.aclApiUrl;
+        const aclOptionsApiUrl = root.dataset.aclOptionsApiUrl;
         const writeUrl = root.dataset.writeUrl || "/docs/write";
         const listContainer = document.getElementById("docs-list");
         const contextMenu = document.getElementById("docs-context-menu");
+        const contextEditButton = contextMenu ? contextMenu.querySelector('button[data-action="edit"]') : null;
+        const contextNewFolderButton = contextMenu ? contextMenu.querySelector('button[data-action="new-folder"]') : null;
+        const contextNewDocButton = contextMenu ? contextMenu.querySelector('button[data-action="new-doc"]') : null;
+        const contextPermissionsButton = contextMenu ? contextMenu.querySelector('button[data-action="permissions"]') : null;
         const renameModal = document.getElementById("docs-rename-modal");
         const renameModalBackdrop = document.getElementById("docs-rename-modal-backdrop");
         const renameInput = document.getElementById("docs-rename-input");
         const renameTarget = document.getElementById("docs-rename-target");
         const renameCancelButton = document.getElementById("docs-rename-cancel-btn");
         const renameConfirmButton = document.getElementById("docs-rename-confirm-btn");
+        const folderCreateModal = document.getElementById("docs-folder-create-modal");
+        const folderCreateModalBackdrop = document.getElementById("docs-folder-create-modal-backdrop");
+        const folderCreateTarget = document.getElementById("docs-folder-create-target");
+        const folderCreateInput = document.getElementById("docs-folder-create-input");
+        const folderCreateCancelButton = document.getElementById("docs-folder-create-cancel-btn");
+        const folderCreateConfirmButton = document.getElementById("docs-folder-create-confirm-btn");
+        const permissionModal = document.getElementById("docs-permission-modal");
+        const permissionModalBackdrop = document.getElementById("docs-permission-modal-backdrop");
+        const permissionTarget = document.getElementById("docs-permission-target");
+        const permissionReadUsersList = document.getElementById("docs-permission-read-users-list");
+        const permissionReadGroupsList = document.getElementById("docs-permission-read-groups-list");
+        const permissionWriteUsersList = document.getElementById("docs-permission-write-users-list");
+        const permissionWriteGroupsList = document.getElementById("docs-permission-write-groups-list");
+        const permissionCancelButton = document.getElementById("docs-permission-cancel-btn");
+        const permissionSaveButton = document.getElementById("docs-permission-save-btn");
 
         const currentDir = normalizePath(root.dataset.currentDir || "", true);
         const initialEntries = getJsonScriptData("docs-initial-entries", []);
@@ -144,8 +190,15 @@
             selectedPath: "",
             contextTarget: null,
             renameTargetEntry: null,
+            folderCreateParentEntry: null,
+            permissionTargetEntry: null,
             expandedFolders: new Set(),
-            directoryCache: new Map()
+            directoryCache: new Map(),
+            aclOptionsLoaded: false,
+            aclOptions: {
+                users: [],
+                groups: [],
+            }
         };
 
         state.directoryCache.set(currentDir, initialEntries);
@@ -158,11 +211,27 @@
             state.contextTarget = null;
         }
 
+        function setContextButtonVisible(button, visible) {
+            if (!button) {
+                return;
+            }
+            button.style.display = visible ? "" : "none";
+        }
+
+        function syncContextMenuByEntry(entry) {
+            const isDirectory = Boolean(entry && entry.type === "dir");
+            setContextButtonVisible(contextEditButton, !isDirectory);
+            setContextButtonVisible(contextNewFolderButton, isDirectory);
+            setContextButtonVisible(contextNewDocButton, isDirectory);
+            setContextButtonVisible(contextPermissionsButton, true);
+        }
+
         function openContextMenuAt(entry, x, y) {
             if (!contextMenu) {
                 return;
             }
             state.contextTarget = entry;
+            syncContextMenuByEntry(entry);
             contextMenu.hidden = false;
             contextMenu.style.left = String(x) + "px";
             contextMenu.style.top = String(y) + "px";
@@ -214,12 +283,24 @@
             return entry.name;
         }
 
+        function syncModalBodyState() {
+            const renameOpened = Boolean(renameModal && !renameModal.hidden);
+            const folderCreateOpened = Boolean(folderCreateModal && !folderCreateModal.hidden);
+            const permissionOpened = Boolean(permissionModal && !permissionModal.hidden);
+            document.body.classList.toggle("docs-modal-open", renameOpened || folderCreateOpened || permissionOpened);
+        }
+
+        function getDocsPathLabel(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            return normalized ? "/docs/" + normalized : "/docs";
+        }
+
         function setRenameModalOpen(opened, entry) {
             if (!renameModal) {
                 return;
             }
             renameModal.hidden = !opened;
-            document.body.classList.toggle("docs-modal-open", opened);
+            syncModalBodyState();
             if (!opened) {
                 state.renameTargetEntry = null;
                 return;
@@ -236,11 +317,209 @@
             }
         }
 
+        function setFolderCreateModalOpen(opened, entry) {
+            if (!folderCreateModal) {
+                return;
+            }
+            folderCreateModal.hidden = !opened;
+            syncModalBodyState();
+            if (!opened) {
+                state.folderCreateParentEntry = null;
+                return;
+            }
+
+            state.folderCreateParentEntry = entry || null;
+            if (folderCreateTarget) {
+                const parentPath = entry && entry.path ? entry.path : "";
+                folderCreateTarget.textContent = t("create_folder_in_label", "생성 위치") + ": " + getDocsPathLabel(parentPath);
+            }
+            if (folderCreateInput) {
+                folderCreateInput.value = "";
+                folderCreateInput.focus();
+                folderCreateInput.select();
+            }
+        }
+
+        function renderPermissionItems(container, items, selectedIdSet, emptyMessage) {
+            if (!container) {
+                return;
+            }
+            container.innerHTML = "";
+
+            if (!Array.isArray(items) || items.length === 0) {
+                const emptyNode = document.createElement("div");
+                emptyNode.className = "docs-permission-empty";
+                emptyNode.textContent = emptyMessage;
+                container.appendChild(emptyNode);
+                return;
+            }
+
+            items.forEach(function (item) {
+                const row = document.createElement("label");
+                row.className = "docs-permission-item";
+
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.value = String(item.id);
+                checkbox.checked = selectedIdSet.has(Number(item.id));
+
+                const text = document.createElement("span");
+                text.textContent = item.label;
+
+                row.appendChild(checkbox);
+                row.appendChild(text);
+                container.appendChild(row);
+            });
+        }
+
+        function readCheckedIds(container) {
+            if (!container) {
+                return [];
+            }
+            return Array.from(container.querySelectorAll('input[type="checkbox"]:checked'))
+                .map(function (input) {
+                    return Number(input.value);
+                })
+                .filter(function (value) {
+                    return Number.isInteger(value) && value > 0;
+                });
+        }
+
+        function setPermissionModalOpen(opened, entry) {
+            if (!permissionModal) {
+                return;
+            }
+            permissionModal.hidden = !opened;
+            syncModalBodyState();
+            if (!opened) {
+                state.permissionTargetEntry = null;
+                return;
+            }
+            state.permissionTargetEntry = entry || null;
+            if (permissionTarget) {
+                permissionTarget.textContent = entry ? entry.path : "";
+            }
+        }
+
+        async function ensureAclOptionsLoaded() {
+            if (state.aclOptionsLoaded || !aclOptionsApiUrl) {
+                return;
+            }
+
+            const data = await requestJson(aclOptionsApiUrl);
+            const users = Array.isArray(data.users) ? data.users : [];
+            const groups = Array.isArray(data.groups) ? data.groups : [];
+            state.aclOptions = {
+                users: users.map(function (user) {
+                    return { id: Number(user.id), label: String(user.username || "") };
+                }).filter(function (user) {
+                    return user.id > 0 && user.label;
+                }),
+                groups: groups.map(function (group) {
+                    return { id: Number(group.id), label: String(group.name || "") };
+                }).filter(function (group) {
+                    return group.id > 0 && group.label;
+                }),
+            };
+            state.aclOptionsLoaded = true;
+        }
+
+        async function openPermissionModal(entry) {
+            if (!entry || !aclApiUrl || !aclOptionsApiUrl) {
+                return;
+            }
+
+            setPermissionModalOpen(true, entry);
+            if (permissionReadUsersList) {
+                permissionReadUsersList.textContent = t("permission_loading", "불러오는 중...");
+            }
+            if (permissionReadGroupsList) {
+                permissionReadGroupsList.textContent = t("permission_loading", "불러오는 중...");
+            }
+            if (permissionWriteUsersList) {
+                permissionWriteUsersList.textContent = t("permission_loading", "불러오는 중...");
+            }
+            if (permissionWriteGroupsList) {
+                permissionWriteGroupsList.textContent = t("permission_loading", "불러오는 중...");
+            }
+
+            await ensureAclOptionsLoaded();
+            const data = await requestJson(aclApiUrl + "?path=" + encodeURIComponent(entry.path));
+            const selectedReadUserIds = new Set(
+                Array.isArray(data.read_user_ids) ? data.read_user_ids.map(Number) : []
+            );
+            const selectedReadGroupIds = new Set(
+                Array.isArray(data.read_group_ids) ? data.read_group_ids.map(Number) : []
+            );
+            const selectedWriteUserIds = new Set(
+                Array.isArray(data.write_user_ids) ? data.write_user_ids.map(Number) : []
+            );
+            const selectedWriteGroupIds = new Set(
+                Array.isArray(data.write_group_ids) ? data.write_group_ids.map(Number) : []
+            );
+
+            renderPermissionItems(
+                permissionReadUsersList,
+                state.aclOptions.users,
+                selectedReadUserIds,
+                t("permission_empty_users", "표시할 사용자가 없습니다.")
+            );
+            renderPermissionItems(
+                permissionReadGroupsList,
+                state.aclOptions.groups,
+                selectedReadGroupIds,
+                t("permission_empty_groups", "표시할 그룹이 없습니다.")
+            );
+            renderPermissionItems(
+                permissionWriteUsersList,
+                state.aclOptions.users,
+                selectedWriteUserIds,
+                t("permission_empty_users", "표시할 사용자가 없습니다.")
+            );
+            renderPermissionItems(
+                permissionWriteGroupsList,
+                state.aclOptions.groups,
+                selectedWriteGroupIds,
+                t("permission_empty_groups", "표시할 그룹이 없습니다.")
+            );
+        }
+
+        async function submitPermissionSettings() {
+            const entry = state.permissionTargetEntry;
+            if (!entry) {
+                return;
+            }
+
+            const readUserIds = readCheckedIds(permissionReadUsersList);
+            const readGroupIds = readCheckedIds(permissionReadGroupsList);
+            const writeUserIds = readCheckedIds(permissionWriteUsersList);
+            const writeGroupIds = readCheckedIds(permissionWriteGroupsList);
+            await requestJson(
+                aclApiUrl,
+                buildPostOptions({
+                    path: entry.path,
+                    read_user_ids: readUserIds,
+                    read_group_ids: readGroupIds,
+                    write_user_ids: writeUserIds,
+                    write_group_ids: writeGroupIds,
+                })
+            );
+            setPermissionModalOpen(false);
+            await refreshCurrentDirectory();
+        }
+
         function renameEntry(entry) {
             if (!entry) {
                 return;
             }
             setRenameModalOpen(true, entry);
+        }
+
+        function newDocumentInFolder(entry) {
+            if (!entry || entry.type !== "dir") {
+                return;
+            }
+            window.location.href = buildWriteUrl(writeUrl, { dir: entry.path });
         }
 
         async function submitRename() {
@@ -265,11 +544,41 @@
             await refreshCurrentDirectory();
         }
 
+        async function submitFolderCreate() {
+            const parentEntry = state.folderCreateParentEntry;
+            if (!parentEntry || parentEntry.type !== "dir") {
+                window.alert(t("js_folder_create_requires_folder", "폴더에서만 새 폴더를 만들 수 있습니다."));
+                return;
+            }
+
+            const folderName = String(folderCreateInput ? folderCreateInput.value : "").trim();
+            if (!folderName) {
+                window.alert(t("js_folder_name_required", "폴더 이름을 입력해주세요."));
+                return;
+            }
+
+            await requestJson(
+                mkdirApiUrl,
+                buildPostOptions({
+                    parent_dir: parentEntry.path,
+                    folder_name: folderName
+                })
+            );
+
+            setFolderCreateModalOpen(false);
+            await refreshCurrentDirectory();
+        }
+
         async function deleteEntry(entry) {
             if (!entry) {
                 return;
             }
-            const confirmed = window.confirm("정말 삭제할까요?\n" + entry.path);
+            const confirmed = window.confirm(
+                formatTemplate(
+                    t("js_confirm_delete_entry", "정말 삭제할까요?\n{path}"),
+                    { path: entry.path }
+                )
+            );
             if (!confirmed) {
                 return;
             }
@@ -390,7 +699,7 @@
                 emptyItem.className = "docs-item";
                 const emptyRow = document.createElement("div");
                 emptyRow.className = "docs-item-row is-empty";
-                emptyRow.textContent = "문서가 없습니다.";
+                emptyRow.textContent = t("js_empty_documents", "문서가 없습니다.");
                 emptyItem.appendChild(emptyRow);
                 fragment.appendChild(emptyItem);
                 listContainer.appendChild(fragment);
@@ -421,8 +730,20 @@
                     renameEntry(entry);
                     return;
                 }
+                if (action === "permissions") {
+                    openPermissionModal(entry).catch(alertError);
+                    return;
+                }
                 if (action === "edit") {
                     editEntry(entry);
+                    return;
+                }
+                if (action === "new-folder") {
+                    setFolderCreateModalOpen(true, entry);
+                    return;
+                }
+                if (action === "new-doc") {
+                    newDocumentInFolder(entry);
                     return;
                 }
                 if (action === "delete") {
@@ -458,6 +779,57 @@
             });
         }
 
+        if (folderCreateModalBackdrop) {
+            folderCreateModalBackdrop.addEventListener("click", function () {
+                setFolderCreateModalOpen(false);
+            });
+        }
+
+        if (folderCreateCancelButton) {
+            folderCreateCancelButton.addEventListener("click", function () {
+                setFolderCreateModalOpen(false);
+            });
+        }
+
+        if (folderCreateConfirmButton) {
+            folderCreateConfirmButton.addEventListener("click", function () {
+                submitFolderCreate().catch(alertError);
+            });
+        }
+
+        if (folderCreateInput) {
+            folderCreateInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitFolderCreate().catch(alertError);
+                }
+            });
+        }
+
+        if (permissionModalBackdrop) {
+            permissionModalBackdrop.addEventListener("click", function () {
+                setPermissionModalOpen(false);
+            });
+        }
+
+        if (permissionCancelButton) {
+            permissionCancelButton.addEventListener("click", function () {
+                setPermissionModalOpen(false);
+            });
+        }
+
+        if (permissionSaveButton) {
+            permissionSaveButton.addEventListener("click", function () {
+                submitPermissionSettings().catch(function (error) {
+                    window.alert(
+                        error && error.message
+                            ? error.message
+                            : t("js_permission_save_failed", "권한 저장 중 오류가 발생했습니다.")
+                    );
+                });
+            });
+        }
+
         document.addEventListener("click", function (event) {
             if (!contextMenu || contextMenu.hidden) {
                 return;
@@ -469,8 +841,16 @@
 
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
+                if (folderCreateModal && !folderCreateModal.hidden) {
+                    setFolderCreateModalOpen(false);
+                    return;
+                }
                 if (renameModal && !renameModal.hidden) {
                     setRenameModalOpen(false);
+                    return;
+                }
+                if (permissionModal && !permissionModal.hidden) {
+                    setPermissionModalOpen(false);
                     return;
                 }
                 closeContextMenu();
@@ -495,7 +875,7 @@
         }
 
         deleteButton.addEventListener("click", async function () {
-            const confirmed = window.confirm("이 문서를 삭제할까요?");
+            const confirmed = window.confirm(t("js_confirm_delete_doc", "이 문서를 삭제할까요?"));
             if (!confirmed) {
                 return;
             }
@@ -518,6 +898,9 @@
         const directoryInput = document.getElementById("docs-dir-input");
         const filenameInput = document.getElementById("docs-filename-input");
         const contentInput = document.getElementById("docs-content-input");
+        const markdownHelpButton = document.getElementById("docs-markdown-help-btn");
+        const markdownHelpModal = document.getElementById("docs-markdown-help-modal");
+        const markdownHelpBackdrop = document.getElementById("docs-markdown-help-backdrop");
         const saveButton = document.getElementById("docs-save-btn");
         const createFolderButton = document.getElementById("docs-create-folder-btn");
         const saveModal = document.getElementById("docs-save-modal");
@@ -673,6 +1056,9 @@
                     button.classList.add("is-active");
                 }
                 button.textContent = pathValue ? pathValue.split("/").slice(-1)[0] : "docs 루트";
+                if (!pathValue) {
+                    button.textContent = t("js_docs_root_label", "docs 루트");
+                }
                 button.addEventListener("click", function () {
                     state.browserDir = pathValue;
                     updateSelectedDir(pathValue);
@@ -693,7 +1079,7 @@
             if (childDirs.length === 0) {
                 const emptyItem = document.createElement("li");
                 emptyItem.className = "docs-save-folder-empty";
-                emptyItem.textContent = "하위 폴더가 없습니다.";
+                emptyItem.textContent = t("js_no_child_folders", "하위 폴더가 없습니다.");
                 saveFolderList.appendChild(emptyItem);
                 return;
             }
@@ -777,12 +1163,26 @@
             }
         }
 
+        function syncModalBodyState() {
+            const saveOpened = Boolean(saveModal && !saveModal.hidden);
+            const helpOpened = Boolean(markdownHelpModal && !markdownHelpModal.hidden);
+            document.body.classList.toggle("docs-modal-open", saveOpened || helpOpened);
+        }
+
+        function setMarkdownHelpModalOpen(opened) {
+            if (!markdownHelpModal) {
+                return;
+            }
+            markdownHelpModal.hidden = !opened;
+            syncModalBodyState();
+        }
+
         function setSaveModalOpen(opened) {
             if (!saveModal) {
                 return;
             }
             saveModal.hidden = !opened;
-            document.body.classList.toggle("docs-modal-open", opened);
+            syncModalBodyState();
 
             if (!opened) {
                 setFolderModalOpen(false);
@@ -811,7 +1211,7 @@
         async function submitSave() {
             const filename = (filenameInput ? filenameInput.value : "").trim();
             if (!filename) {
-                window.alert("파일명을 입력해주세요.");
+                window.alert(t("js_filename_required", "파일명을 입력해주세요."));
                 return;
             }
 
@@ -824,7 +1224,9 @@
             }
 
             if (!hasDirectory(targetDir)) {
-                window.alert("저장 위치를 선택하거나 폴더를 먼저 생성해주세요.");
+                window.alert(
+                    t("js_select_or_create_folder", "저장 위치를 선택하거나 폴더를 먼저 생성해주세요.")
+                );
                 return;
             }
 
@@ -859,13 +1261,15 @@
             const folderName = folderNameInput ? folderNameInput.value : "";
             const trimmed = String(folderName || "").trim();
             if (!trimmed) {
-                window.alert("폴더 이름을 입력해주세요.");
+                window.alert(t("js_folder_name_required", "폴더 이름을 입력해주세요."));
                 return;
             }
 
             const parentDir = getFolderCreateBasePath();
             if (!hasDirectory(parentDir)) {
-                window.alert("선택 경로가 유효하지 않습니다. 목록에서 폴더를 선택해주세요.");
+                window.alert(
+                    t("js_invalid_selected_path", "선택 경로가 유효하지 않습니다. 목록에서 폴더를 선택해주세요.")
+                );
                 return;
             }
 
@@ -901,6 +1305,18 @@
                     return;
                 }
                 submitSave();
+            });
+        }
+
+        if (markdownHelpButton) {
+            markdownHelpButton.addEventListener("click", function () {
+                setMarkdownHelpModalOpen(true);
+            });
+        }
+
+        if (markdownHelpBackdrop) {
+            markdownHelpBackdrop.addEventListener("click", function () {
+                setMarkdownHelpModalOpen(false);
             });
         }
 
@@ -1005,6 +1421,7 @@
             }
             if (saveModal && !saveModal.hidden) {
                 setSaveModalOpen(false);
+                return;
             }
         });
     }

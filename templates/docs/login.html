@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block body_class %}docs-page{% endblock %}
+{% block content %}
+{% include 'docs/_assets_head.html' %}
+
+<div class="docs-toolbar-wrap">
+    <div class="docs-shell docs-toolbar">
+        <div>
+            <h1 class="docs-title">{{ docs_text.auth_login_title }}</h1>
+            <div class="docs-subtitle docs-path-breadcrumbs">
+                <a class="docs-path-link" href="{{ docs_base_url }}">docs</a>
+                <span class="docs-path-sep">/</span>
+                <span class="docs-path-current">{{ docs_text.auth_login_button }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="docs-shell docs-content">
+    <form method="post" class="docs-login-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ docs_login_next }}">
+
+        {% if docs_login_form.non_field_errors %}
+            <div class="docs-login-error">{{ docs_text.auth_login_error }}</div>
+        {% endif %}
+
+        <label class="docs-field docs-field-full">
+            <span>{{ docs_text.auth_username_label }}</span>
+            <input
+                type="text"
+                name="username"
+                value="{{ docs_login_form.username.value|default:'' }}"
+                autocomplete="username"
+                required
+                autofocus
+            >
+        </label>
+
+        <label class="docs-field docs-field-full">
+            <span>{{ docs_text.auth_password_label }}</span>
+            <input
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                required
+            >
+        </label>
+
+        <div class="docs-login-actions">
+            <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
+            <button class="docs-btn docs-btn-primary" type="submit">{{ docs_text.auth_login_submit }}</button>
+        </div>
+    </form>
+</main>
+{% endblock %}
