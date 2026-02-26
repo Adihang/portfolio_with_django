@@ -3,7 +3,8 @@
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 350px;
+    width: 25vw;
+    min-width: 350px;
     z-index: 1000;
     font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     box-shadow:
@@ -57,7 +58,7 @@
 .chat-body {
     display: flex;
     flex-direction: column;
-    height: 400px;
+    height: 50vh;
     max-height: 0;
     opacity: 0;
     transform: translateY(8px);
@@ -67,7 +68,7 @@
 }
 
 .chat-widget.is-open .chat-body {
-    max-height: 400px;
+    max-height: 50vh;
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
@@ -218,7 +219,9 @@ body.portfolio-page.bubble-exhausted-dark .chat-input button:hover {
 /* 반응형 디자인 */
 @media (max-width: 768px) {
     .chat-widget {
-        width: 90%;
-        right: 5%;
+        width: calc(100% - 20px);
+        min-width: 0;
+        right: 10px;
+        left: auto;
     }
 }
