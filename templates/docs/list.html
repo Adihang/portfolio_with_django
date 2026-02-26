@@ -1,20 +1,30 @@
 {% extends 'base.html' %}
-{% load static static_versioned %}
 {% block body_class %}docs-page{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{% static_v 'css/docs.css' %}" type="text/css">
+{% include 'docs/_assets_head.html' %}
 
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
         <div>
             <h1 class="docs-title">문서 목록</h1>
-            <div class="docs-subtitle">{{ current_path_label }}</div>
+            <div class="docs-subtitle docs-path-breadcrumbs">
+                {% for crumb in breadcrumbs %}
+                    {% if not forloop.first %}<span class="docs-path-sep">/</span>{% endif %}
+                    {% if crumb.is_current %}
+                        <span class="docs-path-current">{{ crumb.label }}</span>
+                    {% else %}
+                        <a class="docs-path-link" href="{{ crumb.url }}">{{ crumb.label }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
-        <a
-            class="docs-btn docs-btn-primary"
-            href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
-            id="docs-write-btn"
-        >작성</a>
+        {% if docs_can_edit %}
+            <a
+                class="docs-btn docs-btn-primary"
+                href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
+                id="docs-write-btn"
+            >작성</a>
+        {% endif %}
     </div>
 </div>
 
@@ -33,11 +43,31 @@
 
 <div id="docs-context-menu" class="docs-context-menu" hidden>
     <button type="button" data-action="open">열기</button>
-    <button type="button" data-action="rename">이름 바꾸기</button>
-    <button type="button" data-action="edit">편집</button>
-    <button type="button" data-action="delete">삭제</button>
+    {% if docs_can_edit %}
+        <button type="button" data-action="rename">이름 바꾸기</button>
+        <button type="button" data-action="edit">편집</button>
+        <button type="button" data-action="delete">삭제</button>
+    {% endif %}
 </div>
 
+{% if docs_can_edit %}
+    <div id="docs-rename-modal" class="docs-rename-modal" hidden>
+        <div class="docs-rename-modal-backdrop" id="docs-rename-modal-backdrop"></div>
+        <div class="docs-rename-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-rename-title">
+            <h3 id="docs-rename-title" class="docs-rename-title">이름 바꾸기</h3>
+            <div class="docs-rename-target" id="docs-rename-target"></div>
+            <label class="docs-field docs-field-full">
+                <span>새 이름</span>
+                <input type="text" id="docs-rename-input" placeholder="새 이름">
+            </label>
+            <div class="docs-rename-actions">
+                <button type="button" class="docs-btn" id="docs-rename-cancel-btn">취소</button>
+                <button type="button" class="docs-btn docs-btn-primary" id="docs-rename-confirm-btn">변경</button>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
 {{ initial_entries|json_script:"docs-initial-entries" }}
-<script src="{% static_v 'js/docs_page.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+{% include 'docs/_assets_script.html' %}
 {% endblock %}

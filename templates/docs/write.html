@@ -1,15 +1,14 @@
 {% extends 'base.html' %}
-{% load static static_versioned %}
 {% block body_class %}docs-page{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{% static_v 'css/docs.css' %}" type="text/css">
+{% include 'docs/_assets_head.html' %}
 
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
         <div>
             <h1 class="docs-title">{% if write_mode == 'edit' %}문서 편집{% else %}문서 작성{% endif %}</h1>
             <div class="docs-subtitle">
-                {% if write_mode == 'edit' %}/media/docs/{{ original_relative_path }}{% else %}새 마크다운 파일 작성{% endif %}
+                {% if write_mode == 'edit' %}/docs/{{ original_relative_path }}{% else %}새 마크다운 파일 작성{% endif %}
             </div>
         </div>
         <div class="docs-toolbar-actions">
@@ -29,12 +28,6 @@
     data-original-path="{{ original_relative_path }}"
 >
     <div class="docs-form-grid">
-        <label class="docs-field">
-            <span>저장 위치</span>
-            <input type="text" id="docs-dir-input" list="docs-directory-options" value="{{ initial_dir }}" placeholder="예: JavaScript">
-        </label>
-        <button type="button" class="docs-btn" id="docs-create-folder-btn">폴더 생성</button>
-
         <label class="docs-field docs-field-full">
             <span>파일명 (.md 제외)</span>
             <input type="text" id="docs-filename-input" value="{{ initial_filename }}" placeholder="예: hover">
@@ -45,10 +38,61 @@
             <textarea id="docs-content-input" spellcheck="false">{{ initial_content }}</textarea>
         </label>
     </div>
-
-    <datalist id="docs-directory-options"></datalist>
 </main>
 
+<div id="docs-save-modal" class="docs-save-modal" hidden>
+    <div class="docs-save-modal-backdrop" id="docs-save-modal-backdrop"></div>
+    <div class="docs-save-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-save-modal-title">
+        <div class="docs-save-modal-head">
+            <h2 id="docs-save-modal-title" class="docs-save-modal-title">저장 위치 선택</h2>
+            <button type="button" class="docs-save-close-btn" id="docs-save-close-btn" aria-label="닫기">x</button>
+        </div>
+        <div class="docs-save-location-bar">
+            <button type="button" class="docs-btn" id="docs-save-up-btn">상위</button>
+            <div class="docs-save-breadcrumb" id="docs-save-breadcrumb"></div>
+        </div>
+        <div class="docs-save-browser">
+            <aside class="docs-save-sidebar">
+                <div class="docs-save-sidebar-title">빠른 경로</div>
+                <ul class="docs-save-sidebar-list" id="docs-save-quick-list"></ul>
+            </aside>
+            <section class="docs-save-folder-pane">
+                <div class="docs-save-folder-head">폴더</div>
+                <ul class="docs-save-folder-list" id="docs-save-folder-list"></ul>
+            </section>
+        </div>
+        <label class="docs-field docs-field-full">
+            <span>선택 경로</span>
+            <input type="text" id="docs-dir-input" list="docs-directory-options" value="{{ initial_dir }}" placeholder="예: JavaScript">
+        </label>
+        <div class="docs-save-modal-actions">
+            <button type="button" class="docs-btn" id="docs-create-folder-btn">폴더 생성</button>
+            <div class="docs-save-modal-actions-right">
+                <button type="button" class="docs-btn" id="docs-save-cancel-btn">취소</button>
+                <button type="button" class="docs-btn docs-btn-primary" id="docs-save-confirm-btn">저장</button>
+            </div>
+        </div>
+
+        <div id="docs-folder-modal" class="docs-folder-modal" hidden>
+            <div class="docs-folder-modal-backdrop" id="docs-folder-modal-backdrop"></div>
+            <div class="docs-folder-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-folder-modal-title">
+                <h3 id="docs-folder-modal-title" class="docs-folder-modal-title">새 폴더 생성</h3>
+                <div class="docs-folder-modal-path" id="docs-folder-target-path">/docs</div>
+                <label class="docs-field docs-field-full">
+                    <span>폴더 이름</span>
+                    <input type="text" id="docs-folder-name-input" placeholder="예: JavaScript">
+                </label>
+                <div class="docs-folder-modal-actions">
+                    <button type="button" class="docs-btn" id="docs-folder-cancel-btn">취소</button>
+                    <button type="button" class="docs-btn docs-btn-primary" id="docs-folder-create-btn">생성</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<datalist id="docs-directory-options"></datalist>
+
 {{ available_directories|json_script:"docs-directory-data" }}
-<script src="{% static_v 'js/docs_page.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+{% include 'docs/_assets_script.html' %}
 {% endblock %}

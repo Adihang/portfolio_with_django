@@ -315,11 +315,40 @@ body.portfolio-page section {
     --theme-border: rgba(0, 0, 0, 0.2);
     --theme-surface: rgba(255, 255, 255, 0.97);
     --theme-glow: rgba(0, 0, 0, 0.1);
+    --color-white: #ffffff;
+    --color-ink: #111111;
+    --color-muted: #535353;
+    --color-muted-soft: #3f3f3f;
+    --color-section-border: #b6b6b6;
+    --color-hover-bg: rgba(0, 0, 0, 0.06);
+    --color-hover-border: rgba(0, 0, 0, 0.24);
+    --color-nav-bg-start: rgba(255, 255, 255, 0.8);
+    --color-nav-bg-end: rgba(243, 243, 243, 0.8);
+    --surface-strong: rgba(255, 255, 255, 0.95);
+    --surface-stronger: rgba(255, 255, 255, 0.98);
+    --shadow-soft: 0 4px 8px rgba(0, 0, 0, 0.1);
+    --shadow-medium: 0 8px 18px rgba(0, 0, 0, 0.16);
+    --shadow-hover: 0 10px 18px rgba(0, 0, 0, 0.16);
+    --shadow-focus-ring: 0 0 0 0.18rem rgba(0, 0, 0, 0.12);
+    --motion-fast: 0.2s ease;
+    --motion-medium: 0.3s ease;
+    --motion-card: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    --print-button-bg: rgb(65, 141, 65);
+    --print-button-dark-bg: rgb(95, 95, 104);
     --project-image-size: clamp(200px, 30vw, 300px);
     --project-card-padding: clamp(7px, 1.2vw, 10px);
     --project-card-gap: clamp(7px, 1vw, 10px);
     --project-content-gap: 10px;
     --project-tags-area-height: 86px;
+}
+
+.hover-dark {
+    transition: filter 0.5s ease;
+}
+
+.hover-dark:hover,
+.hover-dark:focus-visible {
+    filter: brightness(0.5);
 }
 
 .portfolio-nav {
@@ -328,9 +357,9 @@ body.portfolio-page section {
     z-index: 1030;
     padding: 9.6px 18px;
     border-bottom: none;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(243, 243, 243, 0.8));
+    background: linear-gradient(90deg, var(--color-nav-bg-start), var(--color-nav-bg-end));
     backdrop-filter: blur(8px);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+    box-shadow: var(--shadow-medium);
 }
 
 .portfolio-nav::after {
@@ -385,12 +414,20 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     flex-wrap: nowrap;
 }
 
+.portfolio-brand-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 0;
+    min-width: 0;
+}
+
 .portfolio-brand {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     gap: 0;
-    margin-right: 16px;
+    margin-right: 0;
     text-align: left;
     color: var(--theme-ink);
     font-weight: 750;
@@ -423,6 +460,8 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     flex-basis: auto;
     align-items: center;
     min-width: 0;
+    margin-left: 0;
+    padding-left: 0;
 }
 
 .portfolio-nav-links {
@@ -489,15 +528,15 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     background-color: transparent;
     color: var(--theme-subtle);
     font-weight: 600;
-    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
     white-space: nowrap;
 }
 
 .portfolio-nav-link:hover,
 .portfolio-nav-link:focus-visible {
     color: var(--theme-accent-strong);
-    background-color: rgba(0, 0, 0, 0.06);
-    border-color: rgba(0, 0, 0, 0.24);
+    background-color: var(--color-hover-bg);
+    border-color: var(--color-hover-border);
     transform: translateY(-1px);
 }
 
@@ -520,7 +559,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     padding: 4px 2px;
     border-bottom: 1.5px solid transparent;
     opacity: 0.8;
-    transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+    transition: color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
 }
 
 .portfolio-lang-link:hover,
@@ -546,14 +585,14 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     display: none;
     border: 1px solid var(--theme-border);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--surface-strong);
     padding: 6px 10px;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 }
 
 .portfolio-nav-toggler:hover {
     border-color: var(--theme-border);
-    box-shadow: 0 0 0 0.18rem rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-focus-ring);
 }
 
 .portfolio-nav-toggler:focus:not(:hover) {
@@ -573,10 +612,6 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-}
-
-.portfolio-nav.nav-auto-collapsed .portfolio-brand-text {
-    font-size: 17px;
 }
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-toggler {
@@ -607,7 +642,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     margin-left: 0;
     padding: 8px;
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.98);
+    background: var(--surface-stronger);
     border: 1px solid rgba(0, 0, 0, 0.14);
     width: 100%;
     gap: 0;
@@ -642,13 +677,12 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     display: block;
 }
 
-.portfolio-nav.nav-auto-collapsed .portfolio-lang-toggle {
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-links .portfolio-lang-toggle {
     width: 100%;
     padding: 8px 0 4px;
 }
 
-.portfolio-nav.nav-auto-collapsed .portfolio-lang-link {
-    font-size: 13px;
+.portfolio-nav.nav-auto-collapsed .portfolio-nav-links .portfolio-lang-link {
     padding: 6px 4px;
 }
 
@@ -697,7 +731,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .por
     }
     section{
         margin-top: 30px;
-        border: 1px solid #b6b6b6;
+        border: 1px solid var(--color-section-border);
         border-radius: 15px;
         padding-left: 30px;
         padding-right: 30px;
@@ -742,7 +776,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .por
     }
     section{
         margin-top: 30px;
-        border: 1px solid #b6b6b6;
+        border: 1px solid var(--color-section-border);
         border-radius: 15px;
         padding-left: 10px;
         padding-right: 10px;
@@ -776,7 +810,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .por
 .contact{
     flex: 1;
     margin-left: 5px;
-    color :#535353
+    color: var(--color-muted);
 }
 
 .main_title{
@@ -805,7 +839,7 @@ body.project-page .project_detail_page {
 
 .project_detail_title {
     margin-top: 30px;
-    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-shadow: var(--shadow-soft);
     text-align: center;
 }
 
@@ -829,7 +863,7 @@ body.project-page .project_detail_page {
     align-content: center;
 }
 .tag {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-soft);
     background-color: rgb(65, 141, 65);
     padding: 7px;
     margin-right: 0;
@@ -874,7 +908,7 @@ body.project-page .project_detail_page {
     margin-bottom: 0;
 }
 .career_card_date{
-    color: #535353;
+    color: var(--color-muted);
     font-size: 14px;
     flex: 1;
     margin-left: 5px;
@@ -887,14 +921,14 @@ body.project-page .project_detail_page {
     font-size: 1.25rem;
     line-height: 1.25;
     font-weight: 700;
-    color: #111111;
+    color: var(--color-ink);
     margin-bottom: 10px;
 }
 .career_card_work{
     font-size: 1.1rem;
     line-height: 1.5;
     font-weight: 400;
-    color: #3f3f3f;
+    color: var(--color-muted-soft);
 }
 .career_card_work *{
     color: inherit;
@@ -997,7 +1031,7 @@ body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-sc
     margin: 0;
     display: flex;
     flex: 0 0 auto;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-soft);
     padding: var(--project-card-padding);
     box-sizing: border-box;
     overflow: hidden;
@@ -1007,17 +1041,17 @@ body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-sc
     filter: brightness(1);
     transform: scale(1);
     transform-origin: center center;
-    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: var(--motion-card);
 }
 
 body.portfolio-page .projects .project_card {
-    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: var(--motion-card);
 }
 
 body.portfolio-page .projects .project_card:hover,
 body.portfolio-page .projects .project_card:focus-within {
     transform: scale(1.06);
-    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
+    box-shadow: var(--shadow-hover);
     filter: brightness(0.96);
 }
 
@@ -1054,8 +1088,8 @@ body.portfolio-page .projects .project_card:focus-within {
     justify-content: center; /* 수평 가운데 정렬 */
     align-items: center; /* 수직 가운데 정렬 */
     border-radius: 15px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    background-color: white;
+    box-shadow: var(--shadow-soft);
+    background-color: var(--color-white);
 }
 
 .project_card_text {
@@ -1097,7 +1131,7 @@ body.portfolio-page .projects .project_card:focus-within {
     display: inline-flex;
     align-items: center;
     min-height: 32px;
-    color: #535353;
+    color: var(--color-muted);
 }
 
 .portfolio-print-btn {
@@ -1110,8 +1144,8 @@ body.portfolio-page .projects .project_card:focus-within {
     box-shadow: none;
     border: none;
     border-radius: 7px;
-    background-color: rgb(65, 141, 65);
-    color: #ffffff;
+    background-color: var(--print-button-bg);
+    color: var(--color-white);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1126,7 +1160,7 @@ body.portfolio-page .projects .project_card:focus-within {
 
 .portfolio-print-btn.portfolio-nav-link {
     transform: translate3d(0, 0, 0);
-    transition: transform 0.3s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+    transition: transform var(--motion-medium), color var(--motion-medium), background-color var(--motion-medium), border-color var(--motion-medium);
 }
 
 .portfolio-print-btn.is-chat-widget-anchor {
@@ -1143,14 +1177,14 @@ body.portfolio-page .projects .project_card:focus-within {
 .portfolio-print-btn.portfolio-nav-link:focus-visible {
     box-shadow: none;
     border: none;
-    color: #ffffff;
-    background-color: rgb(65, 141, 65);
+    color: var(--color-white);
+    background-color: var(--print-button-bg);
     transform: translate3d(0, -10px, 0);
 }
 
 .portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor {
     will-change: transform;
-    transition: transform 0.3s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+    transition: transform var(--motion-medium), color var(--motion-medium), background-color var(--motion-medium), border-color var(--motion-medium);
 }
 
 .portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:hover,
@@ -1165,7 +1199,7 @@ body.portfolio-page .projects .project_card:focus-within {
 }
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn {
-    background-color: rgb(95, 95, 104);
+    background-color: var(--print-button-dark-bg);
     border-color: transparent;
     color: #f3f3f5;
     box-shadow: none;
@@ -1173,7 +1207,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn {
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-link:hover,
 body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-link:focus-visible {
-    background-color: rgb(95, 95, 104);
+    background-color: var(--print-button-dark-bg);
     border-color: transparent;
     color: #f3f3f5;
 }
@@ -1270,8 +1304,8 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-lin
     justify-content: center; /* 수평 가운데 정렬 */
     align-items: center; /* 수직 가운데 정렬 */
     border-radius: 15px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    background-color: white;
+    box-shadow: var(--shadow-soft);
+    background-color: var(--color-white);
 }
 
 .portfolio-nav .container-fluid::before,
