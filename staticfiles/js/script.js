@@ -1367,17 +1367,72 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const openProjectPrintSelector = function (projectOptions) {
         return new Promise(function (resolve) {
+            const isDarkDialog = document.body && document.body.classList
+                ? document.body.classList.contains('bubble-exhausted-dark')
+                : false;
+            const dialogTheme = isDarkDialog ? {
+                overlayOpenColor: 'rgba(0, 0, 0, 0.56)',
+                panelBackground: '#1e2026',
+                panelBorderColor: 'transparent',
+                panelShadow: '0 18px 38px rgba(0, 0, 0, 0.64)',
+                titleColor: '#f1f3f7',
+                descriptionColor: '#c1c7d0',
+                listBorderColor: 'transparent',
+                listInsetShadow: 'inset 0 12px 12px -12px rgba(255, 255, 255, 0.08), inset 0 -12px 12px -12px rgba(255, 255, 255, 0.08)',
+                emptyColor: '#b5bbc5',
+                labelHoverBackground: 'rgba(255, 255, 255, 0.08)',
+                optionTextColor: '#e6e9ef',
+                checkboxAccentColor: '#8d96a8',
+                buttonBaseBackground: 'transparent',
+                buttonBaseBorder: 'transparent',
+                buttonBaseColor: '#e8ebf1',
+                buttonHoverBackground: 'rgba(255, 255, 255, 0.16)',
+                buttonHoverBorder: 'rgba(255, 255, 255, 0.32)',
+                buttonHoverColor: '#ffffff'
+            } : {
+                overlayOpenColor: 'rgba(0, 0, 0, 0.34)',
+                panelBackground: '#ffffff',
+                panelBorderColor: 'transparent',
+                panelShadow: '0 16px 34px rgba(0, 0, 0, 0.24)',
+                titleColor: '#161616',
+                descriptionColor: '#535353',
+                listBorderColor: 'transparent',
+                listInsetShadow: 'inset 0 12px 12px -12px rgba(0, 0, 0, 0.24), inset 0 -12px 12px -12px rgba(0, 0, 0, 0.24)',
+                emptyColor: '#555555',
+                labelHoverBackground: 'rgba(0, 0, 0, 0.04)',
+                optionTextColor: '#202020',
+                checkboxAccentColor: '#5a5a5a',
+                buttonBaseBackground: 'transparent',
+                buttonBaseBorder: 'transparent',
+                buttonBaseColor: 'var(--theme-subtle)',
+                buttonHoverBackground: 'rgba(0, 0, 0, 0.06)',
+                buttonHoverBorder: 'rgba(0, 0, 0, 0.24)',
+                buttonHoverColor: 'var(--theme-accent-strong)'
+            };
+
             const bindDialogButtonInteraction = function (button, styleSet) {
                 if (!button) {
                     return;
                 }
 
-                const baseBackground = styleSet.baseBackground || 'transparent';
-                const baseBorder = styleSet.baseBorder || 'transparent';
-                const baseColor = styleSet.baseColor || 'var(--theme-subtle)';
-                const hoverBackground = styleSet.hoverBackground || 'rgba(0, 0, 0, 0.06)';
-                const hoverBorder = styleSet.hoverBorder || 'rgba(0, 0, 0, 0.24)';
-                const hoverColor = styleSet.hoverColor || baseColor;
+                const baseBackground = typeof styleSet.baseBackground !== 'undefined'
+                    ? styleSet.baseBackground
+                    : dialogTheme.buttonBaseBackground;
+                const baseBorder = typeof styleSet.baseBorder !== 'undefined'
+                    ? styleSet.baseBorder
+                    : dialogTheme.buttonBaseBorder;
+                const baseColor = typeof styleSet.baseColor !== 'undefined'
+                    ? styleSet.baseColor
+                    : dialogTheme.buttonBaseColor;
+                const hoverBackground = typeof styleSet.hoverBackground !== 'undefined'
+                    ? styleSet.hoverBackground
+                    : dialogTheme.buttonHoverBackground;
+                const hoverBorder = typeof styleSet.hoverBorder !== 'undefined'
+                    ? styleSet.hoverBorder
+                    : dialogTheme.buttonHoverBorder;
+                const hoverColor = typeof styleSet.hoverColor !== 'undefined'
+                    ? styleSet.hoverColor
+                    : baseColor;
 
                 button.style.transition = 'all 0.2s ease';
 
@@ -1414,9 +1469,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 Object.assign(button.style, {
                     padding: resolved.padding || '6.4px 14px',
                     borderRadius: '999px',
-                    border: '1px solid transparent',
-                    background: 'transparent',
-                    color: 'var(--theme-subtle)',
+                    border: '1px solid ' + (resolved.borderColor || dialogTheme.buttonBaseBorder),
+                    background: resolved.background || dialogTheme.buttonBaseBackground,
+                    color: resolved.color || dialogTheme.buttonBaseColor,
                     fontWeight: resolved.fontWeight || '600',
                     whiteSpace: 'nowrap',
                     cursor: 'pointer'
@@ -1429,12 +1484,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 bindDialogButtonInteraction(
                     button,
                     resolved.interactionStyle || {
-                        baseBackground: 'transparent',
-                        baseBorder: 'transparent',
-                        baseColor: 'var(--theme-subtle)',
-                        hoverBackground: 'rgba(0, 0, 0, 0.06)',
-                        hoverBorder: 'rgba(0, 0, 0, 0.24)',
-                        hoverColor: 'var(--theme-accent-strong)'
+                        baseBackground: dialogTheme.buttonBaseBackground,
+                        baseBorder: dialogTheme.buttonBaseBorder,
+                        baseColor: dialogTheme.buttonBaseColor,
+                        hoverBackground: dialogTheme.buttonHoverBackground,
+                        hoverBorder: dialogTheme.buttonHoverBorder,
+                        hoverColor: dialogTheme.buttonHoverColor
                     }
                 );
             };
@@ -1461,10 +1516,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 maxWidth: 'calc(100vw - 28px)',
                 maxHeight: '82vh',
                 overflow: 'hidden',
-                background: '#ffffff',
-                border: '1px solid rgba(0, 0, 0, 0.14)',
+                background: dialogTheme.panelBackground,
+                border: '1px solid ' + dialogTheme.panelBorderColor,
                 borderRadius: '14px',
-                boxShadow: '0 16px 34px rgba(0, 0, 0, 0.24)',
+                boxShadow: dialogTheme.panelShadow,
                 display: 'flex',
                 flexDirection: 'column'
             });
@@ -1476,7 +1531,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 padding: '16px 18px 4px 18px',
                 fontSize: '1.12rem',
                 fontWeight: '700',
-                color: '#161616',
+                color: dialogTheme.titleColor,
                 textAlign: 'center'
             });
 
@@ -1488,17 +1543,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 fontSize: '0.9rem',
                 lineHeight: '1.5',
                 whiteSpace: 'pre-line',
-                color: '#535353'
+                color: dialogTheme.descriptionColor
             });
 
             const listArea = document.createElement('div');
             Object.assign(listArea.style, {
                 overflowY: 'auto',
                 maxHeight: '48vh',
-                borderTop: '1px solid rgba(0, 0, 0, 0.08)',
-                borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+                borderTop: '1px solid ' + dialogTheme.listBorderColor,
+                borderBottom: '1px solid ' + dialogTheme.listBorderColor,
                 padding: '8px 12px',
-                boxShadow: 'inset 0 12px 12px -12px rgba(0, 0, 0, 0.24), inset 0 -12px 12px -12px rgba(0, 0, 0, 0.24)'
+                boxShadow: dialogTheme.listInsetShadow
             });
 
             const checkboxes = [];
@@ -1507,7 +1562,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 emptyMessage.textContent = printText.noProjects;
                 Object.assign(emptyMessage.style, {
                     padding: '10px 8px',
-                    color: '#555555',
+                    color: dialogTheme.emptyColor,
                     fontSize: '0.9rem'
                 });
                 listArea.appendChild(emptyMessage);
@@ -1523,7 +1578,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         cursor: 'pointer'
                     });
                     label.addEventListener('mouseover', function () {
-                        label.style.background = 'rgba(0, 0, 0, 0.04)';
+                        label.style.background = dialogTheme.labelHoverBackground;
                     });
                     label.addEventListener('mouseout', function () {
                         label.style.background = 'transparent';
@@ -1533,11 +1588,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     checkbox.type = 'checkbox';
                     checkbox.value = project.url;
                     checkbox.style.marginTop = '2px';
+                    checkbox.style.accentColor = dialogTheme.checkboxAccentColor;
 
                     const text = document.createElement('span');
                     text.textContent = project.title;
                     Object.assign(text.style, {
-                        color: '#202020',
+                        color: dialogTheme.optionTextColor,
                         fontSize: '0.92rem',
                         lineHeight: '1.4'
                     });
@@ -1605,11 +1661,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 padding: '7px 14px',
                 fontWeight: '600',
                 interactionStyle: {
-                    baseBackground: 'rgb(65, 141, 65)',
-                    baseBorder: 'rgb(52, 114, 52)',
+                    baseBackground: isDarkDialog ? 'rgba(95, 95, 104, 0.9)' : 'rgb(65, 141, 65)',
+                    baseBorder: 'transparent',
                     baseColor: '#ffffff',
                     hoverBackground: 'rgb(57, 124, 57)',
-                    hoverBorder: 'rgb(45, 95, 45)',
+                    hoverBorder: 'transparent',
                     hoverColor: '#ffffff'
                 }
             });
@@ -1628,7 +1684,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.body.appendChild(overlay);
 
             window.requestAnimationFrame(function () {
-                overlay.style.background = 'rgba(0, 0, 0, 0.34)';
+                overlay.style.background = dialogTheme.overlayOpenColor;
                 overlay.style.opacity = '1';
             });
 
@@ -1763,6 +1819,8 @@ document.addEventListener('DOMContentLoaded', function () {
             '.print-summary,.print-project{padding-top:8mm;padding-bottom:8mm;padding-left:0;padding-right:0;box-sizing:border-box;border:none;border-radius:0;background:transparent;overflow:visible;}' +
             '.print-summary .main_projects,.print-summary .main_hobbys,.print-summary .foot,.print-summary .portfolio-print-btn,.print-summary .chat-widget,.print-summary .portfolio-nav{display:none;}' +
             '.print-summary .main_banner,.print-summary .main_contents{width:100%;max-width:none;margin:0 auto;padding-left:0;padding-right:0;box-sizing:border-box;}' +
+            '.print-summary .main_banner,.print-summary .main_text{padding-top:0;margin-top:0;}' +
+            '.print-summary .main_title{margin-top:0;}' +
             '.print-project{margin-top:12mm;break-before:page;page-break-before:always;}' +
             '.print-project .project_detail_page,.print-project .project_detail{margin-top:0;}' +
             '.print-project .project_detail_title{margin-top:0;}' +

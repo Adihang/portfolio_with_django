@@ -157,9 +157,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .por
 body.portfolio-page.bubble-exhausted-dark .portfolio-nav {
     background: rgba(20, 20, 24, 0.8);
     background-image: none;
-    box-shadow:
-        0 10px 22px rgba(0, 0, 0, 0.58),
-        0 12px 26px rgba(255, 255, 255, 0.16);
+    box-shadow: 0 8px 18px rgba(255, 255, 255, 0.16);
 }
 
 body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg,
@@ -206,7 +204,7 @@ body.portfolio-page.bubble-exhausted-dark .hobby_card_img {
 }
 
 body.portfolio-page.bubble-exhausted-dark .tag {
-    background-color: rgba(95, 95, 104, 0.9);
+    background-color: rgb(95, 95, 104);
     color: #f3f3f5;
     box-shadow: none;
 }
@@ -796,6 +794,15 @@ input[type=submit] {
 .project_detail{
     margin-top: 30px;
 }
+
+body.project-page .project_detail_page {
+    width: 100%;
+    max-width: 1300px;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
 .project_detail_title {
     margin-top: 30px;
     text-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -1108,9 +1115,9 @@ body.portfolio-page .projects .project_card:focus-within {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 18px;
+    padding: 4px 27px 46px;
     line-height: 1.2;
-    min-height: 34px;
+    min-height: 68px;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: -0.6px;
@@ -1118,10 +1125,8 @@ body.portfolio-page .projects .project_card:focus-within {
 }
 
 .portfolio-print-btn.portfolio-nav-link {
-    transform: translateY(0);
-    transition-property: color, background-color, border-color, transform;
-    transition-duration: 0.2s, 0.2s, 0.2s, 0.5s;
-    transition-timing-function: ease;
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.3s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .portfolio-print-btn.is-chat-widget-anchor {
@@ -1140,7 +1145,17 @@ body.portfolio-page .projects .project_card:focus-within {
     border: none;
     color: #ffffff;
     background-color: rgb(65, 141, 65);
-    transform: translateY(-4px);
+    transform: translate3d(0, -10px, 0);
+}
+
+.portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor {
+    will-change: transform;
+    transition: transform 0.3s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:hover,
+.portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:focus-visible {
+    transform: translate3d(0, -10px, 0);
 }
 
 .portfolio-print-btn-icon {
@@ -1150,8 +1165,17 @@ body.portfolio-page .projects .project_card:focus-within {
 }
 
 body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn {
-    display: none;
+    background-color: rgb(95, 95, 104);
+    border-color: transparent;
+    color: #f3f3f5;
     box-shadow: none;
+}
+
+body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-link:hover,
+body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-link:focus-visible {
+    background-color: rgb(95, 95, 104);
+    border-color: transparent;
+    color: #f3f3f5;
 }
 
 @media (max-width: 768px) {

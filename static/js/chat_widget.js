@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const footer = document.querySelector('.foot');
     const printButton = document.querySelector('[data-portfolio-print]');
     const footerClearance = 0;
-    const printButtonGap = -6;
+    const printButtonGap = -44;
     const printButtonLeftOffset = 5;
     const computedBottom = parseFloat(window.getComputedStyle(chatWidget).bottom || '20');
     const widgetBaseBottom = Number.isNaN(computedBottom) ? 20 : computedBottom;
