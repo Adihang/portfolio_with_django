@@ -1,10 +1,29 @@
 from django.urls import path, re_path
-from . import views
+
+from . import docs_views, views
 
 app_name = 'main'
 
 urlpatterns = [
     path('', views.none, name='none'),
+    path('docs', docs_views.docs_root, name='docs_root'),
+    path('docs/', docs_views.docs_root),
+    path('docs/list', docs_views.docs_root, name='docs_list_root'),
+    path('docs/list/', docs_views.docs_root),
+    path('docs/write', docs_views.docs_write, name='docs_write'),
+    path('docs/api/list', docs_views.docs_api_list, name='docs_api_list'),
+    path('docs/api/save', docs_views.docs_api_save, name='docs_api_save'),
+    path('docs/api/rename', docs_views.docs_api_rename, name='docs_api_rename'),
+    path('docs/api/delete', docs_views.docs_api_delete, name='docs_api_delete'),
+    path('docs/api/mkdir', docs_views.docs_api_mkdir, name='docs_api_mkdir'),
+    path('docs/api/download', docs_views.docs_api_download, name='docs_api_download'),
+    path('docs/<path:folder_path>/list', docs_views.docs_list, name='docs_list'),
+    path('docs/<path:doc_path>', docs_views.docs_view, name='docs_view'),
+    re_path(r'^(?P<ui_lang>ko|en)/docs/?$', docs_views.docs_root, name='docs_root_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/docs/list/?$', docs_views.docs_root, name='docs_list_root_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/docs/write/?$', docs_views.docs_write, name='docs_write_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/docs/(?P<folder_path>.+)/list/?$', docs_views.docs_list, name='docs_list_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/docs/(?P<doc_path>.+)/?$', docs_views.docs_view, name='docs_view_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/portfolio/$', views.main, name='main_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/project/(?P<project_id>\d+)/$', views.ProjectDetail, name='ProjectDetail_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/Salvations_Edge_4/$', views.Salvations_Edge_4, name='Salvations_Edge_4_lang'),
