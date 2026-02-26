@@ -5,7 +5,7 @@
 
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
-        <div>
+        <div class="docs-toolbar-left">
             <div class="docs-title-row">
                 <h1 class="docs-title">{{ doc_title }}</h1>
             </div>
@@ -18,13 +18,16 @@
                 <span class="docs-path-current">{{ view_current_file_name }}</span>
             </div>
         </div>
-        <div class="docs-toolbar-actions">
-            {% include "docs/_auth_button.html" %}
-            {% if docs_can_edit %}
-                <a class="docs-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
-                <button class="docs-btn" type="button" id="docs-delete-btn">{{ docs_text.delete_button }}</button>
-            {% endif %}
-            <a class="docs-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
+        <div class="docs-toolbar-right">
+            {% include "docs/_auth_account.html" %}
+            <div class="docs-toolbar-actions">
+                {% include "docs/_auth_button.html" %}
+                <a class="docs-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
+                {% if docs_can_edit %}
+                    <a class="docs-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
+                    <button class="docs-btn" type="button" id="docs-delete-btn">{{ docs_text.delete_button }}</button>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -40,6 +43,8 @@
 >
     <article class="docs-markdown">{{ doc_content_html }}</article>
 </main>
+
+{% include "docs/_auth_logout_modal.html" %}
 
 {{ docs_text|json_script:"docs-i18n" }}
 {% include 'docs/_assets_script.html' %}

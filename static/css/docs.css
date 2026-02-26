@@ -89,25 +89,141 @@ body.docs-page .portfolio-print-btn {
 }
 
 .docs-toolbar {
-    padding: 12px 20px;
+    position: relative;
+    padding: 24px 20px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
 }
 
+.docs-toolbar-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-self: flex-end;
+    min-width: 0;
+}
+
+.docs-toolbar:not(.docs-toolbar-auto-collapsed) > * {
+    flex: 0 0 auto;
+}
+
+.docs-toolbar:not(.docs-toolbar-auto-collapsed) .docs-title-row,
+.docs-toolbar:not(.docs-toolbar-auto-collapsed) .docs-path-breadcrumbs {
+    flex-wrap: nowrap;
+}
+
+.docs-toolbar.docs-toolbar-auto-collapsed {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.docs-toolbar.docs-toolbar-auto-collapsed > * {
+    width: 100%;
+    flex: 0 0 auto;
+}
+
+.docs-toolbar.docs-toolbar-auto-collapsed .docs-toolbar-left {
+    align-self: stretch;
+    justify-content: flex-start;
+}
+
 .docs-toolbar-actions {
     display: flex;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
 }
 
+.docs-toolbar-right {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-self: flex-end;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 0;
+    min-width: 0;
+}
+
+.docs-toolbar.docs-toolbar-auto-collapsed .docs-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+}
+
+.docs-toolbar.docs-toolbar-auto-collapsed .docs-toolbar-right {
+    width: 100%;
+    align-items: flex-end;
+}
+
+.docs-toolbar.docs-toolbar-auto-collapsed .docs-toolbar-right .docs-toolbar-actions {
+    width: auto;
+}
+
 .docs-auth-form {
     margin: 0;
     display: inline-flex;
+}
+
+.docs-auth-form-hidden {
+    display: none;
+}
+
+.docs-auth-account-floating {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin: 0;
+    margin-bottom: 6px;
+}
+
+.docs-auth-account-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    border: 1px solid var(--docs-border-heavy);
+    border-radius: 999px;
+    background: var(--docs-bg);
+    color: var(--docs-text-stronger);
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.1;
+    min-height: 30px;
+    padding: 4px 10px 4px 8px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.docs-auth-account-trigger:hover,
+.docs-auth-account-trigger:focus-visible {
+    border-color: var(--docs-border-strong);
+    background: var(--docs-hover-soft);
+    color: var(--docs-text-stronger);
+    text-decoration: none;
+}
+
+.docs-auth-account-avatar {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    border: 1px solid var(--docs-border-heavy);
+    background:
+        radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.92) 24%, transparent 26%),
+        radial-gradient(circle at 50% 87%, rgba(255, 255, 255, 0.8) 31%, transparent 33%),
+        linear-gradient(160deg, rgba(40, 40, 40, 0.95), rgba(84, 84, 84, 0.95));
+}
+
+.docs-auth-account-name {
+    color: var(--docs-text-stronger);
 }
 
 .docs-title {
@@ -168,6 +284,13 @@ body.docs-page .portfolio-print-btn {
 .docs-path-link:focus-visible {
     color: var(--docs-text-strong);
     background: var(--docs-hover);
+}
+
+.docs-path-link.is-drop-target,
+.docs-path-current.is-drop-target {
+    background: var(--docs-hover-strong);
+    outline: 1px dashed var(--docs-border-heavy);
+    outline-offset: 1px;
 }
 
 .docs-path-current {
@@ -276,6 +399,24 @@ body.docs-page .portfolio-print-btn {
 
 .docs-item-row.is-selected {
     background: var(--docs-selected-bg);
+}
+
+.docs-item-row.is-dragging {
+    opacity: 0.55;
+}
+
+.docs-item-row.is-drop-target {
+    background: var(--docs-hover);
+    outline: 1px dashed var(--docs-border-heavy);
+    outline-offset: -1px;
+}
+
+.docs-current-dir-row {
+    background: var(--docs-surface-muted);
+}
+
+.docs-current-dir-name {
+    font-weight: 700;
 }
 
 .docs-item-row.is-empty {
@@ -411,6 +552,13 @@ body.docs-page .portfolio-print-btn {
     white-space: nowrap;
 }
 
+.docs-auth-logout-message {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--docs-text-secondary);
+    line-height: 1.45;
+}
+
 .docs-rename-actions {
     display: flex;
     align-items: center;
@@ -487,11 +635,11 @@ body.docs-page .portfolio-print-btn {
 }
 
 .docs-markdown {
-    border: 1px solid var(--docs-border);
+    border: 0;
     border-radius: var(--docs-radius-lg);
     background: var(--docs-bg);
     color: var(--docs-text);
-    padding: 20px;
+    padding: 0;
     line-height: 1.65;
     overflow-wrap: anywhere;
 }
@@ -572,9 +720,9 @@ body.docs-page .portfolio-print-btn {
 }
 
 .docs-form-grid {
-    border: 1px solid var(--docs-border);
+    border: 0;
     border-radius: var(--docs-radius-lg);
-    padding: 14px;
+    padding: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
@@ -611,7 +759,7 @@ body.docs-page .portfolio-print-btn {
 }
 
 .docs-field textarea {
-    min-height: 420px;
+    min-height: 240px;
     resize: vertical;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     line-height: 1.45;
@@ -1089,19 +1237,9 @@ body.docs-modal-open {
 }
 
 @media (max-width: 768px) {
-    .docs-toolbar,
     .docs-content {
         padding-left: 12px;
         padding-right: 12px;
-    }
-
-    .docs-toolbar {
-        flex-wrap: wrap;
-    }
-
-    .docs-toolbar-actions {
-        width: 100%;
-        justify-content: flex-end;
     }
 
     .docs-rename-modal-dialog {

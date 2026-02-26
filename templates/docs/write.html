@@ -5,7 +5,7 @@
 
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
-        <div>
+        <div class="docs-toolbar-left">
             <div class="docs-title-row">
                 <h1 class="docs-title">{% if write_mode == 'edit' %}{{ docs_text.write_title_edit }}{% else %}{{ docs_text.write_title_create }}{% endif %}</h1>
             </div>
@@ -20,11 +20,14 @@
                 {% endif %}
             </div>
         </div>
-        <div class="docs-toolbar-actions">
-            {% include "docs/_auth_button.html" %}
-            <button class="docs-btn" type="button" id="docs-markdown-help-btn">{{ docs_text.markdown_guide_button }}</button>
-            <button class="docs-btn docs-btn-primary" type="button" id="docs-save-btn">{{ docs_text.save_button }}</button>
-            <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
+        <div class="docs-toolbar-right">
+            {% include "docs/_auth_account.html" %}
+            <div class="docs-toolbar-actions">
+                {% include "docs/_auth_button.html" %}
+                <button class="docs-btn" type="button" id="docs-markdown-help-btn">{{ docs_text.markdown_guide_button }}</button>
+                <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
+                <button class="docs-btn docs-btn-primary" type="button" id="docs-save-btn">{{ docs_text.save_button }}</button>
+            </div>
         </div>
     </div>
 </div>
@@ -111,6 +114,8 @@
         </div>
     </div>
 </div>
+
+{% include "docs/_auth_logout_modal.html" %}
 
 <datalist id="docs-directory-options"></datalist>
 

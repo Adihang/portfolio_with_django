@@ -248,6 +248,7 @@ SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = os.environ.get("DJANGO_SECURE_REFERRER_POLICY", "same-origin")
 X_FRAME_OPTIONS = "DENY"
+CSRF_FAILURE_VIEW = "main.docs_views.docs_csrf_failure"
 
 # config/settings.py
 

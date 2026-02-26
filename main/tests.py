@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from django.conf import settings
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
@@ -260,6 +260,18 @@ class DocsAuthFlowTests(TestCase):
         self.assertEqual(response["Location"], "/ko/docs/list/")
         self.assertFalse("_auth_user_id" in self.client.session)
 
+    def test_docs_logout_csrf_failure_redirects_to_docs_root(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+
+        response = csrf_client.post(
+            "/ko/docs/logout/",
+            data={"next": "/ko/docs/list/"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("main:docs_root_lang", kwargs={"ui_lang": "ko"}))
+
 
 class DocsAccessRuleTests(TestCase):
     def setUp(self):
@@ -327,6 +339,71 @@ class DocsAccessRuleTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(allowed.status_code, 200)
+
+    def test_docs_api_move_moves_file_into_target_directory(self):
+        editor = self.create_docs_editor("move_editor")
+        self.client.force_login(editor)
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "archive").mkdir(parents=True, exist_ok=True)
+
+        response = self.client.post(
+            reverse("main:docs_api_move"),
+            data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse((docs_root / "public.md").exists())
+        self.assertTrue((docs_root / "archive" / "public.md").exists())
+        self.assertEqual(response.json().get("path"), "archive/public.md")
+
+    def test_docs_api_move_blocks_folder_move_into_descendant(self):
+        editor = self.create_docs_editor("move_descendant_editor")
+        self.client.force_login(editor)
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "restricted" / "child").mkdir(parents=True, exist_ok=True)
+
+        response = self.client.post(
+            reverse("main:docs_api_move"),
+            data=json.dumps({"source_path": "restricted", "target_dir": "restricted/child"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue((docs_root / "restricted").exists())
+        self.assertTrue((docs_root / "restricted" / "child").exists())
+
+    def test_docs_api_move_requires_write_access_on_target_directory(self):
+        writers_group = Group.objects.create(name="archive_writers")
+        rule = DocsAccessRule.objects.create(path="archive")
+        rule.write_groups.add(writers_group)
+
+        blocked_editor = self.create_docs_editor("blocked_move_editor")
+        allowed_editor = self.create_docs_editor("allowed_move_editor")
+        allowed_editor.groups.add(writers_group)
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "archive").mkdir(parents=True, exist_ok=True)
+
+        self.client.force_login(blocked_editor)
+        blocked_response = self.client.post(
+            reverse("main:docs_api_move"),
+            data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
+            content_type="application/json",
+        )
+        self.assertEqual(blocked_response.status_code, 403)
+
+        self.client.force_login(allowed_editor)
+        allowed_response = self.client.post(
+            reverse("main:docs_api_move"),
+            data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
+            content_type="application/json",
+        )
+        self.assertEqual(allowed_response.status_code, 200)
+        self.assertFalse((docs_root / "public.md").exists())
+        self.assertTrue((docs_root / "archive" / "public.md").exists())
 
     def test_acl_api_is_admin_only(self):
         editor = self.create_docs_editor("acl_editor")
