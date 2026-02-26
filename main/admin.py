@@ -13,7 +13,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 
 from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_markdown
-from .models import Career, Hobby, Project, Project_Tag, Stratagem, Stratagem_Class, Stratagem_Hero_Score
+from .models import Career, DocsAccessRule, Hobby, NavLink, Project, Project_Tag, Stratagem, Stratagem_Class, Stratagem_Hero_Score
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
@@ -52,6 +52,35 @@ class CareerAdmin(admin.ModelAdmin):
 @admin.register(Hobby)
 class HobbyAdmin(admin.ModelAdmin):
     list_display = ['title']
+
+
+@admin.register(NavLink)
+class NavLinkAdmin(admin.ModelAdmin):
+    list_display = ["order", "name", "url"]
+    list_editable = ["name", "url"]
+    ordering = ["order", "id"]
+
+
+@admin.register(DocsAccessRule)
+class DocsAccessRuleAdmin(admin.ModelAdmin):
+    list_display = ["path", "updated_at", "read_subject_count", "write_subject_count"]
+    search_fields = [
+        "path",
+        "read_users__username",
+        "read_groups__name",
+        "write_users__username",
+        "write_groups__name",
+    ]
+    filter_horizontal = ["read_users", "read_groups", "write_users", "write_groups"]
+    ordering = ["path"]
+
+    @admin.display(description="읽기 주체 수")
+    def read_subject_count(self, obj):
+        return obj.read_users.count() + obj.read_groups.count()
+
+    @admin.display(description="쓰기 주체 수")
+    def write_subject_count(self, obj):
+        return obj.write_users.count() + obj.write_groups.count()
 
 admin.site.register(Stratagem_Class)
 

@@ -1,11 +1,19 @@
-from django.test import RequestFactory, TestCase
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from django.conf import settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.core.cache import cache
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 import json
 from datetime import date
 
-from .models import Career, Stratagem_Hero_Score
+from .models import Career, DocsAccessRule, NavLink, Stratagem_Hero_Score
+from .docs_views import DOCS_EDIT_PERMISSION_CODE, DOCS_EDITOR_GROUP_NAME, is_docs_editor
 from .views import (
     build_lang_switch_url,
     has_excessive_korean_text,
@@ -167,3 +175,224 @@ class LanguageUrlRoutingTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/en/portfolio/")
+
+
+class DocsEditorPermissionTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user_model = get_user_model()
+        self.docs_editor_group, _ = Group.objects.get_or_create(name=DOCS_EDITOR_GROUP_NAME)
+        content_type = ContentType.objects.get_for_model(NavLink)
+        self.docs_permission, _ = Permission.objects.get_or_create(
+            content_type=content_type,
+            codename=DOCS_EDIT_PERMISSION_CODE.split(".", 1)[1],
+            defaults={"name": "Can edit docs content"},
+        )
+        self.docs_editor_group.permissions.set([self.docs_permission])
+
+    def test_docs_editor_group_user_is_allowed(self):
+        user = self.user_model.objects.create_user(username="docs_editor", password="pw123456")
+        user.groups.add(self.docs_editor_group)
+        request = self.factory.get("/ko/docs/list/")
+        request.user = user
+
+        self.assertTrue(is_docs_editor(request))
+
+    def test_regular_user_is_denied_for_write_api(self):
+        user = self.user_model.objects.create_user(username="regular_user", password="pw123456")
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("main:docs_api_mkdir"),
+            data=json.dumps({"parent_dir": "", "folder_name": "tmp"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_docs_editor_group_user_passes_auth_gate_for_write_api(self):
+        user = self.user_model.objects.create_user(username="docs_editor2", password="pw123456")
+        user.groups.add(self.docs_editor_group)
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("main:docs_api_mkdir"),
+            data=json.dumps({"parent_dir": "__missing__", "folder_name": "tmp"}),
+            content_type="application/json",
+        )
+
+        self.assertNotEqual(response.status_code, 403)
+
+
+class DocsAuthFlowTests(TestCase):
+    def setUp(self):
+        self.user_model = get_user_model()
+        self.user = self.user_model.objects.create_user(
+            username="docs_login_user",
+            password="pw123456",
+            is_staff=False,
+        )
+
+    def test_docs_login_page_is_accessible(self):
+        response = self.client.get("/ko/docs/login/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Docs 로그인")
+
+    def test_docs_login_authenticates_non_staff_user(self):
+        response = self.client.post(
+            "/ko/docs/login/",
+            data={"username": "docs_login_user", "password": "pw123456", "next": "/ko/docs/list/"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/docs/list/")
+        self.assertTrue("_auth_user_id" in self.client.session)
+
+    def test_docs_logout_clears_session(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            "/ko/docs/logout/",
+            data={"next": "/ko/docs/list/"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/docs/list/")
+        self.assertFalse("_auth_user_id" in self.client.session)
+
+
+class DocsAccessRuleTests(TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.override_settings = override_settings(MEDIA_ROOT=self.temp_dir.name)
+        self.override_settings.enable()
+        self.addCleanup(self.override_settings.disable)
+        self.addCleanup(self.temp_dir.cleanup)
+
+        self.user_model = get_user_model()
+        self.docs_editor_group, _ = Group.objects.get_or_create(name=DOCS_EDITOR_GROUP_NAME)
+        content_type = ContentType.objects.get_for_model(NavLink)
+        self.docs_permission, _ = Permission.objects.get_or_create(
+            content_type=content_type,
+            codename=DOCS_EDIT_PERMISSION_CODE.split(".", 1)[1],
+            defaults={"name": "Can edit docs content"},
+        )
+        self.docs_editor_group.permissions.set([self.docs_permission])
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "restricted").mkdir(parents=True, exist_ok=True)
+        (docs_root / "restricted" / "secret.md").write_text("# secret", encoding="utf-8")
+        (docs_root / "public.md").write_text("# public", encoding="utf-8")
+
+    def create_docs_editor(self, username):
+        user = self.user_model.objects.create_user(username=username, password="pw123456")
+        user.groups.add(self.docs_editor_group)
+        return user
+
+    def test_restricted_path_blocks_non_allowed_user_from_read(self):
+        reader_group = Group.objects.create(name="docs_readers")
+        rule = DocsAccessRule.objects.create(path="restricted")
+        rule.read_groups.add(reader_group)
+
+        blocked_user = self.user_model.objects.create_user(username="blocked", password="pw123456")
+        self.client.force_login(blocked_user)
+        blocked_response = self.client.get("/ko/docs/restricted/secret/")
+        self.assertEqual(blocked_response.status_code, 403)
+
+        blocked_user.groups.add(reader_group)
+        allowed_response = self.client.get("/ko/docs/restricted/secret/")
+        self.assertEqual(allowed_response.status_code, 200)
+
+    def test_restricted_path_blocks_docs_editor_write_when_not_in_acl(self):
+        writers_group = Group.objects.create(name="docs_writers")
+        rule = DocsAccessRule.objects.create(path="restricted")
+        rule.write_groups.add(writers_group)
+
+        blocked_editor = self.create_docs_editor("blocked_editor")
+        allowed_editor = self.create_docs_editor("allowed_editor")
+        allowed_editor.groups.add(writers_group)
+
+        self.client.force_login(blocked_editor)
+        blocked = self.client.post(
+            reverse("main:docs_api_mkdir"),
+            data=json.dumps({"parent_dir": "restricted", "folder_name": "new_folder"}),
+            content_type="application/json",
+        )
+        self.assertEqual(blocked.status_code, 403)
+
+        self.client.force_login(allowed_editor)
+        allowed = self.client.post(
+            reverse("main:docs_api_mkdir"),
+            data=json.dumps({"parent_dir": "restricted", "folder_name": "new_folder"}),
+            content_type="application/json",
+        )
+        self.assertEqual(allowed.status_code, 200)
+
+    def test_acl_api_is_admin_only(self):
+        editor = self.create_docs_editor("acl_editor")
+        target_group = Group.objects.create(name="target_group")
+        target_user = self.user_model.objects.create_user(username="target_user", password="pw123456")
+
+        self.client.force_login(editor)
+        response = self.client.post(
+            reverse("main:docs_api_acl"),
+            data=json.dumps(
+                {
+                    "path": "restricted/secret.md",
+                    "read_user_ids": [target_user.id],
+                    "read_group_ids": [target_group.id],
+                    "write_user_ids": [target_user.id],
+                    "write_group_ids": [target_group.id],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_acl_api_can_save_and_clear_split_rule(self):
+        admin_user = self.user_model.objects.create_user(
+            username="acl_admin",
+            password="pw123456",
+            is_staff=True,
+        )
+        read_group = Group.objects.create(name="read_group")
+        write_group = Group.objects.create(name="write_group")
+        read_user = self.user_model.objects.create_user(username="read_user", password="pw123456")
+        write_user = self.user_model.objects.create_user(username="write_user", password="pw123456")
+
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            reverse("main:docs_api_acl"),
+            data=json.dumps(
+                {
+                    "path": "restricted/secret.md",
+                    "read_user_ids": [read_user.id],
+                    "read_group_ids": [read_group.id],
+                    "write_user_ids": [write_user.id],
+                    "write_group_ids": [write_group.id],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        rule = DocsAccessRule.objects.get(path="restricted/secret.md")
+        self.assertEqual(set(rule.read_users.values_list("id", flat=True)), {read_user.id})
+        self.assertEqual(set(rule.read_groups.values_list("id", flat=True)), {read_group.id})
+        self.assertEqual(set(rule.write_users.values_list("id", flat=True)), {write_user.id})
+        self.assertEqual(set(rule.write_groups.values_list("id", flat=True)), {write_group.id})
+
+        clear_response = self.client.post(
+            reverse("main:docs_api_acl"),
+            data=json.dumps(
+                {
+                    "path": "restricted/secret.md",
+                    "read_user_ids": [],
+                    "read_group_ids": [],
+                    "write_user_ids": [],
+                    "write_group_ids": [],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertFalse(DocsAccessRule.objects.filter(path="restricted/secret.md").exists())

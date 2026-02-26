@@ -6,7 +6,9 @@
 <div class="docs-toolbar-wrap">
     <div class="docs-shell docs-toolbar">
         <div>
-            <h1 class="docs-title">문서 목록</h1>
+            <div class="docs-title-row">
+                <h1 class="docs-title">{{ docs_text.list_title }}</h1>
+            </div>
             <div class="docs-subtitle docs-path-breadcrumbs">
                 {% for crumb in breadcrumbs %}
                     {% if not forloop.first %}<span class="docs-path-sep">/</span>{% endif %}
@@ -18,13 +20,16 @@
                 {% endfor %}
             </div>
         </div>
-        {% if docs_can_edit %}
-            <a
-                class="docs-btn docs-btn-primary"
-                href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
-                id="docs-write-btn"
-            >작성</a>
-        {% endif %}
+        <div class="docs-toolbar-actions">
+            {% include "docs/_auth_button.html" %}
+            {% if docs_can_edit %}
+                <a
+                    class="docs-btn docs-btn-primary"
+                    href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
+                    id="docs-write-btn"
+                >{{ docs_text.write_button }}</a>
+            {% endif %}
+        </div>
     </div>
 </div>
 
@@ -36,17 +41,30 @@
     data-list-api-url="{{ docs_api_list_url }}"
     data-rename-api-url="{{ docs_api_rename_url }}"
     data-delete-api-url="{{ docs_api_delete_url }}"
+    data-mkdir-api-url="{{ docs_api_mkdir_url }}"
+    data-acl-api-url="{{ docs_api_acl_url }}"
+    data-acl-options-api-url="{{ docs_api_acl_options_url }}"
     data-write-url="{{ docs_write_url }}"
+    data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
-    <ul id="docs-list" class="docs-list" aria-label="문서 목록"></ul>
+    <ul id="docs-list" class="docs-list" aria-label="{{ docs_text.list_aria_label }}"></ul>
 </main>
 
 <div id="docs-context-menu" class="docs-context-menu" hidden>
-    <button type="button" data-action="open">열기</button>
-    {% if docs_can_edit %}
-        <button type="button" data-action="rename">이름 바꾸기</button>
-        <button type="button" data-action="edit">편집</button>
-        <button type="button" data-action="delete">삭제</button>
+    <button type="button" data-action="open">{{ docs_text.menu_open }}</button>
+    {% if docs_can_edit or docs_can_manage_acl %}
+        {% if docs_can_edit %}
+        <button type="button" data-action="new-folder">{{ docs_text.menu_new_folder }}</button>
+        <button type="button" data-action="new-doc">{{ docs_text.menu_new_document }}</button>
+        {% endif %}
+        {% if docs_can_manage_acl %}
+        <button type="button" data-action="permissions">{{ docs_text.menu_permissions }}</button>
+        {% endif %}
+        {% if docs_can_edit %}
+        <button type="button" data-action="rename">{{ docs_text.menu_rename }}</button>
+        <button type="button" data-action="edit">{{ docs_text.menu_edit }}</button>
+        <button type="button" data-action="delete">{{ docs_text.menu_delete }}</button>
+        {% endif %}
     {% endif %}
 </div>
 
@@ -54,20 +72,71 @@
     <div id="docs-rename-modal" class="docs-rename-modal" hidden>
         <div class="docs-rename-modal-backdrop" id="docs-rename-modal-backdrop"></div>
         <div class="docs-rename-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-rename-title">
-            <h3 id="docs-rename-title" class="docs-rename-title">이름 바꾸기</h3>
+            <h3 id="docs-rename-title" class="docs-rename-title">{{ docs_text.rename_title }}</h3>
             <div class="docs-rename-target" id="docs-rename-target"></div>
             <label class="docs-field docs-field-full">
-                <span>새 이름</span>
-                <input type="text" id="docs-rename-input" placeholder="새 이름">
+                <span>{{ docs_text.rename_new_name }}</span>
+                <input type="text" id="docs-rename-input" placeholder="{{ docs_text.rename_new_name_placeholder }}">
             </label>
             <div class="docs-rename-actions">
-                <button type="button" class="docs-btn" id="docs-rename-cancel-btn">취소</button>
-                <button type="button" class="docs-btn docs-btn-primary" id="docs-rename-confirm-btn">변경</button>
+                <button type="button" class="docs-btn" id="docs-rename-cancel-btn">{{ docs_text.cancel }}</button>
+                <button type="button" class="docs-btn docs-btn-primary" id="docs-rename-confirm-btn">{{ docs_text.apply }}</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="docs-folder-create-modal" class="docs-rename-modal" hidden>
+        <div class="docs-rename-modal-backdrop" id="docs-folder-create-modal-backdrop"></div>
+        <div class="docs-rename-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-folder-create-title">
+            <h3 id="docs-folder-create-title" class="docs-rename-title">{{ docs_text.folder_modal_title }}</h3>
+            <div class="docs-rename-target" id="docs-folder-create-target"></div>
+            <label class="docs-field docs-field-full">
+                <span>{{ docs_text.folder_name_label }}</span>
+                <input type="text" id="docs-folder-create-input" placeholder="{{ docs_text.folder_name_placeholder }}">
+            </label>
+            <div class="docs-rename-actions">
+                <button type="button" class="docs-btn" id="docs-folder-create-cancel-btn">{{ docs_text.cancel }}</button>
+                <button type="button" class="docs-btn docs-btn-primary" id="docs-folder-create-confirm-btn">{{ docs_text.create_button }}</button>
+            </div>
+        </div>
+    </div>
+
+{% endif %}
+
+{% if docs_can_manage_acl %}
+    <div id="docs-permission-modal" class="docs-rename-modal" hidden>
+        <div class="docs-rename-modal-backdrop" id="docs-permission-modal-backdrop"></div>
+        <div class="docs-rename-modal-dialog docs-permission-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-permission-title">
+            <h3 id="docs-permission-title" class="docs-rename-title">{{ docs_text.permission_title }}</h3>
+            <div class="docs-rename-target" id="docs-permission-target"></div>
+            <div class="docs-permission-grid">
+                <div class="docs-permission-col">
+                    <div class="docs-permission-col-title">{{ docs_text.permission_read_users }}</div>
+                    <div class="docs-permission-list" id="docs-permission-read-users-list"></div>
+                </div>
+                <div class="docs-permission-col">
+                    <div class="docs-permission-col-title">{{ docs_text.permission_read_groups }}</div>
+                    <div class="docs-permission-list" id="docs-permission-read-groups-list"></div>
+                </div>
+                <div class="docs-permission-col">
+                    <div class="docs-permission-col-title">{{ docs_text.permission_write_users }}</div>
+                    <div class="docs-permission-list" id="docs-permission-write-users-list"></div>
+                </div>
+                <div class="docs-permission-col">
+                    <div class="docs-permission-col-title">{{ docs_text.permission_write_groups }}</div>
+                    <div class="docs-permission-list" id="docs-permission-write-groups-list"></div>
+                </div>
+            </div>
+            <div class="docs-permission-help">{{ docs_text.permission_help }}</div>
+            <div class="docs-rename-actions">
+                <button type="button" class="docs-btn" id="docs-permission-cancel-btn">{{ docs_text.cancel }}</button>
+                <button type="button" class="docs-btn docs-btn-primary" id="docs-permission-save-btn">{{ docs_text.permission_save_button }}</button>
             </div>
         </div>
     </div>
 {% endif %}
 
+{{ docs_text|json_script:"docs-i18n" }}
 {{ initial_entries|json_script:"docs-initial-entries" }}
 {% include 'docs/_assets_script.html' %}
 {% endblock %}
