@@ -13,11 +13,9 @@
     <script>
         (function () {
             const path = window.location.pathname;
+            const explicitLightPaths = new Set(['/portfolio/', '/portfolio', '/docs/', '/docs']);
             const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|docs(?:\/.*)?)$/;
-            const shouldUseLightBg = path === '/portfolio/' ||
-                path === '/portfolio' ||
-                path === '/docs/' ||
-                path === '/docs' ||
+            const shouldUseLightBg = explicitLightPaths.has(path) ||
                 path.startsWith('/docs/') ||
                 path.startsWith('/project/') ||
                 localizedLightBgPattern.test(path);
@@ -58,9 +56,16 @@
     <!-- 네비게이션바 -->
     <nav class="navbar portfolio-nav">
         <div class="container-fluid">
-            <a class="navbar-brand portfolio-brand" href="{% url 'main:main_lang' ui_lang=ui_lang %}">
-                <span class="portfolio-brand-text">Hanbyel's Portfolio</span>
-            </a>
+            <div class="portfolio-brand-group">
+                <a class="navbar-brand portfolio-brand" href="{% url 'main:main_lang' ui_lang=ui_lang %}">
+                    <span class="portfolio-brand-text">Hanplanet</span>
+                </a>
+                <div class="portfolio-lang-toggle portfolio-lang-toggle-inline" aria-label="Language Toggle">
+                    <a class="portfolio-lang-link{% if ui_lang|default:'ko' == 'ko' %} is-active{% endif %}" href="{{ lang_switch_ko_url }}">KO</a>
+                    <span class="portfolio-lang-divider">|</span>
+                    <a class="portfolio-lang-link{% if ui_lang|default:'ko' == 'en' %} is-active{% endif %}" href="{{ lang_switch_en_url }}">EN</a>
+                </div>
+            </div>
             <button class="navbar-toggler portfolio-nav-toggler" type="button"
                     data-bs-toggle="collapse"
                     data-bs-target="#navbarSupportedContent"
@@ -71,20 +76,11 @@
             </button>
             <div class="collapse portfolio-nav-collapse" id="navbarSupportedContent">
                 <ul class="portfolio-nav-links">
-                    <li class="nav-item">
-                        <a class="nav-link portfolio-nav-link" href="https://github.com/Adihang">GitHub</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link portfolio-nav-link" href="https://www.thingiverse.com/hanbyel/designs">Thingiverse</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link portfolio-nav-link" href="{% url 'main:Stratagem_Hero_lang' ui_lang=ui_lang %}">Mini Game</a>
-                    </li>
-                    <li class="nav-item portfolio-lang-toggle" aria-label="Language Toggle">
-                        <a class="portfolio-lang-link{% if ui_lang|default:'ko' == 'ko' %} is-active{% endif %}" href="{{ lang_switch_ko_url }}">KO</a>
-                        <span class="portfolio-lang-divider">|</span>
-                        <a class="portfolio-lang-link{% if ui_lang|default:'ko' == 'en' %} is-active{% endif %}" href="{{ lang_switch_en_url }}">EN</a>
-                    </li>
+                    {% for nav_link in nav_links %}
+                        <li class="nav-item">
+                            <a class="nav-link portfolio-nav-link" href="{{ nav_link.url }}">{{ nav_link.name }}</a>
+                        </li>
+                    {% endfor %}
                 </ul>
             </div>
         </div>

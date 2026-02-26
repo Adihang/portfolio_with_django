@@ -1,16 +1,9 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const imageElements = document.querySelectorAll('.hover-dark');
-
-    imageElements.forEach(function (imageElement) {
-        imageElement.style.transition = 'filter 0.5s ease';
-        imageElement.addEventListener('mouseover', function () {
-            imageElement.style.filter = 'brightness(0.5)';
-        });
-
-        imageElement.addEventListener('mouseout', function () {
-            imageElement.style.filter = 'brightness(1)';
-        });
-    });
+    const SURFACE_COLOR = {
+        light: '#ffffff',
+        dark: '#0f1012',
+        transparent: 'transparent'
+    };
 
     const currentPath = window.location.pathname;
     const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?)$/;
@@ -32,6 +25,16 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     let currentSurfaceMode = null;
+
+    const setSurfaceBackground = function (element, color) {
+        if (!element) {
+            return;
+        }
+
+        element.style.background = color;
+        element.style.backgroundColor = color;
+        element.style.backgroundImage = 'none';
+    };
 
     const restoreStyleAttribute = function (element, styleText) {
         if (!element) {
@@ -57,18 +60,13 @@ document.addEventListener('DOMContentLoaded', function () {
         printSurfaceSnapshot.bubbleLayerStyle = bubbleLayer ? bubbleLayer.getAttribute('style') : null;
         printSurfaceSnapshot.bubbleCanvasStyle = bubbleCanvas ? bubbleCanvas.getAttribute('style') : null;
 
-        document.documentElement.style.background = '#ffffff';
-        document.documentElement.style.backgroundColor = '#ffffff';
-        document.documentElement.style.backgroundImage = 'none';
-        document.body.style.background = '#ffffff';
-        document.body.style.backgroundColor = '#ffffff';
-        document.body.style.backgroundImage = 'none';
+        setSurfaceBackground(document.documentElement, SURFACE_COLOR.light);
+        setSurfaceBackground(document.body, SURFACE_COLOR.light);
 
         if (bubbleLayer) {
             bubbleLayer.style.display = 'block';
             bubbleLayer.style.visibility = 'visible';
-            bubbleLayer.style.background = 'transparent';
-            bubbleLayer.style.backgroundColor = 'transparent';
+            setSurfaceBackground(bubbleLayer, SURFACE_COLOR.transparent);
         }
 
         if (bubbleCanvas) {
@@ -120,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!isLightBackgroundPage) {
             return;
         }
-        const surfaceColor = useDarkTheme ? '#0f1012' : '#ffffff';
+        const surfaceColor = useDarkTheme ? SURFACE_COLOR.dark : SURFACE_COLOR.light;
         currentSurfaceMode = useDarkTheme;
         if (useDarkTheme) {
             document.documentElement.classList.remove('preload-light-bg');
@@ -129,12 +127,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         setLightSurfaceStylesEnabled(!useDarkTheme);
         document.body.classList.toggle('bubble-exhausted-dark', useDarkTheme);
-        document.documentElement.style.background = surfaceColor;
-        document.documentElement.style.backgroundColor = surfaceColor;
-        document.documentElement.style.backgroundImage = 'none';
-        document.body.style.background = surfaceColor;
-        document.body.style.backgroundColor = surfaceColor;
-        document.body.style.backgroundImage = 'none';
+        setSurfaceBackground(document.documentElement, surfaceColor);
+        setSurfaceBackground(document.body, surfaceColor);
 
         if (portfolioMainLayer) {
             portfolioMainLayer.style.backgroundColor = 'transparent';
@@ -142,13 +136,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (bubbleLayer) {
             bubbleLayer.style.display = 'block';
-            bubbleLayer.style.background = surfaceColor;
-            bubbleLayer.style.backgroundColor = surfaceColor;
+            setSurfaceBackground(bubbleLayer, surfaceColor);
         }
 
         if (bubbleCanvas) {
-            bubbleCanvas.style.background = surfaceColor;
-            bubbleCanvas.style.backgroundColor = surfaceColor;
+            setSurfaceBackground(bubbleCanvas, surfaceColor);
         }
     };
 
@@ -291,9 +283,13 @@ document.addEventListener('DOMContentLoaded', function () {
         let lastFrameTime = 0;
         let bubblesExhausted = false;
         let hasInitializedBubbles = false;
-        const wallPopSpeedThreshold = prefersReducedMotion ? 12.31 : 10.65;
-        const bubblePopImpactThreshold = prefersReducedMotion ? 11.31 : 9.65;
-        const fixedBubbleCount = 7;
+        const bubblePhysicsConfig = {
+            wallPopSpeedThreshold: prefersReducedMotion ? 12.31 : 10.65,
+            bubblePopImpactThreshold: prefersReducedMotion ? 11.31 : 9.65,
+            fixedBubbleCount: 7,
+            pointerReactionPadding: 180,
+            pointerKeepOutPadding: 32
+        };
 
         const randomBetween = function (min, max) {
             return Math.random() * (max - min) + min;
@@ -368,11 +364,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (!hasInitializedBubbles) {
-                while (bubbles.length < fixedBubbleCount) {
+                while (bubbles.length < bubblePhysicsConfig.fixedBubbleCount) {
                     bubbles.push(createBubble());
                 }
 
-                bubbles.length = fixedBubbleCount;
+                bubbles.length = bubblePhysicsConfig.fixedBubbleCount;
                 hasInitializedBubbles = true;
             } else if (previousViewportMinDimension > 0 && nextViewportMinDimension > 0) {
                 const resizeScale = nextViewportMinDimension / previousViewportMinDimension;
@@ -609,7 +605,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const dx = bubble.x - pointer.x;
                     const dy = bubble.y - pointer.y;
                     const distanceSquared = (dx * dx) + (dy * dy);
-                    const reactionRadius = bubble.radius + 180;
+                    const reactionRadius = bubble.radius + bubblePhysicsConfig.pointerReactionPadding;
                     const reactionRadiusSquared = reactionRadius * reactionRadius;
 
                     if (distanceSquared < reactionRadiusSquared) {
@@ -630,7 +626,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const dxAfterMove = bubble.x - pointer.x;
                     const dyAfterMove = bubble.y - pointer.y;
                     const distanceAfterMove = Math.max(Math.sqrt((dxAfterMove * dxAfterMove) + (dyAfterMove * dyAfterMove)), 0.0001);
-                    const keepOutRadius = bubble.radius + 32;
+                    const keepOutRadius = bubble.radius + bubblePhysicsConfig.pointerKeepOutPadding;
 
                     if (distanceAfterMove < keepOutRadius) {
                         const nx = dxAfterMove / distanceAfterMove;
@@ -690,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const normalVelocity = (relativeVelocityX * nx) + (relativeVelocityY * ny);
                     const impactSpeed = -normalVelocity;
 
-                    if (impactSpeed > bubblePopImpactThreshold) {
+                    if (impactSpeed > bubblePhysicsConfig.bubblePopImpactThreshold) {
                         poppedBubbles.add(bubbleA);
                         poppedBubbles.add(bubbleB);
                         continue;
@@ -722,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     bubble.x = minX;
                     bubble.vx = Math.abs(bubble.vx) * 0.92;
 
-                    if (impactSpeed > wallPopSpeedThreshold) {
+                    if (impactSpeed > bubblePhysicsConfig.wallPopSpeedThreshold) {
                         poppedBubbles.add(bubble);
                         return;
                     }
@@ -731,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     bubble.x = maxX;
                     bubble.vx = -Math.abs(bubble.vx) * 0.92;
 
-                    if (impactSpeed > wallPopSpeedThreshold) {
+                    if (impactSpeed > bubblePhysicsConfig.wallPopSpeedThreshold) {
                         poppedBubbles.add(bubble);
                         return;
                     }
@@ -742,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     bubble.y = minY;
                     bubble.vy = Math.abs(bubble.vy) * 0.92;
 
-                    if (impactSpeed > wallPopSpeedThreshold) {
+                    if (impactSpeed > bubblePhysicsConfig.wallPopSpeedThreshold) {
                         poppedBubbles.add(bubble);
                         return;
                     }
@@ -751,7 +747,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     bubble.y = maxY;
                     bubble.vy = -Math.abs(bubble.vy) * 0.92;
 
-                    if (impactSpeed > wallPopSpeedThreshold) {
+                    if (impactSpeed > bubblePhysicsConfig.wallPopSpeedThreshold) {
                         poppedBubbles.add(bubble);
                         return;
                     }

@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
+    const CHAT_HISTORY_LIMIT = 30;
+    const CHAT_REQUEST_HISTORY_LIMIT = 20;
+    const LOADING_DOT_ANIMATION_INTERVAL_MS = 300;
+    const DEFAULT_WIDGET_BOTTOM_PX = 20;
     const htmlLang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
     const uiLang = htmlLang.startsWith('en') ? 'en' : 'ko';
     const pathLangMatch = (window.location.pathname || '').match(/^\/(ko|en)(\/|$)/);
@@ -66,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const footerClearance = 0;
     const printButtonGap = -44;
     const printButtonLeftOffset = 5;
-    const computedBottom = parseFloat(window.getComputedStyle(chatWidget).bottom || '20');
-    const widgetBaseBottom = Number.isNaN(computedBottom) ? 20 : computedBottom;
+    const computedBottom = parseFloat(window.getComputedStyle(chatWidget).bottom || String(DEFAULT_WIDGET_BOTTOM_PX));
+    const widgetBaseBottom = Number.isNaN(computedBottom) ? DEFAULT_WIDGET_BOTTOM_PX : computedBottom;
     const widgetMotionFollowDurationMs = 420;
     let footerOffsetRafId = null;
     let printButtonAnchorRafId = null;
@@ -178,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     typeof item.content === 'string' &&
                     item.content.trim().length > 0
                 )
-                .slice(-30);
+                .slice(-CHAT_HISTORY_LIMIT);
         } catch (error) {
             console.warn('Failed to load chat history:', error);
             return [];
@@ -187,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function saveConversationHistory() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationHistory.slice(-30)));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationHistory.slice(-CHAT_HISTORY_LIMIT)));
         } catch (error) {
             console.warn('Failed to save chat history:', error);
         }
@@ -284,16 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
             link.href = match[0];
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
-            link.style.color = '#007bff';
-            link.style.textDecoration = 'underline';
-            link.style.transition = 'opacity 0.2s';
+            link.className = 'chat-message-link';
             link.textContent = match[0];
-            link.addEventListener('mouseover', () => {
-                link.style.opacity = '0.8';
-            });
-            link.addEventListener('mouseout', () => {
-                link.style.opacity = '1';
-            });
             container.appendChild(link);
 
             lastIndex = endIndex;
@@ -337,8 +333,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 conversationHistory.push({ role: 'assistant', content: text });
             }
             // Keep only recent history for request payload size.
-            if (conversationHistory.length > 30) {
-                conversationHistory.splice(0, conversationHistory.length - 30);
+            if (conversationHistory.length > CHAT_HISTORY_LIMIT) {
+                conversationHistory.splice(0, conversationHistory.length - CHAT_HISTORY_LIMIT);
             }
             saveConversationHistory();
         }
@@ -374,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 dotCount = (dotCount % 3) + 1;
                 loadingContent.textContent = '.'.repeat(dotCount);
-            }, 300);
+            }, LOADING_DOT_ANIMATION_INTERVAL_MS);
         };
 
         const stopLoadingAnimation = function () {
@@ -409,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     message: userMessage,
-                    history: conversationHistory.slice(-20)
+                    history: conversationHistory.slice(-CHAT_REQUEST_HISTORY_LIMIT)
                 })
             });
             
@@ -462,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 이벤트 리스너 등록
     sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keypress', function(e) {
+    userInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             sendMessage();
         }
