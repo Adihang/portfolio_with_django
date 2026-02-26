@@ -13,9 +13,12 @@
     <script>
         (function () {
             const path = window.location.pathname;
-            const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?)$/;
+            const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|docs(?:\/.*)?)$/;
             const shouldUseLightBg = path === '/portfolio/' ||
                 path === '/portfolio' ||
+                path === '/docs/' ||
+                path === '/docs' ||
+                path.startsWith('/docs/') ||
                 path.startsWith('/project/') ||
                 localizedLightBgPattern.test(path);
 
