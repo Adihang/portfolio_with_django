@@ -44,6 +44,7 @@ chmod 600 config/secrets.json
 현재 운영 기준:
 - Gunicorn: `127.0.0.1:8000`
 - Cloudflare Tunnel: `hanplanet.com`, `www.hanplanet.com` -> `http://localhost:8000`
+- (권장) SSH 전용 호스트 분리: `ssh.hanplanet.com` -> `ssh://localhost:22` (호스트 cloudflared) 또는 `ssh://host.docker.internal:22` (Docker cloudflared)
 - Ollama: `http://127.0.0.1:11434`
 - Static/Media: `DEBUG=False`에서도 `DJANGO_SERVE_FILES=true`면 Django에서 직접 서빙
 
@@ -96,12 +97,19 @@ cp docker/cloudflared/config.yml.example docker/cloudflared/config.yml
 # cloudflared credentials 파일 복사 (파일명은 config.yml의 tunnel id와 일치)
 cp ~/.cloudflared/<TUNNEL_ID>.json docker/cloudflared/<TUNNEL_ID>.json
 
+# (SSH 추가 시) DNS 라우트 생성
+cloudflared tunnel route dns <TUNNEL_NAME> ssh.hanplanet.com
+
 # db 파일이 없다면 생성
 touch db.sqlite3
 
 docker compose up -d --build
 docker compose ps
 ```
+
+보안 권장(SSH 사용 시):
+- `ssh.hanplanet.com`은 Cloudflare Access로 제한하고 MFA를 필수로 설정
+- 서버 22 포트는 인터넷에 직접 노출하지 않고 Cloudflare 경유만 허용
 
 검증:
 

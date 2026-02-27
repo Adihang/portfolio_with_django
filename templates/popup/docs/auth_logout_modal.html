@@ -1,0 +1,3 @@
+{% if user.is_authenticated %}
+{% include "popup/docs/_confirm_modal.html" with modal_id="docs-auth-logout-modal" backdrop_id="docs-auth-logout-modal-backdrop" title_id="docs-auth-logout-title" message_id="docs-auth-logout-message" cancel_button_id="docs-auth-logout-cancel-btn" confirm_button_id="docs-auth-logout-confirm-btn" title_text=docs_text.auth_logout_button message_text=docs_text.auth_logout_confirm cancel_text=docs_text.cancel confirm_text=docs_text.auth_logout_button %}
+{% endif %}

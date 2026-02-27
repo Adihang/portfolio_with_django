@@ -17,7 +17,7 @@
 </div>
 
 <main class="docs-shell docs-content">
-    <form method="post" class="docs-login-form">
+    <form method="post" class="docs-login-form" id="docs-login-form">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ docs_login_next }}">
 
@@ -49,8 +49,34 @@
 
         <div class="docs-login-actions">
             <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
-            <button class="docs-btn docs-btn-primary" type="submit">{{ docs_text.auth_login_submit }}</button>
+            <button class="docs-btn docs-btn-primary" type="submit" id="docs-login-submit-btn">{{ docs_text.auth_login_submit }}</button>
         </div>
     </form>
 </main>
+
+<script>
+    (function () {
+        const loginForm = document.getElementById("docs-login-form");
+        const submitButton = document.getElementById("docs-login-submit-btn");
+        if (!loginForm || !submitButton) {
+            return;
+        }
+
+        const handleEnterSubmit = function (event) {
+            if (event.key !== "Enter" || event.isComposing) {
+                return;
+            }
+            event.preventDefault();
+            if (typeof loginForm.requestSubmit === "function") {
+                loginForm.requestSubmit(submitButton);
+                return;
+            }
+            submitButton.click();
+        };
+
+        loginForm.querySelectorAll('input[name="username"], input[name="password"]').forEach(function (input) {
+            input.addEventListener("keydown", handleEnterSubmit);
+        });
+    })();
+</script>
 {% endblock %}

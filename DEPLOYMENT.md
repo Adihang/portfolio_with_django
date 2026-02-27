@@ -8,6 +8,7 @@
 - Gunicorn 바인드: `127.0.0.1:8000`
 - Ollama API: `http://127.0.0.1:11434`
 - Cloudflare Tunnel ingress: `hanplanet.com`, `www.hanplanet.com` -> `http://localhost:8000`
+- SSH ingress(권장 분리): `ssh.hanplanet.com` -> `ssh://localhost:22` (Docker cloudflared는 `ssh://host.docker.internal:22`)
 - 정적/미디어: `DEBUG=False`에서도 `DJANGO_SERVE_FILES=True`일 때 Django가 직접 서빙
 
 ## 1. 필수 준비
@@ -157,16 +158,64 @@ ingress:
     service: http://localhost:8000
   - hostname: hanplanet.com
     service: http://localhost:8000
+  - hostname: ssh.hanplanet.com
+    service: ssh://localhost:22
   - service: http_status:404
 ```
 
 실행:
 
 ```bash
+cloudflared tunnel ingress validate
+cloudflared tunnel route dns <TUNNEL_NAME> ssh.hanplanet.com
 cloudflared tunnel run <TUNNEL_NAME>
 ```
 
 자동실행 사용 시 LaunchAgent/systemd에 동일 명령을 등록합니다.
+
+### 5-1. 보안 필수 설정 (SSH)
+
+1. Cloudflare Access에서 `ssh.hanplanet.com` 애플리케이션 생성
+2. 허용 대상을 최소화(본인 계정/그룹만)하고 MFA를 필수로 설정
+3. 서버 방화벽/보안그룹에서 22 포트를 인터넷에 직접 노출하지 않음
+4. SSH 서버는 키 기반 인증만 허용
+
+`/etc/ssh/sshd_config` 권장:
+
+```text
+PasswordAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin no
+```
+
+변경 후:
+
+```bash
+sudo sshd -t
+sudo systemctl restart sshd  # Linux
+```
+
+### 5-2. 클라이언트 SSH 설정
+
+`~/.ssh/config`:
+
+```sshconfig
+Host ssh.hanplanet.com
+  User <SSH_USER>
+  ProxyCommand /opt/homebrew/bin/cloudflared access ssh --hostname %h
+```
+
+접속:
+
+```bash
+ssh <SSH_USER>@ssh.hanplanet.com
+```
+
+### 5-3. 충돌 방지 원칙
+
+- 웹과 SSH는 반드시 서로 다른 hostname 사용 (`hanplanet.com` 계열과 `ssh.hanplanet.com` 분리)
+- `cloudflared` 프로세스를 중복 실행하지 않고 하나의 터널 ingress만 확장
+- ingress는 위에서 아래 순서대로 평가되므로 마지막 `http_status:404` 규칙 유지
 
 ## 6. 정적/미디어 서빙 정책
 
@@ -260,6 +309,16 @@ touch db.sqlite3
 
 ```bash
 cp ~/.cloudflared/<TUNNEL_ID>.json docker/cloudflared/<TUNNEL_ID>.json
+
+# SSH도 열 경우 DNS 라우트 추가
+cloudflared tunnel route dns <TUNNEL_NAME> ssh.hanplanet.com
+```
+
+`docker/cloudflared/config.yml`에서 SSH ingress는 아래 값을 사용합니다.
+
+```yaml
+- hostname: ssh.hanplanet.com
+  service: ssh://host.docker.internal:22
 ```
 
 ### 10-2. 실행

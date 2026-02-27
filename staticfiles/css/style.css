@@ -42,6 +42,21 @@ body.project-page {
     background-image: none;
 }
 
+body.bubble-page {
+    background: #bfbfbf;
+    background-image: none;
+    color: #101010;
+    overflow: hidden;
+    transition: background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body.bubble-page .bubble-bg-layer,
+body.bubble-page #interactiveBubbleCanvas,
+body.bubble-page .bubble-bg-canvas {
+    display: block;
+    transition: background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 body.portfolio-page ::-webkit-scrollbar,
 body.project-page ::-webkit-scrollbar {
     background: transparent;
@@ -93,7 +108,54 @@ body.portfolio-page .foot {
         box-shadow 0.62s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-body.portfolio-page.bubble-exhausted-dark {
+body.theme-dark {
+    --site-bg: #14161a;
+    --site-text: #f1f1f1;
+    --site-text-strong: #f3f4f6;
+    --site-text-stronger: #f8f9fb;
+    --site-text-muted: #d7d7d7;
+    --site-text-subtle: #c4cad3;
+    --site-text-faint: #a8afba;
+    --site-text-secondary: #bec4cf;
+    --site-border-soft: rgba(255, 255, 255, 0.12);
+    --site-border: rgba(255, 255, 255, 0.16);
+    --site-border-mid: rgba(255, 255, 255, 0.22);
+    --site-border-strong: rgba(255, 255, 255, 0.26);
+    --site-border-heavy: rgba(255, 255, 255, 0.3);
+    --site-border-context: rgba(255, 255, 255, 0.34);
+    --site-hover-soft: rgba(255, 255, 255, 0.07);
+    --site-hover: rgba(255, 255, 255, 0.12);
+    --site-hover-strong: rgba(255, 255, 255, 0.18);
+    --site-hover-button: rgba(255, 255, 255, 0.12);
+    --site-surface-toolbar: rgba(20, 20, 24, 0.9);
+    --site-surface-muted: rgba(26, 27, 33, 0.92);
+    --site-surface-muted-strong: rgba(31, 33, 39, 0.94);
+    --site-backdrop: rgba(0, 0, 0, 0.58);
+    --site-backdrop-strong: rgba(0, 0, 0, 0.68);
+    --site-shadow-md: 0 16px 34px rgba(0, 0, 0, 0.48);
+    --site-shadow-lg: 0 16px 34px rgba(0, 0, 0, 0.54);
+    --site-shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.58);
+    --site-link: #c6ccd6;
+    --site-btn-hover-border: rgba(255, 255, 255, 0.34);
+    --site-btn-primary-bg: rgba(95, 95, 104, 0.9);
+    --site-btn-primary-border: transparent;
+    --site-btn-primary-text: #f7f8fb;
+    --site-btn-primary-hover-bg: rgba(124, 124, 134, 0.95);
+    --site-btn-primary-hover-border: transparent;
+    --site-btn-primary-hover-text: #ffffff;
+    --site-selected-bg: rgba(255, 255, 255, 0.16);
+    --site-divider-weak: rgba(255, 255, 255, 0.14);
+    --site-panel-border: rgba(255, 255, 255, 0.22);
+    --site-elevated-bg: rgba(31, 33, 39, 0.96);
+    --site-crumb-color: #e1e6ef;
+    --site-crumb-current-color: #f7f9fd;
+    --site-crumb-sep-color: #aeb5c0;
+    --site-save-row-color: #e6ebf3;
+    --site-save-row-hover: rgba(255, 255, 255, 0.1);
+    --site-save-folder-color: #eceff4;
+    --site-close-color: #c7ced8;
+    --site-overlay-soft: rgba(0, 0, 0, 0.52);
+    --site-overlay-shadow: 0 14px 34px rgba(0, 0, 0, 0.58);
     --theme-ink: #f1f1f1;
     --theme-subtle: #d7d7d7;
     --theme-accent: #ffffff;
@@ -101,88 +163,106 @@ body.portfolio-page.bubble-exhausted-dark {
     --theme-border: rgba(255, 255, 255, 0.24);
     --theme-surface: rgba(20, 20, 24, 0.9);
     --theme-glow: rgba(255, 255, 255, 0.16);
+    --btn-template-base-bg: transparent;
+    --btn-template-base-border: var(--site-border-strong);
+    --btn-template-base-color: #e8ebf1;
+    --btn-template-base-hover-bg: rgba(255, 255, 255, 0.16);
+    --btn-template-base-hover-border: rgba(255, 255, 255, 0.32);
+    --btn-template-base-hover-color: #ffffff;
+    --btn-template-primary-bg: var(--print-button-dark-bg);
+    --btn-template-primary-border: transparent;
+    --btn-template-primary-color: #f3f3f5;
+    --btn-template-primary-hover-bg: rgb(84, 84, 92);
+    --btn-template-primary-hover-border: transparent;
+    --btn-template-primary-hover-color: #f3f3f5;
+    --btn-template-radius: 8px;
+    --btn-template-hover-lift: -1px;
+    --btn-template-transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+body.portfolio-page.theme-dark {
     color: #e8e8e8;
-    background: #0f1012;
+    background: var(--site-bg);
     background-image: none;
 }
 
-html.preload-light-bg body.portfolio-page.bubble-exhausted-dark {
-    background: #0f1012;
+html.preload-light-bg body.portfolio-page.theme-dark {
+    background: var(--site-bg);
     background-image: none;
 }
 
-body.portfolio-page.bubble-exhausted-dark .bubble-bg-layer {
-    background: #0f1012;
+body.portfolio-page.theme-dark .bubble-bg-layer {
+    background: var(--site-bg);
 }
 
-body.portfolio-page.bubble-exhausted-dark #interactiveBubbleCanvas {
-    background: #0f1012;
+body.portfolio-page.theme-dark #interactiveBubbleCanvas {
+    background: var(--site-bg);
 }
 
-body.portfolio-page.bubble-exhausted-dark section {
+body.portfolio-page.theme-dark section {
     border-color: rgba(255, 255, 255, 0.28);
 }
 
-body.portfolio-page.bubble-exhausted-dark hr {
+body.portfolio-page.theme-dark hr {
     border-color: rgba(255, 255, 255, 0.28);
     opacity: 1;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav-link:hover,
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav-link:focus-visible {
+body.theme-dark .portfolio-nav-link:hover,
+body.theme-dark .portfolio-nav-link:focus-visible {
     background-color: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.3);
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav-toggler {
+body.theme-dark .portfolio-nav-toggler {
     background: rgba(24, 24, 28, 0.94);
     border-color: rgba(255, 255, 255, 0.24);
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav-toggler:hover {
+body.theme-dark .portfolio-nav-toggler:hover {
     box-shadow: 0 0 0 0.18rem rgba(255, 255, 255, 0.2);
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav .navbar-toggler-icon {
+body.theme-dark .portfolio-nav .navbar-toggler-icon {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23f2f2f2' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
+body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
     background: rgba(22, 22, 26, 0.96);
     border: 1px solid rgba(255, 255, 255, 0.22);
     outline: none;
     box-shadow: none;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav {
+body.theme-dark .portfolio-nav {
     background: rgba(20, 20, 24, 0.8);
     background-image: none;
     box-shadow: 0 8px 18px rgba(255, 255, 255, 0.16);
 }
 
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h1,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h2,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h3,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h4,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg h5,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg p,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg li,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg span,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg div,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg b,
-body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg strong {
+body.portfolio-page.theme-dark .main-has-bubble-bg,
+body.portfolio-page.theme-dark .main-has-bubble-bg h1,
+body.portfolio-page.theme-dark .main-has-bubble-bg h2,
+body.portfolio-page.theme-dark .main-has-bubble-bg h3,
+body.portfolio-page.theme-dark .main-has-bubble-bg h4,
+body.portfolio-page.theme-dark .main-has-bubble-bg h5,
+body.portfolio-page.theme-dark .main-has-bubble-bg p,
+body.portfolio-page.theme-dark .main-has-bubble-bg li,
+body.portfolio-page.theme-dark .main-has-bubble-bg span,
+body.portfolio-page.theme-dark .main-has-bubble-bg div,
+body.portfolio-page.theme-dark .main-has-bubble-bg b,
+body.portfolio-page.theme-dark .main-has-bubble-bg strong {
     color: #ececef;
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_card {
+body.portfolio-page.theme-dark .project_card {
     background-color: rgba(32, 32, 38, 0.92);
     border: none;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
     border-radius: 14px;
 }
 
-body.portfolio-page.bubble-exhausted-dark .career_card {
+body.portfolio-page.theme-dark .career_card {
     background: transparent;
     border: none;
     box-shadow: none;
@@ -191,54 +271,54 @@ body.portfolio-page.bubble-exhausted-dark .career_card {
     margin-bottom: 0;
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_card_text hr,
-body.portfolio-page.bubble-exhausted-dark .career_cards hr {
+body.portfolio-page.theme-dark .project_card_text hr,
+body.portfolio-page.theme-dark .career_cards hr {
     border-color: rgba(255, 255, 255, 0.22);
     opacity: 1;
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_card_img,
-body.portfolio-page.bubble-exhausted-dark .hobby_card_img {
+body.portfolio-page.theme-dark .project_card_img,
+body.portfolio-page.theme-dark .hobby_card_img {
     background-color: rgba(22, 22, 26, 0.92);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42);
 }
 
-body.portfolio-page.bubble-exhausted-dark .tag {
+body.portfolio-page.theme-dark .tag {
     background-color: rgb(95, 95, 104);
     color: #f3f3f5;
     box-shadow: none;
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_card *,
-body.portfolio-page.bubble-exhausted-dark .career_card *,
-body.portfolio-page.bubble-exhausted-dark .hobby_card *,
-body.portfolio-page.bubble-exhausted-dark .main_title,
-body.portfolio-page.bubble-exhausted-dark .contact,
-body.portfolio-page.bubble-exhausted-dark .career_card_date,
-body.portfolio-page.bubble-exhausted-dark .hobbys_subtitle,
-body.portfolio-page.bubble-exhausted-dark .foot {
+body.portfolio-page.theme-dark .project_card *,
+body.portfolio-page.theme-dark .career_card *,
+body.portfolio-page.theme-dark .hobby_card *,
+body.portfolio-page.theme-dark .main_title,
+body.portfolio-page.theme-dark .contact,
+body.portfolio-page.theme-dark .career_card_date,
+body.portfolio-page.theme-dark .hobbys_subtitle,
+body.portfolio-page.theme-dark .foot {
     color: #e7e7ea;
 }
 
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_position {
+body.portfolio-page.theme-dark .career_card .career_card_position {
     color: #f1f2f6;
 }
 
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_work,
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_work *,
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_work strong {
+body.portfolio-page.theme-dark .career_card .career_card_work,
+body.portfolio-page.theme-dark .career_card .career_card_work *,
+body.portfolio-page.theme-dark .career_card .career_card_work strong {
     color: #b9bec8;
 }
 
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_date {
+body.portfolio-page.theme-dark .career_card .career_card_date {
     color: #c4c9d2;
 }
 
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_date > div:first-child {
+body.portfolio-page.theme-dark .career_card .career_card_date > div:first-child {
     color: #d8dce4;
 }
 
-body.portfolio-page.bubble-exhausted-dark .career_card .career_card_date > div:last-child {
+body.portfolio-page.theme-dark .career_card .career_card_date > div:last-child {
     color: #aeb4bf;
 }
 
@@ -281,7 +361,7 @@ body.portfolio-page .bubble-bg-layer {
     opacity: 0.78;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-watermark-layer {
+body.portfolio-page.theme-dark .portfolio-watermark-layer {
     color: rgba(255, 255, 255, 0.16);
 }
 
@@ -308,6 +388,53 @@ body.portfolio-page section {
 }
 
 :root {
+    --site-bg: #ffffff;
+    --site-text: #111111;
+    --site-text-strong: #141414;
+    --site-text-stronger: #151515;
+    --site-text-muted: #5a5a5a;
+    --site-text-subtle: #666666;
+    --site-text-faint: #888888;
+    --site-text-secondary: #606060;
+    --site-border-soft: rgba(0, 0, 0, 0.08);
+    --site-border: rgba(0, 0, 0, 0.12);
+    --site-border-mid: rgba(0, 0, 0, 0.14);
+    --site-border-strong: rgba(0, 0, 0, 0.18);
+    --site-border-heavy: rgba(0, 0, 0, 0.2);
+    --site-border-context: rgba(0, 0, 0, 0.22);
+    --site-hover-soft: rgba(0, 0, 0, 0.04);
+    --site-hover: rgba(0, 0, 0, 0.08);
+    --site-hover-strong: rgba(0, 0, 0, 0.12);
+    --site-hover-button: rgba(0, 0, 0, 0.06);
+    --site-surface-toolbar: rgba(255, 255, 255, 0.88);
+    --site-surface-muted: rgba(248, 248, 248, 0.92);
+    --site-surface-muted-strong: rgba(246, 246, 246, 0.92);
+    --site-backdrop: rgba(0, 0, 0, 0.34);
+    --site-backdrop-strong: rgba(0, 0, 0, 0.4);
+    --site-shadow-md: 0 16px 34px rgba(0, 0, 0, 0.2);
+    --site-shadow-lg: 0 16px 34px rgba(0, 0, 0, 0.24);
+    --site-shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.24);
+    --site-link: #4f4f4f;
+    --site-btn-hover-border: rgba(0, 0, 0, 0.3);
+    --site-btn-primary-bg: #161616;
+    --site-btn-primary-border: #161616;
+    --site-btn-primary-text: #ffffff;
+    --site-btn-primary-hover-bg: #2b2b2b;
+    --site-btn-primary-hover-border: #2b2b2b;
+    --site-btn-primary-hover-text: #ffffff;
+    --site-selected-bg: rgba(0, 0, 0, 0.1);
+    --site-divider-weak: rgba(0, 0, 0, 0.1);
+    --site-panel-border: rgba(0, 0, 0, 0.16);
+    --site-elevated-bg: rgba(248, 248, 248, 0.96);
+    --site-crumb-color: #2a2a2a;
+    --site-crumb-current-color: #101010;
+    --site-crumb-sep-color: #777777;
+    --site-save-row-color: #1d1d1d;
+    --site-save-row-hover: rgba(0, 0, 0, 0.07);
+    --site-save-folder-color: #181818;
+    --site-close-color: #555555;
+    --site-overlay-soft: rgba(0, 0, 0, 0.28);
+    --site-overlay-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
     --theme-ink: #111111;
     --theme-subtle: #2f2f2f;
     --theme-accent: #000000;
@@ -335,6 +462,21 @@ body.portfolio-page section {
     --motion-card: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     --print-button-bg: rgb(65, 141, 65);
     --print-button-dark-bg: rgb(95, 95, 104);
+    --btn-template-base-bg: transparent;
+    --btn-template-base-border: var(--site-border-strong);
+    --btn-template-base-color: var(--theme-subtle);
+    --btn-template-base-hover-bg: rgba(0, 0, 0, 0.06);
+    --btn-template-base-hover-border: rgba(0, 0, 0, 0.24);
+    --btn-template-base-hover-color: var(--theme-accent-strong);
+    --btn-template-primary-bg: var(--print-button-bg);
+    --btn-template-primary-border: transparent;
+    --btn-template-primary-color: #ffffff;
+    --btn-template-primary-hover-bg: rgb(57, 124, 57);
+    --btn-template-primary-hover-border: transparent;
+    --btn-template-primary-hover-color: #ffffff;
+    --btn-template-radius: 8px;
+    --btn-template-hover-lift: -1px;
+    --btn-template-transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     --project-image-size: clamp(200px, 30vw, 300px);
     --project-card-padding: clamp(7px, 1.2vw, 10px);
     --project-card-gap: clamp(7px, 1vw, 10px);
@@ -384,7 +526,7 @@ body.portfolio-page section {
     animation: nav-underline-flow-right 4.2s linear infinite;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
+body.theme-dark .portfolio-nav::after {
     background-image: repeating-linear-gradient(
         90deg,
         #111111 0px,
@@ -417,7 +559,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 .portfolio-brand-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0;
     margin-right: 0;
     min-width: 0;
 }
@@ -436,7 +578,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 }
 
 .portfolio-brand-text {
-    font-size: 20px;
+    font-size: 24px;
     display: inline-block;
     transition: transform 0.2s ease;
 }
@@ -459,9 +601,17 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     flex-grow: 1;
     flex-basis: auto;
     align-items: center;
+    justify-content: flex-end;
+    gap: 0;
     min-width: 0;
     margin-left: 0;
     padding-left: 0;
+}
+
+.portfolio-nav #navbarSupportedContent {
+    margin-left: 0;
+    padding-left: 0;
+    padding-inline-start: 0;
 }
 
 .portfolio-nav-links {
@@ -471,7 +621,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     margin: 0 0 0 auto;
     padding: 0;
     list-style: none;
-    gap: 8px;
+    gap: 0;
     flex-wrap: nowrap;
     border: none;
     outline: none;
@@ -540,19 +690,47 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     transform: translateY(-1px);
 }
 
+.portfolio-control-toggle,
 .portfolio-lang-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 0 6px;
+    padding: 0;
 }
 
+.portfolio-controls-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+.portfolio-nav .portfolio-controls-stack {
+    flex: 0 0 auto;
+    margin-left: 0;
+    align-items: flex-end;
+}
+
+.portfolio-controls-stack .portfolio-control-toggle {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2.8ch 1ch 2.8ch;
+    align-items: center;
+    justify-content: center;
+    column-gap: 4px;
+}
+
+.portfolio-theme-toggle {
+    padding-top: 0;
+}
+
+.portfolio-control-link,
 .portfolio-lang-link {
     display: inline-block;
     text-decoration: none;
     color: var(--theme-subtle);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.12em;
     line-height: 1;
@@ -560,14 +738,35 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     border-bottom: 1.5px solid transparent;
     opacity: 0.8;
     transition: color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
+    cursor: pointer;
 }
 
+.portfolio-control-toggle .portfolio-control-link {
+    width: 2.8ch;
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.portfolio-control-toggle .portfolio-control-link:first-of-type {
+    justify-self: end;
+    text-align: right;
+}
+
+.portfolio-control-toggle .portfolio-control-link:last-of-type {
+    justify-self: start;
+    text-align: left;
+}
+
+.portfolio-control-link:hover,
+.portfolio-control-link:focus-visible,
 .portfolio-lang-link:hover,
 .portfolio-lang-link:focus-visible {
     color: var(--theme-accent-strong);
     opacity: 1;
 }
 
+.portfolio-control-link.is-active,
 .portfolio-lang-link.is-active {
     color: var(--theme-ink);
     border-bottom-color: currentColor;
@@ -577,8 +776,14 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 .portfolio-lang-divider {
     color: var(--theme-subtle);
     opacity: 0.6;
-    font-size: 11px;
+    font-size: 14px;
     line-height: 1;
+}
+
+.portfolio-control-toggle .portfolio-lang-divider {
+    display: inline-flex;
+    width: 1ch;
+    justify-content: center;
 }
 
 .portfolio-nav-toggler {
@@ -604,7 +809,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 }
 
 .portfolio-nav.nav-auto-collapsed {
-    padding: 8px 12px;
+    padding: 9.6px 18px;
     flex-wrap: wrap;
 }
 
@@ -661,7 +866,7 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
     .portfolio-nav .portfolio-nav-collapse.show,
     .portfolio-nav .portfolio-nav-collapse.collapsing,
     .portfolio-nav.nav-auto-collapsed .portfolio-nav-links,
-    body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
+    body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
         forced-color-adjust: none;
         border: none;
         outline: none;
@@ -671,6 +876,15 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
     flex-direction: column;
+}
+
+.portfolio-nav.nav-auto-collapsed .portfolio-controls-stack {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.16);
+    align-items: flex-end;
 }
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-link {
@@ -692,13 +906,18 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-nav::after {
 
 .portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item + .nav-item {
     border-top: 1px solid rgba(0, 0, 0, 0.16);
-    margin-top: 4px;
-    padding-top: 4px;
+    margin-top: 0;
+    padding-top: 0;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item + .nav-item {
+body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item + .nav-item {
     border-top-color: rgba(255, 255, 255, 0.2);
 }
+
+body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-controls-stack {
+    border-top-color: rgba(255, 255, 255, 0.2);
+}
+
 .ogimage{
     padding-right: 30;
 }
@@ -984,11 +1203,11 @@ body.project-page .project_detail_page {
     background-clip: padding-box;
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_cards {
+body.portfolio-page.theme-dark .project_cards {
     scrollbar-color: rgba(198, 198, 205, 0.58) transparent;
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_cards::-webkit-scrollbar-thumb {
+body.portfolio-page.theme-dark .project_cards::-webkit-scrollbar-thumb {
     background: rgba(198, 198, 205, 0.52);
 }
 
@@ -996,7 +1215,7 @@ body.portfolio-page.bubble-exhausted-dark .project_cards::-webkit-scrollbar-thum
     background: rgba(95, 95, 103, 0.58);
 }
 
-body.portfolio-page.bubble-exhausted-dark .project_cards::-webkit-scrollbar-thumb:hover {
+body.portfolio-page.theme-dark .project_cards::-webkit-scrollbar-thumb:hover {
     background: rgba(224, 224, 232, 0.68);
 }
 
@@ -1198,15 +1417,15 @@ body.portfolio-page .projects .project_card:focus-within {
     display: block;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn {
+body.portfolio-page.theme-dark .portfolio-print-btn {
     background-color: var(--print-button-dark-bg);
     border-color: transparent;
     color: #f3f3f5;
     box-shadow: none;
 }
 
-body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-link:hover,
-body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-link:focus-visible {
+body.portfolio-page.theme-dark .portfolio-print-btn.portfolio-nav-link:hover,
+body.portfolio-page.theme-dark .portfolio-print-btn.portfolio-nav-link:focus-visible {
     background-color: var(--print-button-dark-bg);
     border-color: transparent;
     color: #f3f3f5;
@@ -1288,8 +1507,8 @@ body.portfolio-page.bubble-exhausted-dark .portfolio-print-btn.portfolio-nav-lin
         background: transparent;
     }
 
-    body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg,
-    body.portfolio-page.bubble-exhausted-dark .main-has-bubble-bg * {
+    body.portfolio-page.theme-dark .main-has-bubble-bg,
+    body.portfolio-page.theme-dark .main-has-bubble-bg * {
         color: #111111;
     }
 }

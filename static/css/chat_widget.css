@@ -211,7 +211,7 @@ body.portfolio-page .chat-input button {
         box-shadow 0.62s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-body.portfolio-page.bubble-exhausted-dark .chat-widget {
+body.portfolio-page.theme-dark .chat-widget {
     --chat-widget-bg: #1b1c20;
     --chat-widget-shadow: 0 16px 34px rgba(0, 0, 0, 0.62);
     --chat-header-bg: #2a2c31;

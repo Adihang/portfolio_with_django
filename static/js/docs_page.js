@@ -146,6 +146,154 @@
         );
     }
 
+    function hasOpenDocsModal() {
+        return Boolean(
+            document.querySelector(
+                ".docs-rename-modal:not([hidden]), .docs-save-modal:not([hidden]), .docs-help-modal:not([hidden]), .docs-folder-modal:not([hidden])"
+            )
+        );
+    }
+
+    function syncDocsModalBodyState() {
+        document.body.classList.toggle("docs-modal-open", hasOpenDocsModal());
+    }
+
+    function createDocsConfirmDialog() {
+        const confirmModal = document.getElementById("docs-confirm-modal");
+        const confirmBackdrop = document.getElementById("docs-confirm-modal-backdrop");
+        const confirmTitle = document.getElementById("docs-confirm-title");
+        const confirmMessage = document.getElementById("docs-confirm-message");
+        const confirmCancelButton = document.getElementById("docs-confirm-cancel-btn");
+        const confirmConfirmButton = document.getElementById("docs-confirm-confirm-btn");
+
+        if (
+            !confirmModal ||
+            !confirmBackdrop ||
+            !confirmTitle ||
+            !confirmMessage ||
+            !confirmCancelButton ||
+            !confirmConfirmButton
+        ) {
+            return async function () {
+                return false;
+            };
+        }
+
+        let resolvePending = null;
+        let isOpen = false;
+        let lastFocusedElement = null;
+
+        const close = function (confirmed) {
+            if (!isOpen) {
+                return;
+            }
+
+            confirmModal.hidden = true;
+            isOpen = false;
+
+            if (resolvePending) {
+                resolvePending(Boolean(confirmed));
+                resolvePending = null;
+            }
+
+            if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+                lastFocusedElement.focus();
+            }
+            lastFocusedElement = null;
+        };
+
+        confirmBackdrop.addEventListener("click", function () {
+            close(false);
+        });
+
+        confirmCancelButton.addEventListener("click", function () {
+            close(false);
+        });
+
+        confirmConfirmButton.addEventListener("click", function () {
+            close(true);
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key !== "Escape" || !isOpen) {
+                return;
+            }
+            event.preventDefault();
+            close(false);
+        });
+
+        return function requestConfirmDialog(options) {
+            const settings = options || {};
+            const titleText = settings.title || t("js_confirm_title", "확인");
+            const messageText = settings.message || "";
+            const cancelText = settings.cancelText || t("cancel", "취소");
+            const confirmText = settings.confirmText || t("js_confirm_ok", "확인");
+
+            if (resolvePending) {
+                resolvePending(false);
+                resolvePending = null;
+            }
+
+            confirmTitle.textContent = titleText;
+            confirmMessage.textContent = messageText;
+            confirmCancelButton.textContent = cancelText;
+            confirmConfirmButton.textContent = confirmText;
+
+            confirmModal.hidden = false;
+            isOpen = true;
+            lastFocusedElement = document.activeElement;
+            confirmConfirmButton.focus();
+
+            return new Promise(function (resolve) {
+                resolvePending = resolve;
+            });
+        };
+    }
+
+    const requestConfirmDialog = createDocsConfirmDialog();
+
+    function initializeDocsPageHelpModal() {
+        const pageHelpButton = document.getElementById("docs-page-help-btn");
+        const pageHelpModal = document.getElementById("docs-page-help-modal");
+        const pageHelpBackdrop = document.getElementById("docs-page-help-backdrop");
+        if (!pageHelpButton || !pageHelpModal || !pageHelpBackdrop) {
+            return;
+        }
+
+        let lastFocusedElement = null;
+
+        function setPageHelpModalOpen(opened) {
+            pageHelpModal.hidden = !opened;
+            pageHelpButton.setAttribute("aria-expanded", opened ? "true" : "false");
+            syncDocsModalBodyState();
+            if (opened) {
+                lastFocusedElement = document.activeElement;
+                return;
+            }
+            if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+                lastFocusedElement.focus();
+            }
+            lastFocusedElement = null;
+        }
+
+        pageHelpButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            setPageHelpModalOpen(true);
+        });
+
+        pageHelpBackdrop.addEventListener("click", function () {
+            setPageHelpModalOpen(false);
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key !== "Escape" || pageHelpModal.hidden) {
+                return;
+            }
+            event.preventDefault();
+            setPageHelpModalOpen(false);
+        });
+    }
+
     function initializeDocsAuthInteraction() {
         const logoutTrigger = document.querySelector("[data-docs-logout-trigger]");
         const logoutForm = document.getElementById("docs-auth-logout-form");
@@ -177,12 +325,18 @@
             }
         }
 
-        logoutTrigger.addEventListener("click", function () {
+        logoutTrigger.addEventListener("click", async function () {
             const message =
                 logoutTrigger.getAttribute("data-confirm-message") ||
                 t("auth_logout_confirm", "로그아웃 하시겠습니까?");
             if (!logoutModal || !logoutModalBackdrop || !logoutCancelButton || !logoutConfirmButton || !logoutMessage) {
-                if (!window.confirm(message)) {
+                const confirmed = await requestConfirmDialog({
+                    title: t("auth_logout_button", "로그아웃"),
+                    message: message,
+                    cancelText: t("cancel", "취소"),
+                    confirmText: t("auth_logout_button", "로그아웃")
+                });
+                if (!confirmed) {
                     return;
                 }
                 logoutForm.submit();
@@ -336,6 +490,13 @@
         const aclOptionsApiUrl = root.dataset.aclOptionsApiUrl;
         const writeUrl = root.dataset.writeUrl || "/docs/write";
         const listContainer = document.getElementById("docs-list");
+        const pathBreadcrumbs = document.querySelector(".docs-path-breadcrumbs");
+        const initialBreadcrumbNode = pathBreadcrumbs
+            ? pathBreadcrumbs.querySelector(".docs-path-link, .docs-path-current")
+            : null;
+        const breadcrumbRootLabel = (initialBreadcrumbNode && initialBreadcrumbNode.textContent
+            ? initialBreadcrumbNode.textContent
+            : "docs").trim() || "docs";
         const contextMenu = document.getElementById("docs-context-menu");
         const contextOpenButton = contextMenu ? contextMenu.querySelector('button[data-action="open"]') : null;
         const contextEditButton = contextMenu ? contextMenu.querySelector('button[data-action="edit"]') : null;
@@ -367,6 +528,7 @@
         const permissionSaveButton = document.getElementById("docs-permission-save-btn");
 
         const currentDir = normalizePath(root.dataset.currentDir || "", true);
+        const currentDirCanEdit = root.dataset.currentDirCanEdit === "1";
         const initialEntries = getJsonScriptData("docs-initial-entries", []);
 
         const state = {
@@ -406,12 +568,14 @@
         function syncContextMenuByEntry(entry) {
             const isDirectory = Boolean(entry && entry.type === "dir");
             const isCurrentFolder = Boolean(entry && entry.isCurrentFolder);
+            const canEditEntry = Boolean(entry && entry.can_edit);
+            const isPublicWriteFile = Boolean(entry && entry.type === "file" && entry.is_public_write);
             setContextButtonVisible(contextOpenButton, !isCurrentFolder);
-            setContextButtonVisible(contextEditButton, !isDirectory);
-            setContextButtonVisible(contextRenameButton, !isCurrentFolder);
-            setContextButtonVisible(contextDeleteButton, !isCurrentFolder);
-            setContextButtonVisible(contextNewFolderButton, isDirectory);
-            setContextButtonVisible(contextNewDocButton, isDirectory);
+            setContextButtonVisible(contextEditButton, !isDirectory && canEditEntry);
+            setContextButtonVisible(contextRenameButton, !isCurrentFolder && canEditEntry && !isPublicWriteFile);
+            setContextButtonVisible(contextDeleteButton, !isCurrentFolder && canEditEntry && !isPublicWriteFile);
+            setContextButtonVisible(contextNewFolderButton, isDirectory && canEditEntry);
+            setContextButtonVisible(contextNewDocButton, isDirectory && canEditEntry);
             setContextButtonVisible(contextPermissionsButton, true);
         }
 
@@ -421,6 +585,17 @@
             }
             state.contextTarget = entry;
             syncContextMenuByEntry(entry);
+
+            const hasVisibleAction = Array.from(
+                contextMenu.querySelectorAll("button[data-action]")
+            ).some(function (button) {
+                return button.style.display !== "none";
+            });
+            if (!hasVisibleAction) {
+                closeContextMenu();
+                return;
+            }
+
             contextMenu.hidden = false;
             contextMenu.style.left = String(x) + "px";
             contextMenu.style.top = String(y) + "px";
@@ -428,7 +603,68 @@
 
         function selectEntry(entryPath) {
             state.selectedPath = entryPath || "";
+            renderPathBreadcrumbs(state.selectedPath || currentDir);
             renderList();
+        }
+
+        function buildBreadcrumbItems(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            const crumbs = [{
+                label: breadcrumbRootLabel,
+                path: "",
+                isCurrent: normalized === ""
+            }];
+            if (!normalized) {
+                return crumbs;
+            }
+
+            const parts = normalized.split("/").filter(Boolean);
+            let composedPath = "";
+            parts.forEach(function (part, index) {
+                composedPath = composedPath ? composedPath + "/" + part : part;
+                crumbs.push({
+                    label: part,
+                    path: composedPath,
+                    isCurrent: index === parts.length - 1
+                });
+            });
+            return crumbs;
+        }
+
+        function renderPathBreadcrumbs(pathValue) {
+            if (!pathBreadcrumbs) {
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            const crumbs = buildBreadcrumbItems(pathValue);
+            crumbs.forEach(function (crumb, index) {
+                if (index > 0) {
+                    const separator = document.createElement("span");
+                    separator.className = "docs-path-sep";
+                    separator.textContent = "/";
+                    fragment.appendChild(separator);
+                }
+
+                if (crumb.isCurrent) {
+                    const current = document.createElement("span");
+                    current.className = "docs-path-current";
+                    current.setAttribute("data-docs-dir", crumb.path);
+                    current.textContent = crumb.label;
+                    fragment.appendChild(current);
+                    return;
+                }
+
+                const link = document.createElement("a");
+                link.className = "docs-path-link";
+                link.href = buildListUrl(docsBaseUrl, crumb.path);
+                link.setAttribute("data-docs-dir", crumb.path);
+                link.textContent = crumb.label;
+                fragment.appendChild(link);
+            });
+
+            pathBreadcrumbs.replaceChildren(fragment);
+            bindDocsPathDropTargets();
         }
 
         function getCachedEntries(dirPath) {
@@ -473,10 +709,7 @@
         }
 
         function syncModalBodyState() {
-            const renameOpened = Boolean(renameModal && !renameModal.hidden);
-            const folderCreateOpened = Boolean(folderCreateModal && !folderCreateModal.hidden);
-            const permissionOpened = Boolean(permissionModal && !permissionModal.hidden);
-            document.body.classList.toggle("docs-modal-open", renameOpened || folderCreateOpened || permissionOpened);
+            syncDocsModalBodyState();
         }
 
         function getDocsPathLabel(pathValue) {
@@ -510,19 +743,24 @@
             state.dragOverElement.classList.add("is-drop-target");
         }
 
-        function canDropToDirectory(targetDirPath) {
+        function canDropToDirectory(targetDirPath, options) {
             if (!moveApiUrl || !state.draggingEntry) {
                 return false;
             }
 
             const sourcePath = normalizePath(state.draggingEntry.path, false);
             const sourceType = state.draggingEntry.type;
+            const isPublicWriteFile = Boolean(state.draggingEntry.isPublicWriteFile);
             const targetPath = normalizePath(targetDirPath, true);
+            const allowSameParent = Boolean(options && options.allowSameParent);
 
             if (!sourcePath || sourcePath === targetPath) {
                 return false;
             }
-            if (getParentDirectory(sourcePath) === targetPath) {
+            if (isPublicWriteFile) {
+                return false;
+            }
+            if (!allowSameParent && getParentDirectory(sourcePath) === targetPath) {
                 return false;
             }
             if (sourceType === "dir" && targetPath && targetPath.startsWith(sourcePath + "/")) {
@@ -547,13 +785,13 @@
             await refreshCurrentDirectory();
         }
 
-        function bindDropTarget(targetElement, targetDirPath) {
+        function bindDropTarget(targetElement, targetDirPath, options) {
             if (!targetElement || !moveApiUrl) {
                 return;
             }
 
             targetElement.addEventListener("dragenter", function (event) {
-                if (!canDropToDirectory(targetDirPath)) {
+                if (!canDropToDirectory(targetDirPath, options)) {
                     return;
                 }
                 event.preventDefault();
@@ -561,7 +799,7 @@
             });
 
             targetElement.addEventListener("dragover", function (event) {
-                if (!canDropToDirectory(targetDirPath)) {
+                if (!canDropToDirectory(targetDirPath, options)) {
                     return;
                 }
                 event.preventDefault();
@@ -582,7 +820,7 @@
             });
 
             targetElement.addEventListener("drop", function (event) {
-                if (!canDropToDirectory(targetDirPath)) {
+                if (!canDropToDirectory(targetDirPath, options)) {
                     return;
                 }
                 event.preventDefault();
@@ -604,7 +842,8 @@
             const currentFolderEntry = {
                 path: currentDir,
                 type: "dir",
-                isCurrentFolder: true
+                isCurrentFolder: true,
+                can_edit: currentDirCanEdit
             };
 
             const item = document.createElement("li");
@@ -642,6 +881,10 @@
                 selectEntry(currentFolderEntry.path);
                 openContextMenuAt(currentFolderEntry, event.clientX, event.clientY);
             });
+
+            if (currentFolderEntry.can_edit) {
+                bindDropTarget(row, currentFolderEntry.path, { allowSameParent: true });
+            }
 
             item.appendChild(row);
             fragment.appendChild(item);
@@ -768,7 +1011,11 @@
                     return user.id > 0 && user.label;
                 }),
                 groups: groups.map(function (group) {
-                    return { id: Number(group.id), label: String(group.name || "") };
+                    return {
+                        id: Number(group.id),
+                        label: String(group.label || group.name || ""),
+                        isPublicAll: Boolean(group.is_public_all)
+                    };
                 }).filter(function (group) {
                     return group.id > 0 && group.label;
                 }),
@@ -809,6 +1056,11 @@
             const selectedWriteGroupIds = new Set(
                 Array.isArray(data.write_group_ids) ? data.write_group_ids.map(Number) : []
             );
+            const availableGroupItems = entry.type === "dir"
+                ? state.aclOptions.groups.filter(function (group) {
+                    return !group.isPublicAll;
+                })
+                : state.aclOptions.groups;
 
             renderPermissionItems(
                 permissionReadUsersList,
@@ -818,7 +1070,7 @@
             );
             renderPermissionItems(
                 permissionReadGroupsList,
-                state.aclOptions.groups,
+                availableGroupItems,
                 selectedReadGroupIds,
                 t("permission_empty_groups", "표시할 그룹이 없습니다.")
             );
@@ -830,7 +1082,7 @@
             );
             renderPermissionItems(
                 permissionWriteGroupsList,
-                state.aclOptions.groups,
+                availableGroupItems,
                 selectedWriteGroupIds,
                 t("permission_empty_groups", "표시할 그룹이 없습니다.")
             );
@@ -925,12 +1177,15 @@
             if (!entry) {
                 return;
             }
-            const confirmed = window.confirm(
-                formatTemplate(
+            const confirmed = await requestConfirmDialog({
+                title: t("delete_button", "삭제"),
+                message: formatTemplate(
                     t("js_confirm_delete_entry", "정말 삭제할까요?\n{path}"),
                     { path: entry.path }
-                )
-            );
+                ),
+                cancelText: t("cancel", "취소"),
+                confirmText: t("delete_button", "삭제")
+            });
             if (!confirmed) {
                 return;
             }
@@ -978,33 +1233,82 @@
             window.location.href = buildWriteUrl(writeUrl, { path: entry.path });
         }
 
-        function addEntryNode(entry, depth, fragment) {
+        function buildTreePrefixElement(ancestorHasNextSiblings, isLastSibling) {
+            const prefix = document.createElement("span");
+            prefix.className = "docs-item-tree-prefix";
+            prefix.setAttribute("aria-hidden", "true");
+
+            const ancestorFlags = ancestorHasNextSiblings || [];
+            ancestorFlags.forEach(function (hasNextSibling) {
+                const segment = document.createElement("span");
+                segment.className = "docs-tree-segment" + (hasNextSibling ? " has-next" : "");
+                prefix.appendChild(segment);
+            });
+
+            const branch = document.createElement("span");
+            branch.className = "docs-tree-segment docs-tree-branch " + (isLastSibling ? "is-last" : "is-middle");
+            prefix.appendChild(branch);
+
+            if (ancestorFlags.length === 0) {
+                prefix.classList.add("is-root-depth");
+            }
+
+            return prefix;
+        }
+
+        function addEntryNode(entry, fragment, ancestorHasNextSiblings, isLastSibling) {
             const item = document.createElement("li");
             item.className = "docs-item";
 
             const row = document.createElement("button");
             row.type = "button";
-            row.className = "docs-item-row";
-            row.draggable = Boolean(moveApiUrl);
+            row.className = "docs-item-row has-tree-prefix";
+            const isPublicWriteFile = Boolean(entry.type === "file" && entry.is_public_write);
+            row.draggable = Boolean(moveApiUrl && entry.can_edit && !isPublicWriteFile);
             if (state.selectedPath === entry.path) {
                 row.classList.add("is-selected");
             }
 
-            const depthMarker = document.createElement("span");
-            depthMarker.className = "docs-item-depth";
-            depthMarker.style.setProperty("--docs-item-depth", String(depth));
+            const treePrefix = buildTreePrefixElement(ancestorHasNextSiblings, Boolean(isLastSibling));
 
             const typeMarker = document.createElement("span");
             typeMarker.className = "docs-item-type-icon " + (entry.type === "dir" ? "is-dir" : "is-file");
             typeMarker.setAttribute("aria-hidden", "true");
 
+            const aclLabels = Array.isArray(entry.write_acl_labels) ? entry.write_acl_labels : [];
+            const aclLabelLimit = 3;
+
             const name = document.createElement("span");
             name.className = "docs-item-name";
             name.textContent = entry.name;
 
-            row.appendChild(depthMarker);
             row.appendChild(typeMarker);
             row.appendChild(name);
+
+            if (aclLabels.length > 0) {
+                const aclWrap = document.createElement("span");
+                aclWrap.className = "docs-item-acl-list";
+                aclLabels.slice(0, aclLabelLimit).forEach(function (labelText) {
+                    const aclBadge = document.createElement("span");
+                    aclBadge.className = "docs-item-acl-badge";
+                    aclBadge.textContent = String(labelText || "");
+                    aclWrap.appendChild(aclBadge);
+                });
+                if (aclLabels.length > aclLabelLimit) {
+                    const overflowBadge = document.createElement("span");
+                    overflowBadge.className = "docs-item-acl-badge docs-item-acl-badge-overflow";
+                    overflowBadge.textContent = "+" + String(aclLabels.length - aclLabelLimit);
+                    aclWrap.appendChild(overflowBadge);
+                }
+                row.appendChild(aclWrap);
+            }
+
+            if (entry.type === "file" && entry.is_public_write) {
+                const publicBadge = document.createElement("span");
+                publicBadge.className = "docs-item-public-badge";
+                publicBadge.textContent = t("public_write_badge", "전체 허용");
+                row.appendChild(publicBadge);
+            }
 
             row.addEventListener("click", function (event) {
                 event.preventDefault();
@@ -1038,7 +1342,8 @@
                 row.addEventListener("dragstart", function (event) {
                     state.draggingEntry = {
                         path: entry.path,
-                        type: entry.type
+                        type: entry.type,
+                        isPublicWriteFile: isPublicWriteFile
                     };
                     row.classList.add("is-dragging");
                     clearDragOverTarget();
@@ -1060,13 +1365,17 @@
                 bindDropTarget(row, entry.path);
             }
 
+            item.appendChild(treePrefix);
             item.appendChild(row);
             fragment.appendChild(item);
 
             if (entry.type === "dir" && state.expandedFolders.has(entry.path)) {
                 const childEntries = getCachedEntries(entry.path);
-                childEntries.forEach(function (child) {
-                    addEntryNode(child, depth + 1, fragment);
+                const nextAncestorHasNextSiblings = (ancestorHasNextSiblings || []).slice();
+                nextAncestorHasNextSiblings.push(!isLastSibling);
+                childEntries.forEach(function (child, index) {
+                    const childIsLast = index === childEntries.length - 1;
+                    addEntryNode(child, fragment, nextAncestorHasNextSiblings, childIsLast);
                 });
             }
         }
@@ -1090,8 +1399,9 @@
                 listContainer.appendChild(fragment);
                 return;
             }
-            entries.forEach(function (entry) {
-                addEntryNode(entry, 0, fragment);
+            entries.forEach(function (entry, index) {
+                const isLastRootEntry = index === entries.length - 1;
+                addEntryNode(entry, fragment, [], isLastRootEntry);
             });
             listContainer.appendChild(fragment);
         }
@@ -1256,7 +1566,11 @@
         window.addEventListener("scroll", closeContextMenu, { passive: true });
         window.addEventListener("resize", closeContextMenu, { passive: true });
 
-        bindDocsPathDropTargets();
+        if (pathBreadcrumbs) {
+            renderPathBreadcrumbs(currentDir);
+        } else {
+            bindDocsPathDropTargets();
+        }
         renderList();
     }
 
@@ -1272,7 +1586,12 @@
         }
 
         deleteButton.addEventListener("click", async function () {
-            const confirmed = window.confirm(t("js_confirm_delete_doc", "이 문서를 삭제할까요?"));
+            const confirmed = await requestConfirmDialog({
+                title: t("delete_button", "삭제"),
+                message: t("js_confirm_delete_doc", "이 문서를 삭제할까요?"),
+                cancelText: t("cancel", "취소"),
+                confirmText: t("delete_button", "삭제")
+            });
             if (!confirmed) {
                 return;
             }
@@ -1289,8 +1608,10 @@
     function initializeWritePage() {
         const docsBaseUrl = root.dataset.docsBaseUrl || "/docs";
         const saveApiUrl = root.dataset.saveApiUrl;
+        const previewApiUrl = root.dataset.previewApiUrl;
         const mkdirApiUrl = root.dataset.mkdirApiUrl;
         const originalPath = root.dataset.originalPath || "";
+        const isPublicWriteDirectSave = root.dataset.publicWriteDirectSave === "1";
 
         const directoryInput = document.getElementById("docs-dir-input");
         const filenameInput = document.getElementById("docs-filename-input");
@@ -1298,6 +1619,10 @@
         const markdownHelpButton = document.getElementById("docs-markdown-help-btn");
         const markdownHelpModal = document.getElementById("docs-markdown-help-modal");
         const markdownHelpBackdrop = document.getElementById("docs-markdown-help-backdrop");
+        const markdownPreviewButton = document.getElementById("docs-markdown-preview-btn");
+        const markdownPreviewModal = document.getElementById("docs-markdown-preview-modal");
+        const markdownPreviewBackdrop = document.getElementById("docs-markdown-preview-backdrop");
+        const markdownPreviewContent = document.getElementById("docs-markdown-preview-content");
         const saveButton = document.getElementById("docs-save-btn");
         const createFolderButton = document.getElementById("docs-create-folder-btn");
         const saveModal = document.getElementById("docs-save-modal");
@@ -1316,6 +1641,10 @@
         const folderCancelButton = document.getElementById("docs-folder-cancel-btn");
         const folderCreateButton = document.getElementById("docs-folder-create-btn");
         const directoryOptions = document.getElementById("docs-directory-options");
+        const markdownSnippetMenu = document.getElementById("docs-markdown-snippet-menu");
+        const markdownSnippetButtons = Array.from(
+            document.querySelectorAll("button[data-md-snippet]")
+        );
 
         const rawDirectories = getJsonScriptData("docs-directory-data", []);
         const directories = [];
@@ -1325,6 +1654,190 @@
             selectedDir: "",
         };
         let contentHeightRafId = null;
+
+        function closeMarkdownSnippetMenu() {
+            if (!markdownSnippetMenu) {
+                return;
+            }
+            markdownSnippetMenu.hidden = true;
+        }
+
+        function openMarkdownSnippetMenu(clientX, clientY) {
+            if (!markdownSnippetMenu) {
+                return;
+            }
+
+            markdownSnippetMenu.hidden = false;
+            markdownSnippetMenu.style.left = "0px";
+            markdownSnippetMenu.style.top = "0px";
+
+            const rect = markdownSnippetMenu.getBoundingClientRect();
+            const viewportPadding = 8;
+            const maxLeft = Math.max(viewportPadding, window.innerWidth - rect.width - viewportPadding);
+            const maxTop = Math.max(viewportPadding, window.innerHeight - rect.height - viewportPadding);
+            const left = Math.min(Math.max(viewportPadding, clientX), maxLeft);
+            const top = Math.min(Math.max(viewportPadding, clientY), maxTop);
+
+            markdownSnippetMenu.style.left = left + "px";
+            markdownSnippetMenu.style.top = top + "px";
+        }
+
+        function replaceTextareaSelection(insertText, selectionStartOffset, selectionEndOffset) {
+            if (!contentInput) {
+                return;
+            }
+            const start = contentInput.selectionStart || 0;
+            const end = contentInput.selectionEnd || 0;
+            contentInput.setRangeText(insertText, start, end, "end");
+
+            const nextStart = start + (selectionStartOffset || 0);
+            const nextEnd = start + (selectionEndOffset || insertText.length);
+            contentInput.setSelectionRange(nextStart, nextEnd);
+            contentInput.focus();
+            contentInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        function buildWrappedSnippet(prefix, suffix, placeholder) {
+            const start = contentInput ? (contentInput.selectionStart || 0) : 0;
+            const end = contentInput ? (contentInput.selectionEnd || 0) : 0;
+            const selected = contentInput ? contentInput.value.slice(start, end) : "";
+            const body = selected || placeholder;
+            const text = prefix + body + suffix;
+
+            if (selected) {
+                return { text: text, selectStart: text.length, selectEnd: text.length };
+            }
+
+            return {
+                text: text,
+                selectStart: prefix.length,
+                selectEnd: prefix.length + body.length,
+            };
+        }
+
+        function buildPrefixedLinesSnippet(prefix, placeholder) {
+            const start = contentInput ? (contentInput.selectionStart || 0) : 0;
+            const end = contentInput ? (contentInput.selectionEnd || 0) : 0;
+            const selected = contentInput ? contentInput.value.slice(start, end) : "";
+            if (!selected) {
+                const body = prefix + placeholder;
+                return {
+                    text: body,
+                    selectStart: prefix.length,
+                    selectEnd: body.length,
+                };
+            }
+
+            const lines = selected.split(/\r?\n/);
+            const transformed = lines.map(function (line) {
+                if (!line.trim()) {
+                    return line;
+                }
+                return prefix + line;
+            }).join("\n");
+            return { text: transformed, selectStart: transformed.length, selectEnd: transformed.length };
+        }
+
+        function buildTableSnippet() {
+            const col1 = t("markdown_placeholder_table_col1", "Column 1");
+            const col2 = t("markdown_placeholder_table_col2", "Column 2");
+            const table = [
+                "| " + col1 + " | " + col2 + " |",
+                "| --- | --- |",
+                "| Value 1 | Value 2 |",
+            ].join("\n");
+            return {
+                text: table,
+                selectStart: 2,
+                selectEnd: 2 + col1.length,
+            };
+        }
+
+        function buildNumberedLinesSnippet(placeholder) {
+            const start = contentInput ? (contentInput.selectionStart || 0) : 0;
+            const end = contentInput ? (contentInput.selectionEnd || 0) : 0;
+            const selected = contentInput ? contentInput.value.slice(start, end) : "";
+            if (!selected) {
+                const body = "1. " + placeholder;
+                return {
+                    text: body,
+                    selectStart: 3,
+                    selectEnd: body.length,
+                };
+            }
+
+            let order = 1;
+            const transformed = selected
+                .split(/\r?\n/)
+                .map(function (line) {
+                    if (!line.trim()) {
+                        return line;
+                    }
+                    const row = order + ". " + line;
+                    order += 1;
+                    return row;
+                })
+                .join("\n");
+            return { text: transformed, selectStart: transformed.length, selectEnd: transformed.length };
+        }
+
+        function buildCodeBlockSnippet() {
+            const lang = t("markdown_placeholder_code_lang", "text");
+            const body = t("markdown_placeholder_code_body", "type your code");
+            const text = "```" + lang + "\n" + body + "\n```";
+            const bodyStart = ("```" + lang + "\n").length;
+            return {
+                text: text,
+                selectStart: bodyStart,
+                selectEnd: bodyStart + body.length,
+            };
+        }
+
+        function insertMarkdownSnippet(snippetType) {
+            if (!contentInput) {
+                return;
+            }
+
+            let snippet = null;
+            if (snippetType === "heading2") {
+                snippet = buildWrappedSnippet("## ", "", t("markdown_placeholder_heading", "Heading"));
+            } else if (snippetType === "heading3") {
+                snippet = buildWrappedSnippet("### ", "", t("markdown_placeholder_heading", "Heading"));
+            } else if (snippetType === "bold") {
+                snippet = buildWrappedSnippet("**", "**", t("markdown_placeholder_bold", "bold text"));
+            } else if (snippetType === "italic") {
+                snippet = buildWrappedSnippet("*", "*", t("markdown_placeholder_italic", "italic text"));
+            } else if (snippetType === "link") {
+                snippet = buildWrappedSnippet("[", "](https://)", t("markdown_placeholder_link_text", "link text"));
+            } else if (snippetType === "image") {
+                snippet = buildWrappedSnippet("![", "](https://)", t("markdown_placeholder_image_alt", "image description"));
+            } else if (snippetType === "code_inline") {
+                snippet = buildWrappedSnippet("`", "`", t("markdown_placeholder_inline_code", "code"));
+            } else if (snippetType === "code_block") {
+                snippet = buildCodeBlockSnippet();
+            } else if (snippetType === "list_bullet") {
+                snippet = buildPrefixedLinesSnippet("- ", t("markdown_placeholder_list_item", "item"));
+            } else if (snippetType === "list_numbered") {
+                snippet = buildNumberedLinesSnippet(t("markdown_placeholder_list_item", "item"));
+            } else if (snippetType === "list_check") {
+                snippet = buildPrefixedLinesSnippet("- [ ] ", t("markdown_placeholder_list_item", "item"));
+            } else if (snippetType === "quote") {
+                snippet = buildPrefixedLinesSnippet("> ", t("markdown_placeholder_quote", "quote"));
+            } else if (snippetType === "divider") {
+                snippet = {
+                    text: "\n---\n",
+                    selectStart: 5,
+                    selectEnd: 5,
+                };
+            } else if (snippetType === "table") {
+                snippet = buildTableSnippet();
+            }
+
+            if (!snippet) {
+                return;
+            }
+            replaceTextareaSelection(snippet.text, snippet.selectStart, snippet.selectEnd);
+        }
 
         function updateContentInputAutoHeight() {
             contentHeightRafId = null;
@@ -1382,6 +1895,19 @@
             const parts = normalized.split("/");
             parts.pop();
             return parts.join("/");
+        }
+
+        function getPathFileStem(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!normalized) {
+                return "";
+            }
+            const segments = normalized.split("/");
+            const fileName = segments[segments.length - 1] || "";
+            if (fileName.toLowerCase().endsWith(".md")) {
+                return fileName.slice(0, -3);
+            }
+            return fileName;
         }
 
         function getChildDirectories(pathValue) {
@@ -1591,9 +2117,7 @@
         }
 
         function syncModalBodyState() {
-            const saveOpened = Boolean(saveModal && !saveModal.hidden);
-            const helpOpened = Boolean(markdownHelpModal && !markdownHelpModal.hidden);
-            document.body.classList.toggle("docs-modal-open", saveOpened || helpOpened);
+            syncDocsModalBodyState();
         }
 
         function setMarkdownHelpModalOpen(opened) {
@@ -1602,6 +2126,44 @@
             }
             markdownHelpModal.hidden = !opened;
             syncModalBodyState();
+        }
+
+        function setMarkdownPreviewModalOpen(opened) {
+            if (!markdownPreviewModal) {
+                return;
+            }
+            markdownPreviewModal.hidden = !opened;
+            syncModalBodyState();
+        }
+
+        async function openMarkdownPreviewModal() {
+            if (!markdownPreviewModal || !markdownPreviewContent) {
+                return;
+            }
+
+            markdownPreviewContent.innerHTML = "<p>" + t("markdown_preview_loading", "Loading preview...") + "</p>";
+            setMarkdownPreviewModalOpen(true);
+
+            if (!previewApiUrl) {
+                markdownPreviewContent.innerHTML = "<p>" + t("js_error_request_failed", "요청 처리 중 오류가 발생했습니다.") + "</p>";
+                return;
+            }
+
+            try {
+                const data = await requestJson(
+                    previewApiUrl,
+                    buildPostOptions({
+                        original_path: originalPath,
+                        content: contentInput ? contentInput.value : "",
+                    })
+                );
+                markdownPreviewContent.innerHTML = data && typeof data.html === "string" ? data.html : "";
+            } catch (error) {
+                markdownPreviewContent.innerHTML =
+                    "<p>" +
+                    (error && error.message ? error.message : t("js_error_processing_failed", "처리 중 오류가 발생했습니다.")) +
+                    "</p>";
+            }
         }
 
         function setSaveModalOpen(opened) {
@@ -1642,26 +2204,40 @@
                 return;
             }
 
+            let finalFilename = filename;
             let targetDir = "";
-            try {
-                targetDir = normalizeDirectoryInput();
-            } catch (error) {
-                alertError(error);
-                return;
+            if (isPublicWriteDirectSave && originalPath) {
+                targetDir = getParentPath(originalPath);
+                finalFilename = getPathFileStem(originalPath) || filename;
+            } else {
+                try {
+                    targetDir = normalizeDirectoryInput();
+                } catch (error) {
+                    alertError(error);
+                    return;
+                }
             }
 
-            if (!hasDirectory(targetDir)) {
+            if (!isPublicWriteDirectSave && !hasDirectory(targetDir)) {
                 window.alert(
                     t("js_select_or_create_folder", "저장 위치를 선택하거나 폴더를 먼저 생성해주세요.")
                 );
                 return;
             }
 
+            upsertDirectory(targetDir);
+            if (directoryInput) {
+                directoryInput.value = targetDir;
+            }
+            if (filenameInput) {
+                filenameInput.value = finalFilename;
+            }
+
             try {
                 const payload = {
                     original_path: originalPath,
                     target_dir: targetDir,
-                    filename: filename,
+                    filename: finalFilename,
                     content: contentInput ? contentInput.value : ""
                 };
                 const data = await requestJson(saveApiUrl, buildPostOptions(payload));
@@ -1727,6 +2303,10 @@
 
         if (saveButton) {
             saveButton.addEventListener("click", function () {
+                if (isPublicWriteDirectSave) {
+                    submitSave();
+                    return;
+                }
                 if (saveModal) {
                     setSaveModalOpen(true);
                     return;
@@ -1739,11 +2319,57 @@
             markdownHelpButton.addEventListener("click", function () {
                 setMarkdownHelpModalOpen(true);
             });
+            markdownHelpButton.addEventListener("mouseup", function (event) {
+                if (event.currentTarget && typeof event.currentTarget.blur === "function") {
+                    event.currentTarget.blur();
+                }
+            });
         }
+
+        if (markdownPreviewButton) {
+            markdownPreviewButton.addEventListener("click", function () {
+                openMarkdownPreviewModal();
+            });
+            markdownPreviewButton.addEventListener("mouseup", function (event) {
+                if (event.currentTarget && typeof event.currentTarget.blur === "function") {
+                    event.currentTarget.blur();
+                }
+            });
+        }
+
+        markdownSnippetButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                insertMarkdownSnippet(button.getAttribute("data-md-snippet") || "");
+                closeMarkdownSnippetMenu();
+            });
+        });
+
+        if (contentInput && markdownSnippetMenu) {
+            contentInput.addEventListener("contextmenu", function (event) {
+                event.preventDefault();
+                openMarkdownSnippetMenu(event.clientX, event.clientY);
+            });
+        }
+
+        document.addEventListener("click", function (event) {
+            if (!markdownSnippetMenu || markdownSnippetMenu.hidden) {
+                return;
+            }
+            if (event.target instanceof Element && markdownSnippetMenu.contains(event.target)) {
+                return;
+            }
+            closeMarkdownSnippetMenu();
+        });
 
         if (markdownHelpBackdrop) {
             markdownHelpBackdrop.addEventListener("click", function () {
                 setMarkdownHelpModalOpen(false);
+            });
+        }
+
+        if (markdownPreviewBackdrop) {
+            markdownPreviewBackdrop.addEventListener("click", function () {
+                setMarkdownPreviewModalOpen(false);
             });
         }
 
@@ -1842,6 +2468,18 @@
             if (event.key !== "Escape") {
                 return;
             }
+            if (markdownSnippetMenu && !markdownSnippetMenu.hidden) {
+                closeMarkdownSnippetMenu();
+                return;
+            }
+            if (markdownPreviewModal && !markdownPreviewModal.hidden) {
+                setMarkdownPreviewModalOpen(false);
+                return;
+            }
+            if (markdownHelpModal && !markdownHelpModal.hidden) {
+                setMarkdownHelpModalOpen(false);
+                return;
+            }
             if (folderModal && !folderModal.hidden) {
                 setFolderModalOpen(false);
                 return;
@@ -1854,6 +2492,8 @@
 
         window.addEventListener("resize", scheduleContentInputAutoHeight, { passive: true });
         window.addEventListener("orientationchange", scheduleContentInputAutoHeight, { passive: true });
+        window.addEventListener("scroll", closeMarkdownSnippetMenu, { passive: true });
+        window.addEventListener("resize", closeMarkdownSnippetMenu, { passive: true });
 
         if (window.visualViewport) {
             window.visualViewport.addEventListener("resize", scheduleContentInputAutoHeight, { passive: true });
@@ -1877,6 +2517,7 @@
     }
 
     initializeDocsAuthInteraction();
+    initializeDocsPageHelpModal();
     initializeDocsToolbarAutoCollapse();
 
     if (pageType === "list") {

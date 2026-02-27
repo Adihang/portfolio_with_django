@@ -23,8 +23,8 @@
         <div class="docs-toolbar-right">
             {% include "docs/_auth_account.html" %}
             <div class="docs-toolbar-actions">
+                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
                 {% include "docs/_auth_button.html" %}
-                <button class="docs-btn" type="button" id="docs-markdown-help-btn">{{ docs_text.markdown_guide_button }}</button>
                 <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
                 <button class="docs-btn docs-btn-primary" type="button" id="docs-save-btn">{{ docs_text.save_button }}</button>
             </div>
@@ -37,9 +37,11 @@
     data-docs-page="write"
     data-docs-base-url="{{ docs_base_url }}"
     data-save-api-url="{{ docs_api_save_url }}"
+    data-preview-api-url="{{ docs_api_preview_url }}"
     data-mkdir-api-url="{{ docs_api_mkdir_url }}"
     data-write-mode="{{ write_mode }}"
     data-original-path="{{ original_relative_path }}"
+    data-public-write-direct-save="{% if write_public_direct_save %}1{% else %}0{% endif %}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
     <div class="docs-form-grid">
@@ -48,74 +50,42 @@
             <input type="text" id="docs-filename-input" value="{{ initial_filename }}" placeholder="{{ docs_text.filename_placeholder }}">
         </label>
 
-        <label class="docs-field docs-field-full">
-            <span>{{ docs_text.content_label }}</span>
+        <div class="docs-field docs-field-full">
+            <div class="docs-field-head">
+                <label for="docs-content-input" class="docs-field-label">{{ docs_text.content_label }}</label>
+                <div class="docs-content-snippet-tools">
+                    <button class="docs-btn" type="button" id="docs-markdown-help-btn">{{ docs_text.markdown_guide_button }}</button>
+                    <button class="docs-btn" type="button" id="docs-markdown-preview-btn">{{ docs_text.markdown_preview_button }}</button>
+                </div>
+            </div>
             <textarea id="docs-content-input" spellcheck="false">{{ initial_content }}</textarea>
-        </label>
+        </div>
     </div>
 </main>
 
-<div id="docs-save-modal" class="docs-save-modal" hidden>
-    <div class="docs-save-modal-backdrop" id="docs-save-modal-backdrop"></div>
-    <div class="docs-save-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-save-modal-title">
-        <div class="docs-save-modal-head">
-            <h2 id="docs-save-modal-title" class="docs-save-modal-title">{{ docs_text.save_location_title }}</h2>
-            <button type="button" class="docs-save-close-btn" id="docs-save-close-btn" aria-label="{{ docs_text.close_label }}">x</button>
-        </div>
-        <div class="docs-save-location-bar">
-            <button type="button" class="docs-btn" id="docs-save-up-btn">{{ docs_text.up_button }}</button>
-            <div class="docs-save-breadcrumb" id="docs-save-breadcrumb"></div>
-        </div>
-        <div class="docs-save-browser">
-            <aside class="docs-save-sidebar">
-                <div class="docs-save-sidebar-title">{{ docs_text.quick_paths_title }}</div>
-                <ul class="docs-save-sidebar-list" id="docs-save-quick-list"></ul>
-            </aside>
-            <section class="docs-save-folder-pane">
-                <div class="docs-save-folder-head">{{ docs_text.folder_title }}</div>
-                <ul class="docs-save-folder-list" id="docs-save-folder-list"></ul>
-            </section>
-        </div>
-        <label class="docs-field docs-field-full">
-            <span>{{ docs_text.selected_path_label }}</span>
-            <input type="text" id="docs-dir-input" list="docs-directory-options" value="{{ initial_dir }}" placeholder="{{ docs_text.selected_path_placeholder }}">
-        </label>
-        <div class="docs-save-modal-actions">
-            <button type="button" class="docs-btn" id="docs-create-folder-btn">{{ docs_text.create_folder_button }}</button>
-            <div class="docs-save-modal-actions-right">
-                <button type="button" class="docs-btn" id="docs-save-cancel-btn">{{ docs_text.cancel }}</button>
-                <button type="button" class="docs-btn docs-btn-primary" id="docs-save-confirm-btn">{{ docs_text.save_confirm_button }}</button>
-            </div>
-        </div>
-
-        <div id="docs-folder-modal" class="docs-folder-modal" hidden>
-            <div class="docs-folder-modal-backdrop" id="docs-folder-modal-backdrop"></div>
-            <div class="docs-folder-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-folder-modal-title">
-                <h3 id="docs-folder-modal-title" class="docs-folder-modal-title">{{ docs_text.folder_modal_title }}</h3>
-                <div class="docs-folder-modal-path" id="docs-folder-target-path">/docs</div>
-                <label class="docs-field docs-field-full">
-                    <span>{{ docs_text.folder_name_label }}</span>
-                    <input type="text" id="docs-folder-name-input" placeholder="{{ docs_text.folder_name_placeholder }}">
-                </label>
-                <div class="docs-folder-modal-actions">
-                    <button type="button" class="docs-btn" id="docs-folder-cancel-btn">{{ docs_text.cancel }}</button>
-                    <button type="button" class="docs-btn docs-btn-primary" id="docs-folder-create-btn">{{ docs_text.create_button }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
+<div id="docs-markdown-snippet-menu" class="docs-context-menu docs-markdown-context-menu" hidden>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="heading2">{{ docs_text.markdown_snippet_heading2 }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="heading3">{{ docs_text.markdown_snippet_heading3 }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="bold">{{ docs_text.markdown_snippet_bold }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="italic">{{ docs_text.markdown_snippet_italic }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="link">{{ docs_text.markdown_snippet_link }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="image">{{ docs_text.markdown_snippet_image }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="code_inline">{{ docs_text.markdown_snippet_code_inline }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="code_block">{{ docs_text.markdown_snippet_code_block }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="list_bullet">{{ docs_text.markdown_snippet_list_bullet }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="list_numbered">{{ docs_text.markdown_snippet_list_numbered }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="list_check">{{ docs_text.markdown_snippet_list_check }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="quote">{{ docs_text.markdown_snippet_quote }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="divider">{{ docs_text.markdown_snippet_divider }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-md-snippet="table">{{ docs_text.markdown_snippet_table }}</button>
 </div>
 
-<div id="docs-markdown-help-modal" class="docs-help-modal" hidden>
-    <div class="docs-help-modal-backdrop" id="docs-markdown-help-backdrop"></div>
-    <div class="docs-help-modal-dialog" role="dialog" aria-modal="true" aria-label="{{ docs_text.markdown_help_aria }}">
-        <div class="docs-help-modal-body">
-            <article class="docs-markdown docs-help-markdown">{{ markdown_help_html }}</article>
-        </div>
-    </div>
-</div>
-
-{% include "docs/_auth_logout_modal.html" %}
+{% include "popup/docs/save_modal.html" %}
+{% include "popup/docs/page_help_modal.html" %}
+{% include "popup/docs/markdown_help_modal.html" %}
+{% include "popup/docs/markdown_preview_modal.html" %}
+{% include "popup/docs/confirm_modal.html" %}
+{% include "popup/docs/auth_logout_modal.html" %}
 
 <datalist id="docs-directory-options"></datalist>
 

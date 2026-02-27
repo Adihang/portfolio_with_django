@@ -37,13 +37,23 @@ DOCS_LOGOUT_PATH_PATTERN = re.compile(r"^/(?:(ko|en)/)?docs/logout/?$")
 MARKDOWN_HELP_FILENAME_KO = "Markdown description.ko.md"
 MARKDOWN_HELP_FILENAME_EN = "Markdown description.en.md"
 MARKDOWN_HELP_FILENAME_LEGACY = "Markdown description.md"
+MARKDOWN_HELP_DIRECTORY = "help"
+PAGE_HELP_FILE_BASENAMES = {
+    "list": "list",
+    "write": "write",
+    "view": "read",
+}
 DOCS_EDITOR_GROUP_NAME = "DocsEditors"
 DOCS_EDIT_PERMISSION_CODE = "main.can_edit_docs"
+DOCS_PUBLIC_WRITE_GROUP_NAME = "__DOCS_PUBLIC_ALL__"
+DOCS_META_TITLE = "Hanplanet Docs"
+DOCS_META_DESCRIPTION = "마크다운 문서 페이지"
 
 DOCS_TEXT = {
     "ko": {
         "list_title": "문서 목록",
         "write_button": "작성",
+        "help_button": "도움말",
         "list_aria_label": "문서 목록",
         "menu_open": "열기",
         "menu_rename": "이름 바꾸기",
@@ -62,7 +72,35 @@ DOCS_TEXT = {
         "download_button": "다운로드",
         "write_title_edit": "문서 수정",
         "write_title_create": "문서 작성",
-        "markdown_guide_button": "문법 가이드",
+        "markdown_guide_button": "마크다운 가이드",
+        "markdown_preview_button": "미리보기",
+        "markdown_snippet_aria": "마크다운 문법 빠른 입력",
+        "markdown_snippet_heading2": "제목 2",
+        "markdown_snippet_heading3": "제목 3",
+        "markdown_snippet_bold": "굵게",
+        "markdown_snippet_italic": "기울임",
+        "markdown_snippet_link": "링크",
+        "markdown_snippet_image": "이미지",
+        "markdown_snippet_code_inline": "인라인 코드",
+        "markdown_snippet_code_block": "코드 블록",
+        "markdown_snippet_list_bullet": "글머리 목록",
+        "markdown_snippet_list_numbered": "번호 목록",
+        "markdown_snippet_list_check": "체크리스트",
+        "markdown_snippet_quote": "인용문",
+        "markdown_snippet_divider": "구분선",
+        "markdown_snippet_table": "표",
+        "markdown_placeholder_heading": "제목",
+        "markdown_placeholder_bold": "강조 텍스트",
+        "markdown_placeholder_italic": "기울임 텍스트",
+        "markdown_placeholder_link_text": "링크 텍스트",
+        "markdown_placeholder_image_alt": "이미지 설명",
+        "markdown_placeholder_inline_code": "코드",
+        "markdown_placeholder_code_lang": "언어",
+        "markdown_placeholder_code_body": "코드를 입력하세요",
+        "markdown_placeholder_list_item": "항목",
+        "markdown_placeholder_quote": "인용문",
+        "markdown_placeholder_table_col1": "항목",
+        "markdown_placeholder_table_col2": "설명",
         "save_button": "저장",
         "list_button": "목록",
         "filename_label": "파일명 (.md 제외)",
@@ -87,15 +125,19 @@ DOCS_TEXT = {
         "permission_read_groups": "읽기 그룹",
         "permission_write_users": "쓰기 사용자",
         "permission_write_groups": "쓰기 그룹",
-        "permission_help": "읽기/쓰기 권한을 각각 설정합니다. 쓰기 권한이 있으면 읽기도 가능합니다. 모두 비우면 제한이 해제됩니다.",
+        "permission_help": "읽기/쓰기 권한을 각각 독립적으로 설정합니다. 읽기 권한을 비워두면 누구나 읽을 수 있습니다.",
         "permission_save_button": "저장",
         "permission_loading": "불러오는 중...",
         "permission_empty_users": "표시할 사용자가 없습니다.",
         "permission_empty_groups": "표시할 그룹이 없습니다.",
+        "permission_public_group_label": "전체",
+        "public_write_badge": "전체 허용",
         "markdown_help_aria": "마크다운 문법 안내",
         "markdown_help_fallback_title": "마크다운 문법",
         "markdown_help_fallback_missing": "문법 안내 파일을 찾을 수 없습니다.",
         "markdown_help_fallback_read_error": "문법 안내 파일을 읽을 수 없습니다.",
+        "markdown_preview_aria": "마크다운 미리보기",
+        "markdown_preview_loading": "미리보기를 불러오는 중...",
         "js_error_path_required": "경로를 입력해주세요.",
         "js_error_parent_path_not_allowed": "상위 경로(..)는 사용할 수 없습니다.",
         "js_error_request_failed": "요청 처리 중 오류가 발생했습니다.",
@@ -125,6 +167,7 @@ DOCS_TEXT = {
     "en": {
         "list_title": "Documents",
         "write_button": "Write",
+        "help_button": "Help",
         "list_aria_label": "Document list",
         "menu_open": "Open",
         "menu_rename": "Rename",
@@ -144,6 +187,34 @@ DOCS_TEXT = {
         "write_title_edit": "Edit Document",
         "write_title_create": "New Document",
         "markdown_guide_button": "Markdown Guide",
+        "markdown_preview_button": "Preview",
+        "markdown_snippet_aria": "Markdown quick insert",
+        "markdown_snippet_heading2": "Heading 2",
+        "markdown_snippet_heading3": "Heading 3",
+        "markdown_snippet_bold": "Bold",
+        "markdown_snippet_italic": "Italic",
+        "markdown_snippet_link": "Link",
+        "markdown_snippet_image": "Image",
+        "markdown_snippet_code_inline": "Inline Code",
+        "markdown_snippet_code_block": "Code Block",
+        "markdown_snippet_list_bullet": "Bullet List",
+        "markdown_snippet_list_numbered": "Numbered List",
+        "markdown_snippet_list_check": "Checklist",
+        "markdown_snippet_quote": "Quote",
+        "markdown_snippet_divider": "Divider",
+        "markdown_snippet_table": "Table",
+        "markdown_placeholder_heading": "Heading",
+        "markdown_placeholder_bold": "bold text",
+        "markdown_placeholder_italic": "italic text",
+        "markdown_placeholder_link_text": "link text",
+        "markdown_placeholder_image_alt": "image description",
+        "markdown_placeholder_inline_code": "code",
+        "markdown_placeholder_code_lang": "lang",
+        "markdown_placeholder_code_body": "type your code",
+        "markdown_placeholder_list_item": "item",
+        "markdown_placeholder_quote": "quote",
+        "markdown_placeholder_table_col1": "Item",
+        "markdown_placeholder_table_col2": "Description",
         "save_button": "Save",
         "list_button": "List",
         "filename_label": "File name (without .md)",
@@ -168,15 +239,19 @@ DOCS_TEXT = {
         "permission_read_groups": "Read Groups",
         "permission_write_users": "Write Users",
         "permission_write_groups": "Write Groups",
-        "permission_help": "Configure read and write separately. Write access also grants read access. Leave all unchecked to clear restrictions.",
+        "permission_help": "Configure read and write independently. If read access is empty, everyone can read.",
         "permission_save_button": "Save",
         "permission_loading": "Loading...",
         "permission_empty_users": "No users to display.",
         "permission_empty_groups": "No groups to display.",
+        "permission_public_group_label": "All",
+        "public_write_badge": "Public Write",
         "markdown_help_aria": "Markdown syntax guide",
         "markdown_help_fallback_title": "Markdown Guide",
         "markdown_help_fallback_missing": "Guide file not found.",
         "markdown_help_fallback_read_error": "Failed to read the guide file.",
+        "markdown_preview_aria": "Markdown preview",
+        "markdown_preview_loading": "Loading preview...",
         "js_error_path_required": "Please enter a path.",
         "js_error_parent_path_not_allowed": "Parent path (..) is not allowed.",
         "js_error_request_failed": "Request failed while processing the request.",
@@ -365,6 +440,83 @@ def get_effective_docs_acl_rule(request, path_value: str | None) -> tuple[DocsAc
     return None, ""
 
 
+def has_descendant_docs_acl_rule(request, path_value: str | None) -> bool:
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+
+    cache = getattr(request, "_docs_acl_descendant_rule_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(request, "_docs_acl_descendant_rule_cache", cache)
+    if normalized in cache:
+        return cache[normalized]
+
+    rule_map = get_docs_acl_rule_map(request)
+    if not normalized:
+        has_descendant_rule = any(rule_path != "" for rule_path in rule_map.keys())
+        cache[normalized] = has_descendant_rule
+        return has_descendant_rule
+
+    prefix = normalized + "/"
+    has_descendant_rule = any(rule_path.startswith(prefix) for rule_path in rule_map.keys())
+    cache[normalized] = has_descendant_rule
+    return has_descendant_rule
+
+
+def get_docs_public_write_group() -> Group:
+    group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
+    return group
+
+
+def rule_has_public_group(rule: DocsAccessRule, group_relation: str) -> bool:
+    groups = getattr(rule, group_relation).all()
+    return any(group.name == DOCS_PUBLIC_WRITE_GROUP_NAME for group in groups)
+
+
+def get_public_group_display_label(request) -> str:
+    cached = getattr(request, "_docs_public_group_display_label", None)
+    if isinstance(cached, str) and cached:
+        return cached
+    docs_text = get_docs_text(resolve_ui_lang(request, None))
+    label = docs_text.get("permission_public_group_label", "전체")
+    setattr(request, "_docs_public_group_display_label", label)
+    return label
+
+
+def is_docs_public_write_enabled(request, path_value: str | None) -> bool:
+    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    if rule is None:
+        return False
+    return rule_has_public_group(rule, "write_groups")
+
+
+def get_write_acl_display_labels(request, path_value: str | None) -> list[str]:
+    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    if rule is None:
+        return []
+
+    labels = []
+    group_names = sorted(
+        {
+            group.name
+            for group in rule.write_groups.all()
+            if group.name and group.name != DOCS_PUBLIC_WRITE_GROUP_NAME
+        },
+        key=lambda value: value.lower(),
+    )
+    user_names = sorted(
+        {
+            user.get_username()
+            for user in rule.write_users.all()
+            if user.get_username()
+        },
+        key=lambda value: value.lower(),
+    )
+
+    labels.extend(f"#{group_name}" for group_name in group_names)
+    labels.extend(f"@{username}" for username in user_names)
+    return labels
+
+
 def get_request_user_group_ids(request) -> set[int]:
     cached = getattr(request, "_docs_acl_user_group_ids", None)
     if cached is not None:
@@ -413,17 +565,24 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
     rule, _ = get_effective_docs_acl_rule(request, path_value)
     if rule is None:
         return True
+    if rule_has_public_group(rule, "read_groups"):
+        return True
+
+    read_user_ids = {user.id for user in rule.read_users.all()}
+    read_group_ids = {
+        group.id
+        for group in rule.read_groups.all()
+        if group.name != DOCS_PUBLIC_WRITE_GROUP_NAME
+    }
+
+    if not read_user_ids and not read_group_ids:
+        return True
 
     return user_matches_docs_acl_rule(
         request,
         rule,
         user_relation="read_users",
         group_relation="read_groups",
-    ) or user_matches_docs_acl_rule(
-        request,
-        rule,
-        user_relation="write_users",
-        group_relation="write_groups",
     )
 
 
@@ -431,12 +590,28 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
     user = getattr(request, "user", None)
     if user and user.is_superuser:
         return True
+
+    normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    rule, matched_rule_path = get_effective_docs_acl_rule(request, path_value)
+    has_descendant_rule = has_descendant_docs_acl_rule(request, normalized_path)
+    if rule is None:
+        if has_descendant_rule:
+            return False
+        return is_docs_editor(request)
+    if matched_rule_path != normalized_path and has_descendant_rule:
+        return False
+    if rule_has_public_group(rule, "write_groups"):
+        # Safety guard for legacy-invalid ACL data:
+        # public-write ACL is only valid on markdown files, never on directories.
+        try:
+            target_path, _ = resolve_path(normalized_path, must_exist=True)
+        except (ValueError, FileNotFoundError):
+            return True
+        if target_path.is_dir():
+            return False
+        return True
     if not is_docs_editor(request):
         return False
-
-    rule, _ = get_effective_docs_acl_rule(request, path_value)
-    if rule is None:
-        return True
 
     return user_matches_docs_acl_rule(
         request,
@@ -509,12 +684,20 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
             entry = build_entry(child)
             if request is not None and not has_docs_read_access(request, entry["path"]):
                 continue
+            if request is not None:
+                entry["can_edit"] = has_docs_write_access(request, entry["path"])
+                entry["is_public_write"] = False
+                entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
             entries.append(entry)
             continue
         if child.is_file() and child.suffix.lower() == DOCS_FILE_EXTENSION:
             entry = build_entry(child)
             if request is not None and not has_docs_read_access(request, entry["path"]):
                 continue
+            if request is not None:
+                entry["can_edit"] = has_docs_write_access(request, entry["path"])
+                entry["is_public_write"] = is_docs_public_write_enabled(request, entry["path"])
+                entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
             entries.append(entry)
     return entries
 
@@ -606,9 +789,93 @@ def resolve_next_url(request, fallback_url: str) -> str:
     return fallback_url
 
 
+def get_markdown_help_candidates(ui_lang: str | None) -> list[Path]:
+    docs_root = docs_root_dir()
+    help_root = docs_root / MARKDOWN_HELP_DIRECTORY
+    markdown_help_candidates: list[Path] = []
+    if ui_lang == "en":
+        markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_EN)
+        markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_KO)
+    else:
+        markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_KO)
+        markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_EN)
+    markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_LEGACY)
+
+    # Backward compatibility for older deployments that still have root-level help files.
+    if ui_lang == "en":
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
+    else:
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
+        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
+    markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_LEGACY)
+    return markdown_help_candidates
+
+
+def resolve_markdown_help_file(ui_lang: str | None) -> Path | None:
+    for markdown_help_path in get_markdown_help_candidates(ui_lang):
+        if markdown_help_path.exists() and markdown_help_path.is_file():
+            return markdown_help_path
+    return None
+
+
+def get_page_help_candidates(ui_lang: str | None, page_type: str) -> list[Path]:
+    docs_root = docs_root_dir()
+    help_root = docs_root / MARKDOWN_HELP_DIRECTORY
+    base_name = PAGE_HELP_FILE_BASENAMES.get(page_type)
+    if not base_name:
+        return []
+
+    preferred_lang = "en" if ui_lang == "en" else "ko"
+    secondary_lang = "ko" if preferred_lang == "en" else "en"
+    return [
+        help_root / f"{base_name}.{preferred_lang}{DOCS_FILE_EXTENSION}",
+        help_root / f"{base_name}.{secondary_lang}{DOCS_FILE_EXTENSION}",
+        help_root / f"{base_name}{DOCS_FILE_EXTENSION}",
+    ]
+
+
+def resolve_page_help_file(ui_lang: str | None, page_type: str) -> Path | None:
+    for page_help_path in get_page_help_candidates(ui_lang, page_type):
+        if page_help_path.exists() and page_help_path.is_file():
+            return page_help_path
+    return None
+
+
+def build_page_help_html(ui_lang: str | None, page_type: str, docs_text: dict) -> str:
+    page_help_path = resolve_page_help_file(ui_lang, page_type)
+    try:
+        if page_help_path is not None:
+            return render_markdown_safely(page_help_path.read_text(encoding="utf-8"))
+        fallback_markdown = (
+            f"# {docs_text.get('help_button', 'Help')}\n\n"
+            f"{docs_text['markdown_help_fallback_missing']}"
+        )
+    except OSError:
+        fallback_markdown = (
+            f"# {docs_text.get('help_button', 'Help')}\n\n"
+            f"{docs_text['markdown_help_fallback_read_error']}"
+        )
+    return render_markdown_safely(fallback_markdown)
+
+
+def build_docs_help_url(ui_lang: str | None, docs_base_url: str) -> str:
+    help_file = resolve_markdown_help_file(ui_lang)
+    if help_file is None:
+        return docs_base_url
+
+    help_relative = relative_from_root(help_file)
+    help_slug = markdown_slug_from_relative(help_relative)
+
+    if ui_lang in SUPPORTED_UI_LANGS:
+        return reverse("main:docs_view_lang", kwargs={"ui_lang": ui_lang, "doc_path": help_slug})
+    return reverse("main:docs_view", kwargs={"doc_path": help_slug})
+
+
 def docs_common_context(request, ui_lang):
     context = {}
     apply_ui_context(request, context, ui_lang)
+    docs_text = get_docs_text(ui_lang)
 
     if ui_lang in SUPPORTED_UI_LANGS:
         docs_base_url = reverse("main:docs_root_lang", kwargs={"ui_lang": ui_lang})
@@ -620,17 +887,25 @@ def docs_common_context(request, ui_lang):
         docs_write_url = reverse("main:docs_write")
         docs_login_url = reverse("main:docs_login")
         docs_logout_url = reverse("main:docs_logout")
+    docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
 
     context.update(
         {
+            "meta_title": DOCS_META_TITLE,
+            "meta_og_title": DOCS_META_TITLE,
+            "meta_site_name": DOCS_META_TITLE,
+            "meta_description": DOCS_META_DESCRIPTION,
+            "meta_og_description": DOCS_META_DESCRIPTION,
             "docs_base_url": docs_base_url,
             "docs_write_url": docs_write_url,
             "docs_login_url": docs_login_url,
             "docs_logout_url": docs_logout_url,
             "docs_auth_next": request.get_full_path(),
             "docs_logout_next": docs_base_url,
+            "docs_help_url": docs_help_url,
             "docs_api_list_url": reverse("main:docs_api_list"),
             "docs_api_save_url": reverse("main:docs_api_save"),
+            "docs_api_preview_url": reverse("main:docs_api_preview"),
             "docs_api_rename_url": reverse("main:docs_api_rename"),
             "docs_api_delete_url": reverse("main:docs_api_delete"),
             "docs_api_mkdir_url": reverse("main:docs_api_mkdir"),
@@ -640,7 +915,7 @@ def docs_common_context(request, ui_lang):
             "docs_api_acl_options_url": reverse("main:docs_api_acl_options"),
             "docs_can_edit": has_docs_write_access(request, ""),
             "docs_can_manage_acl": is_docs_acl_admin(request),
-            "docs_text": get_docs_text(ui_lang),
+            "docs_text": docs_text,
         }
     )
     return context
@@ -725,6 +1000,7 @@ def docs_logout(request, ui_lang=None):
 def docs_list(request, folder_path="", ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
+    docs_text = context["docs_text"]
 
     try:
         directory, current_dir = resolve_path(folder_path, must_exist=True)
@@ -741,8 +1017,10 @@ def docs_list(request, folder_path="", ui_lang=None):
             "current_dir": current_dir,
             "current_dir_display": current_dir or "/",
             "current_path_label": f"/docs/{current_dir}" if current_dir else "/docs",
+            "current_dir_can_edit": has_docs_write_access(request, current_dir),
             "breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], current_dir),
             "initial_entries": list_directory_entries(directory, request=request),
+            "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
         }
     )
     return render(request, "docs/list.html", context)
@@ -751,6 +1029,7 @@ def docs_list(request, folder_path="", ui_lang=None):
 def docs_view(request, doc_path, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
+    docs_text = context["docs_text"]
 
     try:
         file_path, relative_file_path = normalize_markdown_relative_path(doc_path, must_exist=True)
@@ -771,9 +1050,11 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_relative_path": relative_file_path,
             "doc_slug_path": slug_path,
             "doc_parent_dir": parent_dir,
+            "doc_can_edit": has_docs_write_access(request, relative_file_path),
             "doc_content_html": render_markdown_safely(content),
             "view_breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], parent_dir),
             "view_current_file_name": file_path.name,
+            "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
         }
     )
     return render(request, "docs/view.html", context)
@@ -783,8 +1064,6 @@ def docs_write(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
-    if not context["docs_can_edit"]:
-        raise PermissionDenied("문서 수정 권한이 필요합니다.")
 
     requested_path = request.GET.get("path", "")
     requested_dir = request.GET.get("dir", "")
@@ -795,6 +1074,7 @@ def docs_write(request, ui_lang=None):
     initial_dir = ""
     initial_content = ""
     write_current_file_name = ""
+    write_public_direct_save = False
 
     if requested_path:
         try:
@@ -803,6 +1083,7 @@ def docs_write(request, ui_lang=None):
             raise Http404("수정할 문서를 찾을 수 없습니다.")
         if not has_docs_write_access(request, original_relative_path):
             raise PermissionDenied("문서를 수정할 권한이 없습니다.")
+        write_public_direct_save = is_docs_public_write_enabled(request, original_relative_path)
 
         mode = "edit"
         initial_filename = file_path.stem
@@ -821,24 +1102,11 @@ def docs_write(request, ui_lang=None):
         if not has_docs_write_access(request, ""):
             raise PermissionDenied("문서를 수정할 권한이 없습니다.")
 
-    docs_root = docs_root_dir()
-    markdown_help_candidates = []
-    if resolved_lang == "en":
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
-    else:
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
-    markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_LEGACY)
-
+    markdown_help_path = resolve_markdown_help_file(resolved_lang)
     try:
-        markdown_help_content = ""
-        for markdown_help_path in markdown_help_candidates:
-            if markdown_help_path.exists() and markdown_help_path.is_file():
-                markdown_help_content = markdown_help_path.read_text(encoding="utf-8")
-                break
-
-        if not markdown_help_content:
+        if markdown_help_path is not None:
+            markdown_help_content = markdown_help_path.read_text(encoding="utf-8")
+        else:
             markdown_help_content = (
                 f"# {docs_text['markdown_help_fallback_title']}\n\n"
                 f"{docs_text['markdown_help_fallback_missing']}"
@@ -858,8 +1126,10 @@ def docs_write(request, ui_lang=None):
             "initial_content": initial_content,
             "available_directories": list_all_directories(request=request),
             "markdown_help_html": render_markdown_safely(markdown_help_content),
+            "page_help_html": build_page_help_html(resolved_lang, "write", docs_text),
             "write_breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], initial_dir),
             "write_current_file_name": write_current_file_name,
+            "write_public_direct_save": write_public_direct_save,
         }
     )
     return render(request, "docs/write.html", context)
@@ -897,6 +1167,7 @@ def parse_id_list(raw_value, field_name: str) -> list[int]:
 @require_http_methods(["GET"])
 @require_docs_acl_admin_json
 def docs_api_acl_options(request):
+    public_group = get_docs_public_write_group()
     User = get_user_model()
     users = [
         {
@@ -907,10 +1178,19 @@ def docs_api_acl_options(request):
     ]
     groups = [
         {
+            "id": public_group.id,
+            "name": public_group.name,
+            "label": get_public_group_display_label(request),
+            "is_public_all": True,
+        }
+    ] + [
+        {
             "id": group.id,
             "name": group.name,
+            "label": group.name,
+            "is_public_all": False,
         }
-        for group in Group.objects.order_by("name")
+        for group in Group.objects.exclude(id=public_group.id).order_by("name")
     ]
     return JsonResponse({"ok": True, "users": users, "groups": groups})
 
@@ -930,7 +1210,7 @@ def docs_api_acl(request):
 
     try:
         rel_path = normalize_relative_path(rel_path_raw, allow_empty=True)
-        _, rel_path = resolve_path(rel_path, must_exist=True)
+        target_path_obj, rel_path = resolve_path(rel_path, must_exist=True)
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=404)
 
@@ -966,6 +1246,12 @@ def docs_api_acl(request):
 
     all_user_ids = sorted(set(read_user_ids) | set(write_user_ids))
     all_group_ids = sorted(set(read_group_ids) | set(write_group_ids))
+    public_group_id = get_docs_public_write_group().id
+
+    if target_path_obj.is_dir() and (
+        public_group_id in read_group_ids or public_group_id in write_group_ids
+    ):
+        return json_error("폴더에는 전체 권한을 설정할 수 없습니다.", status=400)
 
     User = get_user_model()
     valid_user_ids = set(User.objects.filter(id__in=all_user_ids, is_active=True).values_list("id", flat=True))
@@ -1029,7 +1315,6 @@ def docs_api_list(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@require_docs_editor_json
 def docs_api_rename(request):
     try:
         payload = parse_json_body(request)
@@ -1043,6 +1328,8 @@ def docs_api_rename(request):
         return json_error("루트 폴더는 이름을 바꿀 수 없습니다.", status=400)
     if not has_docs_write_access(request, source_relative):
         return json_error("문서를 수정할 권한이 없습니다.", status=403)
+    if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
+        return json_error("전체 허용 파일은 이름을 바꿀 수 없습니다.", status=403)
 
     parent = source_path.parent
     if source_path.is_file():
@@ -1073,7 +1360,6 @@ def docs_api_rename(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@require_docs_editor_json
 def docs_api_delete(request):
     try:
         payload = parse_json_body(request)
@@ -1086,6 +1372,8 @@ def docs_api_delete(request):
         return json_error("루트 폴더는 삭제할 수 없습니다.", status=400)
     if not has_docs_write_access(request, target_relative):
         return json_error("문서를 수정할 권한이 없습니다.", status=403)
+    if target_path.is_file() and is_docs_public_write_enabled(request, target_relative):
+        return json_error("전체 허용 파일은 삭제할 수 없습니다.", status=403)
 
     if target_path.is_dir():
         shutil.rmtree(target_path)
@@ -1100,7 +1388,6 @@ def docs_api_delete(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@require_docs_editor_json
 def docs_api_mkdir(request):
     try:
         payload = parse_json_body(request)
@@ -1125,7 +1412,6 @@ def docs_api_mkdir(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@require_docs_editor_json
 def docs_api_move(request):
     try:
         payload = parse_json_body(request)
@@ -1142,6 +1428,8 @@ def docs_api_move(request):
         return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
     if not has_docs_write_access(request, source_relative):
         return json_error("문서를 수정할 권한이 없습니다.", status=403)
+    if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
+        return json_error("전체 허용 파일은 이동할 수 없습니다.", status=403)
     if not has_docs_write_access(request, target_dir_relative):
         return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
@@ -1187,7 +1475,35 @@ def docs_api_move(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@require_docs_editor_json
+def docs_api_preview(request):
+    try:
+        payload = parse_json_body(request)
+        original_relative_path = normalize_relative_path(payload.get("original_path"), allow_empty=True)
+        content = payload.get("content", "")
+        if not isinstance(content, str):
+            raise ValueError("문서 내용 형식이 올바르지 않습니다.")
+    except ValueError as exc:
+        return json_error(str(exc), status=400)
+
+    if original_relative_path:
+        try:
+            _, source_relative = normalize_markdown_relative_path(
+                original_relative_path, must_exist=True
+            )
+        except (ValueError, FileNotFoundError) as exc:
+            return json_error(str(exc), status=400)
+        if not has_docs_write_access(request, source_relative):
+            return json_error("문서를 수정할 권한이 없습니다.", status=403)
+    else:
+        if not has_docs_write_access(request, ""):
+            return json_error("문서를 수정할 권한이 없습니다.", status=403)
+
+    rendered_html = str(render_markdown_safely(content))
+    return JsonResponse({"ok": True, "html": rendered_html})
+
+
+@require_http_methods(["POST"])
+@csrf_protect
 def docs_api_save(request):
     try:
         payload = parse_json_body(request)
@@ -1201,18 +1517,28 @@ def docs_api_save(request):
         target_dir_path, target_dir_rel = resolve_path(target_dir, must_exist=True)
         if not target_dir_path.is_dir():
             raise ValueError("저장 위치가 폴더가 아닙니다.")
-        if not has_docs_write_access(request, target_dir_rel):
-            return json_error("문서를 수정할 권한이 없습니다.", status=403)
-
-        destination = target_dir_path / f"{filename}{DOCS_FILE_EXTENSION}"
-
         source_path = None
         source_relative = ""
+        source_is_public_write = False
         if original_relative_path:
             source_path, source_relative = normalize_markdown_relative_path(
                 original_relative_path, must_exist=True
             )
             if not has_docs_write_access(request, source_relative):
+                return json_error("문서를 수정할 권한이 없습니다.", status=403)
+            source_is_public_write = is_docs_public_write_enabled(request, source_relative)
+
+        destination = target_dir_path / f"{filename}{DOCS_FILE_EXTENSION}"
+        destination_exists = destination.exists()
+        is_same_as_source = bool(
+            source_path is not None and destination_exists and destination.resolve() == source_path.resolve()
+        )
+
+        if source_is_public_write and not is_same_as_source:
+            return json_error("전체 허용 파일은 위치나 이름을 바꿀 수 없습니다.", status=403)
+
+        if source_path is None or not is_same_as_source:
+            if not has_docs_write_access(request, target_dir_rel):
                 return json_error("문서를 수정할 권한이 없습니다.", status=403)
 
         if destination.exists():
