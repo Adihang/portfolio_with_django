@@ -1,0 +1,267 @@
+{% load static static_versioned %}
+<!doctype html>
+<html lang="{{ ui_lang|default:'ko' }}">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Hanplanet mini game index">
+    <meta name="robots" content="noindex">
+    <link rel="icon" href="{% static_v 'favicon.png' %}">
+    <link rel="stylesheet" type="text/css" href="{% static_v 'css/style.css' %}">
+    <title>{{ page_title }}</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body.minigame-page {
+            min-height: 100vh;
+            min-height: 100dvh;
+            color: #f1f1f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 16px;
+            box-sizing: border-box;
+        }
+
+        .minigame-shell {
+            width: min(780px, 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            background: rgba(12, 12, 12, 0.35);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+            padding: 22px 18px;
+            box-sizing: border-box;
+        }
+
+        .minigame-title {
+            margin: 0;
+            font-size: 1.55rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .minigame-list {
+            list-style: none;
+            margin: 18px 0 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .minigame-link {
+            display: grid;
+            grid-template-columns: 88px minmax(0, 1fr);
+            gap: 12px;
+            text-decoration: none;
+            color: #f5f5f5;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 12px 14px;
+            transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            align-items: center;
+        }
+
+        .minigame-link:hover,
+        .minigame-link:focus-visible {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .minigame-link-title {
+            display: block;
+            font-size: 1.02rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .minigame-link-description {
+            display: block;
+            margin-top: 4px;
+            color: #cccccc;
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+
+        .minigame-link-image-wrap {
+            width: 88px;
+            height: 88px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: rgba(0, 0, 0, 0.26);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .minigame-link-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .minigame-link-image-wrap.is-empty::before {
+            content: "No Image";
+            color: #bfbfbf;
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+        }
+
+        .minigame-link-content {
+            min-width: 0;
+        }
+
+        @media (max-width: 640px) {
+            .minigame-link {
+                grid-template-columns: 68px minmax(0, 1fr);
+                gap: 10px;
+            }
+
+            .minigame-link-image-wrap {
+                width: 68px;
+                height: 68px;
+            }
+
+            .minigame-link-description {
+                font-size: 0.84rem;
+            }
+        }
+    </style>
+</head>
+<body class="minigame-page">
+    <main class="minigame-shell">
+        <h1 class="minigame-title">{{ page_title }}</h1>
+
+        <ul class="minigame-list">
+            {% for item in minigame_links %}
+                <li>
+                    <a class="minigame-link" href="{{ item.url }}">
+                        <span class="minigame-link-image-wrap">
+                            <img class="minigame-link-image" src="" alt="{{ item.title }}" loading="lazy" hidden>
+                        </span>
+                        <span class="minigame-link-content" data-minigame-card data-meta-url="{{ item.url }}">
+                            <span class="minigame-link-title">{{ item.title }}</span>
+                            <span class="minigame-link-description"></span>
+                        </span>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </main>
+    <script>
+        (function () {
+            const cards = document.querySelectorAll('[data-minigame-card]');
+            if (!cards.length) {
+                return;
+            }
+
+            const parser = new DOMParser();
+
+            const getMetaContent = function (doc, attrs) {
+                const selectors = [];
+                if (attrs.name) {
+                    selectors.push('meta[name="' + attrs.name + '"]');
+                }
+                if (attrs.property) {
+                    selectors.push('meta[property="' + attrs.property + '"]');
+                }
+
+                for (let i = 0; i < selectors.length; i += 1) {
+                    const tag = doc.querySelector(selectors[i]);
+                    if (!tag) {
+                        continue;
+                    }
+                    const content = (tag.getAttribute('content') || '').trim();
+                    if (content) {
+                        return content;
+                    }
+                }
+                return '';
+            };
+
+            const toAbsoluteUrl = function (rawUrl, baseUrl) {
+                if (!rawUrl) {
+                    return '';
+                }
+
+                try {
+                    return new URL(rawUrl, baseUrl).toString();
+                } catch (error) {
+                    return '';
+                }
+            };
+
+            cards.forEach(function (card) {
+                const metaUrl = card.getAttribute('data-meta-url');
+                if (!metaUrl) {
+                    return;
+                }
+                const pageUrl = toAbsoluteUrl(metaUrl, window.location.origin);
+                const requestUrl = pageUrl || metaUrl;
+
+                const titleNode = card.querySelector('.minigame-link-title');
+                const descriptionNode = card.querySelector('.minigame-link-description');
+                const cardLink = card.closest('.minigame-link');
+                const imageWrap = cardLink ? cardLink.querySelector('.minigame-link-image-wrap') : null;
+                const imageNode = cardLink ? cardLink.querySelector('.minigame-link-image') : null;
+
+                if (imageWrap) {
+                    imageWrap.classList.add('is-empty');
+                }
+
+                fetch(requestUrl, { credentials: 'same-origin' })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch metadata');
+                        }
+                        return response.text();
+                    })
+                    .then(function (html) {
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const parsedTitle = getMetaContent(doc, { property: 'og:title' }) || (doc.title || '').trim();
+                        const parsedDescription = getMetaContent(doc, { property: 'og:description' }) ||
+                            getMetaContent(doc, { name: 'description' });
+                        const parsedImage = getMetaContent(doc, { property: 'og:image' });
+
+                        if (titleNode && parsedTitle) {
+                            titleNode.textContent = parsedTitle;
+                        }
+
+                        if (descriptionNode) {
+                            if (parsedDescription) {
+                                descriptionNode.textContent = parsedDescription;
+                                descriptionNode.hidden = false;
+                            } else {
+                                descriptionNode.hidden = true;
+                            }
+                        }
+
+                        if (imageWrap && imageNode) {
+                            const absoluteImageUrl = toAbsoluteUrl(parsedImage, requestUrl);
+                            if (absoluteImageUrl) {
+                                imageNode.src = absoluteImageUrl;
+                                imageNode.hidden = false;
+                                imageWrap.classList.remove('is-empty');
+                            }
+                        }
+                    })
+                    .catch(function () {
+                        if (descriptionNode) {
+                            descriptionNode.hidden = true;
+                        }
+                    });
+            });
+        })();
+    </script>
+</body>
+</html>

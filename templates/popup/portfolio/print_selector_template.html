@@ -1,0 +1,26 @@
+<template id="portfolio-print-selector-template">
+    <div class="portfolio-print-selector-overlay" data-popup-role="overlay">
+        <div
+            class="portfolio-print-selector-panel"
+            data-popup-role="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="portfolio-print-selector-title"
+            aria-describedby="portfolio-print-selector-description"
+        >
+            <h4 id="portfolio-print-selector-title" class="portfolio-print-selector-title" data-popup-role="title"></h4>
+            <p id="portfolio-print-selector-description" class="portfolio-print-selector-description" data-popup-role="description"></p>
+            <div class="portfolio-print-selector-list" data-popup-role="list"></div>
+            <div class="portfolio-print-selector-footer" data-popup-role="footer">
+                <div class="portfolio-print-selector-left-buttons" data-popup-role="left-buttons">
+                    <button type="button" data-popup-action="select-all"></button>
+                    <button type="button" data-popup-action="clear-all"></button>
+                </div>
+                <div class="portfolio-print-selector-right-buttons" data-popup-role="right-buttons">
+                    <button type="button" data-popup-action="cancel"></button>
+                    <button type="button" data-popup-action="print"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

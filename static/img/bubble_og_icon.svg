@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="1200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DBE5F2"/>
+      <stop offset="1" stop-color="#C6D5E6"/>
+    </linearGradient>
+    <radialGradient id="bubbleA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(430 500) rotate(42) scale(330 320)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="0.72" stop-color="#E9F2FB" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#90A6BF" stop-opacity="0.34"/>
+    </radialGradient>
+    <radialGradient id="bubbleB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(850 560) rotate(36) scale(250 236)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.2"/>
+      <stop offset="0.72" stop-color="#EAF1F8" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#8EA4BE" stop-opacity="0.3"/>
+    </radialGradient>
+    <radialGradient id="bubbleC" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(650 360) rotate(25) scale(150 142)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#98AEC8" stop-opacity="0.28"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+
+  <circle cx="430" cy="500" r="246" fill="url(#bubbleA)"/>
+  <circle cx="850" cy="560" r="188" fill="url(#bubbleB)"/>
+  <circle cx="650" cy="360" r="112" fill="url(#bubbleC)"/>
+
+  <circle cx="348" cy="428" r="42" fill="#FFFFFF" fill-opacity="0.12"/>
+  <circle cx="782" cy="488" r="30" fill="#FFFFFF" fill-opacity="0.11"/>
+  <circle cx="604" cy="320" r="20" fill="#FFFFFF" fill-opacity="0.13"/>
+
+  <text x="92" y="940" fill="#1A2735" font-family="Inter, Noto Sans KR, Arial, sans-serif" font-size="92" font-weight="700" letter-spacing="0.5">
+    Bubble Playground
+  </text>
+  <text x="94" y="1010" fill="#32485F" font-family="Inter, Noto Sans KR, Arial, sans-serif" font-size="44" font-weight="500">
+    Hanplanet Mini Game
+  </text>
+</svg>

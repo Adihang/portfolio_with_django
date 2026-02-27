@@ -33,13 +33,13 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="Django로 작성한 포트폴리오 입니다.">
-    <meta name="author" content="Hanplanet">
+    <meta name="description" content="{{ meta_description|default:'Django로 작성한 포트폴리오 입니다.' }}">
+    <meta name="author" content="{{ meta_author|default:'Hanplanet' }}">
     <meta name="generator" content="Django">
     <meta name="robots" content="noindex">
-    <meta property="og:title" content="Hanplanet">
-    <meta property="og:site_name" content="Hanplanet">
-    <meta property="og:description" content="Django로 작성한 포트폴리오 입니다.">
+    <meta property="og:title" content="{{ meta_og_title|default:'Hanplanet' }}">
+    <meta property="og:site_name" content="{{ meta_site_name|default:'Hanplanet' }}">
+    <meta property="og:description" content="{{ meta_og_description|default:'Django로 작성한 포트폴리오 입니다.' }}">
     <meta property="og:image" content="https://github.com/Adihang/portfolio_with_django/assets/56463432/85411b54-68be-4ece-b21f-b531794020c0">
     {% include "partials/static_script_fallback.html" %}
     <link rel="icon" href="{% static_v 'favicon.png' %}">
@@ -49,7 +49,7 @@
     <script src="{% static_v 'js/script.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
     <!-- 채팅 위젯 스타일 -->
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/chat_widget.css' %}">
-    <title>Hanplanet</title>
+    <title>{{ meta_title|default:'Hanplanet' }}</title>
     <!-- CSRF Token for AJAX -->
     <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
@@ -58,18 +58,6 @@
     <nav class="navbar portfolio-nav">
         <div class="container-fluid">
             <div class="portfolio-brand-group">
-                <div class="portfolio-controls-stack">
-                    <div class="portfolio-lang-toggle portfolio-control-toggle portfolio-lang-toggle-inline" aria-label="Language Toggle">
-                        <a class="portfolio-lang-link portfolio-control-link{% if ui_lang|default:'ko' == 'ko' %} is-active{% endif %}" href="{{ lang_switch_ko_url }}">KO</a>
-                        <span class="portfolio-lang-divider">|</span>
-                        <a class="portfolio-lang-link portfolio-control-link{% if ui_lang|default:'ko' == 'en' %} is-active{% endif %}" href="{{ lang_switch_en_url }}">EN</a>
-                    </div>
-                    <div class="portfolio-lang-toggle portfolio-control-toggle portfolio-theme-toggle" aria-label="Theme Toggle">
-                        <a href="#" role="button" class="portfolio-lang-link portfolio-control-link is-active" data-theme-mode="light">LT</a>
-                        <span class="portfolio-lang-divider">|</span>
-                        <a href="#" role="button" class="portfolio-lang-link portfolio-control-link" data-theme-mode="dark">DK</a>
-                    </div>
-                </div>
                 <a class="navbar-brand portfolio-brand" href="{% url 'main:main_lang' ui_lang=ui_lang %}">
                     <span class="portfolio-brand-text">Hanplanet</span>
                 </a>
@@ -90,6 +78,18 @@
                         </li>
                     {% endfor %}
                 </ul>
+                <div class="portfolio-controls-stack">
+                    <div class="portfolio-lang-toggle portfolio-control-toggle portfolio-lang-toggle-inline" aria-label="Language Toggle">
+                        <a class="portfolio-lang-link portfolio-control-link{% if ui_lang|default:'ko' == 'ko' %} is-active{% endif %}" href="{{ lang_switch_ko_url }}">KO</a>
+                        <span class="portfolio-lang-divider">|</span>
+                        <a class="portfolio-lang-link portfolio-control-link{% if ui_lang|default:'ko' == 'en' %} is-active{% endif %}" href="{{ lang_switch_en_url }}">EN</a>
+                    </div>
+                    <div class="portfolio-lang-toggle portfolio-control-toggle portfolio-theme-toggle" aria-label="Theme Toggle">
+                        <a href="#" role="button" class="portfolio-lang-link portfolio-control-link is-active" data-theme-mode="light">LT</a>
+                        <span class="portfolio-lang-divider">|</span>
+                        <a href="#" role="button" class="portfolio-lang-link portfolio-control-link" data-theme-mode="dark">DK</a>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>

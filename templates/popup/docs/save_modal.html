@@ -1,0 +1,36 @@
+<div id="docs-save-modal" class="docs-save-modal" hidden>
+    <div class="docs-save-modal-backdrop" id="docs-save-modal-backdrop"></div>
+    <div class="docs-save-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-save-modal-title">
+        <div class="docs-save-modal-head">
+            <h2 id="docs-save-modal-title" class="docs-save-modal-title">{{ docs_text.save_location_title }}</h2>
+            <button type="button" class="docs-save-close-btn" id="docs-save-close-btn" aria-label="{{ docs_text.close_label }}">x</button>
+        </div>
+        <div class="docs-save-location-bar">
+            <button type="button" class="docs-btn" id="docs-save-up-btn">{{ docs_text.up_button }}</button>
+            <div class="docs-save-breadcrumb" id="docs-save-breadcrumb"></div>
+        </div>
+        <div class="docs-save-browser">
+            <aside class="docs-save-sidebar">
+                <div class="docs-save-sidebar-title">{{ docs_text.quick_paths_title }}</div>
+                <ul class="docs-save-sidebar-list" id="docs-save-quick-list"></ul>
+            </aside>
+            <section class="docs-save-folder-pane">
+                <div class="docs-save-folder-head">{{ docs_text.folder_title }}</div>
+                <ul class="docs-save-folder-list" id="docs-save-folder-list"></ul>
+            </section>
+        </div>
+        <label class="docs-field docs-field-full">
+            <span>{{ docs_text.selected_path_label }}</span>
+            <input type="text" id="docs-dir-input" list="docs-directory-options" value="{{ initial_dir }}" placeholder="{{ docs_text.selected_path_placeholder }}">
+        </label>
+        <div class="docs-save-modal-actions">
+            <button type="button" class="docs-btn" id="docs-create-folder-btn">{{ docs_text.create_folder_button }}</button>
+            <div class="docs-save-modal-actions-right">
+                <button type="button" class="docs-btn" id="docs-save-cancel-btn">{{ docs_text.cancel }}</button>
+                <button type="button" class="docs-btn docs-btn-primary" id="docs-save-confirm-btn">{{ docs_text.save_confirm_button }}</button>
+            </div>
+        </div>
+
+        {% include "popup/docs/folder_modal.html" %}
+    </div>
+</div>

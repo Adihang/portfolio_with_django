@@ -150,7 +150,7 @@ def apply_ui_context(request, context, ui_lang):
             {"name": "GitHub", "url": "https://github.com/Adihang"},
             {"name": "Thingiverse", "url": "https://www.thingiverse.com/hanbyel/designs"},
             {"name": "Docs", "url": "/docs/list"},
-            {"name": "Mini Game", "url": "/Stratagem_Hero/"},
+            {"name": "Mini Game", "url": "/fun/minigame/"},
         ]
 
 
@@ -181,23 +181,23 @@ def project_detail_legacy_redirect(request, project_id):
     return redirect_to_localized_route(request, "main:ProjectDetail_lang", project_id=project_id)
 
 
-def salvations_edge_legacy_redirect(request):
+def salvations_edge_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:Salvations_Edge_4_lang")
 
 
-def stratagem_hero_legacy_redirect(request):
+def stratagem_hero_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:Stratagem_Hero_lang")
 
 
-def stratagem_hero_scoreboard_legacy_redirect(request):
+def stratagem_hero_scoreboard_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:Stratagem_Hero_Scoreboard_lang")
 
 
-def minigame_legacy_redirect(request):
+def minigame_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:minigame_lang")
 
 
-def bubble_legacy_redirect(request):
+def bubble_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:bubble_lang")
 
 

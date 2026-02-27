@@ -1,9 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    var currentUrl = window.location.href;
-    var protocolAndDomain = currentUrl.split('/').slice(0, 3).join('/');
-    var baseUrl = protocolAndDomain + '/';
-    console.log(baseUrl);
     setTimeout(function() {
-        location.replace(baseUrl + "Stratagem_Hero/");
+        location.replace(new URL("../", window.location.href).toString());
     }, 5000);
 });

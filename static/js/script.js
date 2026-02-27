@@ -1,21 +1,30 @@
 document.addEventListener('DOMContentLoaded', function () {
     const SURFACE_COLOR = {
         light: '#ffffff',
-        dark: '#0f1012',
+        dark: '#14161a',
         transparent: 'transparent'
     };
 
     const currentPath = window.location.pathname;
-    const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?)$/;
+    const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|docs(?:\/.*)?)$/;
     const isLightBackgroundPage = document.body.classList.contains('portfolio-page') ||
         document.body.classList.contains('project-page') ||
+        document.body.classList.contains('docs-page') ||
         currentPath === '/portfolio/' ||
         currentPath === '/portfolio' ||
+        currentPath === '/docs/' ||
+        currentPath === '/docs' ||
+        currentPath.startsWith('/docs/') ||
         currentPath.startsWith('/project/') ||
         localizedLightBgPattern.test(currentPath);
     const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
     const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
     const bubbleLayer = document.querySelector('.bubble-bg-layer');
+    const themeToggle = document.querySelector('.portfolio-theme-toggle');
+    const themeToggleButtons = themeToggle
+        ? Array.from(themeToggle.querySelectorAll('.portfolio-control-link[data-theme-mode]'))
+        : [];
+    const THEME_MODE_STORAGE_KEY = 'portfolio_theme_mode';
     const printSurfaceSnapshot = {
         active: false,
         htmlStyle: null,
@@ -25,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     let currentSurfaceMode = null;
+    let manualThemeMode = null;
 
     const setSurfaceBackground = function (element, color) {
         if (!element) {
@@ -114,19 +124,63 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
+    const readStoredThemeMode = function () {
+        try {
+            const storedMode = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+            if (storedMode === 'dark') {
+                return true;
+            }
+            if (storedMode === 'light') {
+                return false;
+            }
+        } catch (error) {}
+        return null;
+    };
+
+    const persistThemeMode = function (darkMode) {
+        try {
+            if (darkMode === true) {
+                window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'dark');
+                return;
+            }
+            if (darkMode === false) {
+                window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'light');
+                return;
+            }
+            window.localStorage.removeItem(THEME_MODE_STORAGE_KEY);
+        } catch (error) {}
+    };
+
+    const syncThemeToggleState = function () {
+        if (!themeToggle) {
+            return;
+        }
+        themeToggle.style.display = '';
+        const darkActive = Boolean(currentSurfaceMode);
+
+        themeToggleButtons.forEach(function (button) {
+            const isDarkButton = button.dataset.themeMode === 'dark';
+            const isActive = isDarkButton === darkActive;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    };
+
     const applyPageSurfaceMode = function (useDarkTheme) {
+        currentSurfaceMode = useDarkTheme;
+        document.body.classList.toggle('theme-dark', useDarkTheme);
+
         if (!isLightBackgroundPage) {
             return;
         }
+
         const surfaceColor = useDarkTheme ? SURFACE_COLOR.dark : SURFACE_COLOR.light;
-        currentSurfaceMode = useDarkTheme;
         if (useDarkTheme) {
             document.documentElement.classList.remove('preload-light-bg');
         } else {
             document.documentElement.classList.add('preload-light-bg');
         }
         setLightSurfaceStylesEnabled(!useDarkTheme);
-        document.body.classList.toggle('bubble-exhausted-dark', useDarkTheme);
         setSurfaceBackground(document.documentElement, surfaceColor);
         setSurfaceBackground(document.body, surfaceColor);
 
@@ -144,9 +198,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    if (isLightBackgroundPage) {
-        applyPageSurfaceMode(false);
+    const applyThemeMode = function () {
+        applyPageSurfaceMode(Boolean(manualThemeMode));
+        syncThemeToggleState();
+    };
+
+    const setManualThemeMode = function (useDarkTheme) {
+        manualThemeMode = Boolean(useDarkTheme);
+        persistThemeMode(manualThemeMode);
+        applyThemeMode();
+    };
+
+    manualThemeMode = readStoredThemeMode();
+    if (manualThemeMode === null) {
+        manualThemeMode = false;
     }
+
+    themeToggleButtons.forEach(function (button) {
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            const useDarkTheme = button.dataset.themeMode === 'dark';
+            setManualThemeMode(useDarkTheme);
+        });
+    });
+
+    applyThemeMode();
 
     const enableNestedScrollPriority = function () {
         const canUseOverflowScroll = function (overflowValue) {
@@ -283,6 +359,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let lastFrameTime = 0;
         let bubblesExhausted = false;
         let hasInitializedBubbles = false;
+        let respawnTimerId = null;
+        const isBubbleFunPage = document.body.classList.contains('bubble-page');
+        const bubbleRespawnDelayMs = prefersReducedMotion ? 260 : 420;
         const bubblePhysicsConfig = {
             wallPopSpeedThreshold: prefersReducedMotion ? 12.31 : 10.65,
             bubblePopImpactThreshold: prefersReducedMotion ? 11.31 : 9.65,
@@ -293,6 +372,135 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const randomBetween = function (min, max) {
             return Math.random() * (max - min) + min;
+        };
+
+        const clampUnit = function (value) {
+            return Math.min(1, Math.max(0, value));
+        };
+
+        const cmykToRgb = function (c, m, y, k) {
+            const cyan = clampUnit(c);
+            const magenta = clampUnit(m);
+            const yellow = clampUnit(y);
+            const black = clampUnit(k);
+
+            return {
+                r: Math.round(255 * (1 - cyan) * (1 - black)),
+                g: Math.round(255 * (1 - magenta) * (1 - black)),
+                b: Math.round(255 * (1 - yellow) * (1 - black))
+            };
+        };
+
+        const clampByte = function (value) {
+            return Math.min(255, Math.max(0, Math.round(value)));
+        };
+
+        const rgbToCss = function (color) {
+            return 'rgb(' + color.r + ', ' + color.g + ', ' + color.b + ')';
+        };
+
+        const rgbaFrom = function (color, alpha) {
+            return 'rgba(' + color.r + ', ' + color.g + ', ' + color.b + ', ' + alpha + ')';
+        };
+
+        const invertRgb = function (color) {
+            return {
+                r: 255 - color.r,
+                g: 255 - color.g,
+                b: 255 - color.b
+            };
+        };
+
+        const mixRgb = function (fromColor, toColor, ratio) {
+            const t = clampUnit(ratio);
+            return {
+                r: clampByte(fromColor.r + ((toColor.r - fromColor.r) * t)),
+                g: clampByte(fromColor.g + ((toColor.g - fromColor.g) * t)),
+                b: clampByte(fromColor.b + ((toColor.b - fromColor.b) * t))
+            };
+        };
+
+        const buildBubbleVisualPalette = function (backgroundColor) {
+            const inverse = invertRgb(backgroundColor);
+            const white = { r: 255, g: 255, b: 255 };
+            const black = { r: 0, g: 0, b: 0 };
+
+            return {
+                bodyCore: mixRgb(inverse, white, 0.12),
+                bodyMid: mixRgb(inverse, white, 0.02),
+                bodyEdge: mixRgb(inverse, black, 0.2),
+                innerShadow: mixRgb(inverse, black, 0.44),
+                highlight: mixRgb(inverse, white, 0.45),
+                stroke: mixRgb(inverse, white, 0.2),
+                popRing: mixRgb(inverse, white, 0.26),
+                popFlash: mixRgb(inverse, white, 0.48),
+                popParticle: mixRgb(inverse, black, 0.08)
+            };
+        };
+
+        let bubbleVisualPalette = buildBubbleVisualPalette({ r: 191, g: 191, b: 191 });
+
+        const pickRandomBubbleBackgroundColor = function () {
+            // Keep a consistent tone by fixing K and keeping total C+M+Y ink in a narrow band.
+            const k = randomBetween(0.2, 0.28);
+            const targetInk = randomBetween(0.92, 1.18);
+            const neutralMix = randomBetween(0.05, 0.12);
+            const weights = [
+                Math.random() + 0.08,
+                Math.random() + 0.08,
+                Math.random() + 0.08
+            ];
+            const weightSum = weights[0] + weights[1] + weights[2];
+
+            let c = (targetInk * weights[0]) / weightSum;
+            let m = (targetInk * weights[1]) / weightSum;
+            let y = (targetInk * weights[2]) / weightSum;
+
+            c = clampUnit(c * (1 - neutralMix) + (0.42 * neutralMix));
+            m = clampUnit(m * (1 - neutralMix) + (0.42 * neutralMix));
+            y = clampUnit(y * (1 - neutralMix) + (0.42 * neutralMix));
+
+            return cmykToRgb(c, m, y, k);
+        };
+
+        const setBubblePageBackground = function (color) {
+            if (!isBubbleFunPage || !color) {
+                return;
+            }
+
+            const hasRgbObject = typeof color === 'object' && color !== null;
+            const cssColor = hasRgbObject ? rgbToCss(color) : String(color);
+
+            if (hasRgbObject) {
+                bubbleVisualPalette = buildBubbleVisualPalette(color);
+            }
+
+            document.body.style.backgroundColor = cssColor;
+            document.body.style.backgroundImage = 'none';
+
+            if (bubbleLayer) {
+                bubbleLayer.style.backgroundColor = cssColor;
+                bubbleLayer.style.backgroundImage = 'none';
+            }
+
+            if (bubbleCanvas) {
+                bubbleCanvas.style.backgroundColor = cssColor;
+                bubbleCanvas.style.backgroundImage = 'none';
+            }
+        };
+
+        const scheduleBubbleRespawn = function () {
+            if (!isBubbleFunPage || respawnTimerId !== null) {
+                return;
+            }
+
+            setBubblePageBackground(pickRandomBubbleBackgroundColor());
+            respawnTimerId = window.setTimeout(function () {
+                respawnTimerId = null;
+                bubblesExhausted = false;
+                hasInitializedBubbles = false;
+                resizeCanvas();
+            }, bubbleRespawnDelayMs);
         };
 
         const clamp = function (value, min, max) {
@@ -332,6 +540,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const maxX = Math.max(minX, (width || window.innerWidth) - radius);
             const minY = radius + topInset;
             const maxY = Math.max(minY, (height || window.innerHeight) - radius);
+            const spawnDuration = prefersReducedMotion
+                ? randomBetween(120, 220)
+                : randomBetween(260, 420);
 
             return {
                 x: randomBetween(minX, maxX),
@@ -341,8 +552,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 vy: randomBetween(-0.12, 0.12),
                 alpha: randomBetween(0.35, 0.72),
                 phase: randomBetween(0, Math.PI * 2),
-                drift: randomBetween(0.85, 1.2)
+                drift: randomBetween(0.85, 1.2),
+                spawnElapsed: 0,
+                spawnDuration: spawnDuration
             };
+        };
+
+        const getBubbleSpawnProgress = function (bubble) {
+            if (!bubble || !bubble.spawnDuration || bubble.spawnDuration <= 0) {
+                return 1;
+            }
+            return clampUnit((bubble.spawnElapsed || 0) / bubble.spawnDuration);
+        };
+
+        const getBubbleSpawnEase = function (bubble) {
+            const progress = getBubbleSpawnProgress(bubble);
+            return 1 - Math.pow(1 - progress, 3);
         };
 
         const resizeCanvas = function () {
@@ -358,7 +583,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (bubblesExhausted) {
                 bubbles.length = 0;
-                applyPageSurfaceMode(true);
                 viewportMinDimension = nextViewportMinDimension;
                 return;
             }
@@ -389,12 +613,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 bubble.x = Math.min(maxX, Math.max(minX, bubble.x));
                 bubble.y = Math.min(maxY, Math.max(minY, bubble.y));
             });
-            applyPageSurfaceMode(bubbles.length === 0);
         };
 
         const drawBubble = function (bubble, time) {
+            const spawnEase = getBubbleSpawnEase(bubble);
+            const entranceScale = 0.72 + (0.28 * spawnEase);
+            const entranceAlpha = 0.12 + (0.88 * spawnEase);
             const pulse = 1 + Math.sin((time * 0.0012) + bubble.phase) * 0.03;
-            const radius = bubble.radius * pulse;
+            const radius = bubble.radius * pulse * entranceScale;
+            const bubbleAlpha = bubble.alpha * entranceAlpha;
             const bodyGradient = ctx.createRadialGradient(
                 bubble.x - (radius * 0.28),
                 bubble.y - (radius * 0.32),
@@ -404,10 +631,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 radius
             );
 
-            bodyGradient.addColorStop(0, 'rgba(244, 244, 244, 0)');
-            bodyGradient.addColorStop(0.45, 'rgba(240, 240, 240, ' + (0.025 * bubble.alpha) + ')');
-            bodyGradient.addColorStop(0.8, 'rgba(230, 230, 230, ' + (0.065 * bubble.alpha) + ')');
-            bodyGradient.addColorStop(1, 'rgba(214, 214, 214, ' + (0.11 * bubble.alpha) + ')');
+            bodyGradient.addColorStop(0, rgbaFrom(bubbleVisualPalette.bodyCore, 0));
+            bodyGradient.addColorStop(0.45, rgbaFrom(bubbleVisualPalette.bodyCore, 0.032 * bubbleAlpha));
+            bodyGradient.addColorStop(0.8, rgbaFrom(bubbleVisualPalette.bodyMid, 0.082 * bubbleAlpha));
+            bodyGradient.addColorStop(1, rgbaFrom(bubbleVisualPalette.bodyEdge, 0.14 * bubbleAlpha));
 
             ctx.beginPath();
             ctx.fillStyle = bodyGradient;
@@ -427,9 +654,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 bubble.y,
                 radius * 0.92
             );
-            innerShadow.addColorStop(0, 'rgba(8, 8, 8, 0)');
-            innerShadow.addColorStop(0.72, 'rgba(8, 8, 8, ' + (0.05 * bubble.alpha) + ')');
-            innerShadow.addColorStop(1, 'rgba(8, 8, 8, ' + (0.11 * bubble.alpha) + ')');
+            innerShadow.addColorStop(0, rgbaFrom(bubbleVisualPalette.innerShadow, 0));
+            innerShadow.addColorStop(0.72, rgbaFrom(bubbleVisualPalette.innerShadow, 0.11 * bubbleAlpha));
+            innerShadow.addColorStop(1, rgbaFrom(bubbleVisualPalette.innerShadow, 0.24 * bubbleAlpha));
             ctx.fillStyle = innerShadow;
             ctx.fillRect(
                 bubble.x - radius,
@@ -447,24 +674,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 bubble.y - (radius * 0.1),
                 radius * 0.82
             );
-            highlight.addColorStop(0, 'rgba(244, 244, 244, 0)');
-            highlight.addColorStop(0.42, 'rgba(242, 242, 242, ' + (0.025 * bubble.alpha) + ')');
-            highlight.addColorStop(1, 'rgba(232, 232, 232, 0)');
+            highlight.addColorStop(0, rgbaFrom(bubbleVisualPalette.highlight, 0));
+            highlight.addColorStop(0.42, rgbaFrom(bubbleVisualPalette.highlight, 0.035 * bubbleAlpha));
+            highlight.addColorStop(1, rgbaFrom(bubbleVisualPalette.highlight, 0));
             ctx.beginPath();
             ctx.fillStyle = highlight;
             ctx.arc(bubble.x, bubble.y, radius, 0, Math.PI * 2);
             ctx.fill();
-
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(188, 188, 188, ' + (0.03 * bubble.alpha) + ')';
-            ctx.lineWidth = Math.max(0.8, radius * 0.018);
-            ctx.arc(bubble.x, bubble.y, Math.max(0, radius - (ctx.lineWidth * 0.5)), 0, Math.PI * 2);
-            ctx.stroke();
         };
 
         const createPopEffect = function (bubble) {
             const particleCount = prefersReducedMotion ? 4 : 12;
             const particles = [];
+            const popPalette = {
+                popRing: bubbleVisualPalette.popRing,
+                popFlash: bubbleVisualPalette.popFlash,
+                popParticle: bubbleVisualPalette.popParticle
+            };
 
             for (let i = 0; i < particleCount; i += 1) {
                 const angle = randomBetween(0, Math.PI * 2);
@@ -490,6 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 innerRadius: Math.max(4, bubble.radius * 0.35),
                 outerRadius: bubble.radius * 1.9,
                 alpha: Math.min(1, bubble.alpha + 0.2),
+                palette: popPalette,
                 particles: particles
             });
         };
@@ -524,6 +751,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const drawPopEffects = function () {
             popEffects.forEach(function (effect) {
+                const effectPalette = effect.palette || bubbleVisualPalette;
                 const progress = Math.min(effect.age / effect.duration, 1);
                 const expansion = 1 - Math.pow(1 - progress, 3);
                 const ringRadius = effect.innerRadius + ((effect.outerRadius - effect.innerRadius) * expansion);
@@ -531,7 +759,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (ringAlpha > 0.01) {
                     ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(185, 185, 185, ' + ringAlpha + ')';
+                    ctx.strokeStyle = rgbaFrom(effectPalette.popRing, ringAlpha);
                     ctx.lineWidth = Math.max(1.1, (1 - progress) * (effect.innerRadius * 0.5));
                     ctx.arc(effect.x, effect.y, ringRadius, 0, Math.PI * 2);
                     ctx.stroke();
@@ -540,7 +768,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const flashAlpha = (1 - progress) * (1 - progress) * 0.4 * effect.alpha;
                 if (flashAlpha > 0.01) {
                     ctx.beginPath();
-                    ctx.fillStyle = 'rgba(220, 220, 220, ' + flashAlpha + ')';
+                    ctx.fillStyle = rgbaFrom(effectPalette.popFlash, flashAlpha);
                     ctx.arc(effect.x, effect.y, effect.innerRadius * 0.5, 0, Math.PI * 2);
                     ctx.fill();
                 }
@@ -554,7 +782,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     ctx.beginPath();
-                    ctx.fillStyle = 'rgba(205, 205, 205, ' + particleAlpha + ')';
+                    ctx.fillStyle = rgbaFrom(effectPalette.popParticle, particleAlpha);
                     ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
                     ctx.fill();
                 });
@@ -566,15 +794,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const bubble = bubbles[i];
                 const dx = x - bubble.x;
                 const dy = y - bubble.y;
-                const hitRadius = bubble.radius * 1.05;
+                const spawnEase = getBubbleSpawnEase(bubble);
+                const hitRadius = (bubble.radius * (0.72 + (0.28 * spawnEase))) * 1.05;
 
                 if ((dx * dx) + (dy * dy) <= (hitRadius * hitRadius)) {
                     createPopEffect(bubble);
                     bubbles.splice(i, 1);
-                    if (bubbles.length === 0) {
-                        bubblesExhausted = true;
-                        applyPageSurfaceMode(true);
-                    }
                     return true;
                 }
             }
@@ -598,6 +823,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const poppedBubbles = new Set();
 
             bubbles.forEach(function (bubble) {
+                if (bubble.spawnElapsed < bubble.spawnDuration) {
+                    bubble.spawnElapsed = Math.min(bubble.spawnDuration, bubble.spawnElapsed + deltaMs);
+                }
+
                 bubble.vx += Math.sin((time * 0.0005 * bubble.drift) + bubble.phase) * 0.007;
                 bubble.vy += Math.cos((time * 0.00042 * bubble.drift) + bubble.phase) * 0.006;
 
@@ -773,11 +1002,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            if (bubbles.length === 0) {
+            if (bubbles.length === 0 && !bubblesExhausted) {
                 bubblesExhausted = true;
+                scheduleBubbleRespawn();
             }
 
-            applyPageSurfaceMode(bubblesExhausted || bubbles.length === 0);
             updatePopEffects(deltaMs);
             drawPopEffects();
         };
@@ -819,6 +1048,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         window.addEventListener('resize', resizeCanvas, { passive: true });
         window.addEventListener('orientationchange', resizeCanvas, { passive: true });
+
+        if (isBubbleFunPage) {
+            setBubblePageBackground(pickRandomBubbleBackgroundColor());
+        }
 
         resizeCanvas();
 
@@ -1364,8 +1597,41 @@ document.addEventListener('DOMContentLoaded', function () {
     const openProjectPrintSelector = function (projectOptions) {
         return new Promise(function (resolve) {
             const isDarkDialog = document.body && document.body.classList
-                ? document.body.classList.contains('bubble-exhausted-dark')
+                ? document.body.classList.contains('theme-dark')
                 : false;
+            const readThemeToken = function (tokenName, fallbackValue) {
+                try {
+                    const styleTarget = document.body || document.documentElement;
+                    const tokenValue = window.getComputedStyle(styleTarget).getPropertyValue(tokenName);
+                    if (tokenValue && tokenValue.trim()) {
+                        return tokenValue.trim();
+                    }
+                } catch (error) {}
+                return fallbackValue;
+            };
+
+            const buttonTemplate = {
+                base: {
+                    background: readThemeToken('--btn-template-base-bg', 'transparent'),
+                    border: readThemeToken('--btn-template-base-border', isDarkDialog ? 'rgba(255, 255, 255, 0.26)' : 'rgba(0, 0, 0, 0.18)'),
+                    color: readThemeToken('--btn-template-base-color', isDarkDialog ? '#e8ebf1' : '#2f2f2f'),
+                    hoverBackground: readThemeToken('--btn-template-base-hover-bg', isDarkDialog ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.06)'),
+                    hoverBorder: readThemeToken('--btn-template-base-hover-border', isDarkDialog ? 'rgba(255, 255, 255, 0.32)' : 'rgba(0, 0, 0, 0.24)'),
+                    hoverColor: readThemeToken('--btn-template-base-hover-color', isDarkDialog ? '#ffffff' : '#000000')
+                },
+                primary: {
+                    background: readThemeToken('--btn-template-primary-bg', isDarkDialog ? 'rgb(95, 95, 104)' : 'rgb(65, 141, 65)'),
+                    border: readThemeToken('--btn-template-primary-border', 'transparent'),
+                    color: readThemeToken('--btn-template-primary-color', '#ffffff'),
+                    hoverBackground: readThemeToken('--btn-template-primary-hover-bg', isDarkDialog ? 'rgb(84, 84, 92)' : 'rgb(57, 124, 57)'),
+                    hoverBorder: readThemeToken('--btn-template-primary-hover-border', 'transparent'),
+                    hoverColor: readThemeToken('--btn-template-primary-hover-color', '#ffffff')
+                },
+                transition: readThemeToken('--btn-template-transition', 'background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease'),
+                hoverLift: readThemeToken('--btn-template-hover-lift', '-1px'),
+                borderRadius: readThemeToken('--btn-template-radius', '8px')
+            };
+
             const dialogTheme = isDarkDialog ? {
                 overlayOpenColor: 'rgba(0, 0, 0, 0.56)',
                 panelBackground: '#1e2026',
@@ -1379,12 +1645,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 labelHoverBackground: 'rgba(255, 255, 255, 0.08)',
                 optionTextColor: '#e6e9ef',
                 checkboxAccentColor: '#8d96a8',
-                buttonBaseBackground: 'transparent',
-                buttonBaseBorder: 'transparent',
-                buttonBaseColor: '#e8ebf1',
-                buttonHoverBackground: 'rgba(255, 255, 255, 0.16)',
-                buttonHoverBorder: 'rgba(255, 255, 255, 0.32)',
-                buttonHoverColor: '#ffffff'
+                buttonBaseBackground: buttonTemplate.base.background,
+                buttonBaseBorder: buttonTemplate.base.border,
+                buttonBaseColor: buttonTemplate.base.color,
+                buttonHoverBackground: buttonTemplate.base.hoverBackground,
+                buttonHoverBorder: buttonTemplate.base.hoverBorder,
+                buttonHoverColor: buttonTemplate.base.hoverColor,
+                buttonPrimaryBackground: buttonTemplate.primary.background,
+                buttonPrimaryBorder: buttonTemplate.primary.border,
+                buttonPrimaryColor: buttonTemplate.primary.color,
+                buttonPrimaryHoverBackground: buttonTemplate.primary.hoverBackground,
+                buttonPrimaryHoverBorder: buttonTemplate.primary.hoverBorder,
+                buttonPrimaryHoverColor: buttonTemplate.primary.hoverColor,
+                buttonTransition: buttonTemplate.transition,
+                buttonHoverLift: buttonTemplate.hoverLift,
+                buttonRadius: buttonTemplate.borderRadius
             } : {
                 overlayOpenColor: 'rgba(0, 0, 0, 0.34)',
                 panelBackground: '#ffffff',
@@ -1398,12 +1673,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 labelHoverBackground: 'rgba(0, 0, 0, 0.04)',
                 optionTextColor: '#202020',
                 checkboxAccentColor: '#5a5a5a',
-                buttonBaseBackground: 'transparent',
-                buttonBaseBorder: 'transparent',
-                buttonBaseColor: 'var(--theme-subtle)',
-                buttonHoverBackground: 'rgba(0, 0, 0, 0.06)',
-                buttonHoverBorder: 'rgba(0, 0, 0, 0.24)',
-                buttonHoverColor: 'var(--theme-accent-strong)'
+                buttonBaseBackground: buttonTemplate.base.background,
+                buttonBaseBorder: buttonTemplate.base.border,
+                buttonBaseColor: buttonTemplate.base.color,
+                buttonHoverBackground: buttonTemplate.base.hoverBackground,
+                buttonHoverBorder: buttonTemplate.base.hoverBorder,
+                buttonHoverColor: buttonTemplate.base.hoverColor,
+                buttonPrimaryBackground: buttonTemplate.primary.background,
+                buttonPrimaryBorder: buttonTemplate.primary.border,
+                buttonPrimaryColor: buttonTemplate.primary.color,
+                buttonPrimaryHoverBackground: buttonTemplate.primary.hoverBackground,
+                buttonPrimaryHoverBorder: buttonTemplate.primary.hoverBorder,
+                buttonPrimaryHoverColor: buttonTemplate.primary.hoverColor,
+                buttonTransition: buttonTemplate.transition,
+                buttonHoverLift: buttonTemplate.hoverLift,
+                buttonRadius: buttonTemplate.borderRadius
             };
 
             const bindDialogButtonInteraction = function (button, styleSet) {
@@ -1430,7 +1714,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ? styleSet.hoverColor
                     : baseColor;
 
-                button.style.transition = 'all 0.2s ease';
+                button.style.transition = dialogTheme.buttonTransition;
 
                 const setBaseStyle = function () {
                     button.style.background = baseBackground;
@@ -1445,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     button.style.borderColor = hoverBorder;
                     button.style.color = hoverColor;
                     button.style.boxShadow = 'none';
-                    button.style.transform = 'translateY(-1px)';
+                    button.style.transform = 'translateY(' + dialogTheme.buttonHoverLift + ')';
                 };
 
                 setBaseStyle();
@@ -1464,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const resolved = options || {};
                 Object.assign(button.style, {
                     padding: resolved.padding || '6.4px 14px',
-                    borderRadius: '999px',
+                    borderRadius: dialogTheme.buttonRadius,
                     border: '1px solid ' + (resolved.borderColor || dialogTheme.buttonBaseBorder),
                     background: resolved.background || dialogTheme.buttonBaseBackground,
                     color: resolved.color || dialogTheme.buttonBaseColor,
@@ -1491,7 +1775,45 @@ document.addEventListener('DOMContentLoaded', function () {
             };
 
             const overlayFadeMs = 210;
-            const overlay = document.createElement('div');
+            const selectorTemplate = document.getElementById('portfolio-print-selector-template');
+            const templateElementSupported = typeof HTMLTemplateElement !== 'undefined';
+            if (!templateElementSupported || !(selectorTemplate instanceof HTMLTemplateElement)) {
+                resolve(null);
+                return;
+            }
+
+            const templateFragment = selectorTemplate.content.cloneNode(true);
+            const overlay = templateFragment.querySelector('[data-popup-role="overlay"]');
+            const panel = templateFragment.querySelector('[data-popup-role="panel"]');
+            const title = templateFragment.querySelector('[data-popup-role="title"]');
+            const description = templateFragment.querySelector('[data-popup-role="description"]');
+            const listArea = templateFragment.querySelector('[data-popup-role="list"]');
+            const footer = templateFragment.querySelector('[data-popup-role="footer"]');
+            const leftButtons = templateFragment.querySelector('[data-popup-role="left-buttons"]');
+            const rightButtons = templateFragment.querySelector('[data-popup-role="right-buttons"]');
+            const selectAllButton = templateFragment.querySelector('button[data-popup-action="select-all"]');
+            const clearButton = templateFragment.querySelector('button[data-popup-action="clear-all"]');
+            const cancelButton = templateFragment.querySelector('button[data-popup-action="cancel"]');
+            const printButtonInDialog = templateFragment.querySelector('button[data-popup-action="print"]');
+
+            if (
+                !overlay ||
+                !panel ||
+                !title ||
+                !description ||
+                !listArea ||
+                !footer ||
+                !leftButtons ||
+                !rightButtons ||
+                !selectAllButton ||
+                !clearButton ||
+                !cancelButton ||
+                !printButtonInDialog
+            ) {
+                resolve(null);
+                return;
+            }
+
             Object.assign(overlay.style, {
                 position: 'fixed',
                 inset: '0',
@@ -1505,7 +1827,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 padding: '20px'
             });
 
-            const panel = document.createElement('div');
             Object.assign(panel.style, {
                 width: 'fit-content',
                 minWidth: '360px',
@@ -1513,14 +1834,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 maxHeight: '82vh',
                 overflow: 'hidden',
                 background: dialogTheme.panelBackground,
-                border: '1px solid ' + dialogTheme.panelBorderColor,
+                border: '0',
                 borderRadius: '14px',
                 boxShadow: dialogTheme.panelShadow,
                 display: 'flex',
                 flexDirection: 'column'
             });
 
-            const title = document.createElement('h4');
             title.textContent = printText.dialogTitle;
             Object.assign(title.style, {
                 margin: '0',
@@ -1531,7 +1851,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 textAlign: 'center'
             });
 
-            const description = document.createElement('p');
             description.textContent = printText.dialogDescription;
             Object.assign(description.style, {
                 margin: '0',
@@ -1542,12 +1861,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 color: dialogTheme.descriptionColor
             });
 
-            const listArea = document.createElement('div');
             Object.assign(listArea.style, {
                 overflowY: 'auto',
                 maxHeight: '48vh',
-                borderTop: '1px solid ' + dialogTheme.listBorderColor,
-                borderBottom: '1px solid ' + dialogTheme.listBorderColor,
+                borderTop: '0',
+                borderBottom: '0',
                 padding: '8px 12px',
                 boxShadow: dialogTheme.listInsetShadow
             });
@@ -1601,7 +1919,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-            const footer = document.createElement('div');
             Object.assign(footer.style, {
                 display: 'flex',
                 alignItems: 'center',
@@ -1610,73 +1927,49 @@ document.addEventListener('DOMContentLoaded', function () {
                 padding: '12px 14px'
             });
 
-            const leftButtons = document.createElement('div');
             Object.assign(leftButtons.style, {
                 display: 'flex',
                 gap: '8px'
             });
 
-            const selectAllButton = document.createElement('button');
-            selectAllButton.type = 'button';
             selectAllButton.textContent = printText.selectAll;
             applyDialogNavLinkButtonStyle(selectAllButton, {
                 fontSize: '0.9rem',
                 padding: '6px 10px'
             });
 
-            const clearButton = document.createElement('button');
-            clearButton.type = 'button';
             clearButton.textContent = printText.clearAll;
             applyDialogNavLinkButtonStyle(clearButton, {
                 fontSize: '0.9rem',
                 padding: '6px 10px'
             });
 
-            leftButtons.appendChild(selectAllButton);
-            leftButtons.appendChild(clearButton);
-
-            const rightButtons = document.createElement('div');
             Object.assign(rightButtons.style, {
                 display: 'flex',
                 gap: '8px'
             });
 
-            const cancelButton = document.createElement('button');
-            cancelButton.type = 'button';
             cancelButton.textContent = printText.cancel;
             applyDialogNavLinkButtonStyle(cancelButton, {
                 fontSize: '0.95rem',
                 padding: '7px 14px'
             });
 
-            const printButtonInDialog = document.createElement('button');
-            printButtonInDialog.type = 'button';
             printButtonInDialog.textContent = printText.print;
             applyDialogNavLinkButtonStyle(printButtonInDialog, {
                 fontSize: '0.95rem',
                 padding: '7px 14px',
                 fontWeight: '600',
                 interactionStyle: {
-                    baseBackground: isDarkDialog ? 'rgba(95, 95, 104, 0.9)' : 'rgb(65, 141, 65)',
-                    baseBorder: 'transparent',
-                    baseColor: '#ffffff',
-                    hoverBackground: 'rgb(57, 124, 57)',
-                    hoverBorder: 'transparent',
-                    hoverColor: '#ffffff'
+                    baseBackground: dialogTheme.buttonPrimaryBackground,
+                    baseBorder: dialogTheme.buttonPrimaryBorder,
+                    baseColor: dialogTheme.buttonPrimaryColor,
+                    hoverBackground: dialogTheme.buttonPrimaryHoverBackground,
+                    hoverBorder: dialogTheme.buttonPrimaryHoverBorder,
+                    hoverColor: dialogTheme.buttonPrimaryHoverColor
                 }
             });
 
-            rightButtons.appendChild(cancelButton);
-            rightButtons.appendChild(printButtonInDialog);
-
-            footer.appendChild(leftButtons);
-            footer.appendChild(rightButtons);
-
-            panel.appendChild(title);
-            panel.appendChild(description);
-            panel.appendChild(listArea);
-            panel.appendChild(footer);
-            overlay.appendChild(panel);
             document.body.appendChild(overlay);
 
             window.requestAnimationFrame(function () {
@@ -1940,12 +2233,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const navContainer = nav.querySelector('.container-fluid');
-    const navBrand = nav.querySelector('.portfolio-brand');
+    const navBrandGroup = nav.querySelector('.portfolio-brand-group');
     const navLinks = nav.querySelector('.portfolio-nav-links');
     const navCollapse = nav.querySelector('.portfolio-nav-collapse');
+    const navControls = navCollapse ? navCollapse.querySelector('.portfolio-controls-stack') : null;
     const navToggler = nav.querySelector('.portfolio-nav-toggler');
 
-    if (!navContainer || !navBrand || !navLinks || !navCollapse || !navToggler) {
+    if (!navContainer || !navBrandGroup || !navLinks || !navCollapse || !navToggler) {
         return;
     }
 
@@ -1987,7 +2281,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
-    const navItemsMeasure = navLinks.cloneNode(true);
+    const navItemsMeasure = document.createElement('div');
     navItemsMeasure.setAttribute('aria-hidden', 'true');
     Object.assign(navItemsMeasure.style, {
         position: 'fixed',
@@ -1995,6 +2289,17 @@ document.addEventListener('DOMContentLoaded', function () {
         top: '-99999px',
         visibility: 'hidden',
         pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0',
+        flexWrap: 'nowrap',
+        width: 'auto',
+        maxWidth: 'none',
+        margin: '0',
+        padding: '0'
+    });
+    const navLinksMeasure = navLinks.cloneNode(true);
+    Object.assign(navLinksMeasure.style, {
         display: 'flex',
         flexDirection: 'row',
         flexWrap: 'nowrap',
@@ -2004,9 +2309,23 @@ document.addEventListener('DOMContentLoaded', function () {
         padding: '0',
         listStyle: 'none'
     });
-    Array.from(navItemsMeasure.children).forEach(function (item) {
+    Array.from(navLinksMeasure.children).forEach(function (item) {
         item.style.flex = '0 0 auto';
     });
+    navItemsMeasure.appendChild(navLinksMeasure);
+
+    if (navControls) {
+        const navControlsMeasure = navControls.cloneNode(true);
+        Object.assign(navControlsMeasure.style, {
+            display: 'inline-flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            margin: '0',
+            padding: '0'
+        });
+        navItemsMeasure.appendChild(navControlsMeasure);
+    }
+
     document.body.appendChild(navItemsMeasure);
 
     let rafId = null;
@@ -2038,14 +2357,12 @@ document.addEventListener('DOMContentLoaded', function () {
         forceCloseNavMenu();
 
         const availableWidth = navContainer.getBoundingClientRect().width;
-        const brandWidth = navBrand.getBoundingClientRect().width;
+        const brandWidth = navBrandGroup.getBoundingClientRect().width;
         const navItemsBlockWidth = getMeasuredNavItemsWidth();
-        const navItemsBlockLimit = window.innerWidth * 0.6;
         const requiredWidth = brandWidth + navItemsBlockWidth;
-        const shouldCollapseByItemsBlock = navItemsBlockWidth > navItemsBlockLimit;
-        const shouldCollapseByOverlap = requiredWidth >= availableWidth;
+        const shouldCollapseByOverlap = requiredWidth > availableWidth;
 
-        if (shouldCollapseByItemsBlock || shouldCollapseByOverlap) {
+        if (shouldCollapseByOverlap) {
             nav.classList.add('nav-auto-collapsed');
             forceCloseNavMenu();
         }

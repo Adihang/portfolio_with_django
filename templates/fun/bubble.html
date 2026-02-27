@@ -1,0 +1,38 @@
+{% load static static_versioned %}
+<!doctype html>
+<html lang="{{ ui_lang|default:'ko' }}">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="{{ bubble_description }}">
+    <meta name="author" content="Hanplanet">
+    <meta name="robots" content="noindex">
+    <meta property="og:title" content="{{ bubble_title }}">
+    <meta property="og:description" content="{{ bubble_description }}">
+    <meta property="og:image" content="https://www.hanplanet.com{% static 'img/bubble_og_icon.svg' %}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://www.hanplanet.com{% static 'img/bubble_og_icon.svg' %}">
+    {% include "partials/static_script_fallback.html" %}
+    <link rel="icon" href="{% static_v 'favicon.png' %}">
+    <link rel="stylesheet" type="text/css" href="{% static_v 'css/style.css' %}">
+    <script src="{% static_v 'js/script.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    <title>{{ page_title }} | Hanplanet</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body.bubble-page {
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bubble-page">
+    <div class="bubble-bg-layer" aria-hidden="true">
+        <canvas id="interactiveBubbleCanvas" class="bubble-bg-canvas"></canvas>
+    </div>
+</body>
+</html>

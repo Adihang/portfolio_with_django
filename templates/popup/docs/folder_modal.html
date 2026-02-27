@@ -1,0 +1,15 @@
+<div id="docs-folder-modal" class="docs-folder-modal" hidden>
+    <div class="docs-folder-modal-backdrop" id="docs-folder-modal-backdrop"></div>
+    <div class="docs-folder-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-folder-modal-title">
+        <h3 id="docs-folder-modal-title" class="docs-folder-modal-title">{{ docs_text.folder_modal_title }}</h3>
+        <div class="docs-folder-modal-path" id="docs-folder-target-path">/docs</div>
+        <label class="docs-field docs-field-full">
+            <span>{{ docs_text.folder_name_label }}</span>
+            <input type="text" id="docs-folder-name-input" placeholder="{{ docs_text.folder_name_placeholder }}">
+        </label>
+        <div class="docs-folder-modal-actions">
+            <button type="button" class="docs-btn" id="docs-folder-cancel-btn">{{ docs_text.cancel }}</button>
+            <button type="button" class="docs-btn docs-btn-primary" id="docs-folder-create-btn">{{ docs_text.create_button }}</button>
+        </div>
+    </div>
+</div>

@@ -7,11 +7,6 @@
         background-image: none;
     }
 
-    .bubble-bg-layer,
-    #interactiveBubbleCanvas {
-        display: block;
-    }
-
     .main-has-bubble-bg {
         min-height: 100vh;
         background-color: transparent;
@@ -22,10 +17,6 @@
         background-color: transparent;
     }
 </style>
-<div class="bubble-bg-layer" aria-hidden="true">
-    <div class="portfolio-watermark-layer">www.hanplanet.com/portfolio/</div>
-    <canvas id="interactiveBubbleCanvas" class="bubble-bg-canvas"></canvas>
-</div>
 <div class="main main-has-bubble-bg">
     <div class = 'main_banner'>
         <div class = "main_text">
@@ -89,4 +80,5 @@
         </button>
     </div>
 </div>
+{% include "popup/portfolio/print_selector_template.html" %}
 {% endblock %}

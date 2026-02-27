@@ -104,6 +104,7 @@ MIDDLEWARE = [
     "django.middleware.gzip.GZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "main.middleware.GlobalRateLimitMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -171,6 +172,11 @@ USE_I18N = True
 
 USE_TZ = True
 
+GLOBAL_RATE_LIMIT_CACHE_ALIAS = os.environ.get("DJANGO_GLOBAL_RATE_LIMIT_CACHE_ALIAS", "rate_limit")
+GLOBAL_RATE_LIMIT_CACHE_DIR = os.environ.get(
+    "DJANGO_GLOBAL_RATE_LIMIT_CACHE_DIR",
+    "/tmp/hanplanet_rate_limit_cache",
+)
 
 # Cache settings
 CACHES = {
@@ -178,8 +184,24 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         'LOCATION': 'unique-snowflake',
         'TIMEOUT': 60 * 60 * 24,  # 24시간 캐시 유지
-    }
+    },
+    'rate_limit': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': GLOBAL_RATE_LIMIT_CACHE_DIR,
+        'TIMEOUT': 60 * 60 * 24,
+    },
 }
+
+GLOBAL_RATE_LIMIT_ENABLED = env_bool("DJANGO_GLOBAL_RATE_LIMIT_ENABLED", default=True)
+GLOBAL_RATE_LIMIT_REQUESTS = max(
+    1, int(os.environ.get("DJANGO_GLOBAL_RATE_LIMIT_REQUESTS", "240"))
+)
+GLOBAL_RATE_LIMIT_WINDOW_SECONDS = max(
+    1, int(os.environ.get("DJANGO_GLOBAL_RATE_LIMIT_WINDOW_SECONDS", "60"))
+)
+GLOBAL_RATE_LIMIT_EXEMPT_PATH_PREFIXES = tuple(
+    env_list("DJANGO_GLOBAL_RATE_LIMIT_EXEMPT_PATH_PREFIXES", "/static/,/media/")
+)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
