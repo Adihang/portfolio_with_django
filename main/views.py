@@ -9,16 +9,16 @@ import re
 import logging
 import math
 from django.utils import timezone
-from django.utils.html import escape
 from django.utils.safestring import mark_safe
 import markdown
 import random
+import html
 from django.conf import settings
 from django.core.cache import cache
 import httpx
 from django.db.utils import OperationalError, ProgrammingError
 
-MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists", "tables"]
+MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists", "tables", "fenced_code"]
 SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
 MAX_SCORE_SECONDS = 3600.0
 SUPPORTED_UI_LANGS = {"ko", "en"}
@@ -33,10 +33,146 @@ IDENTITY_IMPERSONATION_PATTERNS = [
 ]
 
 
+FENCED_BLOCK_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})")
+FENCED_BLOCK_START_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<fence>`{3,}|~{3,})(?P<info>[^\n]*)$")
+FENCED_BLOCK_END_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*$")
+
+
+def _build_fenced_code_html(info: str, code_lines: list[str], base_indent: str) -> str:
+    normalized_lines = []
+    for line in code_lines:
+        if base_indent and line.startswith(base_indent):
+            normalized_lines.append(line[len(base_indent):])
+        else:
+            normalized_lines.append(line)
+    code_text = "\n".join(normalized_lines)
+    escaped_code = html.escape(code_text, quote=False)
+
+    language = (info or "").strip().split(" ", 1)[0].strip()
+    if language:
+        safe_language = re.sub(r"[^A-Za-z0-9_+.#-]", "", language)
+        if safe_language:
+            return f'<pre><code class="language-{safe_language}">{escaped_code}\n</code></pre>'
+    return f"<pre><code>{escaped_code}\n</code></pre>"
+
+
+def _extract_fenced_code_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
+    source = text or ""
+    lines = source.splitlines()
+    output_lines: list[str] = []
+    tokens: list[tuple[str, str]] = []
+
+    in_fence = False
+    fence_marker = ""
+    fence_len = 0
+    fence_indent = ""
+    fence_info = ""
+    fence_lines: list[str] = []
+    fence_start_line = ""
+
+    for line in lines:
+        if not in_fence:
+            start = FENCED_BLOCK_START_PATTERN.match(line)
+            if not start:
+                output_lines.append(line)
+                continue
+
+            token = f"@@DOCS_CODE_BLOCK_{len(tokens)}@@"
+            output_lines.append(token)
+            in_fence = True
+            fence_marker = start.group("fence")[0]
+            fence_len = len(start.group("fence"))
+            fence_indent = start.group("indent")
+            fence_info = start.group("info") or ""
+            fence_lines = []
+            fence_start_line = line
+            continue
+
+        end = FENCED_BLOCK_END_PATTERN.match(line)
+        if end:
+            end_fence = end.group("fence")
+            if end_fence[0] == fence_marker and len(end_fence) >= fence_len:
+                html_block = _build_fenced_code_html(fence_info, fence_lines, fence_indent)
+                token = output_lines[-1]
+                tokens.append((token, html_block))
+                in_fence = False
+                fence_marker = ""
+                fence_len = 0
+                fence_indent = ""
+                fence_info = ""
+                fence_lines = []
+                fence_start_line = ""
+                continue
+
+        fence_lines.append(line)
+
+    if in_fence:
+        # Unclosed fence: restore raw lines to avoid content loss.
+        output_lines.pop()
+        output_lines.append(fence_start_line)
+        output_lines.extend(fence_lines)
+
+    prepared = "\n".join(output_lines)
+    if source.endswith("\n"):
+        prepared += "\n"
+    return prepared, tokens
+
+
+def _restore_fenced_code_blocks(rendered_html: str, blocks: list[tuple[str, str]]) -> str:
+    result = rendered_html
+    for token, html_block in blocks:
+        result = result.replace(f"<p>{token}</p>", html_block)
+        result = result.replace(token, html_block)
+    return result
+
+
+def _escape_raw_html_outside_fences(text: str) -> str:
+    """Escape raw HTML tag starts outside fenced code blocks.
+
+    We intentionally avoid full-string escaping so markdown syntax
+    (e.g., fenced code blocks, blockquotes) can still be parsed.
+    """
+    source = text or ""
+    lines = source.splitlines(keepends=True)
+    escaped_lines = []
+
+    in_fence = False
+    fence_marker = ""
+    fence_len = 0
+
+    for line in lines:
+        match = FENCED_BLOCK_PATTERN.match(line)
+        if match:
+            token = match.group(1)
+            marker = token[0]
+            length = len(token)
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+                fence_len = length
+            elif marker == fence_marker and length >= fence_len:
+                in_fence = False
+                fence_marker = ""
+                fence_len = 0
+            escaped_lines.append(line)
+            continue
+
+        if in_fence:
+            escaped_lines.append(line)
+            continue
+
+        # Escape raw HTML tag starts while leaving markdown markers intact.
+        escaped_lines.append(line.replace("<", "&lt;"))
+
+    return "".join(escaped_lines)
+
+
 def render_markdown_safely(text):
-    """Render markdown while escaping raw HTML input to prevent script injection."""
-    escaped_text = escape(text or "")
-    rendered_html = markdown.markdown(escaped_text, extensions=MARKDOWN_EXTENSIONS)
+    """Render markdown while neutralizing raw HTML input to prevent script injection."""
+    prepared_source, extracted_blocks = _extract_fenced_code_blocks(text or "")
+    safe_source = _escape_raw_html_outside_fences(prepared_source)
+    rendered_html = markdown.markdown(safe_source, extensions=MARKDOWN_EXTENSIONS)
+    rendered_html = _restore_fenced_code_blocks(rendered_html, extracted_blocks)
     return mark_safe(rendered_html)
 
 

@@ -75,9 +75,29 @@ def load_secret_key():
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = load_secret_key()
 
+
+def load_optional_secret(name, default=""):
+    from_env = os.environ.get(name)
+    if from_env is not None and str(from_env).strip():
+        return str(from_env).strip()
+
+    secrets_path = BASE_DIR / "config" / "secrets.json"
+    if secrets_path.exists():
+        try:
+            with secrets_path.open("r", encoding="utf-8") as file:
+                secrets = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            return default
+        value = secrets.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return default
+
 # Ollama (local LLM) settings
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:latest")
+TURNSTILE_SITE_KEY = load_optional_secret("TURNSTILE_SITE_KEY", "")
+TURNSTILE_SECRET_KEY = load_optional_secret("TURNSTILE_SECRET_KEY", "")
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",

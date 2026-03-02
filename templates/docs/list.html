@@ -8,6 +8,7 @@
         <div class="docs-toolbar-left">
             <div class="docs-title-row">
                 <h1 class="docs-title">{{ docs_text.list_title }}</h1>
+                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
             <div class="docs-subtitle docs-path-breadcrumbs">
                 {% for crumb in breadcrumbs %}
@@ -23,15 +24,7 @@
         <div class="docs-toolbar-right">
             {% include "docs/_auth_account.html" %}
             <div class="docs-toolbar-actions">
-                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
                 {% include "docs/_auth_button.html" %}
-                {% if docs_can_edit %}
-                    <a
-                        class="docs-btn docs-btn-primary"
-                        href="{{ docs_write_url }}{% if current_dir %}?dir={{ current_dir|urlencode }}{% endif %}"
-                        id="docs-write-btn"
-                    >{{ docs_text.write_button }}</a>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -42,18 +35,55 @@
     data-docs-page="list"
     data-current-dir="{{ current_dir }}"
     data-current-dir-can-edit="{% if current_dir_can_edit %}1{% else %}0{% endif %}"
+    data-current-dir-can-write-children="{% if current_dir_can_write_children %}1{% else %}0{% endif %}"
     data-docs-base-url="{{ docs_base_url }}"
     data-list-api-url="{{ docs_api_list_url }}"
     data-rename-api-url="{{ docs_api_rename_url }}"
     data-delete-api-url="{{ docs_api_delete_url }}"
     data-mkdir-api-url="{{ docs_api_mkdir_url }}"
     data-move-api-url="{{ docs_api_move_url }}"
+    data-download-api-url="{{ docs_api_download_url }}"
+    data-preview-api-url="{{ docs_api_preview_url }}"
     data-acl-api-url="{{ docs_api_acl_url }}"
     data-acl-options-api-url="{{ docs_api_acl_options_url }}"
     data-write-url="{{ docs_write_url }}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
-    <ul id="docs-list" class="docs-list" aria-label="{{ docs_text.list_aria_label }}"></ul>
+    <div class="docs-list-layout" id="docs-list-layout">
+        <div class="docs-list-pane">
+            <ul id="docs-list" class="docs-list" aria-label="{{ docs_text.list_aria_label }}"></ul>
+        </div>
+        <aside class="docs-list-preview" id="docs-list-preview" aria-live="polite" aria-hidden="true" hidden>
+            <header class="docs-list-preview-head">
+                <h2 class="docs-list-preview-title" id="docs-list-preview-title">{{ docs_text.list_preview_title }}</h2>
+                <div class="docs-list-preview-actions">
+                    <a
+                        id="docs-list-preview-download-btn"
+                        class="docs-btn docs-list-preview-open-btn"
+                        href="#"
+                        hidden
+                    >{{ docs_text.download_button }}</a>
+                    <a
+                        id="docs-list-preview-edit-btn"
+                        class="docs-btn docs-list-preview-open-btn"
+                        href="#"
+                        hidden
+                    >{{ docs_text.edit_button }}</a>
+                    <button
+                        id="docs-list-preview-delete-btn"
+                        class="docs-btn docs-list-preview-open-btn"
+                        type="button"
+                        hidden
+                    >{{ docs_text.delete_button }}</button>
+                </div>
+            </header>
+            <div class="docs-list-preview-body">
+                <article class="docs-markdown docs-list-preview-content" id="docs-list-preview-content">
+                    <p class="docs-list-preview-placeholder">{{ docs_text.list_preview_empty }}</p>
+                </article>
+            </div>
+        </aside>
+    </div>
 </main>
 
 {% include "popup/docs/context_menu.html" %}

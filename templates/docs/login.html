@@ -21,8 +21,8 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ docs_login_next }}">
 
-        {% if docs_login_form.non_field_errors %}
-            <div class="docs-login-error">{{ docs_text.auth_login_error }}</div>
+        {% if docs_login_error_message or docs_login_form.non_field_errors %}
+            <div class="docs-login-error">{{ docs_login_error_message|default:docs_text.auth_login_error }}</div>
         {% endif %}
 
         <label class="docs-field docs-field-full">
@@ -47,8 +47,27 @@
             >
         </label>
 
+        {% if docs_login_show_captcha %}
+            <label class="docs-field docs-field-full">
+                <span>{{ docs_text.auth_login_captcha_label }}</span>
+                <span class="docs-subtitle">{{ docs_text.auth_login_captcha_hint }}</span>
+                <span>{{ docs_login_captcha_question }}</span>
+                <input
+                    type="text"
+                    name="docs-captcha-answer"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="{{ docs_text.auth_login_captcha_placeholder }}"
+                    required
+                >
+                {% if docs_turnstile_site_key %}
+                    <div id="docs-turnstile-widget"></div>
+                {% endif %}
+            </label>
+        {% endif %}
+
         <div class="docs-login-actions">
-            <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
+            <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.cancel }}</a>
             <button class="docs-btn docs-btn-primary" type="submit" id="docs-login-submit-btn">{{ docs_text.auth_login_submit }}</button>
         </div>
     </form>
@@ -77,6 +96,60 @@
         loginForm.querySelectorAll('input[name="username"], input[name="password"]').forEach(function (input) {
             input.addEventListener("keydown", handleEnterSubmit);
         });
+
+        const turnstileContainer = document.getElementById("docs-turnstile-widget");
+        if (!turnstileContainer) {
+            return;
+        }
+
+        const getTurnstileTheme = function () {
+            return document.body.classList.contains("theme-dark") ? "dark" : "light";
+        };
+
+        let lastTheme = "";
+        let mutationObserver = null;
+
+        const renderTurnstile = function () {
+            if (!window.turnstile || !turnstileContainer) {
+                return;
+            }
+            const nextTheme = getTurnstileTheme();
+            if (lastTheme === nextTheme && turnstileContainer.childElementCount > 0) {
+                return;
+            }
+            turnstileContainer.innerHTML = "";
+            window.turnstile.render("#docs-turnstile-widget", {
+                sitekey: "{{ docs_turnstile_site_key|escapejs }}",
+                theme: nextTheme
+            });
+            lastTheme = nextTheme;
+        };
+
+        window.docsTurnstileOnload = function () {
+            renderTurnstile();
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+            }
+            mutationObserver = new MutationObserver(function (mutations) {
+                for (const mutation of mutations) {
+                    if (mutation.attributeName === "class") {
+                        renderTurnstile();
+                        break;
+                    }
+                }
+            });
+            mutationObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ["class"]
+            });
+        };
+
+        if (window.turnstile && typeof window.turnstile.render === "function") {
+            window.docsTurnstileOnload();
+        }
     })();
 </script>
+{% if docs_login_show_captcha and docs_turnstile_site_key %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=docsTurnstileOnload&render=explicit" async defer></script>
+{% endif %}
 {% endblock %}

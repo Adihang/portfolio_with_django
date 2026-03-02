@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const SURFACE_COLOR = {
         light: '#ffffff',
-        dark: '#14161a',
+        dark: '#222222',
         transparent: 'transparent'
     };
 

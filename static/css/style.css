@@ -57,19 +57,106 @@ body.bubble-page .bubble-bg-canvas {
     transition: background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-body.portfolio-page ::-webkit-scrollbar,
-body.project-page ::-webkit-scrollbar {
+:root {
+    --site-scrollbar-thumb: rgba(120, 120, 128, 0.45);
+    --site-scrollbar-thumb-hover: rgba(95, 95, 103, 0.58);
+}
+
+body.theme-dark {
+    --site-scrollbar-thumb: rgba(198, 198, 205, 0.52);
+    --site-scrollbar-thumb-hover: rgba(224, 224, 232, 0.68);
+}
+
+html::-webkit-scrollbar,
+body ::-webkit-scrollbar {
     background: transparent;
 }
 
-body.portfolio-page ::-webkit-scrollbar-track,
-body.project-page ::-webkit-scrollbar-track {
+html::-webkit-scrollbar-track,
+body ::-webkit-scrollbar-track {
     background: transparent;
 }
 
-body.portfolio-page ::-webkit-scrollbar-corner,
-body.project-page ::-webkit-scrollbar-corner {
+html::-webkit-scrollbar-corner,
+body ::-webkit-scrollbar-corner {
     background: transparent;
+}
+
+*::-webkit-scrollbar-button,
+html::-webkit-scrollbar-button,
+body ::-webkit-scrollbar-button {
+    width: 0;
+    height: 0;
+    max-width: 0;
+    max-height: 0;
+    display: none;
+    background: transparent;
+    background-image: none;
+    border: 0;
+    box-shadow: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+*::-webkit-scrollbar-button:single-button,
+html::-webkit-scrollbar-button:single-button,
+body ::-webkit-scrollbar-button:single-button,
+*::-webkit-scrollbar-button:start,
+html::-webkit-scrollbar-button:start,
+body ::-webkit-scrollbar-button:start,
+*::-webkit-scrollbar-button:end,
+html::-webkit-scrollbar-button:end,
+body ::-webkit-scrollbar-button:end,
+*::-webkit-scrollbar-button:vertical:start:decrement,
+html::-webkit-scrollbar-button:vertical:start:decrement,
+body ::-webkit-scrollbar-button:vertical:start:decrement,
+*::-webkit-scrollbar-button:vertical:end:increment,
+html::-webkit-scrollbar-button:vertical:end:increment,
+body ::-webkit-scrollbar-button:vertical:end:increment,
+*::-webkit-scrollbar-button:horizontal:start:decrement,
+html::-webkit-scrollbar-button:horizontal:start:decrement,
+body ::-webkit-scrollbar-button:horizontal:start:decrement,
+*::-webkit-scrollbar-button:horizontal:end:increment,
+html::-webkit-scrollbar-button:horizontal:end:increment,
+body ::-webkit-scrollbar-button:horizontal:end:increment,
+*::-webkit-scrollbar-button:decrement,
+*::-webkit-scrollbar-button:increment,
+*::-webkit-scrollbar-button:vertical:decrement,
+*::-webkit-scrollbar-button:vertical:increment,
+*::-webkit-scrollbar-button:horizontal:decrement,
+*::-webkit-scrollbar-button:horizontal:increment {
+    width: 0;
+    height: 0;
+    max-width: 0;
+    max-height: 0;
+    display: none;
+    background: transparent;
+    background-image: none;
+    color: transparent;
+    border: 0;
+    box-shadow: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+html::-webkit-scrollbar-thumb,
+body ::-webkit-scrollbar-thumb {
+    background: var(--site-scrollbar-thumb);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body ::-webkit-scrollbar-thumb:hover {
+    background: var(--site-scrollbar-thumb-hover);
+}
+
+html,
+body,
+body * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--site-scrollbar-thumb) transparent;
 }
 
 body.portfolio-page,
@@ -109,72 +196,72 @@ body.portfolio-page .foot {
 }
 
 body.theme-dark {
-    --site-bg: #14161a;
-    --site-text: #f1f1f1;
-    --site-text-strong: #f3f4f6;
-    --site-text-stronger: #f8f9fb;
-    --site-text-muted: #d7d7d7;
-    --site-text-subtle: #c4cad3;
-    --site-text-faint: #a8afba;
-    --site-text-secondary: #bec4cf;
-    --site-border-soft: rgba(255, 255, 255, 0.12);
-    --site-border: rgba(255, 255, 255, 0.16);
-    --site-border-mid: rgba(255, 255, 255, 0.22);
-    --site-border-strong: rgba(255, 255, 255, 0.26);
-    --site-border-heavy: rgba(255, 255, 255, 0.3);
-    --site-border-context: rgba(255, 255, 255, 0.34);
-    --site-hover-soft: rgba(255, 255, 255, 0.07);
-    --site-hover: rgba(255, 255, 255, 0.12);
-    --site-hover-strong: rgba(255, 255, 255, 0.18);
-    --site-hover-button: rgba(255, 255, 255, 0.12);
-    --site-surface-toolbar: rgba(20, 20, 24, 0.9);
-    --site-surface-muted: rgba(26, 27, 33, 0.92);
-    --site-surface-muted-strong: rgba(31, 33, 39, 0.94);
+    --site-bg: #222222;
+    --site-text: #f2f2f2;
+    --site-text-strong: #f5f5f5;
+    --site-text-stronger: #fafafa;
+    --site-text-muted: #d6d6d6;
+    --site-text-subtle: #c8c8c8;
+    --site-text-faint: #b2b2b2;
+    --site-text-secondary: #c2c2c2;
+    --site-border-soft: rgba(255, 255, 255, 0.13);
+    --site-border: rgba(255, 255, 255, 0.18);
+    --site-border-mid: rgba(255, 255, 255, 0.24);
+    --site-border-strong: rgba(255, 255, 255, 0.28);
+    --site-border-heavy: rgba(255, 255, 255, 0.32);
+    --site-border-context: rgba(255, 255, 255, 0.36);
+    --site-hover-soft: rgba(255, 255, 255, 0.08);
+    --site-hover: rgba(255, 255, 255, 0.13);
+    --site-hover-strong: rgba(255, 255, 255, 0.19);
+    --site-hover-button: rgba(255, 255, 255, 0.13);
+    --site-surface-toolbar: rgba(34, 34, 34, 0.9);
+    --site-surface-muted: rgba(40, 40, 40, 0.94);
+    --site-surface-muted-strong: rgba(46, 46, 46, 0.96);
     --site-backdrop: rgba(0, 0, 0, 0.58);
     --site-backdrop-strong: rgba(0, 0, 0, 0.68);
-    --site-shadow-md: 0 16px 34px rgba(0, 0, 0, 0.48);
-    --site-shadow-lg: 0 16px 34px rgba(0, 0, 0, 0.54);
-    --site-shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.58);
-    --site-link: #c6ccd6;
-    --site-btn-hover-border: rgba(255, 255, 255, 0.34);
-    --site-btn-primary-bg: rgba(95, 95, 104, 0.9);
+    --site-shadow-md: 0 16px 34px rgba(0, 0, 0, 0.5);
+    --site-shadow-lg: 0 16px 34px rgba(0, 0, 0, 0.55);
+    --site-shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.6);
+    --site-link: #d2d2d2;
+    --site-btn-hover-border: rgba(255, 255, 255, 0.36);
+    --site-btn-primary-bg: rgba(95, 95, 95, 0.9);
     --site-btn-primary-border: transparent;
-    --site-btn-primary-text: #f7f8fb;
-    --site-btn-primary-hover-bg: rgba(124, 124, 134, 0.95);
+    --site-btn-primary-text: #f7f7f7;
+    --site-btn-primary-hover-bg: rgba(124, 124, 124, 0.95);
     --site-btn-primary-hover-border: transparent;
     --site-btn-primary-hover-text: #ffffff;
-    --site-selected-bg: rgba(255, 255, 255, 0.16);
-    --site-divider-weak: rgba(255, 255, 255, 0.14);
-    --site-panel-border: rgba(255, 255, 255, 0.22);
-    --site-elevated-bg: rgba(31, 33, 39, 0.96);
-    --site-crumb-color: #e1e6ef;
-    --site-crumb-current-color: #f7f9fd;
-    --site-crumb-sep-color: #aeb5c0;
-    --site-save-row-color: #e6ebf3;
-    --site-save-row-hover: rgba(255, 255, 255, 0.1);
-    --site-save-folder-color: #eceff4;
-    --site-close-color: #c7ced8;
+    --site-selected-bg: rgba(255, 255, 255, 0.17);
+    --site-divider-weak: rgba(255, 255, 255, 0.16);
+    --site-panel-border: rgba(255, 255, 255, 0.24);
+    --site-elevated-bg: rgba(46, 46, 46, 0.97);
+    --site-crumb-color: #e2e2e2;
+    --site-crumb-current-color: #fafafa;
+    --site-crumb-sep-color: #b5b5b5;
+    --site-save-row-color: #ebebeb;
+    --site-save-row-hover: rgba(255, 255, 255, 0.11);
+    --site-save-folder-color: #f0f0f0;
+    --site-close-color: #cdcdcd;
     --site-overlay-soft: rgba(0, 0, 0, 0.52);
     --site-overlay-shadow: 0 14px 34px rgba(0, 0, 0, 0.58);
-    --theme-ink: #f1f1f1;
-    --theme-subtle: #d7d7d7;
+    --theme-ink: #f2f2f2;
+    --theme-subtle: #d6d6d6;
     --theme-accent: #ffffff;
     --theme-accent-strong: #ffffff;
-    --theme-border: rgba(255, 255, 255, 0.24);
-    --theme-surface: rgba(20, 20, 24, 0.9);
-    --theme-glow: rgba(255, 255, 255, 0.16);
+    --theme-border: rgba(255, 255, 255, 0.28);
+    --theme-surface: rgba(34, 34, 34, 0.92);
+    --theme-glow: rgba(255, 255, 255, 0.18);
     --btn-template-base-bg: transparent;
     --btn-template-base-border: var(--site-border-strong);
-    --btn-template-base-color: #e8ebf1;
-    --btn-template-base-hover-bg: rgba(255, 255, 255, 0.16);
-    --btn-template-base-hover-border: rgba(255, 255, 255, 0.32);
+    --btn-template-base-color: #ededed;
+    --btn-template-base-hover-bg: rgba(255, 255, 255, 0.17);
+    --btn-template-base-hover-border: rgba(255, 255, 255, 0.34);
     --btn-template-base-hover-color: #ffffff;
     --btn-template-primary-bg: var(--print-button-dark-bg);
     --btn-template-primary-border: transparent;
-    --btn-template-primary-color: #f3f3f5;
-    --btn-template-primary-hover-bg: rgb(84, 84, 92);
+    --btn-template-primary-color: #f3f3f3;
+    --btn-template-primary-hover-bg: rgb(84, 84, 84);
     --btn-template-primary-hover-border: transparent;
-    --btn-template-primary-hover-color: #f3f3f5;
+    --btn-template-primary-hover-color: #f3f3f3;
     --btn-template-radius: 8px;
     --btn-template-hover-lift: -1px;
     --btn-template-transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -209,14 +296,15 @@ body.portfolio-page.theme-dark hr {
 }
 
 body.theme-dark .portfolio-nav-link:hover,
-body.theme-dark .portfolio-nav-link:focus-visible {
-    background-color: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.3);
+body.theme-dark .portfolio-nav-link:focus-visible,
+body.theme-dark .portfolio-nav-link:active {
+    background-color: var(--site-hover);
+    border-color: transparent;
 }
 
 body.theme-dark .portfolio-nav-toggler {
-    background: rgba(24, 24, 28, 0.94);
-    border-color: rgba(255, 255, 255, 0.24);
+    background: var(--site-surface-muted);
+    border-color: transparent;
 }
 
 body.theme-dark .portfolio-nav-toggler:hover {
@@ -228,16 +316,16 @@ body.theme-dark .portfolio-nav .navbar-toggler-icon {
 }
 
 body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links {
-    background: rgba(22, 22, 26, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: var(--site-elevated-bg);
+    border: none;
     outline: none;
     box-shadow: none;
 }
 
 body.theme-dark .portfolio-nav {
-    background: rgba(20, 20, 24, 0.8);
+    background: rgba(34, 34, 34, 0.84);
     background-image: none;
-    box-shadow: 0 8px 18px rgba(255, 255, 255, 0.16);
+    box-shadow: 0 8px 18px rgba(255, 255, 255, 0.18);
 }
 
 body.portfolio-page.theme-dark .main-has-bubble-bg,
@@ -252,11 +340,11 @@ body.portfolio-page.theme-dark .main-has-bubble-bg span,
 body.portfolio-page.theme-dark .main-has-bubble-bg div,
 body.portfolio-page.theme-dark .main-has-bubble-bg b,
 body.portfolio-page.theme-dark .main-has-bubble-bg strong {
-    color: #ececef;
+    color: #ececec;
 }
 
 body.portfolio-page.theme-dark .project_card {
-    background-color: rgba(32, 32, 38, 0.92);
+    background-color: rgba(43, 43, 43, 0.94);
     border: none;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
     border-radius: 14px;
@@ -279,13 +367,13 @@ body.portfolio-page.theme-dark .career_cards hr {
 
 body.portfolio-page.theme-dark .project_card_img,
 body.portfolio-page.theme-dark .hobby_card_img {
-    background-color: rgba(22, 22, 26, 0.92);
+    background-color: rgba(38, 38, 38, 0.92);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42);
 }
 
 body.portfolio-page.theme-dark .tag {
-    background-color: rgb(95, 95, 104);
-    color: #f3f3f5;
+    background-color: rgb(95, 95, 95);
+    color: #f3f3f3;
     box-shadow: none;
 }
 
@@ -297,29 +385,29 @@ body.portfolio-page.theme-dark .contact,
 body.portfolio-page.theme-dark .career_card_date,
 body.portfolio-page.theme-dark .hobbys_subtitle,
 body.portfolio-page.theme-dark .foot {
-    color: #e7e7ea;
+    color: #e7e7e7;
 }
 
 body.portfolio-page.theme-dark .career_card .career_card_position {
-    color: #f1f2f6;
+    color: #f1f1f1;
 }
 
 body.portfolio-page.theme-dark .career_card .career_card_work,
 body.portfolio-page.theme-dark .career_card .career_card_work *,
 body.portfolio-page.theme-dark .career_card .career_card_work strong {
-    color: #b9bec8;
+    color: #b9b9b9;
 }
 
 body.portfolio-page.theme-dark .career_card .career_card_date {
-    color: #c4c9d2;
+    color: #c4c4c4;
 }
 
 body.portfolio-page.theme-dark .career_card .career_card_date > div:first-child {
-    color: #d8dce4;
+    color: #d8d8d8;
 }
 
 body.portfolio-page.theme-dark .career_card .career_card_date > div:last-child {
-    color: #aeb4bf;
+    color: #aeaeae;
 }
 
 body.portfolio-page .bubble-bg-layer {
@@ -461,7 +549,7 @@ body.portfolio-page section {
     --motion-medium: 0.3s ease;
     --motion-card: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     --print-button-bg: rgb(65, 141, 65);
-    --print-button-dark-bg: rgb(95, 95, 104);
+    --print-button-dark-bg: rgb(95, 95, 95);
     --btn-template-base-bg: transparent;
     --btn-template-base-border: var(--site-border-strong);
     --btn-template-base-color: var(--theme-subtle);
@@ -578,7 +666,7 @@ body.theme-dark .portfolio-nav::after {
 }
 
 .portfolio-brand-text {
-    font-size: 24px;
+    font-size: 26px;
     display: inline-block;
     transition: transform 0.2s ease;
 }
@@ -682,8 +770,13 @@ body.theme-dark .portfolio-nav::after {
     white-space: nowrap;
 }
 
+.portfolio-nav-link:visited {
+    color: var(--theme-subtle);
+}
+
 .portfolio-nav-link:hover,
-.portfolio-nav-link:focus-visible {
+.portfolio-nav-link:focus-visible,
+.portfolio-nav-link:active {
     color: var(--theme-accent-strong);
     background-color: var(--color-hover-bg);
     border-color: var(--color-hover-border);
@@ -760,10 +853,17 @@ body.theme-dark .portfolio-nav::after {
 
 .portfolio-control-link:hover,
 .portfolio-control-link:focus-visible,
+.portfolio-control-link:active,
 .portfolio-lang-link:hover,
-.portfolio-lang-link:focus-visible {
+.portfolio-lang-link:focus-visible,
+.portfolio-lang-link:active {
     color: var(--theme-accent-strong);
     opacity: 1;
+}
+
+.portfolio-control-link:visited,
+.portfolio-lang-link:visited {
+    color: var(--theme-subtle);
 }
 
 .portfolio-control-link.is-active,
@@ -911,11 +1011,11 @@ body.theme-dark .portfolio-nav::after {
 }
 
 body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-nav-links .nav-item + .nav-item {
-    border-top-color: rgba(255, 255, 255, 0.2);
+    border-top-color: transparent;
 }
 
 body.theme-dark .portfolio-nav.nav-auto-collapsed .portfolio-controls-stack {
-    border-top-color: rgba(255, 255, 255, 0.2);
+    border-top-color: transparent;
 }
 
 .ogimage{
@@ -1183,65 +1283,11 @@ body.project-page .project_detail_page {
     align-items: stretch; /* 카드 높이를 같은 라인에서 맞춤 */
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(120, 120, 128, 0.45) transparent;
-}
-
-.project_cards::-webkit-scrollbar {
-    height: 10px;
-}
-
-.project_cards::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 999px;
-}
-
-.project_cards::-webkit-scrollbar-thumb {
-    background: rgba(120, 120, 128, 0.45);
-    border-radius: 999px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-}
-
-body.portfolio-page.theme-dark .project_cards {
-    scrollbar-color: rgba(198, 198, 205, 0.58) transparent;
-}
-
-body.portfolio-page.theme-dark .project_cards::-webkit-scrollbar-thumb {
-    background: rgba(198, 198, 205, 0.52);
-}
-
-.project_cards::-webkit-scrollbar-thumb:hover {
-    background: rgba(95, 95, 103, 0.58);
-}
-
-body.portfolio-page.theme-dark .project_cards::-webkit-scrollbar-thumb:hover {
-    background: rgba(224, 224, 232, 0.68);
 }
 
 body.project-page .project_detail_content [style*="overflow-x: auto"],
 body.project-page .project_detail_content [style*="overflow-x:auto"] {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(120, 120, 128, 0.45) transparent;
-}
-
-body.project-page .project_detail_content [style*="overflow-x: auto"]::-webkit-scrollbar,
-body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-scrollbar {
-    height: 10px;
-    background: transparent;
-}
-
-body.project-page .project_detail_content [style*="overflow-x: auto"]::-webkit-scrollbar-track,
-body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-body.project-page .project_detail_content [style*="overflow-x: auto"]::-webkit-scrollbar-thumb,
-body.project-page .project_detail_content [style*="overflow-x:auto"]::-webkit-scrollbar-thumb {
-    background: rgba(120, 120, 128, 0.45);
-    border-radius: 999px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    overflow-x: auto;
 }
 .project_card{
     width: clamp(270px, calc(100vw - 120px), 600px);
@@ -1287,7 +1333,8 @@ body.portfolio-page .projects .project_card:focus-within {
 
 .project_card_link:visited,
 .project_card_link:hover,
-.project_card_link:focus-visible {
+.project_card_link:focus-visible,
+.project_card_link:active {
     color: inherit;
     text-decoration: none;
 }
@@ -1393,7 +1440,8 @@ body.portfolio-page .projects .project_card:focus-within {
 }
 
 .portfolio-print-btn.portfolio-nav-link:hover,
-.portfolio-print-btn.portfolio-nav-link:focus-visible {
+.portfolio-print-btn.portfolio-nav-link:focus-visible,
+.portfolio-print-btn.portfolio-nav-link:active {
     box-shadow: none;
     border: none;
     color: var(--color-white);
@@ -1407,7 +1455,8 @@ body.portfolio-page .projects .project_card:focus-within {
 }
 
 .portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:hover,
-.portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:focus-visible {
+.portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:focus-visible,
+.portfolio-print-btn.portfolio-nav-link.is-chat-widget-anchor:active {
     transform: translate3d(0, -10px, 0);
 }
 
@@ -1425,7 +1474,8 @@ body.portfolio-page.theme-dark .portfolio-print-btn {
 }
 
 body.portfolio-page.theme-dark .portfolio-print-btn.portfolio-nav-link:hover,
-body.portfolio-page.theme-dark .portfolio-print-btn.portfolio-nav-link:focus-visible {
+body.portfolio-page.theme-dark .portfolio-print-btn.portfolio-nav-link:focus-visible,
+body.portfolio-page.theme-dark .portfolio-print-btn.portfolio-nav-link:active {
     background-color: var(--print-button-dark-bg);
     border-color: transparent;
     color: #f3f3f5;

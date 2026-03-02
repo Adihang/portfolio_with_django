@@ -19,10 +19,26 @@
                 <ul class="docs-save-folder-list" id="docs-save-folder-list"></ul>
             </section>
         </div>
-        <label class="docs-field docs-field-full">
-            <span>{{ docs_text.selected_path_label }}</span>
-            <input type="text" id="docs-dir-input" list="docs-directory-options" value="{{ initial_dir }}" placeholder="{{ docs_text.selected_path_placeholder }}">
-        </label>
+        <div class="docs-save-file-meta-grid">
+            <label id="docs-save-name-field">
+                <span>
+                    <span class="docs-save-name-label-main">{{ docs_text.save_filename_label_main|default:"파일명" }}</span>
+                    <span class="docs-save-name-label-sub">{{ docs_text.save_filename_label_sub|default:"(확장자 포함)" }}</span>
+                </span>
+                <input type="text" id="docs-save-filename-input" value="{{ initial_filename }}" placeholder="{{ docs_text.save_filename_placeholder }}">
+            </label>
+            <label id="docs-save-extension-field">
+                <span>{{ docs_text.file_extension_label }}</span>
+                <div class="docs-save-extension-controls">
+                    <select id="docs-save-extension-select" aria-label="{{ docs_text.file_extension_quick_label }}">
+                        {% for ext in docs_file_extension_options %}
+                            <option value="{{ ext }}"{% if ext == initial_extension %} selected{% endif %}>{{ ext }}</option>
+                        {% endfor %}
+                        <option value="__custom__">{{ docs_text.file_extension_custom_option }}</option>
+                    </select>
+                </div>
+            </label>
+        </div>
         <div class="docs-save-modal-actions">
             <button type="button" class="docs-btn" id="docs-create-folder-btn">{{ docs_text.create_folder_button }}</button>
             <div class="docs-save-modal-actions-right">
