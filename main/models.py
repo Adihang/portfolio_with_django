@@ -241,6 +241,25 @@ class DocsAccessRule(models.Model):
 
     def __str__(self):
         return self.path or "/docs"
+
+
+class DocsLoginAttemptGuard(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="docs_login_attempt_guard",
+        verbose_name="사용자",
+    )
+    failed_attempts = models.PositiveIntegerField("연속 로그인 실패 횟수", default=0)
+    captcha_required = models.BooleanField("캡챠 필요 여부", default=False)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "Docs 로그인 보호 상태"
+        verbose_name_plural = "Docs 로그인 보호 상태"
+
+    def __str__(self):
+        return f"{self.user} ({self.failed_attempts})"
         
 class Stratagem_Class(models.Model):
     gem_class = models.CharField("스트라타잼 분류", max_length=128)

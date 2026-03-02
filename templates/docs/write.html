@@ -8,6 +8,7 @@
         <div class="docs-toolbar-left">
             <div class="docs-title-row">
                 <h1 class="docs-title">{% if write_mode == 'edit' %}{{ docs_text.write_title_edit }}{% else %}{{ docs_text.write_title_create }}{% endif %}</h1>
+                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
             <div class="docs-subtitle docs-path-breadcrumbs">
                 {% for crumb in write_breadcrumbs %}
@@ -23,9 +24,8 @@
         <div class="docs-toolbar-right">
             {% include "docs/_auth_account.html" %}
             <div class="docs-toolbar-actions">
-                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
                 {% include "docs/_auth_button.html" %}
-                <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.list_button }}</a>
+                <button class="docs-btn" type="button" id="docs-cancel-btn">{{ docs_text.cancel }}</button>
                 <button class="docs-btn docs-btn-primary" type="button" id="docs-save-btn">{{ docs_text.save_button }}</button>
             </div>
         </div>
@@ -41,49 +41,72 @@
     data-mkdir-api-url="{{ docs_api_mkdir_url }}"
     data-write-mode="{{ write_mode }}"
     data-original-path="{{ original_relative_path }}"
+    data-initial-dir="{{ initial_dir }}"
     data-public-write-direct-save="{% if write_public_direct_save %}1{% else %}0{% endif %}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
     <div class="docs-form-grid">
         <label class="docs-field docs-field-full">
             <span>{{ docs_text.filename_label }}</span>
-            <input type="text" id="docs-filename-input" value="{{ initial_filename }}" placeholder="{{ docs_text.filename_placeholder }}">
+            <input type="text" id="docs-filename-input" value="{{ initial_filename_input }}" placeholder="{{ docs_text.filename_placeholder }}">
         </label>
 
         <div class="docs-field docs-field-full">
             <div class="docs-field-head">
                 <label for="docs-content-input" class="docs-field-label">{{ docs_text.content_label }}</label>
                 <div class="docs-content-snippet-tools">
-                    <button class="docs-btn" type="button" id="docs-markdown-help-btn">{{ docs_text.markdown_guide_button }}</button>
-                    <button class="docs-btn" type="button" id="docs-markdown-preview-btn">{{ docs_text.markdown_preview_button }}</button>
+                    <button class="docs-btn" type="button" id="docs-markdown-help-btn"{% if not write_is_markdown %} hidden disabled{% endif %}>{{ docs_text.markdown_guide_button }}</button>
+                    <button class="docs-btn" type="button" id="docs-markdown-preview-btn"{% if not write_is_markdown %} hidden disabled{% endif %}>{{ docs_text.markdown_preview_button }}</button>
                 </div>
             </div>
-            <textarea id="docs-content-input" spellcheck="false">{{ initial_content }}</textarea>
+            <div class="docs-editor-surface" id="docs-editor-surface">
+                <pre class="docs-editor-highlight docs-plain-text" id="docs-editor-highlight" aria-hidden="true"><code id="docs-editor-highlight-code"></code></pre>
+                <div class="docs-editor-suggest" id="docs-editor-suggest" hidden>
+                    <span class="docs-editor-suggest-label" id="docs-editor-suggest-label"></span>
+                    <span class="docs-editor-suggest-hint"><kbd>Tab</kbd> 적용</span>
+                </div>
+                <textarea id="docs-content-input" spellcheck="false">{{ initial_content }}</textarea>
+            </div>
         </div>
     </div>
 </main>
 
 <div id="docs-markdown-snippet-menu" class="docs-context-menu docs-markdown-context-menu" hidden>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="heading2">{{ docs_text.markdown_snippet_heading2 }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="heading3">{{ docs_text.markdown_snippet_heading3 }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="bold">{{ docs_text.markdown_snippet_bold }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="italic">{{ docs_text.markdown_snippet_italic }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="link">{{ docs_text.markdown_snippet_link }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="image">{{ docs_text.markdown_snippet_image }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="code_inline">{{ docs_text.markdown_snippet_code_inline }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="code_block">{{ docs_text.markdown_snippet_code_block }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="list_bullet">{{ docs_text.markdown_snippet_list_bullet }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="list_numbered">{{ docs_text.markdown_snippet_list_numbered }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="list_check">{{ docs_text.markdown_snippet_list_check }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="quote">{{ docs_text.markdown_snippet_quote }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="divider">{{ docs_text.markdown_snippet_divider }}</button>
-    <button class="docs-md-snippet-btn" type="button" data-md-snippet="table">{{ docs_text.markdown_snippet_table }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="heading2" data-editor-extensions=".md">{{ docs_text.markdown_snippet_heading2 }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="heading3" data-editor-extensions=".md">{{ docs_text.markdown_snippet_heading3 }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="bold" data-editor-extensions=".md">{{ docs_text.markdown_snippet_bold }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="italic" data-editor-extensions=".md">{{ docs_text.markdown_snippet_italic }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="link" data-editor-extensions=".md">{{ docs_text.markdown_snippet_link }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="image" data-editor-extensions=".md">{{ docs_text.markdown_snippet_image }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="code_inline" data-editor-extensions=".md">{{ docs_text.markdown_snippet_code_inline }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="code_block" data-editor-extensions=".md">{{ docs_text.markdown_snippet_code_block }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="list_bullet" data-editor-extensions=".md">{{ docs_text.markdown_snippet_list_bullet }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="list_numbered" data-editor-extensions=".md">{{ docs_text.markdown_snippet_list_numbered }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="list_check" data-editor-extensions=".md">{{ docs_text.markdown_snippet_list_check }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="quote" data-editor-extensions=".md">{{ docs_text.markdown_snippet_quote }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="divider" data-editor-extensions=".md">{{ docs_text.markdown_snippet_divider }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="table" data-editor-extensions=".md">{{ docs_text.markdown_snippet_table }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="py_def" data-editor-extensions=".py">{{ docs_text.editor_snippet_py_def }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="py_class" data-editor-extensions=".py">{{ docs_text.editor_snippet_py_class }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="py_ifmain" data-editor-extensions=".py">{{ docs_text.editor_snippet_py_ifmain }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="py_comment" data-editor-extensions=".py">{{ docs_text.editor_snippet_py_comment }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="js_function" data-editor-extensions=".js">{{ docs_text.editor_snippet_js_function }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="js_if" data-editor-extensions=".js">{{ docs_text.editor_snippet_js_if }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="js_comment" data-editor-extensions=".js">{{ docs_text.editor_snippet_js_comment }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="css_rule" data-editor-extensions=".css">{{ docs_text.editor_snippet_css_rule }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="css_media" data-editor-extensions=".css">{{ docs_text.editor_snippet_css_media }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="css_var" data-editor-extensions=".css">{{ docs_text.editor_snippet_css_var }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="json_pair" data-editor-extensions=".json">{{ docs_text.editor_snippet_json_pair }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="json_object" data-editor-extensions=".json">{{ docs_text.editor_snippet_json_object }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="html_basic" data-editor-extensions=".html">{{ docs_text.editor_snippet_html_basic }}</button>
+    <button class="docs-md-snippet-btn" type="button" data-editor-snippet="html_div" data-editor-extensions=".html">{{ docs_text.editor_snippet_html_div }}</button>
 </div>
 
 {% include "popup/docs/save_modal.html" %}
 {% include "popup/docs/page_help_modal.html" %}
 {% include "popup/docs/markdown_help_modal.html" %}
 {% include "popup/docs/markdown_preview_modal.html" %}
+{% include "popup/docs/unsaved_changes_modal.html" %}
 {% include "popup/docs/confirm_modal.html" %}
 {% include "popup/docs/auth_logout_modal.html" %}
 

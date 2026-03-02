@@ -26,6 +26,7 @@ urlpatterns = [
     path('docs/api/download', docs_views.docs_api_download, name='docs_api_download'),
     path('docs/api/acl', docs_views.docs_api_acl, name='docs_api_acl'),
     path('docs/api/acl-options', docs_views.docs_api_acl_options, name='docs_api_acl_options'),
+    path('docs/api/login-captcha-status', docs_views.docs_api_login_captcha_status, name='docs_api_login_captcha_status'),
     path('docs/<path:folder_path>/list', docs_views.docs_list_legacy_redirect, name='docs_list'),
     path('docs/<path:folder_path>/list/', docs_views.docs_list_legacy_redirect),
     path('docs/<path:doc_path>', docs_views.docs_view_legacy_redirect, name='docs_view'),

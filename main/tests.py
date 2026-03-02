@@ -42,6 +42,31 @@ class MarkdownSafetyTests(TestCase):
         self.assertIn('<div class="embed">ok</div>', rendered)
         self.assertIn("<strong>bold</strong>", rendered)
 
+    def test_render_markdown_supports_fenced_code_blocks(self):
+        rendered = render_markdown_safely("```python\nprint('hi')\n```")
+        self.assertIn("<pre><code", rendered)
+        self.assertIn("language-python", rendered)
+        self.assertIn("print('hi')", rendered)
+        self.assertNotIn("&amp;#x27;", rendered)
+
+    def test_render_markdown_supports_blockquotes(self):
+        rendered = render_markdown_safely("> quoted")
+        self.assertIn("<blockquote>", rendered)
+        self.assertIn("<p>quoted</p>", rendered)
+
+    def test_render_markdown_supports_indented_fenced_code_blocks(self):
+        rendered = render_markdown_safely(
+            "- item\n"
+            "    ```python\n"
+            "    a=1\n"
+            "    b=2\n"
+            "    ```\n"
+        )
+        self.assertIn('<pre><code class="language-python">', rendered)
+        self.assertIn("a=1", rendered)
+        self.assertIn("b=2", rendered)
+        self.assertNotIn("<code>python", rendered)
+
 
 class AddScoreViewTests(TestCase):
     def setUp(self):
@@ -386,7 +411,7 @@ class DocsAccessRuleTests(TestCase):
         )
         self.assertEqual(allowed.status_code, 200)
 
-    def test_child_file_write_acl_does_not_grant_parent_directory_write(self):
+    def test_child_file_write_acl_keeps_parent_directory_writable_for_docs_editors(self):
         writers_group = Group.objects.create(name="child_file_writers")
         rule = DocsAccessRule.objects.create(path="restricted/secret.md")
         rule.write_groups.add(writers_group)
@@ -400,12 +425,12 @@ class DocsAccessRuleTests(TestCase):
             data=json.dumps({"parent_dir": "restricted", "folder_name": "should_block"}),
             content_type="application/json",
         )
-        self.assertEqual(parent_write_response.status_code, 403)
+        self.assertEqual(parent_write_response.status_code, 200)
 
         edit_page_response = self.client.get("/ko/docs/write/", data={"path": "restricted/secret.md"})
         self.assertEqual(edit_page_response.status_code, 200)
 
-    def test_child_file_write_acl_does_not_grant_root_directory_write(self):
+    def test_child_file_write_acl_keeps_root_directory_writable_for_docs_editors(self):
         writers_group = Group.objects.create(name="root_parent_block_writers")
         rule = DocsAccessRule.objects.create(path="public.md")
         rule.write_groups.add(writers_group)
@@ -419,12 +444,38 @@ class DocsAccessRuleTests(TestCase):
             data=json.dumps({"parent_dir": "", "folder_name": "root_should_block"}),
             content_type="application/json",
         )
-        self.assertEqual(root_write_response.status_code, 403)
+        self.assertEqual(root_write_response.status_code, 200)
 
         edit_page_response = self.client.get("/ko/docs/write/", data={"path": "public.md"})
         self.assertEqual(edit_page_response.status_code, 200)
 
-    def test_inherited_root_write_acl_is_blocked_when_child_acl_exists(self):
+    def test_docs_list_uses_current_directory_write_access_for_write_button(self):
+        writers_group = Group.objects.create(name="restricted_list_writers")
+        rule = DocsAccessRule.objects.create(path="restricted")
+        rule.write_groups.add(writers_group)
+
+        allowed_editor = self.create_docs_editor("restricted_list_editor")
+        allowed_editor.groups.add(writers_group)
+        self.client.force_login(allowed_editor)
+
+        list_response = self.client.get("/ko/docs/restricted/list/")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, 'id="docs-write-btn"')
+
+    def test_docs_view_uses_document_write_access_for_delete_button(self):
+        writers_group = Group.objects.create(name="public_doc_writers")
+        rule = DocsAccessRule.objects.create(path="public.md")
+        rule.write_groups.add(writers_group)
+
+        allowed_editor = self.create_docs_editor("public_doc_editor")
+        allowed_editor.groups.add(writers_group)
+        self.client.force_login(allowed_editor)
+
+        view_response = self.client.get("/ko/docs/public/")
+        self.assertEqual(view_response.status_code, 200)
+        self.assertContains(view_response, 'id="docs-delete-btn"')
+
+    def test_inherited_root_write_acl_stays_usable_when_child_acl_exists(self):
         root_rule = DocsAccessRule.objects.create(path="")
         root_rule.write_groups.add(self.docs_editor_group)
 
@@ -435,12 +486,12 @@ class DocsAccessRuleTests(TestCase):
         editor = self.create_docs_editor("root_inherited_editor")
         self.client.force_login(editor)
 
-        blocked_response = self.client.post(
+        inherited_response = self.client.post(
             reverse("main:docs_api_mkdir"),
             data=json.dumps({"parent_dir": "restricted", "folder_name": "blocked_by_child_acl"}),
             content_type="application/json",
         )
-        self.assertEqual(blocked_response.status_code, 403)
+        self.assertEqual(inherited_response.status_code, 200)
 
         root_allowed_response = self.client.post(
             reverse("main:docs_api_mkdir"),
@@ -527,6 +578,33 @@ class DocsAccessRuleTests(TestCase):
         self.assertFalse((docs_root / "public.md").exists())
         self.assertTrue((docs_root / "archive" / "public.md").exists())
 
+    def test_docs_api_move_allows_target_directory_without_explicit_acl_even_with_child_acl(self):
+        editor = self.create_docs_editor("move_target_default_editor")
+        restricted_writer = self.user_model.objects.create_user(
+            username="restricted_writer",
+            password="pw123456",
+        )
+        self.client.force_login(editor)
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "WPF").mkdir(parents=True, exist_ok=True)
+        (docs_root / "C#" / "Winform").mkdir(parents=True, exist_ok=True)
+        (docs_root / "C#" / "Winform" / "test.md").write_text("# test", encoding="utf-8")
+
+        rule = DocsAccessRule.objects.create(path="C#/Winform/test.md")
+        rule.write_users.add(restricted_writer)
+
+        response = self.client.post(
+            reverse("main:docs_api_move"),
+            data=json.dumps({"source_path": "WPF", "target_dir": "C#"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json().get("path"), "C#/WPF")
+        self.assertFalse((docs_root / "WPF").exists())
+        self.assertTrue((docs_root / "C#" / "WPF").exists())
+
     def test_acl_api_is_admin_only(self):
         editor = self.create_docs_editor("acl_editor")
         target_group = Group.objects.create(name="target_group")
@@ -595,6 +673,69 @@ class DocsAccessRuleTests(TestCase):
         )
         self.assertEqual(clear_response.status_code, 200)
         self.assertFalse(DocsAccessRule.objects.filter(path="restricted/secret.md").exists())
+
+    def test_acl_api_can_apply_split_rule_to_multiple_paths(self):
+        admin_user = self.user_model.objects.create_user(
+            username="acl_admin_bulk",
+            password="pw123456",
+            is_staff=True,
+        )
+        read_group = Group.objects.create(name="bulk_read_group")
+        write_group = Group.objects.create(name="bulk_write_group")
+        read_user = self.user_model.objects.create_user(username="bulk_read_user", password="pw123456")
+        write_user = self.user_model.objects.create_user(username="bulk_write_user", password="pw123456")
+
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            reverse("main:docs_api_acl"),
+            data=json.dumps(
+                {
+                    "paths": ["restricted/secret.md", "public.md"],
+                    "read_user_ids": [read_user.id],
+                    "read_group_ids": [read_group.id],
+                    "write_user_ids": [write_user.id],
+                    "write_group_ids": [write_group.id],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(set(payload.get("paths", [])), {"restricted/secret.md", "public.md"})
+        for target_path in ["restricted/secret.md", "public.md"]:
+            rule = DocsAccessRule.objects.get(path=target_path)
+            self.assertEqual(set(rule.read_users.values_list("id", flat=True)), {read_user.id})
+            self.assertEqual(set(rule.read_groups.values_list("id", flat=True)), {read_group.id})
+            self.assertEqual(set(rule.write_users.values_list("id", flat=True)), {write_user.id})
+            self.assertEqual(set(rule.write_groups.values_list("id", flat=True)), {write_group.id})
+
+    def test_acl_api_rejects_public_all_group_for_any_directory_in_bulk_targets(self):
+        admin_user = self.user_model.objects.create_user(
+            username="acl_admin_block_bulk_dir_public",
+            password="pw123456",
+            is_staff=True,
+        )
+        public_group = get_docs_public_write_group()
+        self.client.force_login(admin_user)
+
+        response = self.client.post(
+            reverse("main:docs_api_acl"),
+            data=json.dumps(
+                {
+                    "paths": ["restricted", "public.md"],
+                    "read_user_ids": [],
+                    "read_group_ids": [],
+                    "write_user_ids": [],
+                    "write_group_ids": [public_group.id],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("폴더에는 전체 권한을 설정할 수 없습니다", response.json().get("error", ""))
+        self.assertFalse(DocsAccessRule.objects.filter(path="restricted").exists())
 
     def test_acl_options_includes_public_all_group(self):
         admin_user = self.user_model.objects.create_user(
@@ -740,6 +881,7 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("render_mode"), "markdown")
         self.assertIn("<h1>", payload.get("html", ""))
 
     def test_docs_view_shows_edit_button_for_anonymous_public_writable_file(self):
@@ -751,6 +893,78 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "/ko/docs/write")
         self.assertContains(response, "path=public.md")
+
+    def test_docs_view_renders_plain_text_for_non_markdown_file(self):
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "notes.txt").write_text("# heading\n**bold**", encoding="utf-8")
+
+        response = self.client.get("/ko/docs/notes.txt/")
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn('class="docs-plain-text"', html)
+        self.assertIn("<pre><code># heading", html)
+        self.assertIn("**bold**", html)
+        self.assertNotIn("<strong>bold</strong>", html)
+
+    def test_docs_api_preview_renders_plain_text_for_non_markdown_file(self):
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "notes.txt").write_text("# heading\n**bold**", encoding="utf-8")
+
+        response = self.client.post(
+            reverse("main:docs_api_preview"),
+            data=json.dumps({"path": "notes.txt"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("render_mode"), "plain_text")
+        self.assertIn("<pre><code># heading", payload.get("html", ""))
+        self.assertIn("**bold**", payload.get("html", ""))
+        self.assertNotIn("<strong>bold</strong>", payload.get("html", ""))
+
+    def test_docs_view_renders_html_live_with_same_name_css_and_js(self):
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "sample.html").write_text("<main id='app'>hello</main>", encoding="utf-8")
+        (docs_root / "sample.css").write_text("#app { color: rgb(255, 0, 0); }", encoding="utf-8")
+        (docs_root / "sample.js").write_text("window.__sampleLoaded = true;", encoding="utf-8")
+
+        response = self.client.get("/ko/docs/sample.html/")
+        self.assertEqual(response.status_code, 200)
+
+        html = response.content.decode("utf-8")
+        self.assertIn('class="docs-html"', html)
+        self.assertIn("docs-html-live-frame", html)
+        self.assertIn('sandbox="allow-scripts"', html)
+        self.assertNotIn("allow-forms", html)
+        self.assertNotIn("allow-popups", html)
+        self.assertIn("data-docs-linked-css", html)
+        self.assertIn("data-docs-linked-js", html)
+        self.assertIn("Content-Security-Policy", html)
+        self.assertIn("window.__sampleLoaded = true;", html)
+
+    def test_docs_api_preview_renders_html_live_with_same_name_css_and_js(self):
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "sample.html").write_text("<main id='app'>hello</main>", encoding="utf-8")
+        (docs_root / "sample.css").write_text("#app { color: rgb(255, 0, 0); }", encoding="utf-8")
+        (docs_root / "sample.js").write_text("window.__sampleLoaded = true;", encoding="utf-8")
+
+        response = self.client.post(
+            reverse("main:docs_api_preview"),
+            data=json.dumps({"path": "sample.html"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("render_class"), "docs-html")
+        self.assertIn("docs-html-live-frame", payload.get("html", ""))
+        self.assertIn('sandbox="allow-scripts"', payload.get("html", ""))
+        self.assertNotIn("allow-forms", payload.get("html", ""))
+        self.assertNotIn("allow-popups", payload.get("html", ""))
+        self.assertIn("data-docs-linked-css", payload.get("html", ""))
+        self.assertIn("data-docs-linked-js", payload.get("html", ""))
+        self.assertIn("Content-Security-Policy", payload.get("html", ""))
 
     def test_public_writable_file_cannot_be_renamed(self):
         public_group = get_docs_public_write_group()
@@ -784,6 +998,44 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("전체 허용 파일은 삭제할 수 없습니다", response.json().get("error", ""))
         docs_root = Path(settings.MEDIA_ROOT) / "docs"
         self.assertTrue((docs_root / "public.md").exists())
+
+    def test_docs_api_delete_supports_multiple_paths(self):
+        editor = self.create_docs_editor("bulk_delete_editor")
+        self.client.force_login(editor)
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "extra.md").write_text("# extra", encoding="utf-8")
+
+        response = self.client.post(
+            reverse("main:docs_api_delete"),
+            data=json.dumps({"paths": ["public.md", "extra.md"]}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse((docs_root / "public.md").exists())
+        self.assertFalse((docs_root / "extra.md").exists())
+
+    def test_docs_api_delete_bulk_rejects_when_public_writable_file_is_included(self):
+        editor = self.create_docs_editor("bulk_delete_public_block_editor")
+        self.client.force_login(editor)
+
+        public_group = get_docs_public_write_group()
+        rule = DocsAccessRule.objects.create(path="public.md")
+        rule.write_groups.add(public_group)
+
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "extra.md").write_text("# extra", encoding="utf-8")
+
+        response = self.client.post(
+            reverse("main:docs_api_delete"),
+            data=json.dumps({"paths": ["public.md", "extra.md"]}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue((docs_root / "public.md").exists())
+        self.assertTrue((docs_root / "extra.md").exists())
 
     def test_public_writable_file_cannot_be_moved(self):
         public_group = get_docs_public_write_group()
@@ -873,3 +1125,52 @@ class DocsAccessRuleTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual((docs_root / "public.md").read_text(encoding="utf-8"), "# updated")
+
+    def test_docs_api_save_allows_custom_extension(self):
+        editor = self.create_docs_editor("custom_ext_editor")
+        self.client.force_login(editor)
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+
+        response = self.client.post(
+            reverse("main:docs_api_save"),
+            data=json.dumps(
+                {
+                    "original_path": "",
+                    "target_dir": "",
+                    "filename": "notes",
+                    "extension": ".txt",
+                    "content": "# text document",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("path"), "notes.txt")
+        self.assertEqual(payload.get("slug_path"), "notes.txt")
+        self.assertTrue((docs_root / "notes.txt").exists())
+
+        view_response = self.client.get("/ko/docs/notes.txt/")
+        self.assertEqual(view_response.status_code, 200)
+
+    def test_docs_api_save_rejects_invalid_extension_format(self):
+        editor = self.create_docs_editor("invalid_ext_editor")
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("main:docs_api_save"),
+            data=json.dumps(
+                {
+                    "original_path": "",
+                    "target_dir": "",
+                    "filename": "broken",
+                    "extension": ".",
+                    "content": "# invalid extension",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("확장자 형식이 올바르지 않습니다", response.json().get("error", ""))
