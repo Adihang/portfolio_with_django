@@ -37,6 +37,47 @@
     let currentSurfaceMode = null;
     let manualThemeMode = null;
 
+    // 메뉴바 스크롤 관련 변수
+    const navbar = document.querySelector('.portfolio-nav');
+    let lastScrollTop = 0;
+    let scrollTimer = null;
+    let isNavbarHidden = false;
+
+    // 메뉴바 스크롤 처리 함수
+    const handleNavbarScroll = function () {
+        if (!navbar) return;
+
+        const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollDirection = currentScrollTop > lastScrollTop ? 'down' : 'up';
+        const scrollDistance = Math.abs(currentScrollTop - lastScrollTop);
+
+        // 스크롤이 일정 거리 이상일 때만 처리
+        if (scrollDistance > 10) {
+            if (scrollDirection === 'down' && currentScrollTop > 100 && !isNavbarHidden) {
+                // 아래로 스크롤 시 메뉴바 숨김
+                navbar.classList.add('navbar-hidden');
+                isNavbarHidden = true;
+            } else if (scrollDirection === 'up' && isNavbarHidden) {
+                // 위로 스크롤 시 메뉴바 표시
+                navbar.classList.remove('navbar-hidden');
+                isNavbarHidden = false;
+            }
+        }
+
+        lastScrollTop = currentScrollTop;
+    };
+
+    // 스로틀링된 스크롤 처리 함수
+    const throttledHandleNavbarScroll = function () {
+        if (scrollTimer) {
+            return;
+        }
+        scrollTimer = window.setTimeout(function () {
+            handleNavbarScroll();
+            scrollTimer = null;
+        }, 16); // 약 60fps
+    };
+
     // 요소의 배경색을 설정하는 함수
     const setSurfaceBackground = function (element, color) {
         if (!element) {
@@ -2445,6 +2486,9 @@
     }, { passive: true });
     forceClearNavContainerDecorations();
     scheduleNavModeUpdate();
+
+    // 메뉴바 스크롤 이벤트 리스너 추가
+    window.addEventListener('scroll', throttledHandleNavbarScroll, { passive: true });
 
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(scheduleNavModeUpdate).catch(function () {});

@@ -2487,6 +2487,9 @@
     forceClearNavContainerDecorations();
     scheduleNavModeUpdate();
 
+    // 메뉴바 스크롤 이벤트 리스너 추가
+    window.addEventListener('scroll', throttledHandleNavbarScroll, { passive: true });
+
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(scheduleNavModeUpdate).catch(function () {});
     }

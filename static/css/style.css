@@ -590,6 +590,12 @@ body.portfolio-page section {
     background: linear-gradient(90deg, var(--color-nav-bg-start), var(--color-nav-bg-end));
     backdrop-filter: blur(8px);
     box-shadow: var(--shadow-medium);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 메뉴바 숨김 효과 */
+.portfolio-nav.navbar-hidden {
+    transform: translateY(-100%);
 }
 
 .portfolio-nav::after {
