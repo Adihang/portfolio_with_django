@@ -1379,6 +1379,10 @@ def _reset_docs_login_guard(user):
 
 
 def _verify_docs_turnstile_token(token: str | None, remote_ip: str | None) -> bool:
+    # 디버그 모드에서는 항상 통과
+    if settings.DEBUG:
+        return True
+        
     secret_key = str(getattr(settings, "TURNSTILE_SECRET_KEY", "") or "").strip()
     if not secret_key:
         return False
@@ -1449,8 +1453,14 @@ def docs_login(request, ui_lang=None):
     login_error_message = ""
     show_captcha = False
     captcha_question = ""
-    turnstile_site_key = str(getattr(settings, "TURNSTILE_SITE_KEY", "") or "").strip()
-    turnstile_secret_key = str(getattr(settings, "TURNSTILE_SECRET_KEY", "") or "").strip()
+    
+    # 디버그 모드에서는 Turnstile 비활성화
+    if settings.DEBUG:
+        turnstile_site_key = ""
+        turnstile_secret_key = ""
+    else:
+        turnstile_site_key = str(getattr(settings, "TURNSTILE_SITE_KEY", "") or "").strip()
+        turnstile_secret_key = str(getattr(settings, "TURNSTILE_SECRET_KEY", "") or "").strip()
 
     if request.method == "POST":
         username_value = request.POST.get("username", "")

@@ -997,10 +997,26 @@
             if (!listLayout) {
                 return;
             }
+            // 강제로 리플로우 트리거
+            void listLayout.offsetWidth;
+            
             const isLandscape = window.innerWidth > window.innerHeight;
             listLayout.classList.toggle("is-landscape", isLandscape);
             listLayout.classList.toggle("is-portrait", !isLandscape);
-            syncCurrentDirRowHeightWithPreviewHead();
+            
+            // 레이아웃 변경 후 동기화
+            setTimeout(function() {
+                syncCurrentDirRowHeightWithPreviewHead();
+            }, 10);
+        }
+
+        // 디바운싱된 레이아웃 업데이트 함수
+        let layoutUpdateTimeout = null;
+        function debouncedUpdateListLayoutMode() {
+            if (layoutUpdateTimeout) {
+                clearTimeout(layoutUpdateTimeout);
+            }
+            layoutUpdateTimeout = setTimeout(updateListLayoutMode, 50);
         }
 
         function syncCurrentDirRowHeightWithPreviewHead() {
@@ -2694,8 +2710,8 @@
 
         window.addEventListener("scroll", closeContextMenu, { passive: true });
         window.addEventListener("resize", closeContextMenu, { passive: true });
-        window.addEventListener("resize", updateListLayoutMode, { passive: true });
-        window.addEventListener("orientationchange", updateListLayoutMode, { passive: true });
+        window.addEventListener("resize", debouncedUpdateListLayoutMode, { passive: true });
+        window.addEventListener("orientationchange", debouncedUpdateListLayoutMode, { passive: true });
 
         if (window.ResizeObserver && previewHead) {
             const previewHeadResizeObserver = new ResizeObserver(function () {
@@ -2709,7 +2725,12 @@
         } else {
             bindDocsPathDropTargets();
         }
-        updateListLayoutMode();
+        
+        // 초기화 시 약간의 지연 후 레이아웃 업데이트
+        setTimeout(function() {
+            updateListLayoutMode();
+        }, 100);
+        
         clearPreviewPane();
         renderList();
     }
