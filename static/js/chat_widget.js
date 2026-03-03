@@ -1,3 +1,4 @@
+// DOM이 로드되었을 때 실행되는 챗봇 위젯 초기화 함수
 document.addEventListener('DOMContentLoaded', function() {
     const CHAT_HISTORY_LIMIT = 30;
     const CHAT_REQUEST_HISTORY_LIMIT = 20;
@@ -78,6 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let widgetMotionFollowRafId = null;
     let widgetMotionFollowUntil = 0;
 
+    // 인쇄 버튼 앵커 위치를 업데이트하는 함수
     function updatePrintButtonAnchor() {
         printButtonAnchorRafId = null;
 
@@ -101,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         printButton.style.top = `${targetTop}px`;
     }
 
+    // 인쇄 버튼 앵커 업데이트를 스케줄링하는 함수
     function schedulePrintButtonAnchorUpdate() {
         if (!printButton || printButtonAnchorRafId !== null) {
             return;
@@ -109,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
         printButtonAnchorRafId = window.requestAnimationFrame(updatePrintButtonAnchor);
     }
 
+    // 채팅 위젯 하단 오프셋을 업데이트하는 함수
     function updateChatWidgetBottomOffset() {
         footerOffsetRafId = null;
 
@@ -136,6 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
         schedulePrintButtonAnchorUpdate();
     }
 
+    // 채팅 위젯 하단 오프셋 업데이트를 스케줄링하는 함수
     function scheduleChatWidgetBottomOffsetUpdate() {
         if (footerOffsetRafId !== null) {
             return;
@@ -144,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
         schedulePrintButtonAnchorUpdate();
     }
 
+    // 채팅 위젯 모션을 따라가는 함수
     function followChatWidgetMotion(durationMs = widgetMotionFollowDurationMs) {
         const now = (window.performance && typeof window.performance.now === 'function')
             ? window.performance.now()
@@ -169,6 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
         widgetMotionFollowRafId = window.requestAnimationFrame(step);
     }
 
+    // 대화 기록을 로드하는 함수
     function loadConversationHistory() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -189,6 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 대화 기록을 저장하는 함수
     function saveConversationHistory() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationHistory.slice(-CHAT_HISTORY_LIMIT)));
@@ -197,6 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 대화 기록을 복원하는 함수
     function restoreConversationHistory() {
         const saved = loadConversationHistory();
         if (saved.length > 0) {
@@ -217,6 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
     chatWidget.classList.remove('is-open');
     chatToggle.textContent = '+';
 
+    // 채팅창 열림 상태를 설정하는 함수
     function setChatOpen(open) {
         isChatOpen = open;
         chatWidget.classList.toggle('is-open', open);
@@ -246,6 +256,7 @@ document.addEventListener('DOMContentLoaded', function() {
     chatBody.addEventListener('transitioncancel', handleChatBodyTransitionEvent);
 
     // 메시지 전송 함수
+    // 메시지를 전송하는 비동기 함수
     async function sendMessage() {
         const message = userInput.value.trim();
         if (message === '') return;
@@ -271,6 +282,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 컨테이너에 링크가 포함된 텍스트를 추가하는 함수
     function appendTextWithLinks(container, text) {
         const urlRegex = /(https?:\/\/[^\s<>()"'`\[\]{}|\\^]+(?:\([^\s<>()"'`\[\]{}|\\^]*\))*[^\s<>()"'`\[\]{}|\\^.,;:!?])/g;
         let lastIndex = 0;
@@ -301,6 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 메시지 추가 함수
+    // 메시지를 추가하는 함수
     function addMessage(text, sender, messageId = '', trackHistory = true) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
@@ -343,15 +356,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 스크롤을 가장 아래로 이동하는 함수
+    // 스크롤을 가장 아래로 이동하는 함수
     function scrollToBottom() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     // GPT API를 호출하여 챗봇 응답 생성
+    // GPT API를 호출하여 챗봇 응답을 생성하는 비동기 함수
     async function getBotResponse(userMessage) {
         let loadingMessage = null;
         let loadingAnimationIntervalId = null;
 
+        // 로딩 애니메이션을 시작하는 함수
         const startLoadingAnimation = function () {
             const loadingMessageId = 'loading-' + Date.now();
             loadingMessage = addMessage('.', 'bot', loadingMessageId, false);
@@ -373,6 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, LOADING_DOT_ANIMATION_INTERVAL_MS);
         };
 
+        // 로딩 애니메이션을 중지하는 함수
         const stopLoadingAnimation = function () {
             if (loadingAnimationIntervalId !== null) {
                 window.clearInterval(loadingAnimationIntervalId);
@@ -432,6 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // CSRF 토큰을 가져오는 헬퍼 함수
     // CSRF 토큰을 가져오는 헬퍼 함수
     function getCSRFToken() {
         // 메타 태그에서 CSRF 토큰 가져오기
