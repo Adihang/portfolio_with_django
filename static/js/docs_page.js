@@ -3907,6 +3907,9 @@
             activeEditorSuggestion = null;
             if (editorSuggest) {
                 editorSuggest.hidden = true;
+                // 위치 스타일 초기화
+                editorSuggest.style.left = '';
+                editorSuggest.style.top = '';
             }
             if (editorSuggestLabel) {
                 editorSuggestLabel.textContent = "";
@@ -3961,8 +3964,101 @@
                 cursorBack: Number(suggestion.cursorBack || 0),
                 label: suggestion.label || suggestion.insertText
             };
+            
+            // 커서 위치 계산
+            const cursorPosition = calculateCursorPosition(contentInput, start);
+            if (cursorPosition) {
+                // 에디터 서페이스 내에서의 상대 위치 계산
+                const editorRect = contentInput.getBoundingClientRect();
+                const surfaceRect = editorSurface ? editorSurface.getBoundingClientRect() : null;
+                
+                // 커서 기준으로 오른쪽 4픽셀, 수직으로 (suggest 상단 높이 - 커서 상단 높이)/2 만큼 조정
+                let left = cursorPosition.left + 4;
+                let top = cursorPosition.top;
+                
+                // 에디터 서페이스가 있으면 상대 위치 조정
+                if (surfaceRect) {
+                    left = (cursorPosition.left + 4) - surfaceRect.left;
+                    top = cursorPosition.top - surfaceRect.top;
+                }
+                
+                // 화면 밖으로 나가지 않도록 조정
+                const suggestWidth = 200; // 예상 너비
+                const suggestHeight = 30; // 예상 높이
+                
+                if (left + suggestWidth > (surfaceRect ? surfaceRect.width : window.innerWidth)) {
+                    left = (surfaceRect ? surfaceRect.width : window.innerWidth) - suggestWidth - 10;
+                }
+                
+                if (top + suggestHeight > (surfaceRect ? surfaceRect.height : window.innerHeight)) {
+                    top = top - suggestHeight - 5;
+                }
+                
+                // suggest 상단과 커서 상단이 일치하도록 높이 조정: (suggest 높이 - 커서 높이)/2
+                const suggestElement = editorSuggest;
+                if (suggestElement) {
+                    const suggestRect = suggestElement.getBoundingClientRect();
+                    const lineHeight = cursorPosition.lineHeight || 20; // 커서 라인 높이
+                    
+                    // suggest의 상단이 커서 상단과 일치하도록 조정
+                    top = top - (suggestRect.height - lineHeight) / 2;
+                    
+                    // 에디터 서페이스가 있으면 상대 위치 재조정
+                    if (surfaceRect) {
+                        top = (cursorPosition.top - (suggestRect.height - lineHeight) / 2) - surfaceRect.top;
+                    }
+                }
+                
+                editorSuggest.style.left = left + 'px';
+                editorSuggest.style.top = top + 'px';
+            }
+            
             editorSuggestLabel.textContent = activeEditorSuggestion.label;
             editorSuggest.hidden = false;
+        }
+
+        function calculateCursorPosition(textarea, position) {
+            // 텍스트 영역에서 커서의 픽셀 위치 계산
+            const text = textarea.value;
+            const textBeforeCursor = text.substring(0, position);
+            const lines = textBeforeCursor.split('\n');
+            const currentLine = lines.length - 1;
+            const currentColumn = lines[lines.length - 1].length;
+            
+            // textarea의 스타일 정보 가져오기
+            const styles = window.getComputedStyle(textarea);
+            const fontSize = parseFloat(styles.fontSize);
+            const lineHeight = parseFloat(styles.lineHeight) || fontSize * 1.2;
+            const fontFamily = styles.fontFamily;
+            const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+            const paddingTop = parseFloat(styles.paddingTop) || 0;
+            const borderLeft = parseFloat(styles.borderLeftWidth) || 0;
+            const borderTop = parseFloat(styles.borderTopWidth) || 0;
+            
+            // 캔버스를 사용해서 텍스트 너비 계산
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = `${fontSize}px ${fontFamily}`;
+            
+            // 현재 라인의 텍스트 너비 계산
+            const lineWidth = context.measureText(lines[lines.length - 1]).width;
+            
+            // textarea의 실제 위치
+            const textareaRect = textarea.getBoundingClientRect();
+            
+            // 스크롤 위치 고려
+            const scrollTop = textarea.scrollTop;
+            const scrollLeft = textarea.scrollLeft;
+            
+            // 커서의 절대 위치 계산
+            const left = textareaRect.left + paddingLeft + borderLeft + lineWidth - scrollLeft;
+            const top = textareaRect.top + paddingTop + borderTop + (currentLine * lineHeight) - scrollTop;
+            
+            return {
+                left: left,
+                top: top,
+                lineHeight: lineHeight
+            };
         }
 
         function acceptEditorSuggestion() {
@@ -3987,10 +4083,13 @@
             const renderClass = resolveWriteEditorRenderClass();
             const source = contentInput.value || "";
             let highlightedHtml = escapeHtml(source);
+            
+            // .md 파일일 때는 마크다운 렌더링을 하지 않음
             if (renderClass === "docs-js") {
                 highlightedHtml = highlightJavaScriptCode(source);
             } else if (renderClass === "docs-editor-md") {
-                highlightedHtml = highlightMarkdownSourceCode(source);
+                // .md 파일은 plain text로 표시
+                highlightedHtml = escapeHtml(source);
             } else if (renderClass === "docs-css") {
                 highlightedHtml = highlightCssCode(source);
             } else if (renderClass === "docs-json") {

@@ -478,6 +478,7 @@ body.theme-dark .docs-help-icon-symbol {
 
 .docs-list-layout.is-portrait.has-preview {
     /* keep same appearance to stay consistent when preview is visible */
+    display: flex;
 }
 
 .docs-list-pane {
@@ -1796,8 +1797,6 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
 
 .docs-editor-suggest {
     position: absolute;
-    right: 10px;
-    bottom: 10px;
     z-index: 2;
     display: inline-flex;
     align-items: center;
@@ -1809,6 +1808,7 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
     color: var(--docs-text);
     padding: 6px 8px;
     pointer-events: none;
+    white-space: nowrap;
 }
 
 .docs-editor-suggest-label {
