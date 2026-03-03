@@ -457,13 +457,28 @@ body.theme-dark .docs-help-icon-symbol {
     align-items: stretch;
 }
 
+.docs-list-layout.is-landscape.has-editor {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+}
+
 .docs-list-layout.is-landscape.has-preview > .docs-list-pane,
 .docs-list-layout.is-landscape.has-preview > .docs-list-preview {
     align-self: stretch;
     min-height: 0;
 }
 
+.docs-list-layout.is-landscape.has-editor > .docs-list-pane,
+.docs-list-layout.is-landscape.has-editor > .docs-list-editor {
+    align-self: stretch;
+    min-height: 0;
+}
+
 .docs-list-layout.is-landscape.has-preview > .docs-list-preview {
+    height: 100%;
+}
+
+.docs-list-layout.is-landscape.has-editor > .docs-list-editor {
     height: 100%;
 }
 
@@ -490,11 +505,27 @@ body.theme-dark .docs-help-icon-symbol {
     min-height: 0;
 }
 
+.docs-list-layout.is-portrait.has-editor > .docs-list-editor {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
 .docs-list-pane {
     min-width: 0;
 }
 
 .docs-list-preview {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    border-radius: 0;
+    background: var(--docs-bg);
+    overflow: hidden;
+    margin-top: 0;
+}
+
+.docs-list-editor {
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -517,6 +548,48 @@ body.theme-dark .docs-help-icon-symbol {
     border: 0;
     box-shadow: inset 0 -1px 0 var(--docs-border-soft);
     background: var(--docs-surface-muted);
+}
+
+.docs-list-editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: var(--docs-list-head-pad-y) var(--docs-list-head-pad-x);
+    min-height: 47px;
+    box-sizing: border-box;
+    border: 0;
+    box-shadow: inset 0 -1px 0 var(--docs-border-soft);
+    background: var(--docs-surface-muted);
+}
+
+.docs-list-editor-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex: 1 1 auto;
+    margin-left: auto;
+}
+
+.docs-list-editor-actions .docs-filename-field {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 300px;
+    order: -1; /* 왼쪽 정렬을 위해 */
+    margin-right: auto; /* 오른쪽 여백 추가 */
+}
+
+.docs-filename-field input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-sm);
+    background: var(--docs-bg);
+    color: var(--docs-text);
+    font-size: 14px;
+    box-sizing: border-box;
 }
 
 .docs-list-preview-title {
@@ -554,6 +627,95 @@ body.theme-dark .docs-help-icon-symbol {
     overflow: hidden;
 }
 
+.docs-list-editor-surface {
+    position: relative;
+    min-height: 240px;
+    border: 1px solid var(--docs-border-heavy);
+    border-radius: var(--docs-radius-sm);
+    background: var(--docs-bg);
+    overflow: hidden;
+}
+
+.docs-list-editor-highlight {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow: auto;
+    pointer-events: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.94rem;
+    line-height: 1.45;
+    white-space: pre;
+    color: var(--docs-text);
+}
+
+.docs-list-editor-highlight code {
+    display: block;
+    min-height: 100%;
+    font: inherit;
+    line-height: inherit;
+    white-space: inherit;
+}
+
+.docs-list-editor-surface > #docs-list-content-input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--docs-text-stronger);
+    padding: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.94rem;
+    line-height: 1.45;
+    resize: none;
+    overflow: auto;
+    z-index: 1;
+}
+
+.docs-list-editor-surface > #docs-list-content-input::selection {
+    background: var(--docs-selected-bg);
+}
+
+.docs-list-editor-suggest {
+    position: absolute;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 20px);
+    border: 1px solid var(--docs-border-mid);
+    border-radius: 8px;
+    background: var(--docs-surface-muted-strong);
+    color: var(--docs-text);
+    padding: 6px 8px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.docs-list-editor-suggest-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    color: var(--docs-text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.docs-list-editor-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 10px 12px; /* 상하 10px, 좌우 12px */
+}
+
 .docs-list-layout.is-landscape.has-preview .docs-list-preview-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -566,6 +728,17 @@ body.theme-dark .docs-help-icon-symbol {
 }
 
 .docs-list-layout.is-landscape.has-preview::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: var(--docs-border-soft);
+    pointer-events: none;
+}
+
+.docs-list-layout.is-landscape.has-editor::after {
     content: "";
     position: absolute;
     top: 0;

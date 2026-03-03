@@ -83,6 +83,27 @@
                 </article>
             </div>
         </aside>
+        <!-- 편집기 요소 (초기에는 hidden) -->
+        <aside class="docs-list-editor" id="docs-list-editor" aria-live="polite" aria-hidden="true" hidden>
+            <header class="docs-list-editor-head">
+                <div class="docs-list-editor-actions">
+                    <div class="docs-filename-field">
+                        <input type="text" id="docs-list-filename-input" placeholder="{{ docs_text.filename_placeholder }}">
+                    </div>
+                    <button class="docs-btn" type="button" id="docs-list-cancel-btn">{{ docs_text.cancel }}</button>
+                    <button class="docs-btn docs-btn-primary" type="button" id="docs-list-save-btn">{{ docs_text.save_button }}</button>
+                </div>
+            </header>
+            <div class="docs-list-editor-body">
+                <div class="docs-list-editor-surface" id="docs-list-editor-surface">
+                    <pre class="docs-list-editor-highlight docs-plain-text" id="docs-list-editor-highlight" aria-hidden="true"><code id="docs-list-editor-highlight-code"></code></pre>
+                    <textarea id="docs-list-content-input" spellcheck="false"></textarea>
+                    <div class="docs-list-editor-suggest" id="docs-list-editor-suggest" aria-hidden="true" hidden>
+                        <span class="docs-list-editor-suggest-label"></span>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 </main>
 
