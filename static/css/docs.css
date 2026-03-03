@@ -576,7 +576,6 @@ body.theme-dark .docs-help-icon-symbol {
 .docs-list-editor-actions .docs-filename-field {
     flex: 1 1 auto;
     min-width: 0;
-    max-width: 300px;
     order: -1; /* 왼쪽 정렬을 위해 */
     margin-right: auto; /* 오른쪽 여백 추가 */
 }
@@ -588,7 +587,7 @@ body.theme-dark .docs-help-icon-symbol {
     border-radius: var(--docs-radius-sm);
     background: var(--docs-bg);
     color: var(--docs-text);
-    font-size: 14px;
+    font-size: 16px;
     box-sizing: border-box;
 }
 
@@ -627,40 +626,7 @@ body.theme-dark .docs-help-icon-symbol {
     overflow: hidden;
 }
 
-.docs-list-editor-surface {
-    position: relative;
-    min-height: 240px;
-    border: 1px solid var(--docs-border-heavy);
-    border-radius: var(--docs-radius-sm);
-    background: var(--docs-bg);
-    overflow: hidden;
-}
-
-.docs-list-editor-highlight {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    min-height: 240px;
-    padding: 10px;
-    box-sizing: border-box;
-    overflow: auto;
-    pointer-events: none;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.94rem;
-    line-height: 1.45;
-    white-space: pre;
-    color: var(--docs-text);
-}
-
-.docs-list-editor-highlight code {
-    display: block;
-    min-height: 100%;
-    font: inherit;
-    line-height: inherit;
-    white-space: inherit;
-}
-
-.docs-list-editor-surface > #docs-list-content-input {
+.docs-editor-surface > #docs-list-content-input {
     position: absolute;
     inset: 0;
     margin: 0;
@@ -673,39 +639,15 @@ body.theme-dark .docs-help-icon-symbol {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-size: 0.94rem;
     line-height: 1.45;
+    tab-size: 4;
+    font-variant-ligatures: none;
     resize: none;
     overflow: auto;
     z-index: 1;
 }
 
-.docs-list-editor-surface > #docs-list-content-input::selection {
+.docs-editor-surface > #docs-list-content-input::selection {
     background: var(--docs-selected-bg);
-}
-
-.docs-list-editor-suggest {
-    position: absolute;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    max-width: calc(100% - 20px);
-    border: 1px solid var(--docs-border-mid);
-    border-radius: 8px;
-    background: var(--docs-surface-muted-strong);
-    color: var(--docs-text);
-    padding: 6px 8px;
-    pointer-events: none;
-    white-space: nowrap;
-}
-
-.docs-list-editor-suggest-label {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.82rem;
-    line-height: 1.2;
-    color: var(--docs-text-strong);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .docs-list-editor-body {
@@ -1927,6 +1869,11 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
     overflow: hidden;
 }
 
+.docs-editor-surface:focus-within {
+    border-color: var(--theme-accent-strong, #3b82f6);
+    box-shadow: inset 0 0 0 2px var(--theme-accent-strong, #3b82f6);
+}
+
 .docs-editor-highlight {
     margin: 0;
     width: 100%;
@@ -1940,6 +1887,8 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
     font-size: 0.94rem;
     line-height: 1.45;
     white-space: pre;
+    tab-size: 4;
+    font-variant-ligatures: none;
     color: var(--docs-text);
 }
 

@@ -184,6 +184,80 @@
             .replace(/>/g, "&gt;");
     }
 
+    function calculateCursorPosition(textarea, position) {
+        const text = textarea.value;
+        const textBeforeCursor = text.substring(0, position);
+        const lines = textBeforeCursor.split("\n");
+        const currentLine = lines.length - 1;
+        const currentColumn = lines[currentLine].length;
+        const textareaStyles = window.getComputedStyle(textarea);
+        const lineHeight = parseFloat(textareaStyles.lineHeight) || 20;
+        const paddingLeft = parseFloat(textareaStyles.paddingLeft) || 0;
+        const paddingTop = parseFloat(textareaStyles.paddingTop) || 0;
+        const borderLeft = parseFloat(textareaStyles.borderLeftWidth) || 0;
+        const borderTop = parseFloat(textareaStyles.borderTopWidth) || 0;
+        const scrollLeft = textarea.scrollLeft;
+        const scrollTop = textarea.scrollTop;
+
+        const textareaRect = textarea.getBoundingClientRect();
+
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        context.font = textareaStyles.font;
+
+        const textLine = lines[currentLine] || "";
+        const lineWidth = context.measureText(textLine.substring(0, currentColumn)).width;
+
+        const left = textareaRect.left + paddingLeft + borderLeft + lineWidth - scrollLeft;
+        const top = textareaRect.top + paddingTop + borderTop + (currentLine * lineHeight) - scrollTop;
+
+        return {
+            left: left,
+            top: top,
+            lineHeight: lineHeight
+        };
+    }
+
+    if (!window.__docsCalculateCursorPosition) {
+        window.__docsCalculateCursorPosition = calculateCursorPosition;
+    }
+
+    if (!window.__docsEditorCompletionMap) {
+        window.__docsEditorCompletionMap = {
+            ".md": [
+                { trigger: "head", insertText: "## ", label: "## Heading" },
+                { trigger: "head1", insertText: "# ", label: "# Heading 1" },
+                { trigger: "head3", insertText: "### ", label: "### Heading 3" },
+                { trigger: "bold", insertText: "**text**", label: "**bold**", cursorBack: 6 },
+                { trigger: "italic", insertText: "*text*", label: "*italic*", cursorBack: 5 },
+                { trigger: "link", insertText: "[text](url)", label: "[text](url)", cursorBack: 4 },
+                { trigger: "code", insertText: "```\n\n```", label: "code block", cursorBack: 4 },
+            ],
+            ".py": [
+                { trigger: "def", insertText: "def function_name():\n    pass", label: "def ...", cursorBack: 8 },
+                { trigger: "class", insertText: "class ClassName:\n    def __init__(self):\n        pass", label: "class ...", cursorBack: 39 },
+                { trigger: "ifmain", insertText: "if __name__ == \"__main__\":\n    main()", label: "if __name__...", cursorBack: 6 },
+            ],
+            ".js": [
+                { trigger: "function", insertText: "function functionName(params) {\n    \n}", label: "function ...", cursorBack: 3 },
+                { trigger: "if", insertText: "if (condition) {\n    \n}", label: "if (...) { }", cursorBack: 3 },
+            ],
+            ".css": [
+                { trigger: "rule", insertText: ".selector {\n    property: value;\n}", label: ".selector { }", cursorBack: 23 },
+                { trigger: "media", insertText: "@media (max-width: 768px) {\n    \n}", label: "@media ...", cursorBack: 3 },
+                { trigger: "var", insertText: ":root {\n    --color-name: #000;\n}", label: ":root vars", cursorBack: 17 },
+            ],
+            ".json": [
+                { trigger: "pair", insertText: "\"key\": \"value\"", label: "\"key\": \"value\"", cursorBack: 10 },
+                { trigger: "object", insertText: "{\n  \"key\": \"value\"\n}", label: "{ ... }", cursorBack: 5 },
+            ],
+            ".html": [
+                { trigger: "doctype", insertText: "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title></title>\n</head>\n<body>\n  \n</body>\n</html>", label: "HTML boilerplate", cursorBack: 92 },
+                { trigger: "div", insertText: "<div class=\"\">\n  \n</div>", label: "<div>", cursorBack: 12 },
+            ]
+        };
+    }
+
     // JavaScript 코드를 하이라이팅하는 함수
     function highlightJavaScriptCode(source) {
         const placeholders = [];
@@ -876,6 +950,7 @@
         const aclApiUrl = root.dataset.aclApiUrl;
         const aclOptionsApiUrl = root.dataset.aclOptionsApiUrl;
         const writeUrl = root.dataset.writeUrl || "/docs/write";
+        const pathBreadcrumbs = document.querySelector(".docs-path-breadcrumbs");
         const listLayout = document.getElementById("docs-list-layout");
         const listContainer = document.getElementById("docs-list");
         const previewPanel = document.getElementById("docs-list-preview");
@@ -894,8 +969,13 @@
         const editorCancelButton = document.getElementById("docs-list-cancel-btn");
         const editorSaveButton = document.getElementById("docs-list-save-btn");
         const editorHighlightCode = document.getElementById("docs-list-editor-highlight-code");
+        const editorSurface = document.getElementById("docs-list-editor-surface");
+        const editorHighlight = document.getElementById("docs-list-editor-highlight");
+        const editorSuggest = document.getElementById("docs-list-editor-suggest");
+        const editorSuggestLabel = document.getElementById("docs-list-editor-suggest-label");
         
-        const pathBreadcrumbs = document.querySelector(".docs-path-breadcrumbs");
+        // API URL들
+        const docsApiPreviewUrl = previewApiUrl;
         const initialBreadcrumbNode = pathBreadcrumbs
             ? pathBreadcrumbs.querySelector(".docs-path-link, .docs-path-current")
             : null;
@@ -968,6 +1048,183 @@
             activePreviewPath: "",
         };
 
+        let activeListEditorSuggestion = null;
+        let activeListEditorEntry = null;
+
+        function resolveListEditorExtension() {
+            const entryPath = activeListEditorEntry && activeListEditorEntry.path
+                ? String(activeListEditorEntry.path)
+                : "";
+            const entryMatch = entryPath.match(/\.[A-Za-z0-9]+$/);
+            if (entryMatch) {
+                return entryMatch[0].toLowerCase();
+            }
+
+            const raw = (editorFilenameInput && editorFilenameInput.value ? editorFilenameInput.value : "").trim();
+            const match = raw.match(/\.[A-Za-z0-9]+$/);
+            return match ? match[0].toLowerCase() : "";
+        }
+
+        function clearListEditorSuggestion() {
+            activeListEditorSuggestion = null;
+            if (editorSuggest) {
+                editorSuggest.hidden = true;
+                editorSuggest.style.left = "";
+                editorSuggest.style.top = "";
+            }
+            if (editorSuggestLabel) {
+                editorSuggestLabel.textContent = "";
+            }
+        }
+
+        function findListEditorSuggestion(extension, tokenText) {
+            const completionMap = window.__docsEditorCompletionMap || {};
+            const items = completionMap[extension] || [];
+            const normalizedToken = String(tokenText || "").toLowerCase();
+            if (!normalizedToken) {
+                return null;
+            }
+            for (let i = 0; i < items.length; i += 1) {
+                const item = items[i];
+                const trigger = String(item.trigger || "").toLowerCase();
+                if (trigger && trigger.startsWith(normalizedToken)) {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        function syncListEditorHighlightScroll() {
+            if (!editorContentInput || !editorHighlight) {
+                return;
+            }
+            editorHighlight.scrollTop = editorContentInput.scrollTop;
+            editorHighlight.scrollLeft = editorContentInput.scrollLeft;
+        }
+
+        function renderListEditorHighlight() {
+            if (!editorContentInput || !editorHighlight || !editorHighlightCode) {
+                return;
+            }
+
+            const extension = resolveListEditorExtension();
+            const source = editorContentInput.value || "";
+            let renderClass = "docs-plain-text";
+            let highlightedHtml = escapeHtml(source);
+
+            if (extension === ".js") {
+                renderClass = "docs-js";
+                highlightedHtml = highlightJavaScriptCode(source);
+            } else if (extension === ".md") {
+                renderClass = "docs-editor-md";
+                highlightedHtml = escapeHtml(source);
+            } else if (extension === ".css") {
+                renderClass = "docs-css";
+                highlightedHtml = highlightCssCode(source);
+            } else if (extension === ".json") {
+                renderClass = "docs-json";
+                highlightedHtml = highlightJsonCode(source);
+            } else if (extension === ".py") {
+                renderClass = "docs-py";
+                highlightedHtml = highlightPythonCode(source);
+            } else if (extension === ".html") {
+                renderClass = "docs-editor-html";
+                highlightedHtml = highlightHtmlCode(source);
+            }
+
+            editorHighlight.classList.remove(
+                "docs-plain-text",
+                "docs-editor-md",
+                "docs-js",
+                "docs-css",
+                "docs-json",
+                "docs-py",
+                "docs-editor-html"
+            );
+            editorHighlight.classList.add(renderClass);
+            editorHighlightCode.innerHTML = highlightedHtml + (source.endsWith("\n") ? "\u200b" : "");
+            syncListEditorHighlightScroll();
+            updateListEditorSuggestion();
+        }
+
+        function updateListEditorSuggestion() {
+            if (!editorContentInput || !editorSuggest || !editorSuggestLabel) {
+                return;
+            }
+
+            const start = editorContentInput.selectionStart || 0;
+            const end = editorContentInput.selectionEnd || 0;
+            if (start !== end) {
+                clearListEditorSuggestion();
+                return;
+            }
+
+            const extension = resolveListEditorExtension();
+            const linePrefix = (editorContentInput.value || "").slice(0, start);
+            const wordMatch = linePrefix.match(/[A-Za-z_][A-Za-z0-9_-]*$/);
+            if (!wordMatch) {
+                clearListEditorSuggestion();
+                return;
+            }
+
+            const token = wordMatch[0] || "";
+            const suggestion = findListEditorSuggestion(extension, token);
+            if (!suggestion) {
+                clearListEditorSuggestion();
+                return;
+            }
+
+            activeListEditorSuggestion = {
+                start: start - token.length,
+                end: start,
+                insertText: suggestion.insertText,
+                cursorBack: Number(suggestion.cursorBack || 0),
+                label: suggestion.label || suggestion.insertText,
+            };
+
+            editorSuggestLabel.textContent = activeListEditorSuggestion.label;
+            editorSuggest.hidden = false;
+
+            const calc = window.__docsCalculateCursorPosition;
+            const cursorPosition = typeof calc === "function" ? calc(editorContentInput, start) : null;
+            if (cursorPosition) {
+                const surfaceRect = editorSurface ? editorSurface.getBoundingClientRect() : null;
+
+                let left = cursorPosition.left + 4;
+                let top = cursorPosition.top;
+
+                if (surfaceRect) {
+                    left = (cursorPosition.left + 4) - surfaceRect.left;
+                    top = cursorPosition.top - surfaceRect.top;
+                }
+
+                const suggestRect = editorSuggest.getBoundingClientRect();
+                const lineHeight = cursorPosition.lineHeight || 20;
+                if (surfaceRect) {
+                    top = (cursorPosition.top - (suggestRect.height - lineHeight) / 2) - surfaceRect.top;
+                } else {
+                    top = top - (suggestRect.height - lineHeight) / 2;
+                }
+
+                editorSuggest.style.left = String(left) + "px";
+                editorSuggest.style.top = String(top) + "px";
+            }
+        }
+
+        function acceptListEditorSuggestion() {
+            if (!editorContentInput || !activeListEditorSuggestion) {
+                return false;
+            }
+            const suggestion = activeListEditorSuggestion;
+            editorContentInput.setRangeText(suggestion.insertText, suggestion.start, suggestion.end, "end");
+            const cursorPos = (suggestion.start + suggestion.insertText.length) - Math.max(0, suggestion.cursorBack);
+            editorContentInput.setSelectionRange(cursorPos, cursorPos);
+            editorContentInput.focus();
+            editorContentInput.dispatchEvent(new Event("input", { bubbles: true }));
+            clearListEditorSuggestion();
+            return true;
+        }
+
         state.directoryCache.set(currentDir, initialEntries);
 
         function closeContextMenu() {
@@ -1022,7 +1279,7 @@
             
             // 레이아웃 변경 후 동기화
             setTimeout(function() {
-                syncCurrentDirRowHeightWithPreviewHead();
+                scheduleSyncCurrentDirRowHeightWithSideHead();
             }, 10);
         }
 
@@ -1035,7 +1292,22 @@
             layoutUpdateTimeout = setTimeout(updateListLayoutMode, 50);
         }
 
-        function syncCurrentDirRowHeightWithPreviewHead() {
+        let currentDirRowSyncRafId = null;
+
+        function scheduleSyncCurrentDirRowHeightWithSideHead() {
+            if (currentDirRowSyncRafId !== null) {
+                return;
+            }
+            currentDirRowSyncRafId = window.requestAnimationFrame(function () {
+                currentDirRowSyncRafId = null;
+                syncCurrentDirRowHeightWithSideHead();
+                window.requestAnimationFrame(function () {
+                    syncCurrentDirRowHeightWithSideHead();
+                });
+            });
+        }
+
+        function syncCurrentDirRowHeightWithSideHead() {
             if (!listContainer) {
                 return;
             }
@@ -1044,23 +1316,36 @@
                 return;
             }
 
-            const shouldSync = Boolean(
+            const isLandscape = Boolean(listLayout && listLayout.classList.contains("is-landscape"));
+            if (!isLandscape) {
+                currentDirRow.style.minHeight = "";
+                return;
+            }
+
+            const hasVisibleEditor = Boolean(
                 listLayout &&
-                listLayout.classList.contains("is-landscape") &&
+                listLayout.classList.contains("has-editor") &&
+                editorPanel &&
+                !editorPanel.hidden &&
+                editorHead
+            );
+            const hasVisiblePreview = Boolean(
+                listLayout &&
                 listLayout.classList.contains("has-preview") &&
                 previewPanel &&
                 !previewPanel.hidden &&
                 previewHead
             );
 
-            if (!shouldSync) {
+            const activeHead = hasVisibleEditor ? editorHead : (hasVisiblePreview ? previewHead : null);
+            if (!activeHead) {
                 currentDirRow.style.minHeight = "";
                 return;
             }
 
-            const previewHeadHeight = Math.ceil(previewHead.getBoundingClientRect().height);
-            if (previewHeadHeight > 0) {
-                currentDirRow.style.minHeight = String(previewHeadHeight) + "px";
+            const headHeight = Math.ceil(activeHead.getBoundingClientRect().height);
+            if (headHeight > 0) {
+                currentDirRow.style.minHeight = String(headHeight) + "px";
                 return;
             }
             currentDirRow.style.minHeight = "";
@@ -1076,7 +1361,7 @@
             if (listLayout) {
                 listLayout.classList.toggle("has-preview", visible);
             }
-            syncCurrentDirRowHeightWithPreviewHead();
+            scheduleSyncCurrentDirRowHeightWithSideHead();
         }
 
         function isPreviewableFileEntry(entry) {
@@ -1151,34 +1436,47 @@
             if (!editorPanel || !editorFilenameInput || !editorContentInput) {
                 return;
             }
+
+            activeListEditorEntry = entry || null;
+            clearListEditorSuggestion();
             
             // 현재 선택된 파일 정보를 편집기에 설정
             editorFilenameInput.value = entry.name || '';
             
             // 파일 내용이 없으면 API로 불러오기
             if (!entry.content) {
-                // API URL을 매번 다시 가져와서 스코프 문제 방지
-                const previewApiUrl = document.body.getAttribute('data-preview-api-url');
-                
-                // 실제 API 호출로 파일 내용 불러오기
-                fetch(previewApiUrl + '?path=' + encodeURIComponent(entry.path))
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.content !== undefined) {
-                            entry.content = data.content;
+                const targetUrl = downloadApiUrl
+                    ? downloadApiUrl + '?path=' + encodeURIComponent(entry.path)
+                    : '';
+
+                if (!targetUrl) {
+                    console.error('Error loading file content: download API URL is missing');
+                    entry.content = '';
+                    editorContentInput.value = '';
+                    renderListEditorHighlight();
+                } else {
+                    fetch(targetUrl)
+                        .then(function (response) {
+                            if (!response.ok) {
+                                throw new Error('Download API request failed: ' + String(response.status));
+                            }
+                            return response.text();
+                        })
+                        .then(function (text) {
+                            entry.content = typeof text === 'string' ? text : '';
                             editorContentInput.value = entry.content;
-                            updateEditorHighlight();
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading file content:', error);
-                        entry.content = '';
-                        editorContentInput.value = '';
-                        updateEditorHighlight();
-                    });
+                            renderListEditorHighlight();
+                        })
+                        .catch(function (error) {
+                            console.error('Error loading file content:', error);
+                            entry.content = '';
+                            editorContentInput.value = '';
+                            renderListEditorHighlight();
+                        });
+                }
             } else {
                 editorContentInput.value = entry.content;
-                updateEditorHighlight();
+                renderListEditorHighlight();
             }
             
             // 미리보기 숨기고 편집기 표시
@@ -1198,6 +1496,8 @@
                 listLayout.classList.add("has-editor");
                 setPreviewVisibility(false); // preview visibility를 false로 설정
             }
+
+            scheduleSyncCurrentDirRowHeightWithSideHead();
             
             // 편집기에 포커스
             editorContentInput.focus();
@@ -1223,9 +1523,12 @@
                 listLayout.classList.remove("has-editor");
                 listLayout.classList.add("has-preview");
             }
+
+            scheduleSyncCurrentDirRowHeightWithSideHead();
             
             // 편집기 이벤트 정리
             cleanupEditorEvents();
+            activeListEditorEntry = null;
         }
 
         function setupEditorEvents(entry) {
@@ -1235,6 +1538,35 @@
             
             // 기존 이벤트 정리
             cleanupEditorEvents();
+            
+            if (editorContentInput) {
+                editorContentInput.addEventListener("input", renderListEditorHighlight);
+                editorContentInput.addEventListener("scroll", syncListEditorHighlightScroll, { passive: true });
+                editorContentInput.addEventListener("click", updateListEditorSuggestion);
+                editorContentInput.addEventListener("keyup", function (event) {
+                    if (event.key === "Tab") {
+                        return;
+                    }
+                    updateListEditorSuggestion();
+                });
+                editorContentInput.addEventListener("keydown", function (event) {
+                    if (event.key === "Escape") {
+                        clearListEditorSuggestion();
+                        return;
+                    }
+                    if (event.key === "Tab" && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+                        if (acceptListEditorSuggestion()) {
+                            event.preventDefault();
+                        }
+                    }
+                });
+            }
+
+            if (editorFilenameInput) {
+                editorFilenameInput.addEventListener("input", function () {
+                    renderListEditorHighlight();
+                });
+            }
             
             // 저장 버튼 이벤트
             editorSaveButton.addEventListener("click", function(e) {
@@ -1250,12 +1582,7 @@
         }
 
         function cleanupEditorEvents() {
-            if (editorSaveButton) {
-                editorSaveButton.removeEventListener("click", saveEditorContent);
-            }
-            if (editorCancelButton) {
-                editorCancelButton.removeEventListener("click", switchToPreview);
-            }
+            clearListEditorSuggestion();
         }
 
         function saveEditorContent(entry) {
@@ -1330,7 +1657,7 @@
             previewContent.innerHTML = safeHtml;
             applyDocsCodeHighlighting(previewContent, normalizedRenderClass || "docs-markdown");
             setPreviewActionTargets(entry);
-            syncCurrentDirRowHeightWithPreviewHead();
+            scheduleSyncCurrentDirRowHeightWithSideHead();
         }
 
         async function loadPreviewForEntry(entry) {
@@ -1341,6 +1668,11 @@
                 clearPreviewPane();
                 return;
             }
+
+            if (editorPanel && !editorPanel.hidden) {
+                switchToPreview();
+            }
+
             setPreviewVisibility(true);
 
             const pathValue = normalizePath(entry.path, true);
@@ -2663,7 +2995,7 @@
                 : (state.selectedPath || "");
             listContainer.appendChild(fragment);
             syncPreviewFromSelection();
-            syncCurrentDirRowHeightWithPreviewHead();
+            scheduleSyncCurrentDirRowHeightWithSideHead();
             state.openingFolderPath = "";
         }
 
@@ -2892,7 +3224,7 @@
 
         if (window.ResizeObserver && previewHead) {
             const previewHeadResizeObserver = new ResizeObserver(function () {
-                syncCurrentDirRowHeightWithPreviewHead();
+                scheduleSyncCurrentDirRowHeightWithSideHead();
             });
             previewHeadResizeObserver.observe(previewHead);
         }
@@ -3489,6 +3821,8 @@
                 { trigger: "type", insertText: "type=\"\"", label: "type=\"\"", cursorBack: 1 }
             ]
         };
+
+        window.__docsEditorCompletionMap = editorCompletionMap;
 
         function markCurrentAsSaved() {
             savedFilenameValue = filenameInput ? filenameInput.value : "";
@@ -4287,6 +4621,8 @@
                 lineHeight: lineHeight
             };
         }
+
+        window.__docsCalculateCursorPosition = calculateCursorPosition;
 
         function acceptEditorSuggestion() {
             if (!contentInput || !activeEditorSuggestion) {
