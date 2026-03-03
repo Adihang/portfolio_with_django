@@ -1,4 +1,4 @@
-import fcntl
+import platform
 import logging
 import os
 import sys
@@ -6,6 +6,12 @@ import threading
 import time
 from datetime import timedelta
 from pathlib import Path
+
+# 윈도우에서 fcntl 대신 msvcrt 사용
+if platform.system() == 'Windows':
+    import msvcrt
+else:
+    import fcntl
 
 from django.utils import timezone
 
@@ -55,7 +61,16 @@ def _acquire_scheduler_lock():
 
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if platform.system() == 'Windows':
+            # 윈도우에서는 msvcrt.locking 사용
+            try:
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            except OSError:
+                os.close(fd)
+                return None
+        else:
+            # Unix/Linux에서는 fcntl 사용
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         os.close(fd)
         return None

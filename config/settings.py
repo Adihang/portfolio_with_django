@@ -81,6 +81,10 @@ def load_optional_secret(name, default=""):
     if from_env is not None and str(from_env).strip():
         return str(from_env).strip()
 
+    # 디버그 모드에서는 secrets.json 파일이 없어도 기본값 반환
+    if DEBUG:
+        return default
+
     secrets_path = BASE_DIR / "config" / "secrets.json"
     if secrets_path.exists():
         try:
@@ -96,8 +100,14 @@ def load_optional_secret(name, default=""):
 # Ollama (local LLM) settings
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:latest")
-TURNSTILE_SITE_KEY = load_optional_secret("TURNSTILE_SITE_KEY", "")
-TURNSTILE_SECRET_KEY = load_optional_secret("TURNSTILE_SECRET_KEY", "")
+
+# Cloudflare Turnstile 설정 - 디버그 모드에서는 비활성화
+if DEBUG:
+    TURNSTILE_SITE_KEY = ""
+    TURNSTILE_SECRET_KEY = ""
+else:
+    TURNSTILE_SITE_KEY = load_optional_secret("TURNSTILE_SITE_KEY", "")
+    TURNSTILE_SECRET_KEY = load_optional_secret("TURNSTILE_SECRET_KEY", "")
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
@@ -276,9 +286,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #     }
 # }
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=DEFAULT_SECURE_TRANSPORT)
-SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", default=DEFAULT_SECURE_TRANSPORT)
-CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", default=DEFAULT_SECURE_TRANSPORT)
+# 디버그 모드에서는 HTTPS 리다이렉트 비활성화
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False) if not DEBUG else False
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", default=DEFAULT_SECURE_TRANSPORT) if not DEBUG else False
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", default=DEFAULT_SECURE_TRANSPORT) if not DEBUG else False
 SECURE_HSTS_SECONDS = int(
     os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000" if DEFAULT_SECURE_TRANSPORT else "0")
 )
