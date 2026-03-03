@@ -1,12 +1,15 @@
+// 사운드를 재생하는 비동기 함수
 async function playSound(soundURL) {
     const soundEffect = new Audio(soundURL);
     await soundEffect.play();
 }
 
+// CSRF 토큰을 가져오는 함수
 function getCSRFToken() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 }
 
+// DOM이 로드되었을 때 실행되는 초기화 함수
 document.addEventListener('DOMContentLoaded', function() {
     //스트라타잼 아이콘 생성
     const stratagem_commands = document.querySelectorAll('.stratagem_command');
@@ -43,6 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     arrowRight.addEventListener('click', function() {
         simulateKeyEvent('ArrowRight');
     });
+    // 키보드 이벤트를 시뮬레이션하는 함수
     function simulateKeyEvent(key) {
         document.dispatchEvent(new KeyboardEvent('keydown', {'key': key}));
     }
@@ -82,7 +86,7 @@ let startTime;
 let allCardsHidden;
 let seconds;
 
-//키입력받고 게임 알고리즘 실행
+// 키 입력을 처리하고 게임 알고리즘을 실행하는 이벤트 리스너
 document.addEventListener('keydown', async function(event) {
     const find_remove_cards = document.querySelectorAll('.stratagem_card');
     if (find_remove_cards.length != 0)

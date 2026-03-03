@@ -1,6 +1,7 @@
 (function () {
     "use strict";
 
+    // 문서 페이지 루트 요소 확인
     const root = document.querySelector("[data-docs-page]");
     if (!root) {
         return;
@@ -8,6 +9,7 @@
 
     const pageType = root.dataset.docsPage;
 
+    // CSRF 토큰을 가져오는 함수
     function getCsrfToken() {
         const meta = document.querySelector('meta[name="csrf-token"]');
         if (meta && meta.content) {
@@ -16,6 +18,7 @@
         return "";
     }
 
+    // 경로를 정규화하는 함수
     function normalizePath(raw, allowEmpty = true) {
         const source = String(raw || "").replace(/\\/g, "/").trim();
         const trimmed = source.replace(/^\/+|\/+$/g, "");
@@ -43,6 +46,7 @@
         return parts.join("/");
     }
 
+    // 경로 세그먼트를 인코딩하는 함수
     function encodePathSegments(pathValue) {
         const normalized = normalizePath(pathValue, true);
         if (!normalized) {
@@ -56,6 +60,7 @@
             .join("/");
     }
 
+    // 목록 URL을 구축하는 함수
     function buildListUrl(baseUrl, relativePath) {
         const encoded = encodePathSegments(relativePath);
         if (!encoded) {
@@ -64,6 +69,7 @@
         return baseUrl + "/" + encoded + "/list";
     }
 
+    // 보기 URL을 구축하는 함수
     function buildViewUrl(baseUrl, slugPath) {
         const encoded = encodePathSegments(slugPath);
         if (!encoded) {
@@ -72,12 +78,14 @@
         return baseUrl + "/" + encoded;
     }
 
+    // 쓰기 URL을 구축하는 함수
     function buildWriteUrl(writeBaseUrl, params) {
         const search = new URLSearchParams(params || {});
         const query = search.toString();
         return query ? writeBaseUrl + "?" + query : writeBaseUrl;
     }
 
+    // JSON 요청을 보내는 비동기 함수
     async function requestJson(url, options) {
         const response = await fetch(url, options || {});
         let payload = null;
@@ -97,6 +105,7 @@
         return payload;
     }
 
+    // POST 요청 옵션을 구축하는 함수
     function buildPostOptions(body) {
         return {
             method: "POST",
@@ -108,6 +117,7 @@
         };
     }
 
+    // JSON 스크립트 데이터를 가져오는 함수
     function getJsonScriptData(id, fallbackValue) {
         const element = document.getElementById(id);
         if (!element) {
@@ -122,6 +132,7 @@
 
     const i18n = getJsonScriptData("docs-i18n", {});
 
+    // 다국어 텍스트를 가져오는 함수
     function t(key, fallbackValue) {
         if (Object.prototype.hasOwnProperty.call(i18n, key) && typeof i18n[key] === "string") {
             return i18n[key];
@@ -129,6 +140,7 @@
         return fallbackValue;
     }
 
+    // 템플릿을 포맷팅하는 함수
     function formatTemplate(template, values) {
         return String(template || "").replace(/\{(\w+)\}/g, function (_, token) {
             if (values && Object.prototype.hasOwnProperty.call(values, token)) {
@@ -138,6 +150,7 @@
         });
     }
 
+    // 에러를 알림창으로 표시하는 함수
     function alertError(error) {
         window.alert(
             error && error.message
@@ -146,6 +159,7 @@
         );
     }
 
+    // 문서 렌더링 콘텐츠 모드 클래스를 적용하는 함수
     function applyDocsRenderedContentModeClass(targetElement, renderMode, renderClass) {
         if (!targetElement || !(targetElement instanceof Element)) {
             return;
@@ -162,6 +176,7 @@
         targetElement.classList.add("docs-plain-text");
     }
 
+    // HTML을 이스케이프하는 함수
     function escapeHtml(value) {
         return String(value || "")
             .replace(/&/g, "&amp;")
@@ -169,6 +184,7 @@
             .replace(/>/g, "&gt;");
     }
 
+    // JavaScript 코드를 하이라이팅하는 함수
     function highlightJavaScriptCode(source) {
         const placeholders = [];
 
@@ -215,6 +231,7 @@
         return restorePlaceholders(text);
     }
 
+    // CSS 코드를 하이라이팅하는 함수
     function highlightCssCode(source) {
         const placeholders = [];
 
@@ -254,6 +271,7 @@
         return restorePlaceholders(text);
     }
 
+    // JSON 코드를 하이라이팅하는 함수
     function highlightJsonCode(source) {
         const placeholders = [];
 
@@ -288,6 +306,7 @@
         return restorePlaceholders(text);
     }
 
+    // Python 코드를 하이라이팅하는 함수
     function highlightPythonCode(source) {
         const placeholders = [];
 
@@ -336,6 +355,7 @@
         return restorePlaceholders(text);
     }
 
+    // HTML 코드를 하이라이팅하는 함수
     function highlightHtmlCode(source) {
         const placeholders = [];
 
@@ -383,6 +403,7 @@
         return restorePlaceholders(text);
     }
 
+    // 마크다운 소스 코드를 하이라이팅하는 함수
     function highlightMarkdownSourceCode(source) {
         const placeholders = [];
 
@@ -429,6 +450,7 @@
         return restorePlaceholders(text);
     }
 
+    // 코드 언어 클래스를 감지하는 함수
     function detectCodeLanguageClass(codeNode) {
         if (!codeNode || !(codeNode instanceof Element)) {
             return "";
@@ -454,6 +476,7 @@
         return "";
     }
 
+    // 문서 코드 하이라이팅을 적용하는 함수
     function applyDocsCodeHighlighting(targetElement, renderClass) {
         if (!targetElement || !(targetElement instanceof Element)) {
             return;
@@ -496,6 +519,7 @@
         });
     }
 
+    // 열린 문서 모달이 있는지 확인하는 함수
     function hasOpenDocsModal() {
         return Boolean(
             document.querySelector(
@@ -504,10 +528,12 @@
         );
     }
 
+    // 문서 모달 바디 상태를 동기화하는 함수
     function syncDocsModalBodyState() {
         document.body.classList.toggle("docs-modal-open", hasOpenDocsModal());
     }
 
+    // 문서 확인 다이얼로그를 생성하는 함수
     function createDocsConfirmDialog() {
         const confirmModal = document.getElementById("docs-confirm-modal");
         const confirmBackdrop = document.getElementById("docs-confirm-modal-backdrop");
@@ -533,6 +559,7 @@
         let isOpen = false;
         let lastFocusedElement = null;
 
+        // 다이얼로그를 닫는 함수
         const close = function (confirmed) {
             if (!isOpen) {
                 return;
@@ -572,6 +599,7 @@
             close(false);
         });
 
+        // 확인 다이얼로그를 요청하는 함수
         return function requestConfirmDialog(options) {
             const settings = options || {};
             const titleText = settings.title || t("js_confirm_title", "확인");
@@ -602,6 +630,7 @@
 
     const requestConfirmDialog = createDocsConfirmDialog();
 
+    // 문서 페이지 도움말 모달을 초기화하는 함수
     function initializeDocsPageHelpModal() {
         const pageHelpButton = document.getElementById("docs-page-help-btn");
         const pageHelpModal = document.getElementById("docs-page-help-modal");
@@ -612,6 +641,7 @@
 
         let lastFocusedElement = null;
 
+        // 페이지 도움말 모달 열림 상태를 설정하는 함수
         function setPageHelpModalOpen(opened) {
             pageHelpModal.hidden = !opened;
             pageHelpButton.setAttribute("aria-expanded", opened ? "true" : "false");
@@ -644,6 +674,7 @@
         });
     }
 
+    // 문서 인증 상호작용을 초기화하는 함수
     function initializeDocsAuthInteraction() {
         const logoutTrigger = document.querySelector("[data-docs-logout-trigger]");
         const logoutForm = document.getElementById("docs-auth-logout-form");
@@ -659,6 +690,7 @@
 
         let lastFocusedElement = null;
 
+        // 로그아웃 모달 열림 상태를 설정하는 함수
         function setLogoutModalOpen(opened) {
             if (!logoutModal) {
                 return;
@@ -725,6 +757,7 @@
         });
     }
 
+    // 문서 툴바 자동 축소를 초기화하는 함수
     function initializeDocsToolbarAutoCollapse() {
         const toolbar = document.querySelector(".docs-toolbar-wrap .docs-toolbar");
         if (!toolbar) {
@@ -782,6 +815,7 @@
 
         document.body.appendChild(toolbarItemsMeasure);
 
+        // 툴바 모드를 업데이트하는 함수
         const updateToolbarMode = function () {
             rafId = null;
 
@@ -804,6 +838,7 @@
             toolbar.classList.toggle("docs-toolbar-auto-collapsed", shouldCollapse);
         };
 
+        // 툴바 모드 업데이트를 스케줄링하는 함수
         const scheduleToolbarModeUpdate = function () {
             if (rafId !== null) {
                 return;

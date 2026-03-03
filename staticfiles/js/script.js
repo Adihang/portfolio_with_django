@@ -1,4 +1,5 @@
-document.addEventListener('DOMContentLoaded', function () {
+    // DOM이 로드되었을 때 실행되는 메인 초기화 함수
+    document.addEventListener('DOMContentLoaded', function () {
     const SURFACE_COLOR = {
         light: '#ffffff',
         dark: '#222222',
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentSurfaceMode = null;
     let manualThemeMode = null;
 
+    // 요소의 배경색을 설정하는 함수
     const setSurfaceBackground = function (element, color) {
         if (!element) {
             return;
@@ -46,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
         element.style.backgroundImage = 'none';
     };
 
+    // 요소의 스타일 속성을 복원하는 함수
     const restoreStyleAttribute = function (element, styleText) {
         if (!element) {
             return;
@@ -59,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
         element.setAttribute('style', styleText);
     };
 
+    // 인쇄 시 표면 스타일을 강제로 흰색으로 설정하는 함수
     const applyPrintSurfaceOverride = function () {
         if (!isLightBackgroundPage || printSurfaceSnapshot.active) {
             return;
@@ -85,6 +89,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
+    // 인쇄 후 원래 스타일로 복원하는 함수
     const clearPrintSurfaceOverride = function () {
         if (!printSurfaceSnapshot.active) {
             return;
@@ -101,6 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('beforeprint', applyPrintSurfaceOverride);
     window.addEventListener('afterprint', clearPrintSurfaceOverride);
 
+    // 라이트 표면 스타일을 활성화/비활성화하는 함수
     const setLightSurfaceStylesEnabled = function (enabled) {
         const mediaValue = enabled ? 'all' : 'not all';
         const taggedStyles = document.querySelectorAll('style[data-surface-light]');
@@ -124,6 +130,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
+    // 저장된 테마 모드를 읽어오는 함수
     const readStoredThemeMode = function () {
         try {
             const storedMode = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
@@ -137,6 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return null;
     };
 
+    // 테마 모드를 로컬 스토리지에 저장하는 함수
     const persistThemeMode = function (darkMode) {
         try {
             if (darkMode === true) {
@@ -151,6 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {}
     };
 
+    // 테마 토글 버튼 상태를 동기화하는 함수
     const syncThemeToggleState = function () {
         if (!themeToggle) {
             return;
@@ -166,6 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
+    // 페이지 표면 모드를 적용하는 함수
     const applyPageSurfaceMode = function (useDarkTheme) {
         currentSurfaceMode = useDarkTheme;
         document.body.classList.toggle('theme-dark', useDarkTheme);
@@ -198,11 +208,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
+    // 테마 모드를 적용하는 함수
     const applyThemeMode = function () {
         applyPageSurfaceMode(Boolean(manualThemeMode));
         syncThemeToggleState();
     };
 
+    // 수동 테마 모드를 설정하는 함수
     const setManualThemeMode = function (useDarkTheme) {
         manualThemeMode = Boolean(useDarkTheme);
         persistThemeMode(manualThemeMode);
@@ -224,19 +236,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
     applyThemeMode();
 
+    // 중첩 스크롤 우선순위를 활성화하는 함수
     const enableNestedScrollPriority = function () {
+        // 오버플로우 스크롤 가능 여부를 확인하는 함수
         const canUseOverflowScroll = function (overflowValue) {
             return overflowValue === 'auto' || overflowValue === 'scroll' || overflowValue === 'overlay';
         };
 
+        // Y축 스크롤 가능 여부를 확인하는 함수
         const hasScrollableY = function (element, style) {
             return canUseOverflowScroll(style.overflowY) && (element.scrollHeight - element.clientHeight) > 1;
         };
 
+        // X축 스크롤 가능 여부를 확인하는 함수
         const hasScrollableX = function (element, style) {
             return canUseOverflowScroll(style.overflowX) && (element.scrollWidth - element.clientWidth) > 1;
         };
 
+        // Y축 델타 값을 소비할 수 있는지 확인하는 함수
         const canConsumeY = function (element, deltaY) {
             if (deltaY < 0) {
                 return element.scrollTop > 0;
@@ -250,6 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return false;
         };
 
+        // X축 델타 값을 소비할 수 있는지 확인하는 함수
         const canConsumeX = function (element, deltaX) {
             if (deltaX < 0) {
                 return element.scrollLeft > 0;
@@ -263,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return false;
         };
 
+        // 휠 델타 값을 정규화하는 함수
         const normalizeWheelDelta = function (delta, deltaMode) {
             if (deltaMode === 1) {
                 return delta * 16;
@@ -275,6 +294,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return delta;
         };
 
+        // 편집 가능한 요소인지 확인하는 함수
         const isEditableElement = function (element) {
             if (!element || !element.closest) {
                 return false;
@@ -340,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     enableNestedScrollPriority();
 
+    // 인터랙티브 버블 배경을 초기화하는 함수
     const initInteractiveBubbleBackground = function (canvas) {
         const ctx = canvas.getContext('2d');
 
@@ -370,14 +391,17 @@ document.addEventListener('DOMContentLoaded', function () {
             pointerKeepOutPadding: 32
         };
 
+        // 최소값과 최대값 사이의 랜덤 값을 생성하는 함수
         const randomBetween = function (min, max) {
             return Math.random() * (max - min) + min;
         };
 
+        // 값을 0-1 사이로 제한하는 함수
         const clampUnit = function (value) {
             return Math.min(1, Math.max(0, value));
         };
 
+        // CMYK 색상을 RGB로 변환하는 함수
         const cmykToRgb = function (c, m, y, k) {
             const cyan = clampUnit(c);
             const magenta = clampUnit(m);
@@ -391,18 +415,22 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         };
 
+        // 값을 0-255 바이트로 제한하는 함수
         const clampByte = function (value) {
             return Math.min(255, Math.max(0, Math.round(value)));
         };
 
+        // RGB 색상을 CSS 문자열로 변환하는 함수
         const rgbToCss = function (color) {
             return 'rgb(' + color.r + ', ' + color.g + ', ' + color.b + ')';
         };
 
+        // RGB 색상에서 RGBA를 생성하는 함수
         const rgbaFrom = function (color, alpha) {
             return 'rgba(' + color.r + ', ' + color.g + ', ' + color.b + ', ' + alpha + ')';
         };
 
+        // RGB 색상을 반전시키는 함수
         const invertRgb = function (color) {
             return {
                 r: 255 - color.r,
@@ -411,6 +439,7 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         };
 
+        // 두 RGB 색상을 혼합하는 함수
         const mixRgb = function (fromColor, toColor, ratio) {
             const t = clampUnit(ratio);
             return {
@@ -420,6 +449,7 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         };
 
+        // 버블 시각 팔레트를 구축하는 함수
         const buildBubbleVisualPalette = function (backgroundColor) {
             const inverse = invertRgb(backgroundColor);
             const white = { r: 255, g: 255, b: 255 };
@@ -440,6 +470,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let bubbleVisualPalette = buildBubbleVisualPalette({ r: 191, g: 191, b: 191 });
 
+        // 랜덤 버블 배경색을 선택하는 함수
         const pickRandomBubbleBackgroundColor = function () {
             // Keep a consistent tone by fixing K and keeping total C+M+Y ink in a narrow band.
             const k = randomBetween(0.2, 0.28);
@@ -463,6 +494,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return cmykToRgb(c, m, y, k);
         };
 
+        // 버블 페이지 배경을 설정하는 함수
         const setBubblePageBackground = function (color) {
             if (!isBubbleFunPage || !color) {
                 return;
@@ -489,6 +521,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
+        // 버블 재생성을 스케줄링하는 함수
         const scheduleBubbleRespawn = function () {
             if (!isBubbleFunPage || respawnTimerId !== null) {
                 return;
@@ -503,16 +536,19 @@ document.addEventListener('DOMContentLoaded', function () {
             }, bubbleRespawnDelayMs);
         };
 
+        // 값을 최소-최대 범위로 제한하는 함수
         const clamp = function (value, min, max) {
             return Math.min(max, Math.max(min, value));
         };
 
+        // 뷰포트 최소 크기를 가져오는 함수
         const getViewportMinDimension = function () {
             const viewportWidth = width || window.innerWidth;
             const viewportHeight = height || window.innerHeight;
             return Math.max(320, Math.min(viewportWidth, viewportHeight));
         };
 
+        // 버블 반지름 범위를 계산하는 함수
         const getBubbleRadiusRange = function () {
             const base = getViewportMinDimension();
             const baseMinRadius = Math.max(26, Math.round(base * 0.045));
@@ -522,6 +558,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return { min: minRadius, max: maxRadius };
         };
 
+        // 상단 인셋 값을 계산하는 함수
         const getTopInset = function () {
             const navElement = document.querySelector('.portfolio-nav');
 
@@ -533,6 +570,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return Math.max(0, Math.ceil(navRect.bottom + 4));
         };
 
+        // 새 버블을 생성하는 함수
         const createBubble = function () {
             const radiusRange = getBubbleRadiusRange();
             const radius = randomBetween(radiusRange.min, radiusRange.max);
@@ -558,6 +596,7 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         };
 
+        // 버블 생성 진행률을 가져오는 함수
         const getBubbleSpawnProgress = function (bubble) {
             if (!bubble || !bubble.spawnDuration || bubble.spawnDuration <= 0) {
                 return 1;
@@ -565,11 +604,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return clampUnit((bubble.spawnElapsed || 0) / bubble.spawnDuration);
         };
 
+        // 버블 생성 이징을 계산하는 함수
         const getBubbleSpawnEase = function (bubble) {
             const progress = getBubbleSpawnProgress(bubble);
             return 1 - Math.pow(1 - progress, 3);
         };
 
+        // 캔버스 크기를 조정하는 함수
         const resizeCanvas = function () {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             const previousViewportMinDimension = viewportMinDimension || getViewportMinDimension();
@@ -615,6 +656,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
+        // 버블을 그리는 함수
         const drawBubble = function (bubble, time) {
             const spawnEase = getBubbleSpawnEase(bubble);
             const entranceScale = 0.72 + (0.28 * spawnEase);
@@ -683,6 +725,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ctx.fill();
         };
 
+        // 팝업 효과를 생성하는 함수
         const createPopEffect = function (bubble) {
             const particleCount = prefersReducedMotion ? 4 : 12;
             const particles = [];
@@ -721,6 +764,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
+        // 팝업 효과를 업데이트하는 함수
         const updatePopEffects = function (deltaMs) {
             const frameScale = deltaMs / 16.666;
 
@@ -749,6 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
 
+        // 팝업 효과를 그리는 함수
         const drawPopEffects = function () {
             popEffects.forEach(function (effect) {
                 const effectPalette = effect.palette || bubbleVisualPalette;
@@ -789,6 +834,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
+        // 특정 지점의 버블을 제거하는 함수
         const removeBubbleAtPoint = function (x, y) {
             for (let i = bubbles.length - 1; i >= 0; i -= 1) {
                 const bubble = bubbles[i];
@@ -807,6 +853,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return false;
         };
 
+        // 애니메이션 메인 루프 함수
         const animate = function (time) {
             rafBubbleId = window.requestAnimationFrame(animate);
 
