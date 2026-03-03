@@ -559,6 +559,7 @@
         let isOpen = false;
         let lastFocusedElement = null;
 
+        // 다이얼로그를 닫는 함수
         const close = function (confirmed) {
             if (!isOpen) {
                 return;
@@ -598,6 +599,7 @@
             close(false);
         });
 
+        // 확인 다이얼로그를 요청하는 함수
         return function requestConfirmDialog(options) {
             const settings = options || {};
             const titleText = settings.title || t("js_confirm_title", "확인");
@@ -639,6 +641,7 @@
 
         let lastFocusedElement = null;
 
+        // 페이지 도움말 모달 열림 상태를 설정하는 함수
         function setPageHelpModalOpen(opened) {
             pageHelpModal.hidden = !opened;
             pageHelpButton.setAttribute("aria-expanded", opened ? "true" : "false");
@@ -687,6 +690,7 @@
 
         let lastFocusedElement = null;
 
+        // 로그아웃 모달 열림 상태를 설정하는 함수
         function setLogoutModalOpen(opened) {
             if (!logoutModal) {
                 return;
@@ -811,6 +815,7 @@
 
         document.body.appendChild(toolbarItemsMeasure);
 
+        // 툴바 모드를 업데이트하는 함수
         const updateToolbarMode = function () {
             rafId = null;
 
@@ -833,6 +838,7 @@
             toolbar.classList.toggle("docs-toolbar-auto-collapsed", shouldCollapse);
         };
 
+        // 툴바 모드 업데이트를 스케줄링하는 함수
         const scheduleToolbarModeUpdate = function () {
             if (rafId !== null) {
                 return;
@@ -879,6 +885,16 @@
         const previewDownloadButton = document.getElementById("docs-list-preview-download-btn");
         const previewEditButton = document.getElementById("docs-list-preview-edit-btn");
         const previewDeleteButton = document.getElementById("docs-list-preview-delete-btn");
+        
+        // 편집기 관련 요소들
+        const editorPanel = document.getElementById("docs-list-editor");
+        const editorHead = editorPanel ? editorPanel.querySelector(".docs-list-editor-head") : null;
+        const editorFilenameInput = document.getElementById("docs-list-filename-input");
+        const editorContentInput = document.getElementById("docs-list-content-input");
+        const editorCancelButton = document.getElementById("docs-list-cancel-btn");
+        const editorSaveButton = document.getElementById("docs-list-save-btn");
+        const editorHighlightCode = document.getElementById("docs-list-editor-highlight-code");
+        
         const pathBreadcrumbs = document.querySelector(".docs-path-breadcrumbs");
         const initialBreadcrumbNode = pathBreadcrumbs
             ? pathBreadcrumbs.querySelector(".docs-path-link, .docs-path-current")
@@ -1093,9 +1109,19 @@
             if (previewEditButton) {
                 previewEditButton.hidden = !(isFileEntry && canEdit);
                 if (!previewEditButton.hidden) {
-                    previewEditButton.href = buildWriteUrl(writeUrl, { path: entry.path });
+                    // 편집 버튼 클릭 시 미리보기에서 편집기로 전환
+                    const editButtonClickHandler = function(e) {
+                        e.preventDefault();
+                        if (typeof switchToEditor === 'function') {
+                            switchToEditor(entry);
+                        }
+                    };
+                    
+                    // 기존 이벤트 리스너가 있다면 교체
+                    previewEditButton.onclick = editButtonClickHandler;
                 } else {
                     previewEditButton.removeAttribute("href");
+                    previewEditButton.onclick = null;
                 }
             }
 
@@ -1108,17 +1134,168 @@
             if (!previewContent) {
                 return;
             }
-            previewContent.innerHTML = "";
-            const textNode = document.createElement("p");
-            textNode.className = "docs-list-preview-placeholder";
-            textNode.textContent = message;
-            previewContent.appendChild(textNode);
+            previewContent.innerHTML = '<p class="docs-list-preview-placeholder">' + escapeHtml(message) + '</p>';
+        }
+
+        function updateEditorHighlight() {
+            if (!editorContentInput || !editorHighlightCode) {
+                return;
+            }
+            
+            const content = editorContentInput.value;
+            const escapedContent = escapeHtml(content);
+            editorHighlightCode.textContent = content;
+        }
+
+        function switchToEditor(entry) {
+            if (!editorPanel || !editorFilenameInput || !editorContentInput) {
+                return;
+            }
+            
+            // 현재 선택된 파일 정보를 편집기에 설정
+            editorFilenameInput.value = entry.name || '';
+            
+            // 파일 내용이 없으면 API로 불러오기
+            if (!entry.content) {
+                // API URL을 매번 다시 가져와서 스코프 문제 방지
+                const previewApiUrl = document.body.getAttribute('data-preview-api-url');
+                
+                // 실제 API 호출로 파일 내용 불러오기
+                fetch(previewApiUrl + '?path=' + encodeURIComponent(entry.path))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.content !== undefined) {
+                            entry.content = data.content;
+                            editorContentInput.value = entry.content;
+                            updateEditorHighlight();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading file content:', error);
+                        entry.content = '';
+                        editorContentInput.value = '';
+                        updateEditorHighlight();
+                    });
+            } else {
+                editorContentInput.value = entry.content;
+                updateEditorHighlight();
+            }
+            
+            // 미리보기 숨기고 편집기 표시
+            if (previewPanel) {
+                previewPanel.hidden = true;
+                previewPanel.setAttribute("aria-hidden", "true");
+            }
+            
+            if (editorPanel) {
+                editorPanel.hidden = false;
+                editorPanel.setAttribute("aria-hidden", "false");
+            }
+            
+            // 레이아웃 클래스 업데이트 (preview 제거, editor 추가)
+            if (listLayout) {
+                listLayout.classList.remove("has-preview");
+                listLayout.classList.add("has-editor");
+                setPreviewVisibility(false); // preview visibility를 false로 설정
+            }
+            
+            // 편집기에 포커스
+            editorContentInput.focus();
+            
+            // 저장 및 취소 버튼 이벤트 설정
+            setupEditorEvents(entry);
+        }
+
+        function switchToPreview() {
+            // 편집기 숨기고 미리보기 표시
+            if (editorPanel) {
+                editorPanel.hidden = true;
+                editorPanel.setAttribute("aria-hidden", "true");
+            }
+            
+            if (previewPanel) {
+                previewPanel.hidden = false;
+                previewPanel.setAttribute("aria-hidden", "false");
+            }
+            
+            // 레이아웃 클래스 업데이트
+            if (listLayout) {
+                listLayout.classList.remove("has-editor");
+                listLayout.classList.add("has-preview");
+            }
+            
+            // 편집기 이벤트 정리
+            cleanupEditorEvents();
+        }
+
+        function setupEditorEvents(entry) {
+            if (!editorSaveButton || !editorCancelButton) {
+                return;
+            }
+            
+            // 기존 이벤트 정리
+            cleanupEditorEvents();
+            
+            // 저장 버튼 이벤트
+            editorSaveButton.addEventListener("click", function(e) {
+                e.preventDefault();
+                saveEditorContent(entry);
+            });
+            
+            // 취소 버튼 이벤트
+            editorCancelButton.addEventListener("click", function(e) {
+                e.preventDefault();
+                switchToPreview();
+            });
+        }
+
+        function cleanupEditorEvents() {
+            if (editorSaveButton) {
+                editorSaveButton.removeEventListener("click", saveEditorContent);
+            }
+            if (editorCancelButton) {
+                editorCancelButton.removeEventListener("click", switchToPreview);
+            }
+        }
+
+        function saveEditorContent(entry) {
+            if (!editorContentInput || !editorFilenameInput) {
+                return;
+            }
+            
+            const content = editorContentInput.value;
+            const filename = editorFilenameInput.value.trim();
+            
+            if (!filename) {
+                alert(t("js_error_filename_required", "파일 이름을 입력해주세요."));
+                return;
+            }
+            
+            // API 호출하여 저장
+            // TODO: 실제 저장 API 구현 필요
+            console.log("Saving:", { path: entry.path, filename: filename, content: content });
+            
+            // 임시로 저장 성공 처리 (실제 API 연동 필요)
+            setTimeout(() => {
+                alert("파일이 저장되었습니다.");
+                // 저장 후 미리보기로 전환
+                switchToPreview();
+            }, 500);
+            
+            // 미리보기 새로고침
+            loadPreviewForEntry(entry);
         }
 
         function clearPreviewPane() {
             state.activePreviewPath = "";
             state.previewRequestToken += 1;
             setPreviewVisibility(false);
+            
+            // 편집기가 열려있으면 닫기
+            if (editorPanel && !editorPanel.hidden) {
+                switchToPreview();
+            }
+            
             if (previewTitle) {
                 previewTitle.textContent = t("list_preview_title", "파일 미리보기");
             }
