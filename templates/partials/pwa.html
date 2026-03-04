@@ -1,10 +1,81 @@
 {% load static static_versioned %}
 <!-- PWA metadata for installable app behavior -->
-<meta name="theme-color" content="#0d6efd">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0d6efd">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171717">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="{% static_v 'favicon.png' %}">
+<link rel="apple-touch-icon" href="{% static_v 'icons/apple-touch-icon.png' %}">
 <script>
     (function () {
+        var deferredInstallPrompt = null;
+        var installButtonSelector = '[data-pwa-install]';
+        var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true;
+
+        var setInstallButtonsState = function (state) {
+            var buttons = document.querySelectorAll(installButtonSelector);
+            buttons.forEach(function (button) {
+                if (state === 'ready') {
+                    button.style.display = 'inline-flex';
+                    button.classList.remove('is-disabled');
+                    button.removeAttribute('aria-disabled');
+                    return;
+                }
+
+                if (state === 'installed' || state === 'hidden') {
+                    button.style.display = 'none';
+                    return;
+                }
+
+                button.style.display = 'none';
+            });
+        };
+
+        var showInstallFallbackGuide = function () {
+            var message = '브라우저 메뉴에서 "홈 화면에 추가" 또는 "앱 설치"를 선택해 주세요.';
+            var ua = (window.navigator.userAgent || '').toLowerCase();
+            var isIOS = /iphone|ipad|ipod/.test(ua);
+            if (isIOS) {
+                message = 'Safari에서 공유 버튼을 누른 뒤 "홈 화면에 추가"를 선택해 주세요.';
+            }
+            window.alert(message);
+        };
+
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest(installButtonSelector);
+            if (!button) {
+                return;
+            }
+
+            event.preventDefault();
+            if (!deferredInstallPrompt) {
+                showInstallFallbackGuide();
+                return;
+            }
+
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.finally(function () {
+                deferredInstallPrompt = null;
+                setInstallButtonsState('hidden');
+            });
+        });
+
+        window.addEventListener('beforeinstallprompt', function (event) {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            setInstallButtonsState('ready');
+        });
+
+        window.addEventListener('appinstalled', function () {
+            deferredInstallPrompt = null;
+            setInstallButtonsState('installed');
+        });
+
+        if (isStandalone) {
+            setInstallButtonsState('installed');
+        } else {
+            setInstallButtonsState('hidden');
+        }
+
         if (!('serviceWorker' in navigator)) {
             return;
         }

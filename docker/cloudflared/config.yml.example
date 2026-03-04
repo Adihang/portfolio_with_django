@@ -1,0 +1,11 @@
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: www.hanplanet.com
+    service: http://nginx:80
+  - hostname: hanplanet.com
+    service: http://nginx:80
+  - hostname: ssh.hanplanet.com
+    service: ssh://host.docker.internal:22
+  - service: http_status:404
