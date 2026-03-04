@@ -1864,7 +1864,7 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
 
 .docs-editor-surface {
     position: relative;
-    min-height: 240px;
+    height: 100%;
     border: 1px solid var(--docs-border-heavy);
     border-radius: var(--docs-radius-sm);
     background: var(--docs-bg);
@@ -1880,7 +1880,6 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
     margin: 0;
     width: 100%;
     height: 100%;
-    min-height: 240px;
     padding: 10px;
     box-sizing: border-box;
     overflow: auto;
