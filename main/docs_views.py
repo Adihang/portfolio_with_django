@@ -1467,6 +1467,11 @@ def docs_login(request, ui_lang=None):
         target_user = _resolve_docs_login_target_user(username_value)
         show_captcha = _is_docs_login_captcha_required(target_user)
 
+        if settings.DEBUG:
+            show_captcha = False
+            captcha_question = ""
+            _clear_docs_login_captcha(request)
+
         if show_captcha:
             captcha_question = _build_docs_login_captcha(request)
             if not turnstile_site_key or not turnstile_secret_key:

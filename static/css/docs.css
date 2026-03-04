@@ -453,12 +453,12 @@ body.theme-dark .docs-help-icon-symbol {
 }
 
 .docs-list-layout.is-landscape.has-preview {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
     align-items: stretch;
 }
 
 .docs-list-layout.is-landscape.has-editor {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
     align-items: stretch;
 }
 
@@ -492,6 +492,7 @@ body.theme-dark .docs-help-icon-symbol {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    align-items: stretch;
 }
 
 .docs-list-layout.is-portrait.has-preview > .docs-list-pane {
@@ -653,6 +654,7 @@ body.theme-dark .docs-help-icon-symbol {
 .docs-list-editor-body {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
     padding: 10px 12px; /* 상하 10px, 좌우 12px */
@@ -674,7 +676,7 @@ body.theme-dark .docs-help-icon-symbol {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
+    left: 25%;
     width: 1px;
     background: var(--docs-border-soft);
     pointer-events: none;
@@ -685,7 +687,7 @@ body.theme-dark .docs-help-icon-symbol {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
+    left: 25%;
     width: 1px;
     background: var(--docs-border-soft);
     pointer-events: none;

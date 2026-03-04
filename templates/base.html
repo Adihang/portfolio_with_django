@@ -59,7 +59,7 @@
         <div class="container-fluid">
             <div class="portfolio-brand-group">
                 <a class="navbar-brand portfolio-brand" href="{% url 'main:main_lang' ui_lang=ui_lang %}">
-                    <span class="portfolio-brand-text">Hanplanet</span>
+                    <span class="portfolio-brand-text">Hanplanet{% if debug %}<sup>D</sup>{% endif %}</span>
                 </a>
             </div>
             <button class="navbar-toggler portfolio-nav-toggler" type="button"
