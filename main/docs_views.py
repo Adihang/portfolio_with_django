@@ -9,14 +9,15 @@ from pathlib import Path
 from urllib.parse import quote
 import httpx
 
+from django import forms
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.conf import settings
 from django.db import transaction
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -44,7 +45,7 @@ DOCS_ALLOWED_FILE_EXTENSIONS = (
     ".py",
 )
 INVALID_NAME_PATTERN = re.compile(r"[\\/]")
-DOCS_LOGOUT_PATH_PATTERN = re.compile(r"^/(?:(ko|en)/)?docs/logout/?$")
+DOCS_LOGOUT_PATH_PATTERN = re.compile(r"^/(?:(ko|en)/)?(?:docs|ide)/logout/?$")
 MARKDOWN_HELP_FILENAME_KO = "Markdown description_ko.md"
 MARKDOWN_HELP_FILENAME_EN = "Markdown description_en.md"
 MARKDOWN_HELP_FILENAME_KO_DOT_LEGACY = "Markdown description.ko.md"
@@ -59,50 +60,75 @@ PAGE_HELP_FILE_BASENAMES = {
 DOCS_EDITOR_GROUP_NAME = "DocsEditors"
 DOCS_EDIT_PERMISSION_CODE = "main.can_edit_docs"
 DOCS_PUBLIC_WRITE_GROUP_NAME = "__DOCS_PUBLIC_ALL__"
-DOCS_META_TITLE = "Hanplanet Docs"
-DOCS_META_DESCRIPTION = "마크다운 문서 페이지"
+DOCS_META_TITLE = "Hanplanet IDE"
+DOCS_META_DESCRIPTION = "Web IDE Page"
 DOCS_LOGIN_CAPTCHA_THRESHOLD = 1
 DOCS_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "docs_login_captcha_question"
 DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY = "docs_login_captcha_answer"
+DOCS_SIGNUP_FORBIDDEN_TERMS = (
+    "admin",
+    "administrator",
+    "root",
+    "system",
+    "operator",
+    "staff",
+    "moderator",
+    "program",
+    "developer",
+    "dev",
+    "engineer",
+    "ops",
+    "sql",
+    "mysql",
+    "postgres",
+    "oracle",
+    "mssql",
+    "sqlserver",
+    "dba",
+)
+DOCS_SIGNUP_SQL_PATTERN = re.compile(
+    r"(?:--|/\*|\*/|;|\b(select|insert|update|delete|drop|alter|create|truncate|union|into|from|where|or|and)\b)",
+    re.IGNORECASE,
+)
 DOCS_RENDER_MODE_MARKDOWN = "markdown"
 DOCS_RENDER_MODE_PLAIN_TEXT = "plain_text"
 DOCS_DEFAULT_RENDER_PROFILE = {
     "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
-    "css_class": "docs-plain-text",
+    "css_class": "ide-plain-text",
 }
 DOCS_RENDER_PROFILES_BY_EXTENSION = {
     DOCS_FILE_EXTENSION: {
         "mode": DOCS_RENDER_MODE_MARKDOWN,
-        "css_class": "docs-markdown",
+        "css_class": "ide-markdown",
     },
     ".html": {
         "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
-        "css_class": "docs-html",
+        "css_class": "ide-html",
     },
     ".css": {
         "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
-        "css_class": "docs-css",
+        "css_class": "ide-css",
     },
     ".js": {
         "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
-        "css_class": "docs-js",
+        "css_class": "ide-js",
     },
     ".py": {
         "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
-        "css_class": "docs-py",
+        "css_class": "ide-py",
     },
     ".json": {
         "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
-        "css_class": "docs-json",
+        "css_class": "ide-json",
     },
 }
 
 DOCS_TEXT = {
     "ko": {
-        "list_title": "문서 탐색기",
+        "list_title": "탐색기",
         "write_button": "작성",
         "help_button": "도움말",
-        "list_aria_label": "문서 목록",
+        "list_aria_label": "목록",
         "menu_open": "열기",
         "menu_download": "다운로드",
         "menu_rename": "이름 바꾸기",
@@ -110,7 +136,7 @@ DOCS_TEXT = {
         "menu_edit": "수정",
         "menu_delete": "삭제",
         "menu_new_folder": "새 폴더",
-        "menu_new_document": "새 문서",
+        "menu_new_document": "새 파일",
         "rename_title": "이름 바꾸기",
         "rename_new_name": "새 이름",
         "rename_new_name_placeholder": "새 이름",
@@ -119,8 +145,8 @@ DOCS_TEXT = {
         "edit_button": "수정",
         "delete_button": "삭제",
         "download_button": "다운로드",
-        "write_title_edit": "문서 수정",
-        "write_title_create": "문서 작성",
+        "write_title_edit": "수정",
+        "write_title_create": "작성",
         "markdown_guide_button": "마크다운 가이드",
         "markdown_preview_button": "미리보기",
         "markdown_snippet_aria": "마크다운 문법 빠른 입력",
@@ -224,10 +250,10 @@ DOCS_TEXT = {
         "js_confirm_delete_entry": "정말 삭제할까요?\n{path}",
         "js_confirm_delete_entries": "선택한 {count}개 항목을 삭제할까요?",
         "js_permission_target_multiple": "{count}개 항목",
-        "js_empty_documents": "문서가 없습니다.",
-        "js_confirm_delete_doc": "이 문서를 삭제할까요?",
+        "js_empty_documents": "파일이 없습니다.",
+        "js_confirm_delete_doc": "이 파일을 삭제할까요?",
         "js_current_folder_label": "현재 폴더",
-        "js_docs_root_label": "docs 루트",
+        "js_docs_root_label": "IDE 루트",
         "js_no_child_folders": "하위 폴더가 없습니다.",
         "js_filename_required": "파일명을 입력해주세요.",
         "js_extension_required": "확장자를 입력해주세요.",
@@ -240,10 +266,18 @@ DOCS_TEXT = {
         "js_permission_save_failed": "권한 저장 중 오류가 발생했습니다.",
         "auth_login_button": "로그인",
         "auth_logout_button": "로그아웃",
-        "auth_login_title": "Docs 로그인",
+        "admin_button": "Admin",
+        "auth_login_title": "IDE 로그인",
         "auth_username_label": "아이디",
         "auth_password_label": "비밀번호",
         "auth_login_submit": "로그인",
+        "auth_signup_button": "회원가입",
+        "auth_signup_title": "IDE 회원가입",
+        "auth_signup_submit": "가입하기",
+        "auth_name_label": "이름",
+        "auth_email_label": "이메일 주소",
+        "auth_password_confirm_label": "비밀번호 확인",
+        "auth_signup_error": "회원가입 정보를 확인해주세요.",
         "auth_login_error": "아이디 또는 비밀번호를 확인해주세요.",
         "auth_login_captcha_label": "캡챠 인증",
         "auth_login_captcha_hint": "아래 보안 인증을 완료해주세요.",
@@ -254,10 +288,10 @@ DOCS_TEXT = {
         "auth_profile_label": "프로필",
     },
     "en": {
-        "list_title": "Documents",
+        "list_title": "Files",
         "write_button": "Write",
         "help_button": "Help",
-        "list_aria_label": "Document list",
+        "list_aria_label": "File list",
         "menu_open": "Open",
         "menu_download": "Download",
         "menu_rename": "Rename",
@@ -265,7 +299,7 @@ DOCS_TEXT = {
         "menu_edit": "Edit",
         "menu_delete": "Delete",
         "menu_new_folder": "New Folder",
-        "menu_new_document": "New Document",
+        "menu_new_document": "New File",
         "rename_title": "Rename",
         "rename_new_name": "New name",
         "rename_new_name_placeholder": "New name",
@@ -274,8 +308,8 @@ DOCS_TEXT = {
         "edit_button": "Edit",
         "delete_button": "Delete",
         "download_button": "Download",
-        "write_title_edit": "Edit Document",
-        "write_title_create": "New Document",
+        "write_title_edit": "Edit File",
+        "write_title_create": "New File",
         "markdown_guide_button": "Markdown Guide",
         "markdown_preview_button": "Preview",
         "markdown_snippet_aria": "Markdown quick insert",
@@ -379,10 +413,10 @@ DOCS_TEXT = {
         "js_confirm_delete_entry": "Delete this item?\n{path}",
         "js_confirm_delete_entries": "Delete {count} selected items?",
         "js_permission_target_multiple": "{count} items",
-        "js_empty_documents": "No documents found.",
-        "js_confirm_delete_doc": "Delete this document?",
+        "js_empty_documents": "No files found.",
+        "js_confirm_delete_doc": "Delete this file?",
         "js_current_folder_label": "Current folder",
-        "js_docs_root_label": "docs root",
+        "js_docs_root_label": "IDE root",
         "js_no_child_folders": "No subfolders.",
         "js_filename_required": "Please enter a file name.",
         "js_extension_required": "Please enter a file extension.",
@@ -395,10 +429,18 @@ DOCS_TEXT = {
         "js_permission_save_failed": "Failed to save permissions.",
         "auth_login_button": "Login",
         "auth_logout_button": "Logout",
-        "auth_login_title": "Docs Login",
+        "admin_button": "Admin",
+        "auth_login_title": "IDE Login",
         "auth_username_label": "Username",
         "auth_password_label": "Password",
         "auth_login_submit": "Login",
+        "auth_signup_button": "회원가입",
+        "auth_signup_title": "IDE Sign up",
+        "auth_signup_submit": "Create account",
+        "auth_name_label": "Name",
+        "auth_email_label": "Email address",
+        "auth_password_confirm_label": "Confirm password",
+        "auth_signup_error": "Please check the sign up information.",
         "auth_login_error": "Please check your username or password.",
         "auth_login_captcha_label": "Captcha Verification",
         "auth_login_captcha_hint": "Complete the security verification below.",
@@ -419,7 +461,12 @@ def get_docs_text(ui_lang: str | None) -> dict:
 
 
 def docs_root_dir() -> Path:
-    root = Path(settings.MEDIA_ROOT) / "docs"
+    media_root = Path(settings.MEDIA_ROOT)
+    root = media_root / "ide"
+    legacy_root = media_root / "docs"
+    # 기존 docs 저장소를 ide로 자동 이전해 기존 파일 접근이 끊기지 않게 유지한다.
+    if not root.exists() and legacy_root.exists():
+        legacy_root.rename(root)
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -481,18 +528,18 @@ def normalize_docs_relative_path(raw_path: str | None, must_exist: bool = True) 
         try:
             normalize_file_extension(suffix)
         except ValueError as exc:
-            raise FileNotFoundError("문서 파일을 찾을 수 없습니다.") from exc
+            raise FileNotFoundError("파일을 찾을 수 없습니다.") from exc
     else:
         normalized = f"{normalized}{DOCS_FILE_EXTENSION}"
 
     path_obj, rel_path = resolve_path(normalized, must_exist=must_exist)
     if must_exist:
         if not path_obj.is_file():
-            raise FileNotFoundError("문서 파일을 찾을 수 없습니다.")
+            raise FileNotFoundError("파일을 찾을 수 없습니다.")
         try:
             normalize_file_extension(path_obj.suffix.lower())
         except ValueError as exc:
-            raise FileNotFoundError("문서 파일을 찾을 수 없습니다.") from exc
+            raise FileNotFoundError("파일을 찾을 수 없습니다.") from exc
 
     return path_obj, rel_path
 
@@ -576,7 +623,7 @@ def build_docs_html_live_document(html_source: str, *, companion_css: str = "", 
 
     if css_text:
         safe_css_text = css_text.replace("</style", "<\\/style")
-        css_block = f"\n<style data-docs-linked-css>\n{safe_css_text}\n</style>\n"
+        css_block = f"\n<style data-ide-linked-css>\n{safe_css_text}\n</style>\n"
         if re.search(r"</head\s*>", document, flags=re.IGNORECASE):
             document = _inject_before_first_closing_tag(document, "</head>", css_block)
         else:
@@ -584,7 +631,7 @@ def build_docs_html_live_document(html_source: str, *, companion_css: str = "", 
 
     if js_text:
         safe_js_text = js_text.replace("</script", "<\\/script")
-        js_block = f"\n<script data-docs-linked-js>\n{safe_js_text}\n</script>\n"
+        js_block = f"\n<script data-ide-linked-js>\n{safe_js_text}\n</script>\n"
         if re.search(r"</body\s*>", document, flags=re.IGNORECASE):
             document = _inject_before_first_closing_tag(document, "</body>", js_block)
         else:
@@ -601,8 +648,8 @@ def render_docs_html_live_safely(html_source: str, *, companion_css: str = "", c
     )
     escaped_srcdoc = escape(live_document)
     iframe_html = (
-        '<div class="docs-html-live-wrap">'
-        '<iframe class="docs-html-live-frame" '
+        '<div class="ide-html-live-wrap">'
+        '<iframe class="ide-html-live-frame" '
         'sandbox="allow-scripts" '
         'referrerpolicy="no-referrer" '
         f'srcdoc="{escaped_srcdoc}"></iframe>'
@@ -663,7 +710,7 @@ def get_docs_save_extension_options() -> list[str]:
     for extension, profile in DOCS_RENDER_PROFILES_BY_EXTENSION.items():
         if (
             profile.get("mode") == DOCS_RENDER_MODE_MARKDOWN
-            or profile.get("css_class") != "docs-plain-text"
+            or profile.get("css_class") != "ide-plain-text"
         ):
             options.append(extension)
 
@@ -682,7 +729,7 @@ def render_docs_content(
     request=None,
 ) -> tuple[str, dict[str, str]]:
     profile = resolve_docs_render_profile(file_extension)
-    if profile["css_class"] == "docs-html":
+    if profile["css_class"] == "ide-html":
         companion_css = ""
         companion_js = ""
         if source_path is not None:
@@ -886,6 +933,13 @@ def user_matches_docs_acl_rule(
 
 
 def has_docs_read_access(request, path_value: str | None) -> bool:
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
+        return False
+    if scoped_home_dir:
+        return True
+
     if is_docs_acl_admin(request):
         return True
 
@@ -914,11 +968,17 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
 
 
 def has_docs_write_access(request, path_value: str | None) -> bool:
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
+        return False
+    if scoped_home_dir and is_public_group_scoped_user(request):
+        return True
+
     user = getattr(request, "user", None)
     if user and user.is_superuser:
         return True
 
-    normalized_path = normalize_relative_path(path_value, allow_empty=True)
     rule, matched_rule_path = get_effective_docs_acl_rule(request, path_value)
     has_descendant_rule = has_descendant_docs_acl_rule(request, normalized_path)
     if rule is None:
@@ -954,6 +1014,13 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
 
 
 def has_docs_directory_write_access(request, path_value: str | None) -> bool:
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
+        return False
+    if scoped_home_dir and is_public_group_scoped_user(request):
+        return True
+
     user = getattr(request, "user", None)
     if user and user.is_superuser:
         return True
@@ -1081,19 +1148,87 @@ def build_docs_list_url(base_url: str, relative_path: str) -> str:
     return f"{base_url}/{encoded}/list"
 
 
-def build_docs_breadcrumbs(base_url: str, current_dir: str) -> list[dict]:
-    breadcrumbs = [{"label": "docs", "url": base_url, "is_current": current_dir == "", "path": ""}]
-    if not current_dir:
+def get_scoped_docs_home_dir(request) -> str:
+    user = getattr(request, "user", None)
+    if not (user and user.is_authenticated):
+        return "all"
+    if not user.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists():
+        return ""
+    username = str(user.get_username() or "").strip()
+    if not username:
+        return ""
+    try:
+        return normalize_relative_path(f"users/{username}", allow_empty=False)
+    except ValueError:
+        return ""
+
+
+def is_public_group_scoped_user(request) -> bool:
+    user = getattr(request, "user", None)
+    if not (user and user.is_authenticated):
+        return False
+    return user.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists()
+
+
+def is_path_in_docs_scope(path_value: str, scoped_home_dir: str) -> bool:
+    if not scoped_home_dir:
+        return True
+    if not path_value:
+        return False
+    return path_value == scoped_home_dir or path_value.startswith(scoped_home_dir + "/")
+
+
+def ensure_scoped_home_dir(scoped_home_dir: str) -> None:
+    if not scoped_home_dir:
+        return
+    path_obj, _ = resolve_path(scoped_home_dir, must_exist=False)
+    path_obj.mkdir(parents=True, exist_ok=True)
+
+
+def build_docs_breadcrumbs(
+    base_url: str,
+    current_dir: str,
+    *,
+    scoped_home_dir: str = "",
+) -> list[dict]:
+    if not scoped_home_dir:
+        breadcrumbs = [{"label": "ide", "url": base_url, "is_current": current_dir == "", "path": ""}]
+        if not current_dir:
+            return breadcrumbs
+
+        parts = [part for part in current_dir.split("/") if part]
+        for index, part in enumerate(parts):
+            parent_path = "/".join(parts[: index + 1])
+            breadcrumbs.append(
+                {
+                    "label": part,
+                    "url": build_docs_list_url(base_url, parent_path),
+                    "is_current": index == len(parts) - 1,
+                    "path": parent_path,
+                }
+            )
         return breadcrumbs
 
-    parts = [part for part in current_dir.split("/") if part]
-    for index, part in enumerate(parts):
-        parent_path = "/".join(parts[: index + 1])
+    current_parts = [part for part in current_dir.split("/") if part]
+    home_parts = [part for part in scoped_home_dir.split("/") if part]
+    home_label = home_parts[-1] if home_parts else scoped_home_dir
+    breadcrumbs = [
+        {
+            "label": home_label,
+            "url": build_docs_list_url(base_url, scoped_home_dir),
+            "is_current": current_dir == scoped_home_dir,
+            "path": scoped_home_dir,
+        }
+    ]
+    start_index = len(home_parts) if current_parts[: len(home_parts)] == home_parts else 0
+    for index in range(start_index, len(current_parts)):
+        part = current_parts[index]
+        parent_path = "/".join(current_parts[: index + 1])
         breadcrumbs.append(
             {
                 "label": part,
                 "url": build_docs_list_url(base_url, parent_path),
-                "is_current": index == len(parts) - 1,
+                "is_current": index == len(current_parts) - 1,
                 "path": parent_path,
             }
         )
@@ -1120,7 +1255,7 @@ def require_docs_editor_json(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         if not is_docs_editor(request):
-            return json_error("문서 수정 권한이 필요합니다.", status=403)
+            return json_error("파일 수정 권한이 필요합니다.", status=403)
         return view_func(request, *args, **kwargs)
 
     return _wrapped
@@ -1248,11 +1383,13 @@ def docs_common_context(request, ui_lang):
         docs_base_url = reverse("main:docs_root_lang", kwargs={"ui_lang": ui_lang})
         docs_write_url = reverse("main:docs_write_lang", kwargs={"ui_lang": ui_lang})
         docs_login_url = reverse("main:docs_login_lang", kwargs={"ui_lang": ui_lang})
+        docs_signup_url = reverse("main:docs_signup_lang", kwargs={"ui_lang": ui_lang})
         docs_logout_url = reverse("main:docs_logout_lang", kwargs={"ui_lang": ui_lang})
     else:
         docs_base_url = reverse("main:docs_root")
         docs_write_url = reverse("main:docs_write")
         docs_login_url = reverse("main:docs_login")
+        docs_signup_url = reverse("main:docs_signup")
         docs_logout_url = reverse("main:docs_logout")
     docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
 
@@ -1266,6 +1403,7 @@ def docs_common_context(request, ui_lang):
             "docs_base_url": docs_base_url,
             "docs_write_url": docs_write_url,
             "docs_login_url": docs_login_url,
+            "docs_signup_url": docs_signup_url,
             "docs_logout_url": docs_logout_url,
             "docs_auth_next": request.get_full_path(),
             "docs_logout_next": docs_base_url,
@@ -1301,6 +1439,15 @@ def docs_csrf_failure(request, reason="", template_name="403_csrf.html"):
 
 
 def docs_root(request, ui_lang=None):
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    if scoped_home_dir:
+        ensure_scoped_home_dir(scoped_home_dir)
+        resolved_lang = resolve_ui_lang(request, ui_lang)
+        if resolved_lang in SUPPORTED_UI_LANGS:
+            return redirect(
+                reverse("main:docs_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": scoped_home_dir})
+            )
+        return redirect(reverse("main:docs_list", kwargs={"folder_path": scoped_home_dir}))
     return docs_list(request, folder_path="", ui_lang=ui_lang)
 
 
@@ -1314,6 +1461,10 @@ def docs_list_root_legacy_redirect(request):
 
 def docs_write_legacy_redirect(request):
     return redirect_to_localized_route(request, "main:docs_write_lang")
+
+
+def docs_signup_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:docs_signup_lang")
 
 
 def docs_login_legacy_redirect(request):
@@ -1433,10 +1584,70 @@ def _build_docs_login_captcha(request, refresh: bool = False) -> str:
 
 def _verify_docs_login_captcha_answer(request) -> bool:
     expected = str(request.session.get(DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
-    provided = str(request.POST.get("docs-captcha-answer", "") or "").strip()
+    provided = str(request.POST.get("ide-captcha-answer", "") or "").strip()
     if not expected or not provided:
         return False
     return provided == expected
+
+
+def _resolve_docs_post_login_url(request, ui_lang: str | None, fallback_next_url: str, user) -> str:
+    if user and user.is_authenticated and user.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists():
+        username = str(user.get_username() or "").strip()
+        if username:
+            try:
+                scoped_home_dir = normalize_relative_path(f"users/{username}", allow_empty=False)
+            except ValueError:
+                scoped_home_dir = ""
+            if scoped_home_dir:
+                ensure_scoped_home_dir(scoped_home_dir)
+                if ui_lang in SUPPORTED_UI_LANGS:
+                    return reverse("main:docs_list_lang", kwargs={"ui_lang": ui_lang, "folder_path": scoped_home_dir})
+                return reverse("main:docs_list", kwargs={"folder_path": scoped_home_dir})
+    return fallback_next_url
+
+
+class DocsSignupForm(UserCreationForm):
+    first_name = forms.CharField(max_length=150, required=False)
+    email = forms.EmailField(required=False)
+
+    def __init__(self, *args, ui_lang: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        docs_text = get_docs_text(ui_lang)
+        self.fields["first_name"].label = docs_text.get("auth_name_label", "이름")
+        self.fields["email"].label = docs_text.get("auth_email_label", "이메일 주소")
+        self.fields["first_name"].widget.attrs.update({"autocomplete": "name"})
+        self.fields["email"].widget.attrs.update({"autocomplete": "email"})
+        self.fields["username"].widget.attrs.update({"autocomplete": "username"})
+        self.fields["password1"].widget.attrs.update({"autocomplete": "new-password"})
+        self.fields["password2"].widget.attrs.update({"autocomplete": "new-password"})
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.first_name = str(self.cleaned_data.get("first_name", "") or "").strip()
+        user.email = str(self.cleaned_data.get("email", "") or "").strip()
+        if commit:
+            user.save()
+        return user
+
+    def _contains_forbidden_term(self, value: str) -> bool:
+        lowered = value.lower()
+        return any(term in lowered for term in DOCS_SIGNUP_FORBIDDEN_TERMS)
+
+    def clean_username(self):
+        username = str(self.cleaned_data.get("username", "") or "").strip()
+        if self._contains_forbidden_term(username):
+            raise ValidationError("아이디에 사용할 수 없는 단어가 포함되어 있습니다.")
+        if DOCS_SIGNUP_SQL_PATTERN.search(username):
+            raise ValidationError("아이디에 SQL 구문으로 해석될 수 있는 입력은 사용할 수 없습니다.")
+        return username
+
+    def clean_password1(self):
+        password = str(self.cleaned_data.get("password1", "") or "")
+        if self._contains_forbidden_term(password):
+            raise ValidationError("비밀번호에 사용할 수 없는 단어가 포함되어 있습니다.")
+        if DOCS_SIGNUP_SQL_PATTERN.search(password):
+            raise ValidationError("비밀번호에 SQL 구문으로 해석될 수 있는 입력은 사용할 수 없습니다.")
+        return password
 
 
 @require_http_methods(["GET", "POST"])
@@ -1490,7 +1701,7 @@ def docs_login(request, ui_lang=None):
                 _reset_docs_login_guard(authed_user)
                 _clear_docs_login_captcha(request)
                 auth_login(request, authed_user)
-                return redirect(next_url)
+                return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user))
             else:
                 login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
                 captcha_question = _build_docs_login_captcha(request, refresh=True)
@@ -1502,7 +1713,7 @@ def docs_login(request, ui_lang=None):
             _reset_docs_login_guard(authed_user)
             _clear_docs_login_captcha(request)
             auth_login(request, authed_user)
-            return redirect(next_url)
+            return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user))
         else:
             login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
             if target_user is not None:
@@ -1537,6 +1748,44 @@ def docs_api_login_captcha_status(request):
     return JsonResponse({"ok": True, "required": required, "question": question})
 
 
+@require_http_methods(["GET", "POST"])
+def docs_signup(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    context = docs_common_context(request, resolved_lang)
+    docs_text = context["docs_text"]
+    next_url = resolve_next_url(request, context["docs_base_url"])
+
+    if request.user.is_authenticated:
+        return redirect(next_url)
+
+    form = DocsSignupForm(request.POST or None, ui_lang=resolved_lang)
+    signup_error_message = ""
+    if request.method == "POST":
+        if form.is_valid():
+            user = form.save()
+            public_group = get_docs_public_write_group()
+            user.groups.add(public_group)
+            scoped_home_dir = get_scoped_docs_home_dir(request)
+            if not scoped_home_dir:
+                try:
+                    scoped_home_dir = normalize_relative_path(f"users/{user.get_username()}", allow_empty=False)
+                except ValueError:
+                    scoped_home_dir = ""
+            ensure_scoped_home_dir(scoped_home_dir)
+            auth_login(request, user)
+            return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, user))
+        signup_error_message = docs_text.get("auth_signup_error", "회원가입 정보를 확인해주세요.")
+
+    context.update(
+        {
+            "docs_signup_form": form,
+            "docs_signup_next": next_url,
+            "docs_signup_error_message": signup_error_message,
+        }
+    )
+    return render(request, "docs/signup.html", context)
+
+
 @require_http_methods(["POST"])
 @csrf_protect
 def docs_logout(request, ui_lang=None):
@@ -1551,6 +1800,18 @@ def docs_list(request, folder_path="", ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    requested_dir = normalize_relative_path(folder_path, allow_empty=True)
+    if scoped_home_dir:
+        ensure_scoped_home_dir(scoped_home_dir)
+        if not requested_dir:
+            if resolved_lang in SUPPORTED_UI_LANGS:
+                return redirect(
+                    reverse("main:docs_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": scoped_home_dir})
+                )
+            return redirect(reverse("main:docs_list", kwargs={"folder_path": scoped_home_dir}))
+        if not is_path_in_docs_scope(requested_dir, scoped_home_dir):
+            raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     try:
         directory, current_dir = resolve_path(folder_path, must_exist=True)
@@ -1560,16 +1821,21 @@ def docs_list(request, folder_path="", ui_lang=None):
     if not directory.is_dir():
         raise Http404("폴더를 찾을 수 없습니다.")
     if not has_docs_read_access(request, current_dir):
-        raise PermissionDenied("문서를 볼 권한이 없습니다.")
+        raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     context.update(
         {
             "current_dir": current_dir,
             "current_dir_display": current_dir or "/",
-            "current_path_label": f"/docs/{current_dir}" if current_dir else "/docs",
+            "current_path_label": f"/ide/{current_dir}" if current_dir else "/ide",
+            "scoped_home_dir": scoped_home_dir,
             "current_dir_can_edit": has_docs_write_access(request, current_dir),
             "current_dir_can_write_children": has_docs_directory_write_access(request, current_dir),
-            "breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], current_dir),
+            "breadcrumbs": build_docs_breadcrumbs(
+                context["docs_base_url"],
+                current_dir,
+                scoped_home_dir=scoped_home_dir,
+            ),
             "initial_entries": list_directory_entries(directory, request=request),
             "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
         }
@@ -1581,13 +1847,16 @@ def docs_view(request, doc_path, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
+    scoped_home_dir = get_scoped_docs_home_dir(request)
 
     try:
         file_path, relative_file_path = normalize_docs_relative_path(doc_path, must_exist=True)
     except (ValueError, FileNotFoundError):
-        raise Http404("문서를 찾을 수 없습니다.")
+        raise Http404("파일을 찾을 수 없습니다.")
+    if not is_path_in_docs_scope(relative_file_path, scoped_home_dir):
+        raise PermissionDenied("파일을 볼 권한이 없습니다.")
     if not has_docs_read_access(request, relative_file_path):
-        raise PermissionDenied("문서를 볼 권한이 없습니다.")
+        raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     content = file_path.read_text(encoding="utf-8")
     rendered_content_html, render_profile = render_docs_content(
@@ -1611,7 +1880,11 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_content_html": rendered_content_html,
             "doc_content_mode": render_profile["mode"],
             "doc_content_class": render_profile["css_class"],
-            "view_breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], parent_dir),
+            "view_breadcrumbs": build_docs_breadcrumbs(
+                context["docs_base_url"],
+                parent_dir,
+                scoped_home_dir=scoped_home_dir,
+            ),
             "view_current_file_name": file_path.name,
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
         }
@@ -1623,6 +1896,9 @@ def docs_write(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    if scoped_home_dir:
+        ensure_scoped_home_dir(scoped_home_dir)
 
     requested_path = request.GET.get("path", "")
     requested_dir = request.GET.get("dir", "")
@@ -1641,9 +1917,11 @@ def docs_write(request, ui_lang=None):
         try:
             file_path, original_relative_path = normalize_markdown_relative_path(requested_path, must_exist=True)
         except (ValueError, FileNotFoundError):
-            raise Http404("수정할 문서를 찾을 수 없습니다.")
+            raise Http404("수정할 파일을 찾을 수 없습니다.")
+        if not is_path_in_docs_scope(original_relative_path, scoped_home_dir):
+            raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         if not has_docs_write_access(request, original_relative_path):
-            raise PermissionDenied("문서를 수정할 권한이 없습니다.")
+            raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         write_public_direct_save = is_docs_public_write_enabled(request, original_relative_path)
 
         mode = "edit"
@@ -1656,14 +1934,18 @@ def docs_write(request, ui_lang=None):
         initial_content = file_path.read_text(encoding="utf-8")
     elif requested_dir:
         initial_dir = normalize_relative_path(requested_dir)
+        if not is_path_in_docs_scope(initial_dir, scoped_home_dir):
+            raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         target_dir, _ = resolve_path(initial_dir, must_exist=True)
         if not target_dir.is_dir():
             raise Http404("대상 폴더를 찾을 수 없습니다.")
         if not has_docs_directory_write_access(request, initial_dir):
-            raise PermissionDenied("문서를 수정할 권한이 없습니다.")
+            raise PermissionDenied("파일을 수정할 권한이 없습니다.")
     else:
-        if not has_docs_directory_write_access(request, ""):
-            raise PermissionDenied("문서를 수정할 권한이 없습니다.")
+        if scoped_home_dir:
+            initial_dir = scoped_home_dir
+        if not has_docs_directory_write_access(request, initial_dir):
+            raise PermissionDenied("파일을 수정할 권한이 없습니다.")
 
     markdown_help_path = resolve_markdown_help_file(resolved_lang)
     try:
@@ -1693,7 +1975,11 @@ def docs_write(request, ui_lang=None):
             "available_directories": list_all_directories(request=request),
             "markdown_help_html": render_markdown_safely(markdown_help_content),
             "page_help_html": build_page_help_html(resolved_lang, "write", docs_text),
-            "write_breadcrumbs": build_docs_breadcrumbs(context["docs_base_url"], initial_dir),
+            "write_breadcrumbs": build_docs_breadcrumbs(
+                context["docs_base_url"],
+                initial_dir,
+                scoped_home_dir=scoped_home_dir,
+            ),
             "write_current_file_name": write_current_file_name,
             "write_public_direct_save": write_public_direct_save,
         }
@@ -1911,7 +2197,7 @@ def docs_api_list(request):
     if not target_dir.is_dir():
         return json_error("폴더 경로가 아닙니다.", status=400)
     if not has_docs_read_access(request, normalized):
-        return json_error("문서를 볼 권한이 없습니다.", status=403)
+        return json_error("파일을 볼 권한이 없습니다.", status=403)
 
     return JsonResponse(
         {
@@ -1936,7 +2222,7 @@ def docs_api_rename(request):
     if source_relative == "":
         return json_error("루트 폴더는 이름을 바꿀 수 없습니다.", status=400)
     if not has_docs_write_access(request, source_relative):
-        return json_error("문서를 수정할 권한이 없습니다.", status=403)
+        return json_error("파일을 수정할 권한이 없습니다.", status=403)
     if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
         return json_error("전체 허용 파일은 이름을 바꿀 수 없습니다.", status=403)
 
@@ -1946,7 +2232,7 @@ def docs_api_rename(request):
         try:
             source_extension = normalize_file_extension(source_extension)
         except ValueError:
-            return json_error("문서 파일만 이름을 바꿀 수 있습니다.", status=400)
+            return json_error("파일만 이름을 바꿀 수 있습니다.", status=400)
         candidate_name = validate_name(new_name, for_file=True, file_extension=source_extension)
         destination = parent / f"{candidate_name}{source_extension}"
     else:
@@ -1995,14 +2281,14 @@ def docs_api_delete(request):
         if target_relative == "":
             return json_error("루트 폴더는 삭제할 수 없습니다.", status=400)
         if not has_docs_write_access(request, target_relative):
-            return json_error("문서를 수정할 권한이 없습니다.", status=403)
+            return json_error("파일을 수정할 권한이 없습니다.", status=403)
         if target_path.is_file() and is_docs_public_write_enabled(request, target_relative):
             return json_error("전체 허용 파일은 삭제할 수 없습니다.", status=403)
         if target_path.is_file():
             try:
                 normalize_file_extension(target_path.suffix.lower())
             except ValueError:
-                return json_error("문서 파일만 삭제할 수 있습니다.", status=400)
+                return json_error("파일만 삭제할 수 있습니다.", status=400)
 
     selected_directory_paths = {
         target_relative
@@ -2045,7 +2331,7 @@ def docs_api_mkdir(request):
     if not parent_path.is_dir():
         return json_error("폴더 생성 위치가 올바르지 않습니다.", status=400)
     if not has_docs_directory_write_access(request, parent_dir):
-        return json_error("문서를 수정할 권한이 없습니다.", status=403)
+        return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
     target_path = parent_path / folder_name
     if target_path.exists():
@@ -2072,11 +2358,11 @@ def docs_api_move(request):
     if not target_dir_path.is_dir():
         return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
     if not has_docs_write_access(request, source_relative):
-        return json_error("문서를 수정할 권한이 없습니다.", status=403)
+        return json_error("파일을 수정할 권한이 없습니다.", status=403)
     if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
         return json_error("전체 허용 파일은 이동할 수 없습니다.", status=403)
     if not has_docs_directory_write_access(request, target_dir_relative):
-        return json_error("문서를 수정할 권한이 없습니다.", status=403)
+        return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
     source_parent_relative = normalize_relative_path(
         str(Path(source_relative).parent).replace("\\", "/"),
@@ -2129,7 +2415,7 @@ def docs_api_preview(request):
                 preview_relative_path, must_exist=True
             )
             if not has_docs_read_access(request, relative_file_path):
-                return json_error("문서를 볼 권한이 없습니다.", status=403)
+                return json_error("파일을 볼 권한이 없습니다.", status=403)
             content = file_path.read_text(encoding="utf-8")
             rendered_html, render_profile = render_docs_content(
                 content,
@@ -2153,7 +2439,7 @@ def docs_api_preview(request):
         preview_extension = normalize_file_extension(payload.get("extension"), allow_empty=True)
         content = payload.get("content", "")
         if not isinstance(content, str):
-            raise ValueError("문서 내용 형식이 올바르지 않습니다.")
+            raise ValueError("내용 형식이 올바르지 않습니다.")
     except ValueError as exc:
         return json_error(str(exc), status=400)
 
@@ -2168,10 +2454,10 @@ def docs_api_preview(request):
             return json_error(str(exc), status=400)
         source_extension = source_path.suffix.lower() if source_path.suffix else DOCS_FILE_EXTENSION
         if not has_docs_write_access(request, source_relative):
-            return json_error("문서를 수정할 권한이 없습니다.", status=403)
+            return json_error("파일을 수정할 권한이 없습니다.", status=403)
     else:
         if not has_docs_directory_write_access(request, ""):
-            return json_error("문서를 수정할 권한이 없습니다.", status=403)
+            return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
     rendered_html, render_profile = render_docs_content(
         content,
@@ -2199,7 +2485,7 @@ def docs_api_save(request):
         requested_extension = normalize_file_extension(payload.get("extension"), allow_empty=True)
         content = payload.get("content", "")
         if not isinstance(content, str):
-            raise ValueError("문서 내용 형식이 올바르지 않습니다.")
+            raise ValueError("내용 형식이 올바르지 않습니다.")
 
         target_dir_path, target_dir_rel = resolve_path(target_dir, must_exist=True)
         if not target_dir_path.is_dir():
@@ -2214,7 +2500,7 @@ def docs_api_save(request):
             )
             source_extension = source_path.suffix.lower() if source_path.suffix else DOCS_FILE_EXTENSION
             if not has_docs_write_access(request, source_relative):
-                return json_error("문서를 수정할 권한이 없습니다.", status=403)
+                return json_error("파일을 수정할 권한이 없습니다.", status=403)
             source_is_public_write = is_docs_public_write_enabled(request, source_relative)
 
         target_extension = requested_extension or source_extension or DOCS_FILE_EXTENSION
@@ -2237,7 +2523,7 @@ def docs_api_save(request):
 
         if source_path is None or not is_same_as_source:
             if not has_docs_directory_write_access(request, target_dir_rel):
-                return json_error("문서를 수정할 권한이 없습니다.", status=403)
+                return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
         if destination.exists():
             if source_path is None or destination.resolve() != source_path.resolve():
@@ -2283,6 +2569,6 @@ def docs_api_download(request):
     except (ValueError, FileNotFoundError):
         raise Http404("다운로드할 파일을 찾을 수 없습니다.")
     if not has_docs_read_access(request, rel_path):
-        raise PermissionDenied("문서를 볼 권한이 없습니다.")
+        raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     return FileResponse(file_path.open("rb"), as_attachment=True, filename=file_path.name)

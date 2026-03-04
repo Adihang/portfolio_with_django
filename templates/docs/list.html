@@ -1,42 +1,49 @@
 {% extends 'base.html' %}
-{% block body_class %}docs-page{% endblock %}
+{% block body_class %}ide-page{% endblock %}
 {% block content %}
 {% include 'docs/_assets_head.html' %}
 
-<div class="docs-toolbar-wrap">
-    <div class="docs-shell docs-toolbar">
-        <div class="docs-toolbar-left">
-            <div class="docs-title-row">
-                <h1 class="docs-title">{{ docs_text.list_title }}</h1>
-                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
+<div class="ide-toolbar-wrap ui-toolbar-wrap">
+    <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
+        <div class="ide-toolbar-left ui-toolbar-left">
+            <div class="ide-title-row ui-title-row">
+                <h1 class="ide-title ui-title">{{ docs_text.list_title }}</h1>
+                <button class="ide-help-icon-link" type="button" id="ide-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="ide-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
-            <div class="docs-subtitle docs-path-breadcrumbs">
+            <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
                 {% for crumb in breadcrumbs %}
-                    {% if not forloop.first %}<span class="docs-path-sep">/</span>{% endif %}
+                    {% if not forloop.first %}<span class="ide-path-sep ui-path-sep">/</span>{% endif %}
                     {% if crumb.is_current %}
-                        <span class="docs-path-current" data-docs-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</span>
+                        <span class="ide-path-current ui-path-current" data-ide-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</span>
                     {% else %}
-                        <a class="docs-path-link" href="{{ crumb.url }}" data-docs-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</a>
+                        <a class="ide-path-link ui-path-link" href="{{ crumb.url }}" data-ide-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</a>
                     {% endif %}
                 {% endfor %}
             </div>
         </div>
-        <div class="docs-toolbar-right">
+        <div class="ide-toolbar-right ui-toolbar-right">
             {% include "docs/_auth_account.html" %}
-            <div class="docs-toolbar-actions">
+            <div class="ide-toolbar-actions ui-toolbar-actions">
                 {% include "docs/_auth_button.html" %}
+                {% if user.is_staff %}
+                <a class="ide-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
+                {% endif %}
+                {% if not user.is_authenticated %}
+                <a class="ide-btn ide-btn-primary" href="{{ docs_signup_url }}">{{ docs_text.auth_signup_button }}</a>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <main
-    class="docs-shell docs-content"
-    data-docs-page="list"
+    class="ide-shell ui-shell ide-content ui-content"
+    data-ide-page="list"
     data-current-dir="{{ current_dir }}"
     data-current-dir-can-edit="{% if current_dir_can_edit %}1{% else %}0{% endif %}"
     data-current-dir-can-write-children="{% if current_dir_can_write_children %}1{% else %}0{% endif %}"
-    data-docs-base-url="{{ docs_base_url }}"
+    data-scoped-home-dir="{{ scoped_home_dir|default:'' }}"
+    data-ide-base-url="{{ docs_base_url }}"
     data-list-api-url="{{ docs_api_list_url }}"
     data-save-api-url="{{ docs_api_save_url }}"
     data-rename-api-url="{{ docs_api_rename_url }}"
@@ -50,59 +57,59 @@
     data-write-url="{{ docs_write_url }}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
-    <div class="docs-list-layout" id="docs-list-layout">
-        <div class="docs-list-pane">
-            <ul id="docs-list" class="docs-list" aria-label="{{ docs_text.list_aria_label }}"></ul>
+    <div class="ide-list-layout" id="ide-list-layout">
+        <div class="ide-list-pane">
+            <ul id="ide-list" class="ide-list" aria-label="{{ docs_text.list_aria_label }}"></ul>
         </div>
-        <aside class="docs-list-preview" id="docs-list-preview" aria-live="polite" aria-hidden="true" hidden>
-            <header class="docs-list-preview-head">
-                <h2 class="docs-list-preview-title" id="docs-list-preview-title">{{ docs_text.list_preview_title }}</h2>
-                <div class="docs-list-preview-actions">
+        <aside class="ide-list-preview" id="ide-list-preview" aria-live="polite" aria-hidden="true" hidden>
+            <header class="ide-list-preview-head">
+                <h2 class="ide-list-preview-title" id="ide-list-preview-title">{{ docs_text.list_preview_title }}</h2>
+                <div class="ide-list-preview-actions">
                     <a
-                        id="docs-list-preview-download-btn"
-                        class="docs-btn docs-list-preview-open-btn"
+                        id="ide-list-preview-download-btn"
+                        class="ide-btn ide-list-preview-open-btn"
                         href="#"
                         hidden
                     >{{ docs_text.download_button }}</a>
                     <a
-                        id="docs-list-preview-edit-btn"
-                        class="docs-btn docs-list-preview-open-btn"
+                        id="ide-list-preview-edit-btn"
+                        class="ide-btn ide-list-preview-open-btn"
                         href="#"
                         hidden
                     >{{ docs_text.edit_button }}</a>
                     <button
-                        id="docs-list-preview-delete-btn"
-                        class="docs-btn docs-list-preview-open-btn"
+                        id="ide-list-preview-delete-btn"
+                        class="ide-btn ide-list-preview-open-btn"
                         type="button"
                         hidden
                     >{{ docs_text.delete_button }}</button>
                 </div>
             </header>
-            <div class="docs-list-preview-body">
-                <article class="docs-markdown docs-list-preview-content" id="docs-list-preview-content">
-                    <p class="docs-list-preview-placeholder">{{ docs_text.list_preview_empty }}</p>
+            <div class="ide-list-preview-body">
+                <article class="ide-markdown ide-list-preview-content" id="ide-list-preview-content">
+                    <p class="ide-list-preview-placeholder">{{ docs_text.list_preview_empty }}</p>
                 </article>
             </div>
         </aside>
         <!-- 편집기 요소 (초기에는 hidden) -->
-        <aside class="docs-list-editor" id="docs-list-editor" aria-live="polite" aria-hidden="true" hidden>
-            <header class="docs-list-editor-head">
-                <div class="docs-list-editor-actions">
-                    <div class="docs-filename-field">
-                        <input type="text" id="docs-list-filename-input" placeholder="{{ docs_text.filename_placeholder }}">
+        <aside class="ide-list-editor" id="ide-list-editor" aria-live="polite" aria-hidden="true" hidden>
+            <header class="ide-list-editor-head">
+                <div class="ide-list-editor-actions">
+                    <div class="ide-filename-field">
+                        <input type="text" id="ide-list-filename-input" placeholder="{{ docs_text.filename_placeholder }}">
                     </div>
-                    <button class="docs-btn" type="button" id="docs-list-cancel-btn">{{ docs_text.cancel }}</button>
-                    <button class="docs-btn docs-btn-primary" type="button" id="docs-list-save-btn">{{ docs_text.save_button }}</button>
+                    <button class="ide-btn" type="button" id="ide-list-cancel-btn">{{ docs_text.cancel }}</button>
+                    <button class="ide-btn ide-btn-primary" type="button" id="ide-list-save-btn">{{ docs_text.save_button }}</button>
                 </div>
             </header>
-            <div class="docs-list-editor-body">
-                <div class="docs-editor-surface" id="docs-list-editor-surface">
-                    <pre class="docs-editor-highlight docs-plain-text" id="docs-list-editor-highlight" aria-hidden="true"><code id="docs-list-editor-highlight-code"></code></pre>
-                    <div class="docs-editor-suggest" id="docs-list-editor-suggest" hidden>
-                        <span class="docs-editor-suggest-label" id="docs-list-editor-suggest-label"></span>
-                        <span class="docs-editor-suggest-hint"><kbd>Tab</kbd> 적용</span>
+            <div class="ide-list-editor-body">
+                <div class="ide-editor-surface" id="ide-list-editor-surface">
+                    <pre class="ide-editor-highlight ide-plain-text" id="ide-list-editor-highlight" aria-hidden="true"><code id="ide-list-editor-highlight-code"></code></pre>
+                    <div class="ide-editor-suggest" id="ide-list-editor-suggest" hidden>
+                        <span class="ide-editor-suggest-label" id="ide-list-editor-suggest-label"></span>
+                        <span class="ide-editor-suggest-hint"><kbd>Tab</kbd> 적용</span>
                     </div>
-                    <textarea id="docs-list-content-input" spellcheck="false" wrap="off"></textarea>
+                    <textarea id="ide-list-content-input" spellcheck="false" wrap="off"></textarea>
                 </div>
             </div>
         </aside>
@@ -122,7 +129,7 @@
 {% include "popup/docs/auth_logout_modal.html" %}
 {% include "popup/docs/page_help_modal.html" %}
 
-{{ docs_text|json_script:"docs-i18n" }}
-{{ initial_entries|json_script:"docs-initial-entries" }}
+{{ docs_text|json_script:"ide-i18n" }}
+{{ initial_entries|json_script:"ide-initial-entries" }}
 {% include 'docs/_assets_script.html' %}
 {% endblock %}

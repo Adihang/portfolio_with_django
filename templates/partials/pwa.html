@@ -1,0 +1,20 @@
+{% load static static_versioned %}
+<!-- PWA metadata for installable app behavior -->
+<meta name="theme-color" content="#0d6efd">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="{% static_v 'favicon.png' %}">
+<script>
+    (function () {
+        if (!('serviceWorker' in navigator)) {
+            return;
+        }
+
+        window.addEventListener('load', function () {
+            // Register once on load; failures are non-blocking for normal page use.
+            navigator.serviceWorker.register('/service-worker.js')
+                .catch(function (error) {
+                    console.warn('[pwa] service worker registration failed:', error);
+                });
+        });
+    })();
+</script>

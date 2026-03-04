@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block body_class %}ide-page{% endblock %}
+{% block content %}
+{% include 'docs/_assets_head.html' %}
+
+<div class="ide-toolbar-wrap ui-toolbar-wrap">
+    <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
+        <div class="ide-toolbar-left ui-toolbar-left">
+            <h1 class="ide-title ui-title">{{ docs_text.auth_signup_title }}</h1>
+            <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
+                <a class="ide-path-link ui-path-link" href="{{ docs_base_url }}">ide</a>
+                <span class="ide-path-sep ui-path-sep">/</span>
+                <span class="ide-path-current ui-path-current">{{ docs_text.auth_signup_button }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="ide-shell ui-shell ide-content ui-content">
+    <form method="post" class="ide-login-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ docs_signup_next }}">
+
+        {% if docs_signup_error_message or docs_signup_form.non_field_errors %}
+            <div class="ide-login-error">{{ docs_signup_error_message|default:docs_text.auth_signup_error }}</div>
+        {% endif %}
+
+        <label class="ide-field ide-field-full">
+            <span>{{ docs_text.auth_username_label }}</span>
+            {{ docs_signup_form.username }}
+        </label>
+        {% if docs_signup_form.username.errors %}
+            <div class="ide-login-error">{{ docs_signup_form.username.errors|join:", " }}</div>
+        {% endif %}
+
+        <label class="ide-field ide-field-full">
+            <span>{{ docs_text.auth_password_label }}</span>
+            {{ docs_signup_form.password1 }}
+        </label>
+        {% if docs_signup_form.password1.errors %}
+            <div class="ide-login-error">{{ docs_signup_form.password1.errors|join:", " }}</div>
+        {% endif %}
+
+        <label class="ide-field ide-field-full">
+            <span>{{ docs_text.auth_password_confirm_label }}</span>
+            {{ docs_signup_form.password2 }}
+        </label>
+        {% if docs_signup_form.password2.errors %}
+            <div class="ide-login-error">{{ docs_signup_form.password2.errors|join:", " }}</div>
+        {% endif %}
+
+        <label class="ide-field ide-field-full">
+            <span>{{ docs_text.auth_name_label }}</span>
+            {{ docs_signup_form.first_name }}
+        </label>
+        {% if docs_signup_form.first_name.errors %}
+            <div class="ide-login-error">{{ docs_signup_form.first_name.errors|join:", " }}</div>
+        {% endif %}
+
+        <label class="ide-field ide-field-full">
+            <span>{{ docs_text.auth_email_label }}</span>
+            {{ docs_signup_form.email }}
+        </label>
+        {% if docs_signup_form.email.errors %}
+            <div class="ide-login-error">{{ docs_signup_form.email.errors|join:", " }}</div>
+        {% endif %}
+
+        <div class="ide-login-actions">
+            <a class="ide-btn" href="{{ docs_login_url }}">{{ docs_text.cancel }}</a>
+            <button class="ide-btn ide-btn-primary" type="submit">{{ docs_text.auth_signup_submit }}</button>
+        </div>
+    </form>
+</main>
+{% endblock %}

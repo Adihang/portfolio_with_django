@@ -2,12 +2,12 @@
     "use strict";
 
     // 문서 페이지 루트 요소 확인
-    const root = document.querySelector("[data-docs-page]");
+    const root = document.querySelector("[data-ide-page]");
     if (!root) {
         return;
     }
 
-    const pageType = root.dataset.docsPage;
+    const pageType = root.dataset.idePage;
 
     // CSRF 토큰을 가져오는 함수
     function getCsrfToken() {
@@ -130,7 +130,7 @@
         }
     }
 
-    const i18n = getJsonScriptData("docs-i18n", {});
+    const i18n = getJsonScriptData("ide-i18n", {});
 
     // 다국어 텍스트를 가져오는 함수
     function t(key, fallbackValue) {
@@ -164,16 +164,16 @@
         if (!targetElement || !(targetElement instanceof Element)) {
             return;
         }
-        targetElement.classList.remove("docs-markdown", "docs-plain-text", "docs-json", "docs-html", "docs-css", "docs-js", "docs-py");
-        if (renderClass === "docs-json" || renderClass === "docs-html" || renderClass === "docs-css" || renderClass === "docs-js" || renderClass === "docs-py") {
+        targetElement.classList.remove("ide-markdown", "ide-plain-text", "ide-json", "ide-html", "ide-css", "ide-js", "ide-py");
+        if (renderClass === "ide-json" || renderClass === "ide-html" || renderClass === "ide-css" || renderClass === "ide-js" || renderClass === "ide-py") {
             targetElement.classList.add(renderClass);
             return;
         }
         if (renderMode === "markdown") {
-            targetElement.classList.add("docs-markdown");
+            targetElement.classList.add("ide-markdown");
             return;
         }
-        targetElement.classList.add("docs-plain-text");
+        targetElement.classList.add("ide-plain-text");
     }
 
     // HTML을 이스케이프하는 함수
@@ -225,37 +225,130 @@
     if (!window.__docsEditorCompletionMap) {
         window.__docsEditorCompletionMap = {
             ".md": [
-                { trigger: "head", insertText: "## ", label: "## Heading" },
-                { trigger: "head1", insertText: "# ", label: "# Heading 1" },
-                { trigger: "head3", insertText: "### ", label: "### Heading 3" },
-                { trigger: "bold", insertText: "**text**", label: "**bold**", cursorBack: 6 },
-                { trigger: "italic", insertText: "*text*", label: "*italic*", cursorBack: 5 },
-                { trigger: "link", insertText: "[text](url)", label: "[text](url)", cursorBack: 4 },
-                { trigger: "code", insertText: "```\n\n```", label: "code block", cursorBack: 4 },
+                { trigger: "head", insertText: "## ", label: "## Heading", priority: 100 },
+                { trigger: "head1", insertText: "# ", label: "# Heading 1", priority: 99 },
+                { trigger: "head3", insertText: "### ", label: "### Heading 3", priority: 97 },
+                { trigger: "bold", insertText: "**text**", label: "**bold**", cursorBack: 6, priority: 93 },
+                { trigger: "italic", insertText: "*text*", label: "*italic*", cursorBack: 5, priority: 92 },
+                { trigger: "link", insertText: "[text](url)", label: "[text](url)", cursorBack: 4, priority: 94 },
+                { trigger: "code", insertText: "```\n\n```", label: "code block", cursorBack: 4, priority: 91 },
             ],
             ".py": [
-                { trigger: "def", insertText: "def function_name():\n    pass", label: "def ...", cursorBack: 8 },
-                { trigger: "class", insertText: "class ClassName:\n    def __init__(self):\n        pass", label: "class ...", cursorBack: 39 },
+                { trigger: "def", insertText: "def function_name():\n    pass", label: "def ...", cursorBack: 8, priority: 98 },
+                { trigger: "class", insertText: "class ClassName:\n    def __init__(self):\n        pass", label: "class ...", cursorBack: 39, priority: 97 },
                 { trigger: "ifmain", insertText: "if __name__ == \"__main__\":\n    main()", label: "if __name__...", cursorBack: 6 },
+                { trigger: "import", insertText: "import ", label: "import ", priority: 100 },
+                { trigger: "from", insertText: "from ", label: "from ", priority: 99 },
+                { trigger: "return", insertText: "return ", label: "return ", priority: 96 },
+                { trigger: "string", insertText: "str()", label: "str()", cursorBack: 1, priority: 88 },
+                { trigger: "str", insertText: "str()", label: "str()", cursorBack: 1, priority: 88 },
+                { trigger: "int", insertText: "int()", label: "int()", cursorBack: 1, priority: 89 },
+                { trigger: "float", insertText: "float()", label: "float()", cursorBack: 1 },
+                { trigger: "bool", insertText: "bool()", label: "bool()", cursorBack: 1 },
+                { trigger: "list", insertText: "list()", label: "list()", cursorBack: 1, priority: 87 },
+                { trigger: "dict", insertText: "dict()", label: "dict()", cursorBack: 1, priority: 86 },
+                { trigger: "set", insertText: "set()", label: "set()", cursorBack: 1 },
+                { trigger: "tuple", insertText: "tuple()", label: "tuple()", cursorBack: 1 },
+                { trigger: "if", insertText: "if :\n    ", label: "if :", cursorBack: 1, priority: 95 },
+                { trigger: "elif", insertText: "elif :\n    ", label: "elif :", cursorBack: 1 },
+                { trigger: "else", insertText: "else:\n    ", label: "else:" },
+                { trigger: "for", insertText: "for  in :\n    ", label: "for ... in ...", cursorBack: 6, priority: 94 },
+                { trigger: "while", insertText: "while :\n    ", label: "while :", cursorBack: 1, priority: 93 },
+                { trigger: "try", insertText: "try:\n    \nexcept Exception as e:\n    ", label: "try/except", cursorBack: 14, priority: 92 },
+                { trigger: "with", insertText: "with  as :\n    ", label: "with ... as ...", cursorBack: 6, priority: 91 },
+                { trigger: "pass", insertText: "pass", label: "pass" },
+                { trigger: "break", insertText: "break", label: "break" },
+                { trigger: "continue", insertText: "continue", label: "continue" },
+                { trigger: "print", insertText: "print()", label: "print()", cursorBack: 1, priority: 90 },
+                { trigger: "len", insertText: "len()", label: "len()", cursorBack: 1, priority: 85 },
+                { trigger: "range", insertText: "range()", label: "range()", cursorBack: 1, priority: 84 },
+                { trigger: "isinstance", insertText: "isinstance()", label: "isinstance()", cursorBack: 1 },
             ],
             ".js": [
-                { trigger: "function", insertText: "function functionName(params) {\n    \n}", label: "function ...", cursorBack: 3 },
-                { trigger: "if", insertText: "if (condition) {\n    \n}", label: "if (...) { }", cursorBack: 3 },
+                { trigger: "function", insertText: "function functionName(params) {\n    \n}", label: "function ...", cursorBack: 3, priority: 98 },
+                { trigger: "if", insertText: "if (condition) {\n    \n}", label: "if (...) { }", cursorBack: 3, priority: 97 },
             ],
             ".css": [
-                { trigger: "rule", insertText: ".selector {\n    property: value;\n}", label: ".selector { }", cursorBack: 23 },
-                { trigger: "media", insertText: "@media (max-width: 768px) {\n    \n}", label: "@media ...", cursorBack: 3 },
+                { trigger: "rule", insertText: ".selector {\n    property: value;\n}", label: ".selector { }", cursorBack: 23, priority: 100 },
+                { trigger: "media", insertText: "@media (max-width: 768px) {\n    \n}", label: "@media ...", cursorBack: 3, priority: 89 },
                 { trigger: "var", insertText: ":root {\n    --color-name: #000;\n}", label: ":root vars", cursorBack: 17 },
             ],
             ".json": [
-                { trigger: "pair", insertText: "\"key\": \"value\"", label: "\"key\": \"value\"", cursorBack: 10 },
-                { trigger: "object", insertText: "{\n  \"key\": \"value\"\n}", label: "{ ... }", cursorBack: 5 },
+                { trigger: "pair", insertText: "\"key\": \"value\"", label: "\"key\": \"value\"", cursorBack: 10, priority: 98 },
+                { trigger: "object", insertText: "{\n  \"key\": \"value\"\n}", label: "{ ... }", cursorBack: 5, priority: 100 },
             ],
             ".html": [
-                { trigger: "doctype", insertText: "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title></title>\n</head>\n<body>\n  \n</body>\n</html>", label: "HTML boilerplate", cursorBack: 92 },
-                { trigger: "div", insertText: "<div class=\"\">\n  \n</div>", label: "<div>", cursorBack: 12 },
+                { trigger: "doctype", insertText: "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title></title>\n</head>\n<body>\n  \n</body>\n</html>", label: "HTML boilerplate", cursorBack: 92, priority: 95 },
+                { trigger: "div", insertText: "<div class=\"\">\n  \n</div>", label: "<div>", cursorBack: 12, priority: 100 },
             ]
         };
+    }
+
+    function extractEditorCompletionToken(sourceText, cursorIndex) {
+        const text = String(sourceText || "");
+        const cursor = Math.max(0, Number(cursorIndex || 0));
+        const prefix = text.slice(0, cursor);
+        const match = prefix.match(/([A-Za-z0-9_][A-Za-z0-9_-]*)$/);
+        if (!match || !match[1]) {
+            return null;
+        }
+        const token = match[1];
+        return {
+            token: token,
+            start: cursor - token.length,
+            end: cursor,
+        };
+    }
+
+    function findBestEditorCompletionItem(completionItems, tokenText) {
+        const matches = findEditorCompletionItems(completionItems, tokenText, 1);
+        return matches.length ? matches[0] : null;
+    }
+
+    function findEditorCompletionItems(completionItems, tokenText, limit) {
+        const normalizedToken = String(tokenText || "").toLowerCase();
+        if (!normalizedToken || !Array.isArray(completionItems) || completionItems.length === 0) {
+            return [];
+        }
+
+        const candidates = [];
+        for (let i = 0; i < completionItems.length; i += 1) {
+            const item = completionItems[i] || {};
+            const trigger = String(item.trigger || "").toLowerCase();
+            if (!trigger || !trigger.startsWith(normalizedToken)) {
+                continue;
+            }
+            candidates.push({
+                item: item,
+                trigger: trigger,
+            });
+        }
+
+        if (candidates.length === 0) {
+            return [];
+        }
+
+        candidates.sort(function (a, b) {
+            const aExact = a.trigger === normalizedToken ? 1 : 0;
+            const bExact = b.trigger === normalizedToken ? 1 : 0;
+            if (aExact !== bExact) {
+                return bExact - aExact;
+            }
+            const aPriority = Number((a.item && a.item.priority) || 0);
+            const bPriority = Number((b.item && b.item.priority) || 0);
+            if (aPriority !== bPriority) {
+                return bPriority - aPriority;
+            }
+            if (a.trigger.length !== b.trigger.length) {
+                return a.trigger.length - b.trigger.length;
+            }
+            return a.trigger.localeCompare(b.trigger);
+        });
+
+        const maxItems = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : candidates.length;
+        return candidates.slice(0, maxItems).map(function (candidate) {
+            return candidate.item;
+        });
     }
 
     // JavaScript 코드를 하이라이팅하는 함수
@@ -281,26 +374,26 @@
         let text = escapeHtml(source);
 
         text = text.replace(/\/\*[\s\S]*?\*\//g, function (match) {
-            return putPlaceholder('<span class="docs-js-token-comment">' + match + "</span>");
+            return putPlaceholder('<span class="ide-js-token-comment">' + match + "</span>");
         });
         text = text.replace(/(^|[^\S\r\n])\/\/[^\r\n]*/g, function (match) {
-            return putPlaceholder('<span class="docs-js-token-comment">' + match + "</span>");
+            return putPlaceholder('<span class="ide-js-token-comment">' + match + "</span>");
         });
         text = text.replace(/(["'`])(?:\\[\s\S]|(?!\1)[^\\])*\1/g, function (match) {
-            return putPlaceholder('<span class="docs-js-token-string">' + match + "</span>");
+            return putPlaceholder('<span class="ide-js-token-string">' + match + "</span>");
         });
 
-        text = text.replace(/\b(\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/gi, '<span class="docs-js-token-number">$1</span>');
+        text = text.replace(/\b(\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/gi, '<span class="ide-js-token-number">$1</span>');
         text = text.replace(
             /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|import|from|export|default|try|catch|finally|throw|async|await|typeof|instanceof|in|of|void|delete)\b/g,
-            '<span class="docs-js-token-keyword">$1</span>'
+            '<span class="ide-js-token-keyword">$1</span>'
         );
-        text = text.replace(/\b(true|false|null|undefined|this|super)\b/g, '<span class="docs-js-token-literal">$1</span>');
+        text = text.replace(/\b(true|false|null|undefined|this|super)\b/g, '<span class="ide-js-token-literal">$1</span>');
         text = text.replace(
             /\b(Array|Object|String|Number|Boolean|Date|Math|JSON|Promise|Map|Set|RegExp|Error|console|window|document)\b/g,
-            '<span class="docs-js-token-builtin">$1</span>'
+            '<span class="ide-js-token-builtin">$1</span>'
         );
-        text = text.replace(/(\b[a-zA-Z_$][\w$]*)(\s*\()/g, '<span class="docs-js-token-function">$1</span>$2');
+        text = text.replace(/(\b[a-zA-Z_$][\w$]*)(\s*\()/g, '<span class="ide-js-token-function">$1</span>$2');
 
         return restorePlaceholders(text);
     }
@@ -328,19 +421,19 @@
         let text = escapeHtml(source);
 
         text = text.replace(/\/\*[\s\S]*?\*\//g, function (match) {
-            return putPlaceholder('<span class="docs-css-token-comment">' + match + "</span>");
+            return putPlaceholder('<span class="ide-css-token-comment">' + match + "</span>");
         });
         text = text.replace(/(["'])(?:\\[\s\S]|(?!\1)[^\\])*\1/g, function (match) {
-            return putPlaceholder('<span class="docs-css-token-string">' + match + "</span>");
+            return putPlaceholder('<span class="ide-css-token-string">' + match + "</span>");
         });
 
         text = text.replace(/(^|[}\s])([#.:\w\-\[\]=\*>\+\~,]+)(\s*\{)/g, function (_, p1, selectorText, p3) {
-            return p1 + '<span class="docs-css-token-selector">' + selectorText + "</span>" + p3;
+            return p1 + '<span class="ide-css-token-selector">' + selectorText + "</span>" + p3;
         });
-        text = text.replace(/(--[\w-]+)(\s*:)/g, '<span class="docs-css-token-variable">$1</span>$2');
-        text = text.replace(/([a-z-]+)(\s*:)/gi, '<span class="docs-css-token-property">$1</span>$2');
-        text = text.replace(/(:\s*)(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]+\)|hsla?\([^)]+\)|\b[a-zA-Z]+\b)/g, '$1<span class="docs-css-token-value">$2</span>');
-        text = text.replace(/(-?\d+(?:\.\d+)?)(px|em|rem|vh|vw|%|deg|s|ms)?\b/g, '<span class="docs-css-token-number">$1$2</span>');
+        text = text.replace(/(--[\w-]+)(\s*:)/g, '<span class="ide-css-token-variable">$1</span>$2');
+        text = text.replace(/([a-z-]+)(\s*:)/gi, '<span class="ide-css-token-property">$1</span>$2');
+        text = text.replace(/(:\s*)(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]+\)|hsla?\([^)]+\)|\b[a-zA-Z]+\b)/g, '$1<span class="ide-css-token-value">$2</span>');
+        text = text.replace(/(-?\d+(?:\.\d+)?)(px|em|rem|vh|vw|%|deg|s|ms)?\b/g, '<span class="ide-css-token-number">$1$2</span>');
 
         return restorePlaceholders(text);
     }
@@ -368,14 +461,14 @@
         let text = escapeHtml(source);
 
         text = text.replace(/"(?:\\.|[^"\\])*"(?=\s*:)/g, function (match) {
-            return putPlaceholder('<span class="docs-json-token-key">' + match + "</span>");
+            return putPlaceholder('<span class="ide-json-token-key">' + match + "</span>");
         });
         text = text.replace(/"(?:\\.|[^"\\])*"/g, function (match) {
-            return putPlaceholder('<span class="docs-json-token-string">' + match + "</span>");
+            return putPlaceholder('<span class="ide-json-token-string">' + match + "</span>");
         });
-        text = text.replace(/\b(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/gi, '<span class="docs-json-token-number">$1</span>');
-        text = text.replace(/\b(true|false|null)\b/g, '<span class="docs-json-token-literal">$1</span>');
-        text = text.replace(/([{}\[\],:])/g, '<span class="docs-json-token-punctuation">$1</span>');
+        text = text.replace(/\b(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/gi, '<span class="ide-json-token-number">$1</span>');
+        text = text.replace(/\b(true|false|null)\b/g, '<span class="ide-json-token-literal">$1</span>');
+        text = text.replace(/([{}\[\],:])/g, '<span class="ide-json-token-punctuation">$1</span>');
 
         return restorePlaceholders(text);
     }
@@ -403,28 +496,28 @@
         let text = escapeHtml(source);
 
         text = text.replace(/("""[\s\S]*?"""|'''[\s\S]*?''')/g, function (match) {
-            return putPlaceholder('<span class="docs-py-token-string">' + match + "</span>");
+            return putPlaceholder('<span class="ide-py-token-string">' + match + "</span>");
         });
         text = text.replace(/#[^\r\n]*/g, function (match) {
-            return putPlaceholder('<span class="docs-py-token-comment">' + match + "</span>");
+            return putPlaceholder('<span class="ide-py-token-comment">' + match + "</span>");
         });
         text = text.replace(/(["'])(?:\\[\s\S]|(?!\1)[^\\])*\1/g, function (match) {
-            return putPlaceholder('<span class="docs-py-token-string">' + match + "</span>");
+            return putPlaceholder('<span class="ide-py-token-string">' + match + "</span>");
         });
 
-        text = text.replace(/(^|\s)(@[a-zA-Z_][\w.]*)/g, '$1<span class="docs-py-token-decorator">$2</span>');
-        text = text.replace(/\b(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/gi, '<span class="docs-py-token-number">$1</span>');
+        text = text.replace(/(^|\s)(@[a-zA-Z_][\w.]*)/g, '$1<span class="ide-py-token-decorator">$2</span>');
+        text = text.replace(/\b(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/gi, '<span class="ide-py-token-number">$1</span>');
         text = text.replace(
             /\b(def|class|return|if|elif|else|for|while|break|continue|try|except|finally|raise|import|from|as|with|pass|yield|lambda|global|nonlocal|assert|del|in|is|and|or|not|async|await|match|case)\b/g,
-            '<span class="docs-py-token-keyword">$1</span>'
+            '<span class="ide-py-token-keyword">$1</span>'
         );
-        text = text.replace(/\b(True|False|None)\b/g, '<span class="docs-py-token-literal">$1</span>');
+        text = text.replace(/\b(True|False|None)\b/g, '<span class="ide-py-token-literal">$1</span>');
         text = text.replace(
             /\b(len|range|str|int|float|dict|list|set|tuple|print|open|type|isinstance|enumerate|zip|map|filter|sum|min|max|abs|sorted|reversed|any|all)\b/g,
-            '<span class="docs-py-token-builtin">$1</span>'
+            '<span class="ide-py-token-builtin">$1</span>'
         );
-        text = text.replace(/\b(def)\s+([a-zA-Z_][\w]*)/g, '$1 <span class="docs-py-token-function">$2</span>');
-        text = text.replace(/\b(class)\s+([a-zA-Z_][\w]*)/g, '$1 <span class="docs-py-token-class">$2</span>');
+        text = text.replace(/\b(def)\s+([a-zA-Z_][\w]*)/g, '$1 <span class="ide-py-token-function">$2</span>');
+        text = text.replace(/\b(class)\s+([a-zA-Z_][\w]*)/g, '$1 <span class="ide-py-token-class">$2</span>');
 
         return restorePlaceholders(text);
     }
@@ -452,10 +545,10 @@
         let text = escapeHtml(source);
 
         text = text.replace(/&lt;!--[\s\S]*?--&gt;/g, function (match) {
-            return putPlaceholder('<span class="docs-html-token-comment">' + match + "</span>");
+            return putPlaceholder('<span class="ide-html-token-comment">' + match + "</span>");
         });
         text = text.replace(/(["'])(?:\\[\s\S]|(?!\1)[^\\])*\1/g, function (match) {
-            return putPlaceholder('<span class="docs-html-token-string">' + match + "</span>");
+            return putPlaceholder('<span class="ide-html-token-string">' + match + "</span>");
         });
         text = text.replace(
             /(&lt;\/?)([a-zA-Z][\w:-]*)([\s\S]*?)(&gt;)/g,
@@ -463,13 +556,13 @@
                 let highlightedAttributes = attributes;
                 highlightedAttributes = highlightedAttributes.replace(
                     /(\s)([a-zA-Z_:][\w:.-]*)(\s*=\s*)/g,
-                    '$1<span class="docs-html-token-attr">$2</span>$3'
+                    '$1<span class="ide-html-token-attr">$2</span>$3'
                 );
                 return (
-                    '<span class="docs-html-token-punctuation">' + open + "</span>" +
-                    '<span class="docs-html-token-tag">' + tagName + "</span>" +
+                    '<span class="ide-html-token-punctuation">' + open + "</span>" +
+                    '<span class="ide-html-token-tag">' + tagName + "</span>" +
                     highlightedAttributes +
-                    '<span class="docs-html-token-punctuation">' + close + "</span>"
+                    '<span class="ide-html-token-punctuation">' + close + "</span>"
                 );
             }
         );
@@ -500,26 +593,26 @@
         let text = escapeHtml(source);
 
         text = text.replace(/```[\s\S]*?```/g, function (match) {
-            return putPlaceholder('<span class="docs-md-src-token-codeblock">' + match + "</span>");
+            return putPlaceholder('<span class="ide-md-src-token-codeblock">' + match + "</span>");
         });
         text = text.replace(/`[^`\r\n]+`/g, function (match) {
-            return putPlaceholder('<span class="docs-md-src-token-code">' + match + "</span>");
+            return putPlaceholder('<span class="ide-md-src-token-code">' + match + "</span>");
         });
         text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, label, url) {
             return (
-                '<span class="docs-md-src-token-link">[' +
+                '<span class="ide-md-src-token-link">[' +
                 label +
                 "](" +
                 url +
                 ")</span>"
             );
         });
-        text = text.replace(/^(\s{0,3}#{1,6}\s+)/gm, '<span class="docs-md-src-token-heading">$1</span>');
-        text = text.replace(/^(\s{0,3}(?:[-*+]|\d+\.)\s+)/gm, '<span class="docs-md-src-token-list">$1</span>');
-        text = text.replace(/^(\s{0,3}&gt;\s?)/gm, '<span class="docs-md-src-token-quote">$1</span>');
-        text = text.replace(/^(\s{0,3}(?:[-*_])(?:\s*[-*_]){2,}\s*)$/gm, '<span class="docs-md-src-token-hr">$1</span>');
-        text = text.replace(/(\*\*|__)(.+?)\1/g, '<span class="docs-md-src-token-strong">$1$2$1</span>');
-        text = text.replace(/(\*|_)([^*_][^]*?)\1/g, '<span class="docs-md-src-token-em">$1$2$1</span>');
+        text = text.replace(/^(\s{0,3}#{1,6}\s+)/gm, '<span class="ide-md-src-token-heading">$1</span>');
+        text = text.replace(/^(\s{0,3}(?:[-*+]|\d+\.)\s+)/gm, '<span class="ide-md-src-token-list">$1</span>');
+        text = text.replace(/^(\s{0,3}&gt;\s?)/gm, '<span class="ide-md-src-token-quote">$1</span>');
+        text = text.replace(/^(\s{0,3}(?:[-*_])(?:\s*[-*_]){2,}\s*)$/gm, '<span class="ide-md-src-token-hr">$1</span>');
+        text = text.replace(/(\*\*|__)(.+?)\1/g, '<span class="ide-md-src-token-strong">$1$2$1</span>');
+        text = text.replace(/(\*|_)([^*_][^]*?)\1/g, '<span class="ide-md-src-token-em">$1$2$1</span>');
 
         return restorePlaceholders(text);
     }
@@ -536,16 +629,16 @@
         const languageValue = languageClass ? languageClass.replace(/^language-/i, "") : "";
         const normalized = String(languageValue || "").toLowerCase();
         if (normalized === "js" || normalized === "javascript" || normalized === "mjs" || normalized === "cjs") {
-            return "docs-js";
+            return "ide-js";
         }
         if (normalized === "css") {
-            return "docs-css";
+            return "ide-css";
         }
         if (normalized === "json" || normalized === "jsonc") {
-            return "docs-json";
+            return "ide-json";
         }
         if (normalized === "py" || normalized === "python" || normalized === "py3" || normalized === "pyi") {
-            return "docs-py";
+            return "ide-py";
         }
         return "";
     }
@@ -556,11 +649,11 @@
             return;
         }
         if (
-            renderClass !== "docs-js" &&
-            renderClass !== "docs-css" &&
-            renderClass !== "docs-json" &&
-            renderClass !== "docs-py" &&
-            renderClass !== "docs-markdown"
+            renderClass !== "ide-js" &&
+            renderClass !== "ide-css" &&
+            renderClass !== "ide-json" &&
+            renderClass !== "ide-py" &&
+            renderClass !== "ide-markdown"
         ) {
             return;
         }
@@ -570,26 +663,26 @@
             if (!(codeNode instanceof HTMLElement)) {
                 return;
             }
-            if (codeNode.dataset.docsCodeHighlighted === "1") {
+            if (codeNode.dataset.ideCodeHighlighted === "1") {
                 return;
             }
-            const effectiveRenderClass = renderClass === "docs-markdown"
+            const effectiveRenderClass = renderClass === "ide-markdown"
                 ? detectCodeLanguageClass(codeNode)
                 : renderClass;
             if (!effectiveRenderClass) {
                 return;
             }
             const source = codeNode.textContent || "";
-            if (effectiveRenderClass === "docs-js") {
+            if (effectiveRenderClass === "ide-js") {
                 codeNode.innerHTML = highlightJavaScriptCode(source);
-            } else if (effectiveRenderClass === "docs-css") {
+            } else if (effectiveRenderClass === "ide-css") {
                 codeNode.innerHTML = highlightCssCode(source);
-            } else if (effectiveRenderClass === "docs-py") {
+            } else if (effectiveRenderClass === "ide-py") {
                 codeNode.innerHTML = highlightPythonCode(source);
             } else {
                 codeNode.innerHTML = highlightJsonCode(source);
             }
-            codeNode.dataset.docsCodeHighlighted = "1";
+            codeNode.dataset.ideCodeHighlighted = "1";
         });
     }
 
@@ -597,24 +690,24 @@
     function hasOpenDocsModal() {
         return Boolean(
             document.querySelector(
-                ".docs-rename-modal:not([hidden]), .docs-save-modal:not([hidden]), .docs-help-modal:not([hidden]), .docs-folder-modal:not([hidden])"
+                ".ide-rename-modal:not([hidden]), .ide-save-modal:not([hidden]), .ide-help-modal:not([hidden]), .ide-folder-modal:not([hidden])"
             )
         );
     }
 
     // 문서 모달 바디 상태를 동기화하는 함수
     function syncDocsModalBodyState() {
-        document.body.classList.toggle("docs-modal-open", hasOpenDocsModal());
+        document.body.classList.toggle("ide-modal-open", hasOpenDocsModal());
     }
 
     // 문서 확인 다이얼로그를 생성하는 함수
     function createDocsConfirmDialog() {
-        const confirmModal = document.getElementById("docs-confirm-modal");
-        const confirmBackdrop = document.getElementById("docs-confirm-modal-backdrop");
-        const confirmTitle = document.getElementById("docs-confirm-title");
-        const confirmMessage = document.getElementById("docs-confirm-message");
-        const confirmCancelButton = document.getElementById("docs-confirm-cancel-btn");
-        const confirmConfirmButton = document.getElementById("docs-confirm-confirm-btn");
+        const confirmModal = document.getElementById("ide-confirm-modal");
+        const confirmBackdrop = document.getElementById("ide-confirm-modal-backdrop");
+        const confirmTitle = document.getElementById("ide-confirm-title");
+        const confirmMessage = document.getElementById("ide-confirm-message");
+        const confirmCancelButton = document.getElementById("ide-confirm-cancel-btn");
+        const confirmConfirmButton = document.getElementById("ide-confirm-confirm-btn");
 
         if (
             !confirmModal ||
@@ -706,9 +799,9 @@
 
     // 문서 페이지 도움말 모달을 초기화하는 함수
     function initializeDocsPageHelpModal() {
-        const pageHelpButton = document.getElementById("docs-page-help-btn");
-        const pageHelpModal = document.getElementById("docs-page-help-modal");
-        const pageHelpBackdrop = document.getElementById("docs-page-help-backdrop");
+        const pageHelpButton = document.getElementById("ide-page-help-btn");
+        const pageHelpModal = document.getElementById("ide-page-help-modal");
+        const pageHelpBackdrop = document.getElementById("ide-page-help-backdrop");
         if (!pageHelpButton || !pageHelpModal || !pageHelpBackdrop) {
             return;
         }
@@ -750,17 +843,17 @@
 
     // 문서 인증 상호작용을 초기화하는 함수
     function initializeDocsAuthInteraction() {
-        const logoutTrigger = document.querySelector("[data-docs-logout-trigger]");
-        const logoutForm = document.getElementById("docs-auth-logout-form");
+        const logoutTrigger = document.querySelector("[data-ide-logout-trigger]");
+        const logoutForm = document.getElementById("ide-auth-logout-form");
         if (!logoutTrigger || !logoutForm) {
             return;
         }
 
-        const logoutModal = document.getElementById("docs-auth-logout-modal");
-        const logoutModalBackdrop = document.getElementById("docs-auth-logout-modal-backdrop");
-        const logoutCancelButton = document.getElementById("docs-auth-logout-cancel-btn");
-        const logoutConfirmButton = document.getElementById("docs-auth-logout-confirm-btn");
-        const logoutMessage = document.getElementById("docs-auth-logout-message");
+        const logoutModal = document.getElementById("ide-auth-logout-modal");
+        const logoutModalBackdrop = document.getElementById("ide-auth-logout-modal-backdrop");
+        const logoutCancelButton = document.getElementById("ide-auth-logout-cancel-btn");
+        const logoutConfirmButton = document.getElementById("ide-auth-logout-confirm-btn");
+        const logoutMessage = document.getElementById("ide-auth-logout-message");
 
         let lastFocusedElement = null;
 
@@ -833,16 +926,16 @@
 
     // 문서 툴바 자동 축소를 초기화하는 함수
     function initializeDocsToolbarAutoCollapse() {
-        const toolbar = document.querySelector(".docs-toolbar-wrap .docs-toolbar");
+        const toolbar = document.querySelector(".ide-toolbar-wrap .ide-toolbar");
         if (!toolbar) {
             return;
         }
 
         const toolbarChildren = Array.from(toolbar.children).filter(function (child) {
-            return child && child.nodeType === 1 && !child.hasAttribute("data-docs-auth-account");
+            return child && child.nodeType === 1 && !child.hasAttribute("data-ide-auth-account");
         });
         if (toolbarChildren.length < 2) {
-            toolbar.classList.remove("docs-toolbar-auto-collapsed");
+            toolbar.classList.remove("ide-toolbar-auto-collapsed");
             return;
         }
 
@@ -893,7 +986,7 @@
         const updateToolbarMode = function () {
             rafId = null;
 
-            toolbar.classList.remove("docs-toolbar-auto-collapsed");
+            toolbar.classList.remove("ide-toolbar-auto-collapsed");
 
             const toolbarStyle = window.getComputedStyle(toolbar);
             const gapValue = parseFloat(toolbarStyle.columnGap || toolbarStyle.gap || "0");
@@ -909,7 +1002,7 @@
             const availableWidth = Math.max(0, toolbar.clientWidth - horizontalPadding);
             const shouldCollapse = requiredWidth > availableWidth;
 
-            toolbar.classList.toggle("docs-toolbar-auto-collapsed", shouldCollapse);
+            toolbar.classList.toggle("ide-toolbar-auto-collapsed", shouldCollapse);
         };
 
         // 툴바 모드 업데이트를 스케줄링하는 함수
@@ -939,7 +1032,7 @@
     }
 
     function initializeListPage() {
-        const docsBaseUrl = root.dataset.docsBaseUrl || "/docs";
+        const ideBaseUrl = root.dataset.ideBaseUrl || "/ide";
         const listApiUrl = root.dataset.listApiUrl;
         const saveApiUrl = root.dataset.saveApiUrl;
         const renameApiUrl = root.dataset.renameApiUrl;
@@ -950,40 +1043,41 @@
         const previewApiUrl = root.dataset.previewApiUrl;
         const aclApiUrl = root.dataset.aclApiUrl;
         const aclOptionsApiUrl = root.dataset.aclOptionsApiUrl;
-        const writeUrl = root.dataset.writeUrl || "/docs/write";
-        const pathBreadcrumbs = document.querySelector(".docs-path-breadcrumbs");
-        const listLayout = document.getElementById("docs-list-layout");
-        const listContainer = document.getElementById("docs-list");
-        const previewPanel = document.getElementById("docs-list-preview");
-        const previewHead = previewPanel ? previewPanel.querySelector(".docs-list-preview-head") : null;
-        const previewTitle = document.getElementById("docs-list-preview-title");
-        const previewContent = document.getElementById("docs-list-preview-content");
-        const previewDownloadButton = document.getElementById("docs-list-preview-download-btn");
-        const previewEditButton = document.getElementById("docs-list-preview-edit-btn");
-        const previewDeleteButton = document.getElementById("docs-list-preview-delete-btn");
+        const writeUrl = root.dataset.writeUrl || "/ide/write";
+        const pathBreadcrumbs = document.querySelector(".ide-path-breadcrumbs");
+        const listLayout = document.getElementById("ide-list-layout");
+        const listContainer = document.getElementById("ide-list");
+        const previewPanel = document.getElementById("ide-list-preview");
+        const previewHead = previewPanel ? previewPanel.querySelector(".ide-list-preview-head") : null;
+        const previewTitle = document.getElementById("ide-list-preview-title");
+        const previewContent = document.getElementById("ide-list-preview-content");
+        const previewDownloadButton = document.getElementById("ide-list-preview-download-btn");
+        const previewEditButton = document.getElementById("ide-list-preview-edit-btn");
+        const previewDeleteButton = document.getElementById("ide-list-preview-delete-btn");
         
         // 편집기 관련 요소들
-        const editorPanel = document.getElementById("docs-list-editor");
-        const editorHead = editorPanel ? editorPanel.querySelector(".docs-list-editor-head") : null;
-        const editorFilenameInput = document.getElementById("docs-list-filename-input");
-        const editorContentInput = document.getElementById("docs-list-content-input");
-        const editorCancelButton = document.getElementById("docs-list-cancel-btn");
-        const editorSaveButton = document.getElementById("docs-list-save-btn");
-        const editorHighlightCode = document.getElementById("docs-list-editor-highlight-code");
-        const editorSurface = document.getElementById("docs-list-editor-surface");
-        const editorHighlight = document.getElementById("docs-list-editor-highlight");
-        const editorSuggest = document.getElementById("docs-list-editor-suggest");
-        const editorSuggestLabel = document.getElementById("docs-list-editor-suggest-label");
+        const editorPanel = document.getElementById("ide-list-editor");
+        const editorHead = editorPanel ? editorPanel.querySelector(".ide-list-editor-head") : null;
+        const editorFilenameInput = document.getElementById("ide-list-filename-input");
+        const editorContentInput = document.getElementById("ide-list-content-input");
+        const editorCancelButton = document.getElementById("ide-list-cancel-btn");
+        const editorSaveButton = document.getElementById("ide-list-save-btn");
+        const editorHighlightCode = document.getElementById("ide-list-editor-highlight-code");
+        const editorSurface = document.getElementById("ide-list-editor-surface");
+        const editorHighlight = document.getElementById("ide-list-editor-highlight");
+        const editorSuggest = document.getElementById("ide-list-editor-suggest");
+        const editorSuggestLabel = document.getElementById("ide-list-editor-suggest-label");
         
         // API URL들
-        const docsApiPreviewUrl = previewApiUrl;
+        const ideApiPreviewUrl = previewApiUrl;
+        const scopedHomeDir = normalizePath(root.dataset.scopedHomeDir || "", true);
         const initialBreadcrumbNode = pathBreadcrumbs
-            ? pathBreadcrumbs.querySelector(".docs-path-link, .docs-path-current")
+            ? pathBreadcrumbs.querySelector(".ide-path-link, .ide-path-current")
             : null;
         const breadcrumbRootLabel = (initialBreadcrumbNode && initialBreadcrumbNode.textContent
             ? initialBreadcrumbNode.textContent
-            : "docs").trim() || "docs";
-        const contextMenu = document.getElementById("docs-context-menu");
+            : "ide").trim() || "ide";
+        const contextMenu = document.getElementById("ide-context-menu");
         const contextOpenButton = contextMenu ? contextMenu.querySelector('button[data-action="open"]') : null;
         const contextDownloadButton = contextMenu ? contextMenu.querySelector('button[data-action="download"]') : null;
         const contextEditButton = contextMenu ? contextMenu.querySelector('button[data-action="edit"]') : null;
@@ -992,33 +1086,33 @@
         const contextNewFolderButton = contextMenu ? contextMenu.querySelector('button[data-action="new-folder"]') : null;
         const contextNewDocButton = contextMenu ? contextMenu.querySelector('button[data-action="new-doc"]') : null;
         const contextPermissionsButton = contextMenu ? contextMenu.querySelector('button[data-action="permissions"]') : null;
-        const renameModal = document.getElementById("docs-rename-modal");
-        const renameModalBackdrop = document.getElementById("docs-rename-modal-backdrop");
-        const renameInput = document.getElementById("docs-rename-input");
-        const renameTarget = document.getElementById("docs-rename-target");
-        const renameCancelButton = document.getElementById("docs-rename-cancel-btn");
-        const renameConfirmButton = document.getElementById("docs-rename-confirm-btn");
-        const folderCreateModal = document.getElementById("docs-folder-create-modal");
-        const folderCreateModalBackdrop = document.getElementById("docs-folder-create-modal-backdrop");
-        const folderCreateTarget = document.getElementById("docs-folder-create-target");
-        const folderCreateInput = document.getElementById("docs-folder-create-input");
-        const folderCreateCancelButton = document.getElementById("docs-folder-create-cancel-btn");
-        const folderCreateConfirmButton = document.getElementById("docs-folder-create-confirm-btn");
-        const permissionModal = document.getElementById("docs-permission-modal");
-        const permissionModalBackdrop = document.getElementById("docs-permission-modal-backdrop");
-        const permissionTarget = document.getElementById("docs-permission-target");
-        const permissionReadUsersList = document.getElementById("docs-permission-read-users-list");
-        const permissionReadGroupsList = document.getElementById("docs-permission-read-groups-list");
-        const permissionWriteUsersList = document.getElementById("docs-permission-write-users-list");
-        const permissionWriteGroupsList = document.getElementById("docs-permission-write-groups-list");
-        const permissionCancelButton = document.getElementById("docs-permission-cancel-btn");
-        const permissionSaveButton = document.getElementById("docs-permission-save-btn");
+        const renameModal = document.getElementById("ide-rename-modal");
+        const renameModalBackdrop = document.getElementById("ide-rename-modal-backdrop");
+        const renameInput = document.getElementById("ide-rename-input");
+        const renameTarget = document.getElementById("ide-rename-target");
+        const renameCancelButton = document.getElementById("ide-rename-cancel-btn");
+        const renameConfirmButton = document.getElementById("ide-rename-confirm-btn");
+        const folderCreateModal = document.getElementById("ide-folder-create-modal");
+        const folderCreateModalBackdrop = document.getElementById("ide-folder-create-modal-backdrop");
+        const folderCreateTarget = document.getElementById("ide-folder-create-target");
+        const folderCreateInput = document.getElementById("ide-folder-create-input");
+        const folderCreateCancelButton = document.getElementById("ide-folder-create-cancel-btn");
+        const folderCreateConfirmButton = document.getElementById("ide-folder-create-confirm-btn");
+        const permissionModal = document.getElementById("ide-permission-modal");
+        const permissionModalBackdrop = document.getElementById("ide-permission-modal-backdrop");
+        const permissionTarget = document.getElementById("ide-permission-target");
+        const permissionReadUsersList = document.getElementById("ide-permission-read-users-list");
+        const permissionReadGroupsList = document.getElementById("ide-permission-read-groups-list");
+        const permissionWriteUsersList = document.getElementById("ide-permission-write-users-list");
+        const permissionWriteGroupsList = document.getElementById("ide-permission-write-groups-list");
+        const permissionCancelButton = document.getElementById("ide-permission-cancel-btn");
+        const permissionSaveButton = document.getElementById("ide-permission-save-btn");
 
         const currentDir = normalizePath(root.dataset.currentDir || "", true);
         const currentDirCanEdit = root.dataset.currentDirCanEdit === "1";
         const currentDirCanWriteChildren =
             root.dataset.currentDirCanWriteChildren === "1" || currentDirCanEdit;
-        const initialEntries = getJsonScriptData("docs-initial-entries", []);
+        const initialEntries = getJsonScriptData("ide-initial-entries", []);
 
         const state = {
             selectedPath: "",
@@ -1049,8 +1143,10 @@
             activePreviewPath: "",
         };
 
-        let activeListEditorSuggestion = null;
+        let activeListEditorSuggestions = [];
+        let activeListEditorSuggestionIndex = -1;
         let activeListEditorEntry = null;
+        let listSuggestEventsBound = false;
 
         function resolveListEditorExtension() {
             const entryPath = activeListEditorEntry && activeListEditorEntry.path
@@ -1067,32 +1163,69 @@
         }
 
         function clearListEditorSuggestion() {
-            activeListEditorSuggestion = null;
+            activeListEditorSuggestions = [];
+            activeListEditorSuggestionIndex = -1;
             if (editorSuggest) {
                 editorSuggest.hidden = true;
                 editorSuggest.style.left = "";
                 editorSuggest.style.top = "";
+                editorSuggest.innerHTML = "";
             }
             if (editorSuggestLabel) {
                 editorSuggestLabel.textContent = "";
             }
         }
 
-        function findListEditorSuggestion(extension, tokenText) {
+        function findListEditorSuggestions(extension, tokenText) {
             const completionMap = window.__docsEditorCompletionMap || {};
             const items = completionMap[extension] || [];
-            const normalizedToken = String(tokenText || "").toLowerCase();
-            if (!normalizedToken) {
-                return null;
+            return findEditorCompletionItems(items, tokenText, 8);
+        }
+
+        function renderListEditorSuggestDropdown() {
+            if (!editorSuggest) {
+                return;
             }
-            for (let i = 0; i < items.length; i += 1) {
-                const item = items[i];
-                const trigger = String(item.trigger || "").toLowerCase();
-                if (trigger && trigger.startsWith(normalizedToken)) {
-                    return item;
-                }
+            editorSuggest.innerHTML = "";
+
+            const list = document.createElement("div");
+            list.className = "ide-editor-suggest-list";
+
+            for (let i = 0; i < activeListEditorSuggestions.length; i += 1) {
+                const item = activeListEditorSuggestions[i] || {};
+                const option = document.createElement("button");
+                option.type = "button";
+                option.className = "ide-editor-suggest-item" + (i === activeListEditorSuggestionIndex ? " is-active" : "");
+                option.setAttribute("data-suggest-index", String(i));
+
+                const labelNode = document.createElement("span");
+                labelNode.className = "ide-editor-suggest-item-label";
+                labelNode.textContent = item.label || item.insertText || "";
+
+                const triggerNode = document.createElement("span");
+                triggerNode.className = "ide-editor-suggest-item-trigger";
+                triggerNode.textContent = item.trigger || "";
+
+                option.appendChild(labelNode);
+                option.appendChild(triggerNode);
+                list.appendChild(option);
             }
-            return null;
+
+            const footer = document.createElement("div");
+            footer.className = "ide-editor-suggest-footer";
+            footer.textContent = "↑↓ 이동 · Enter/Tab 적용";
+
+            editorSuggest.appendChild(list);
+            editorSuggest.appendChild(footer);
+        }
+
+        function moveListEditorSuggestion(step) {
+            if (!activeListEditorSuggestions.length) {
+                return;
+            }
+            const count = activeListEditorSuggestions.length;
+            activeListEditorSuggestionIndex = (activeListEditorSuggestionIndex + step + count) % count;
+            renderListEditorSuggestDropdown();
         }
 
         function syncListEditorHighlightScroll() {
@@ -1110,37 +1243,37 @@
 
             const extension = resolveListEditorExtension();
             const source = editorContentInput.value || "";
-            let renderClass = "docs-plain-text";
+            let renderClass = "ide-plain-text";
             let highlightedHtml = escapeHtml(source);
 
             if (extension === ".js") {
-                renderClass = "docs-js";
+                renderClass = "ide-js";
                 highlightedHtml = highlightJavaScriptCode(source);
             } else if (extension === ".md") {
-                renderClass = "docs-editor-md";
+                renderClass = "ide-editor-md";
                 highlightedHtml = escapeHtml(source);
             } else if (extension === ".css") {
-                renderClass = "docs-css";
+                renderClass = "ide-css";
                 highlightedHtml = highlightCssCode(source);
             } else if (extension === ".json") {
-                renderClass = "docs-json";
+                renderClass = "ide-json";
                 highlightedHtml = highlightJsonCode(source);
             } else if (extension === ".py") {
-                renderClass = "docs-py";
+                renderClass = "ide-py";
                 highlightedHtml = highlightPythonCode(source);
             } else if (extension === ".html") {
-                renderClass = "docs-editor-html";
+                renderClass = "ide-editor-html";
                 highlightedHtml = highlightHtmlCode(source);
             }
 
             editorHighlight.classList.remove(
-                "docs-plain-text",
-                "docs-editor-md",
-                "docs-js",
-                "docs-css",
-                "docs-json",
-                "docs-py",
-                "docs-editor-html"
+                "ide-plain-text",
+                "ide-editor-md",
+                "ide-js",
+                "ide-css",
+                "ide-json",
+                "ide-py",
+                "ide-editor-html"
             );
             editorHighlight.classList.add(renderClass);
             editorHighlightCode.innerHTML = highlightedHtml + (source.endsWith("\n") ? "\u200b" : "");
@@ -1149,7 +1282,7 @@
         }
 
         function updateListEditorSuggestion() {
-            if (!editorContentInput || !editorSuggest || !editorSuggestLabel) {
+            if (!editorContentInput || !editorSuggest) {
                 return;
             }
 
@@ -1161,29 +1294,30 @@
             }
 
             const extension = resolveListEditorExtension();
-            const linePrefix = (editorContentInput.value || "").slice(0, start);
-            const wordMatch = linePrefix.match(/[A-Za-z_][A-Za-z0-9_-]*$/);
-            if (!wordMatch) {
+            const tokenInfo = extractEditorCompletionToken(editorContentInput.value || "", start);
+            if (!tokenInfo) {
                 clearListEditorSuggestion();
                 return;
             }
 
-            const token = wordMatch[0] || "";
-            const suggestion = findListEditorSuggestion(extension, token);
-            if (!suggestion) {
+            const suggestions = findListEditorSuggestions(extension, tokenInfo.token);
+            if (!suggestions.length) {
                 clearListEditorSuggestion();
                 return;
             }
 
-            activeListEditorSuggestion = {
-                start: start - token.length,
-                end: start,
-                insertText: suggestion.insertText,
-                cursorBack: Number(suggestion.cursorBack || 0),
-                label: suggestion.label || suggestion.insertText,
-            };
-
-            editorSuggestLabel.textContent = activeListEditorSuggestion.label;
+            activeListEditorSuggestions = suggestions.map(function (suggestion) {
+                return {
+                    start: tokenInfo.start,
+                    end: tokenInfo.end,
+                    insertText: suggestion.insertText,
+                    cursorBack: Number(suggestion.cursorBack || 0),
+                    label: suggestion.label || suggestion.insertText,
+                    trigger: suggestion.trigger || "",
+                };
+            });
+            activeListEditorSuggestionIndex = 0;
+            renderListEditorSuggestDropdown();
             editorSuggest.hidden = false;
 
             const calc = window.__docsCalculateCursorPosition;
@@ -1191,20 +1325,22 @@
             if (cursorPosition) {
                 const surfaceRect = editorSurface ? editorSurface.getBoundingClientRect() : null;
 
-                let left = cursorPosition.left + 4;
-                let top = cursorPosition.top;
+                let left = cursorPosition.left + 12;
+                let top = cursorPosition.top + (cursorPosition.lineHeight || 20) + 6;
 
                 if (surfaceRect) {
-                    left = (cursorPosition.left + 4) - surfaceRect.left;
-                    top = cursorPosition.top - surfaceRect.top;
+                    left = (cursorPosition.left + 12) - surfaceRect.left;
+                    top = (cursorPosition.top + (cursorPosition.lineHeight || 20) + 6) - surfaceRect.top;
                 }
 
                 const suggestRect = editorSuggest.getBoundingClientRect();
-                const lineHeight = cursorPosition.lineHeight || 20;
                 if (surfaceRect) {
-                    top = (cursorPosition.top - (suggestRect.height - lineHeight) / 2) - surfaceRect.top;
-                } else {
-                    top = top - (suggestRect.height - lineHeight) / 2;
+                    const minLeft = 8;
+                    const minTop = 8;
+                    const maxLeft = Math.max(minLeft, surfaceRect.width - suggestRect.width - 8);
+                    const maxTop = Math.max(minTop, surfaceRect.height - suggestRect.height - 8);
+                    left = Math.min(Math.max(minLeft, left), maxLeft);
+                    top = Math.min(Math.max(minTop, top), maxTop);
                 }
 
                 editorSuggest.style.left = String(left) + "px";
@@ -1212,11 +1348,15 @@
             }
         }
 
-        function acceptListEditorSuggestion() {
-            if (!editorContentInput || !activeListEditorSuggestion) {
+        function acceptListEditorSuggestion(index) {
+            if (!editorContentInput) {
                 return false;
             }
-            const suggestion = activeListEditorSuggestion;
+            const resolvedIndex = Number.isInteger(index) ? index : activeListEditorSuggestionIndex;
+            const suggestion = activeListEditorSuggestions[resolvedIndex] || null;
+            if (!suggestion) {
+                return false;
+            }
             editorContentInput.setRangeText(suggestion.insertText, suggestion.start, suggestion.end, "end");
             const cursorPos = (suggestion.start + suggestion.insertText.length) - Math.max(0, suggestion.cursorBack);
             editorContentInput.setSelectionRange(cursorPos, cursorPos);
@@ -1312,7 +1452,7 @@
             if (!listContainer) {
                 return;
             }
-            const currentDirRow = listContainer.querySelector(".docs-current-dir-row");
+            const currentDirRow = listContainer.querySelector(".ide-current-dir-row");
             if (!currentDirRow) {
                 return;
             }
@@ -1442,7 +1582,7 @@
             if (!previewContent) {
                 return;
             }
-            previewContent.innerHTML = '<p class="docs-list-preview-placeholder">' + escapeHtml(message) + '</p>';
+            previewContent.innerHTML = '<p class="ide-list-preview-placeholder">' + escapeHtml(message) + '</p>';
         }
 
         function updateEditorHighlight() {
@@ -1567,7 +1707,13 @@
                 editorContentInput.addEventListener("scroll", syncListEditorHighlightScroll, { passive: true });
                 editorContentInput.addEventListener("click", updateListEditorSuggestion);
                 editorContentInput.addEventListener("keyup", function (event) {
-                    if (event.key === "Tab") {
+                    if (
+                        event.key === "Tab" ||
+                        event.key === "ArrowDown" ||
+                        event.key === "ArrowUp" ||
+                        event.key === "Enter" ||
+                        event.key === "Escape"
+                    ) {
                         return;
                     }
                     updateListEditorSuggestion();
@@ -1575,6 +1721,22 @@
                 editorContentInput.addEventListener("keydown", function (event) {
                     if (event.key === "Escape") {
                         clearListEditorSuggestion();
+                        return;
+                    }
+                    if (!editorSuggest.hidden && event.key === "ArrowDown") {
+                        event.preventDefault();
+                        moveListEditorSuggestion(1);
+                        return;
+                    }
+                    if (!editorSuggest.hidden && event.key === "ArrowUp") {
+                        event.preventDefault();
+                        moveListEditorSuggestion(-1);
+                        return;
+                    }
+                    if (!editorSuggest.hidden && event.key === "Enter") {
+                        if (acceptListEditorSuggestion()) {
+                            event.preventDefault();
+                        }
                         return;
                     }
                     if (event.key === "Tab" && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
@@ -1588,6 +1750,24 @@
             if (editorFilenameInput) {
                 editorFilenameInput.addEventListener("input", function () {
                     renderListEditorHighlight();
+                });
+            }
+            if (editorSuggest && !listSuggestEventsBound) {
+                listSuggestEventsBound = true;
+                editorSuggest.addEventListener("mousedown", function (event) {
+                    event.preventDefault();
+                });
+                editorSuggest.addEventListener("click", function (event) {
+                    const target = event.target instanceof Element
+                        ? event.target.closest("[data-suggest-index]")
+                        : null;
+                    if (!target) {
+                        return;
+                    }
+                    const index = Number(target.getAttribute("data-suggest-index"));
+                    if (Number.isInteger(index) && acceptListEditorSuggestion(index)) {
+                        event.preventDefault();
+                    }
                 });
             }
             
@@ -1675,6 +1855,9 @@
                 const savedPath = data && typeof data.path === "string" && data.path.trim()
                     ? normalizePath(data.path, true)
                     : sourcePath;
+                // 저장 직후에는 캐시를 무효화해 미리보기가 항상 최신 내용을 다시 불러오도록 한다.
+                state.previewCache.delete(sourcePath);
+                state.previewCache.delete(savedPath);
                 await refreshCurrentDirectory();
                 switchToPreview();
 
@@ -1718,7 +1901,7 @@
                 previewTitle.textContent = t("list_preview_title", "파일 미리보기");
             }
             setPreviewActionTargets(null);
-            applyRenderedContentModeClass(previewContent, "plain_text", "docs-plain-text");
+            applyRenderedContentModeClass(previewContent, "plain_text", "ide-plain-text");
             setPreviewPlaceholder(
                 t("list_preview_empty", "파일을 선택하면 미리보기가 표시됩니다.")
             );
@@ -1731,11 +1914,11 @@
             const safeHtml = typeof html === "string" ? html : "";
             const normalizedRenderMode = renderMode === "markdown" ? "markdown" : "plain_text";
             const normalizedRenderClass =
-                renderClass === "docs-json" ||
-                renderClass === "docs-html" ||
-                renderClass === "docs-css" ||
-                renderClass === "docs-js" ||
-                renderClass === "docs-py"
+                renderClass === "ide-json" ||
+                renderClass === "ide-html" ||
+                renderClass === "ide-css" ||
+                renderClass === "ide-js" ||
+                renderClass === "ide-py"
                     ? renderClass
                     : "";
             applyRenderedContentModeClass(previewContent, normalizedRenderMode, normalizedRenderClass);
@@ -1746,7 +1929,7 @@
                 return;
             }
             previewContent.innerHTML = safeHtml;
-            applyDocsCodeHighlighting(previewContent, normalizedRenderClass || "docs-markdown");
+            applyDocsCodeHighlighting(previewContent, normalizedRenderClass || "ide-markdown");
             setPreviewActionTargets(entry);
             scheduleSyncCurrentDirRowHeightWithSideHead();
         }
@@ -1780,7 +1963,7 @@
                     scrollPreviewIntoViewIfPortrait();
                     return;
                 }
-                renderPreviewHtml(entry, cached, "markdown", "docs-markdown");
+                renderPreviewHtml(entry, cached, "markdown", "ide-markdown");
                 scrollPreviewIntoViewIfPortrait();
                 return;
             }
@@ -2051,6 +2234,36 @@
 
         function buildBreadcrumbItems(pathValue) {
             const normalized = normalizePath(pathValue, true);
+            if (scopedHomeDir) {
+                const homeParts = scopedHomeDir.split("/").filter(Boolean);
+                const homeLabel = homeParts.length ? homeParts[homeParts.length - 1] : scopedHomeDir;
+                const effectivePath = normalized && (
+                    normalized === scopedHomeDir || normalized.startsWith(scopedHomeDir + "/")
+                )
+                    ? normalized
+                    : scopedHomeDir;
+
+                const crumbs = [{
+                    label: homeLabel,
+                    path: scopedHomeDir,
+                    isCurrent: effectivePath === scopedHomeDir
+                }];
+                if (effectivePath === scopedHomeDir) {
+                    return crumbs;
+                }
+
+                const parts = effectivePath.split("/").filter(Boolean);
+                for (let index = homeParts.length; index < parts.length; index += 1) {
+                    const composedPath = parts.slice(0, index + 1).join("/");
+                    crumbs.push({
+                        label: parts[index],
+                        path: composedPath,
+                        isCurrent: index === parts.length - 1
+                    });
+                }
+                return crumbs;
+            }
+
             const crumbs = [{
                 label: breadcrumbRootLabel,
                 path: "",
@@ -2083,24 +2296,24 @@
             crumbs.forEach(function (crumb, index) {
                 if (index > 0) {
                     const separator = document.createElement("span");
-                    separator.className = "docs-path-sep";
+                    separator.className = "ide-path-sep";
                     separator.textContent = "/";
                     fragment.appendChild(separator);
                 }
 
                 if (crumb.isCurrent) {
                     const current = document.createElement("span");
-                    current.className = "docs-path-current";
-                    current.setAttribute("data-docs-dir", crumb.path);
+                    current.className = "ide-path-current";
+                    current.setAttribute("data-ide-dir", crumb.path);
                     current.textContent = crumb.label;
                     fragment.appendChild(current);
                     return;
                 }
 
                 const link = document.createElement("a");
-                link.className = "docs-path-link";
-                link.href = buildListUrl(docsBaseUrl, crumb.path);
-                link.setAttribute("data-docs-dir", crumb.path);
+                link.className = "ide-path-link";
+                link.href = buildListUrl(ideBaseUrl, crumb.path);
+                link.setAttribute("data-ide-dir", crumb.path);
                 link.textContent = crumb.label;
                 fragment.appendChild(link);
             });
@@ -2226,7 +2439,7 @@
 
         function getDocsPathLabel(pathValue) {
             const normalized = normalizePath(pathValue, true);
-            return normalized ? "/docs/" + normalized : "/docs";
+            return normalized ? "/ide/" + normalized : "/ide";
         }
 
         function getParentDirectory(pathValue) {
@@ -2427,10 +2640,10 @@
         function getCurrentFolderName(pathValue) {
             const normalized = normalizePath(pathValue, true);
             if (!normalized) {
-                return "docs";
+                return "ide";
             }
             const parts = normalized.split("/");
-            return parts[parts.length - 1] || "docs";
+            return parts[parts.length - 1] || "ide";
         }
 
         function addCurrentDirectoryNode(fragment) {
@@ -2443,11 +2656,11 @@
             };
 
             const item = document.createElement("li");
-            item.className = "docs-item docs-current-dir-item";
+            item.className = "ide-item ide-current-dir-item";
 
             const row = document.createElement("button");
             row.type = "button";
-            row.className = "docs-item-row docs-current-dir-row";
+            row.className = "ide-item-row ide-current-dir-row";
             row.setAttribute("data-entry-path", currentFolderEntry.path);
             row.draggable = false;
             if (state.selectedPaths.has(currentFolderEntry.path)) {
@@ -2455,11 +2668,11 @@
             }
 
             const typeMarker = document.createElement("span");
-            typeMarker.className = "docs-item-type-icon is-dir";
+            typeMarker.className = "ide-item-type-icon is-dir";
             typeMarker.setAttribute("aria-hidden", "true");
 
             const name = document.createElement("span");
-            name.className = "docs-item-name docs-current-dir-name";
+            name.className = "ide-item-name ide-current-dir-name";
             name.textContent = getCurrentFolderName(currentDir);
 
             row.appendChild(typeMarker);
@@ -2543,7 +2756,7 @@
 
             if (!Array.isArray(items) || items.length === 0) {
                 const emptyNode = document.createElement("div");
-                emptyNode.className = "docs-permission-empty";
+                emptyNode.className = "ide-permission-empty";
                 emptyNode.textContent = emptyMessage;
                 container.appendChild(emptyNode);
                 return;
@@ -2551,7 +2764,7 @@
 
             items.forEach(function (item) {
                 const row = document.createElement("label");
-                row.className = "docs-permission-item";
+                row.className = "ide-permission-item";
                 const disabled = Boolean(isItemDisabled(item));
 
                 const checkbox = document.createElement("input");
@@ -2885,10 +3098,10 @@
                 return;
             }
             if (entry.type === "dir") {
-                window.location.href = buildListUrl(docsBaseUrl, entry.path);
+                window.location.href = buildListUrl(ideBaseUrl, entry.path);
                 return;
             }
-            window.location.href = buildViewUrl(docsBaseUrl, entry.slug_path || entry.path);
+            window.location.href = buildViewUrl(ideBaseUrl, entry.slug_path || entry.path);
         }
 
         function openEntriesInNewTabs(entries) {
@@ -2897,8 +3110,8 @@
             }
             entries.forEach(function (entry) {
                 const targetUrl = entry.type === "dir"
-                    ? buildListUrl(docsBaseUrl, entry.path)
-                    : buildViewUrl(docsBaseUrl, entry.slug_path || entry.path);
+                    ? buildListUrl(ideBaseUrl, entry.path)
+                    : buildViewUrl(ideBaseUrl, entry.slug_path || entry.path);
                 window.open(targetUrl, "_blank", "noopener");
             });
         }
@@ -2940,18 +3153,18 @@
 
         function buildTreePrefixElement(ancestorHasNextSiblings, isLastSibling) {
             const prefix = document.createElement("span");
-            prefix.className = "docs-item-tree-prefix";
+            prefix.className = "ide-item-tree-prefix";
             prefix.setAttribute("aria-hidden", "true");
 
             const ancestorFlags = ancestorHasNextSiblings || [];
             ancestorFlags.forEach(function (hasNextSibling) {
                 const segment = document.createElement("span");
-                segment.className = "docs-tree-segment" + (hasNextSibling ? " has-next" : "");
+                segment.className = "ide-tree-segment" + (hasNextSibling ? " has-next" : "");
                 prefix.appendChild(segment);
             });
 
             const branch = document.createElement("span");
-            branch.className = "docs-tree-segment docs-tree-branch " + (isLastSibling ? "is-last" : "is-middle");
+            branch.className = "ide-tree-segment ide-tree-branch " + (isLastSibling ? "is-last" : "is-middle");
             prefix.appendChild(branch);
 
             if (ancestorFlags.length === 0) {
@@ -2963,7 +3176,7 @@
 
         function addEntryNode(entry, fragment, ancestorHasNextSiblings, isLastSibling) {
             const item = document.createElement("li");
-            item.className = "docs-item";
+            item.className = "ide-item";
             const openingFolderPath = state.openingFolderPath;
             if (
                 openingFolderPath &&
@@ -2978,7 +3191,7 @@
 
             const row = document.createElement("button");
             row.type = "button";
-            row.className = "docs-item-row has-tree-prefix";
+            row.className = "ide-item-row has-tree-prefix";
             row.setAttribute("data-entry-path", entry.path);
             const isPublicWriteFile = Boolean(entry.type === "file" && entry.is_public_write);
             row.draggable = Boolean(moveApiUrl && entry.can_edit && !isPublicWriteFile);
@@ -2989,14 +3202,14 @@
             const treePrefix = buildTreePrefixElement(ancestorHasNextSiblings, Boolean(isLastSibling));
 
             const typeMarker = document.createElement("span");
-            typeMarker.className = "docs-item-type-icon " + (entry.type === "dir" ? "is-dir" : "is-file");
+            typeMarker.className = "ide-item-type-icon " + (entry.type === "dir" ? "is-dir" : "is-file");
             typeMarker.setAttribute("aria-hidden", "true");
 
             const aclLabels = Array.isArray(entry.write_acl_labels) ? entry.write_acl_labels : [];
             const aclLabelLimit = 3;
 
             const name = document.createElement("span");
-            name.className = "docs-item-name";
+            name.className = "ide-item-name";
             name.textContent = entry.name;
 
             row.appendChild(typeMarker);
@@ -3004,16 +3217,16 @@
 
             if (aclLabels.length > 0) {
                 const aclWrap = document.createElement("span");
-                aclWrap.className = "docs-item-acl-list";
+                aclWrap.className = "ide-item-acl-list";
                 aclLabels.slice(0, aclLabelLimit).forEach(function (labelText) {
                     const aclBadge = document.createElement("span");
-                    aclBadge.className = "docs-item-acl-badge";
+                    aclBadge.className = "ide-item-acl-badge";
                     aclBadge.textContent = String(labelText || "");
                     aclWrap.appendChild(aclBadge);
                 });
                 if (aclLabels.length > aclLabelLimit) {
                     const overflowBadge = document.createElement("span");
-                    overflowBadge.className = "docs-item-acl-badge docs-item-acl-badge-overflow";
+                    overflowBadge.className = "ide-item-acl-badge ide-item-acl-badge-overflow";
                     overflowBadge.textContent = "+" + String(aclLabels.length - aclLabelLimit);
                     aclWrap.appendChild(overflowBadge);
                 }
@@ -3022,7 +3235,7 @@
 
             if (entry.type === "file" && entry.is_public_write) {
                 const publicBadge = document.createElement("span");
-                publicBadge.className = "docs-item-public-badge";
+                publicBadge.className = "ide-item-public-badge";
                 publicBadge.textContent = t("public_write_badge", "전체 허용");
                 row.appendChild(publicBadge);
             }
@@ -3128,9 +3341,9 @@
 
             if (entries.length === 0) {
                 const emptyItem = document.createElement("li");
-                emptyItem.className = "docs-item";
+                emptyItem.className = "ide-item";
                 const emptyRow = document.createElement("div");
-                emptyRow.className = "docs-item-row is-empty";
+                emptyRow.className = "ide-item-row is-empty";
                 emptyRow.textContent = t("js_empty_documents", "문서가 없습니다.");
                 emptyItem.appendChild(emptyRow);
                 fragment.appendChild(emptyItem);
@@ -3182,9 +3395,9 @@
             if (!moveApiUrl) {
                 return;
             }
-            const pathTargets = document.querySelectorAll(".docs-path-link[data-docs-dir], .docs-path-current[data-docs-dir]");
+            const pathTargets = document.querySelectorAll(".ide-path-link[data-ide-dir], .ide-path-current[data-ide-dir]");
             pathTargets.forEach(function (target) {
-                const targetDirPath = normalizePath(target.getAttribute("data-docs-dir") || "", true);
+                const targetDirPath = normalizePath(target.getAttribute("data-ide-dir") || "", true);
                 bindDropTarget(target, targetDirPath);
             });
         }
@@ -3342,7 +3555,7 @@
                 if (!targetElement) {
                     return;
                 }
-                const row = targetElement.closest(".docs-item-row");
+                const row = targetElement.closest(".ide-item-row");
                 if (!row || !listContainer.contains(row)) {
                     return;
                 }
@@ -3411,23 +3624,23 @@
     }
 
     function initializeViewPage() {
-        const docsBaseUrl = root.dataset.docsBaseUrl || "/docs";
+        const ideBaseUrl = root.dataset.ideBaseUrl || "/ide";
         const deleteApiUrl = root.dataset.deleteApiUrl;
         const docPath = root.dataset.docPath || "";
         const parentDir = root.dataset.parentDir || "";
-        const deleteButton = document.getElementById("docs-delete-btn");
-        const contentArticle = document.querySelector(".docs-content > article");
+        const deleteButton = document.getElementById("ide-delete-btn");
+        const contentArticle = document.querySelector(".ide-content > article");
 
-        if (contentArticle && contentArticle.classList.contains("docs-js")) {
-            applyDocsCodeHighlighting(contentArticle, "docs-js");
-        } else if (contentArticle && contentArticle.classList.contains("docs-css")) {
-            applyDocsCodeHighlighting(contentArticle, "docs-css");
-        } else if (contentArticle && contentArticle.classList.contains("docs-json")) {
-            applyDocsCodeHighlighting(contentArticle, "docs-json");
-        } else if (contentArticle && contentArticle.classList.contains("docs-py")) {
-            applyDocsCodeHighlighting(contentArticle, "docs-py");
-        } else if (contentArticle && contentArticle.classList.contains("docs-markdown")) {
-            applyDocsCodeHighlighting(contentArticle, "docs-markdown");
+        if (contentArticle && contentArticle.classList.contains("ide-js")) {
+            applyDocsCodeHighlighting(contentArticle, "ide-js");
+        } else if (contentArticle && contentArticle.classList.contains("ide-css")) {
+            applyDocsCodeHighlighting(contentArticle, "ide-css");
+        } else if (contentArticle && contentArticle.classList.contains("ide-json")) {
+            applyDocsCodeHighlighting(contentArticle, "ide-json");
+        } else if (contentArticle && contentArticle.classList.contains("ide-py")) {
+            applyDocsCodeHighlighting(contentArticle, "ide-py");
+        } else if (contentArticle && contentArticle.classList.contains("ide-markdown")) {
+            applyDocsCodeHighlighting(contentArticle, "ide-markdown");
         }
 
         if (!deleteButton) {
@@ -3447,7 +3660,7 @@
 
             try {
                 await requestJson(deleteApiUrl, buildPostOptions({ path: docPath }));
-                window.location.href = buildListUrl(docsBaseUrl, parentDir);
+                window.location.href = buildListUrl(ideBaseUrl, parentDir);
             } catch (error) {
                 alertError(error);
             }
@@ -3455,7 +3668,7 @@
     }
 
     function initializeWritePage() {
-        const docsBaseUrl = root.dataset.docsBaseUrl || "/docs";
+        const ideBaseUrl = root.dataset.ideBaseUrl || "/ide";
         const saveApiUrl = root.dataset.saveApiUrl;
         const previewApiUrl = root.dataset.previewApiUrl;
         const mkdirApiUrl = root.dataset.mkdirApiUrl;
@@ -3463,48 +3676,48 @@
         const initialDir = root.dataset.initialDir || "";
         const isPublicWriteDirectSave = root.dataset.publicWriteDirectSave === "1";
 
-        const filenameInput = document.getElementById("docs-filename-input");
-        const saveFilenameInput = document.getElementById("docs-save-filename-input");
-        const saveExtensionSelect = document.getElementById("docs-save-extension-select");
-        const contentInput = document.getElementById("docs-content-input");
-        const editorSurface = document.getElementById("docs-editor-surface");
-        const editorHighlight = document.getElementById("docs-editor-highlight");
-        const editorHighlightCode = document.getElementById("docs-editor-highlight-code");
-        const editorSuggest = document.getElementById("docs-editor-suggest");
-        const editorSuggestLabel = document.getElementById("docs-editor-suggest-label");
-        const markdownHelpButton = document.getElementById("docs-markdown-help-btn");
-        const markdownHelpModal = document.getElementById("docs-markdown-help-modal");
-        const markdownHelpBackdrop = document.getElementById("docs-markdown-help-backdrop");
-        const markdownPreviewButton = document.getElementById("docs-markdown-preview-btn");
-        const markdownPreviewModal = document.getElementById("docs-markdown-preview-modal");
-        const markdownPreviewBackdrop = document.getElementById("docs-markdown-preview-backdrop");
-        const markdownPreviewContent = document.getElementById("docs-markdown-preview-content");
-        const cancelButton = document.getElementById("docs-cancel-btn");
-        const saveButton = document.getElementById("docs-save-btn");
-        const createFolderButton = document.getElementById("docs-create-folder-btn");
-        const saveModal = document.getElementById("docs-save-modal");
-        const saveModalBackdrop = document.getElementById("docs-save-modal-backdrop");
-        const saveCloseButton = document.getElementById("docs-save-close-btn");
-        const saveCancelButton = document.getElementById("docs-save-cancel-btn");
-        const saveConfirmButton = document.getElementById("docs-save-confirm-btn");
-        const saveUpButton = document.getElementById("docs-save-up-btn");
-        const saveBreadcrumb = document.getElementById("docs-save-breadcrumb");
-        const saveQuickList = document.getElementById("docs-save-quick-list");
-        const saveFolderList = document.getElementById("docs-save-folder-list");
-        const folderModal = document.getElementById("docs-folder-modal");
-        const folderModalBackdrop = document.getElementById("docs-folder-modal-backdrop");
-        const folderNameInput = document.getElementById("docs-folder-name-input");
-        const folderTargetPath = document.getElementById("docs-folder-target-path");
-        const folderCancelButton = document.getElementById("docs-folder-cancel-btn");
-        const folderCreateButton = document.getElementById("docs-folder-create-btn");
-        const unsavedModal = document.getElementById("docs-unsaved-modal");
-        const unsavedModalBackdrop = document.getElementById("docs-unsaved-modal-backdrop");
-        const unsavedMessage = document.getElementById("docs-unsaved-message");
-        const unsavedCancelButton = document.getElementById("docs-unsaved-cancel-btn");
-        const unsavedLeaveButton = document.getElementById("docs-unsaved-leave-btn");
-        const unsavedSaveButton = document.getElementById("docs-unsaved-save-btn");
-        const directoryOptions = document.getElementById("docs-directory-options");
-        const markdownSnippetMenu = document.getElementById("docs-markdown-snippet-menu");
+        const filenameInput = document.getElementById("ide-filename-input");
+        const saveFilenameInput = document.getElementById("ide-save-filename-input");
+        const saveExtensionSelect = document.getElementById("ide-save-extension-select");
+        const contentInput = document.getElementById("ide-content-input");
+        const editorSurface = document.getElementById("ide-editor-surface");
+        const editorHighlight = document.getElementById("ide-editor-highlight");
+        const editorHighlightCode = document.getElementById("ide-editor-highlight-code");
+        const editorSuggest = document.getElementById("ide-editor-suggest");
+        const editorSuggestLabel = document.getElementById("ide-editor-suggest-label");
+        const markdownHelpButton = document.getElementById("ide-markdown-help-btn");
+        const markdownHelpModal = document.getElementById("ide-markdown-help-modal");
+        const markdownHelpBackdrop = document.getElementById("ide-markdown-help-backdrop");
+        const markdownPreviewButton = document.getElementById("ide-markdown-preview-btn");
+        const markdownPreviewModal = document.getElementById("ide-markdown-preview-modal");
+        const markdownPreviewBackdrop = document.getElementById("ide-markdown-preview-backdrop");
+        const markdownPreviewContent = document.getElementById("ide-markdown-preview-content");
+        const cancelButton = document.getElementById("ide-cancel-btn");
+        const saveButton = document.getElementById("ide-save-btn");
+        const createFolderButton = document.getElementById("ide-create-folder-btn");
+        const saveModal = document.getElementById("ide-save-modal");
+        const saveModalBackdrop = document.getElementById("ide-save-modal-backdrop");
+        const saveCloseButton = document.getElementById("ide-save-close-btn");
+        const saveCancelButton = document.getElementById("ide-save-cancel-btn");
+        const saveConfirmButton = document.getElementById("ide-save-confirm-btn");
+        const saveUpButton = document.getElementById("ide-save-up-btn");
+        const saveBreadcrumb = document.getElementById("ide-save-breadcrumb");
+        const saveQuickList = document.getElementById("ide-save-quick-list");
+        const saveFolderList = document.getElementById("ide-save-folder-list");
+        const folderModal = document.getElementById("ide-folder-modal");
+        const folderModalBackdrop = document.getElementById("ide-folder-modal-backdrop");
+        const folderNameInput = document.getElementById("ide-folder-name-input");
+        const folderTargetPath = document.getElementById("ide-folder-target-path");
+        const folderCancelButton = document.getElementById("ide-folder-cancel-btn");
+        const folderCreateButton = document.getElementById("ide-folder-create-btn");
+        const unsavedModal = document.getElementById("ide-unsaved-modal");
+        const unsavedModalBackdrop = document.getElementById("ide-unsaved-modal-backdrop");
+        const unsavedMessage = document.getElementById("ide-unsaved-message");
+        const unsavedCancelButton = document.getElementById("ide-unsaved-cancel-btn");
+        const unsavedLeaveButton = document.getElementById("ide-unsaved-leave-btn");
+        const unsavedSaveButton = document.getElementById("ide-unsaved-save-btn");
+        const directoryOptions = document.getElementById("ide-directory-options");
+        const markdownSnippetMenu = document.getElementById("ide-markdown-snippet-menu");
         const markdownSnippetButtons = Array.from(
             document.querySelectorAll("button[data-editor-snippet]")
         );
@@ -3520,7 +3733,7 @@
             : [".md"];
         const extensionPresetSet = new Set(extensionPresetValues);
 
-        const rawDirectories = getJsonScriptData("docs-directory-data", []);
+        const rawDirectories = getJsonScriptData("ide-directory-data", []);
         const directories = [];
         const directorySet = new Set();
         const DOCS_DEFAULT_EXTENSION = ".md";
@@ -3537,458 +3750,11 @@
         let resolveUnsavedChoice = null;
         let unsavedModalOpen = false;
         let lastUnsavedFocusedElement = null;
-        let activeEditorSuggestion = null;
-        //자동완성 단어 리스트
-        const editorCompletionMap = {
-            ".md": [
-                { trigger: "head", insertText: "## ", label: "## Heading" },
-                { trigger: "head1", insertText: "# ", label: "# Heading 1" },
-                { trigger: "head3", insertText: "### ", label: "### Heading 3" },
-                { trigger: "head4", insertText: "#### ", label: "#### Heading 4" },
-                { trigger: "head5", insertText: "##### ", label: "##### Heading 5" },
-                { trigger: "head6", insertText: "###### ", label: "###### Heading 6" },
-                { trigger: "link", insertText: "[title](https://)", label: "[title](https://)" },
-                { trigger: "img", insertText: "![alt](https://)", label: "![alt](url)" },
-                { trigger: "code", insertText: "```text\n\n```", label: "```code```", cursorBack: 4 },
-                { trigger: "codejs", insertText: "```javascript\n\n```", label: "```javascript```", cursorBack: 13 },
-                { trigger: "codepy", insertText: "```python\n\n```", label: "```python```", cursorBack: 11 },
-                { trigger: "codecss", insertText: "```css\n\n```", label: "```css```", cursorBack: 7 },
-                { trigger: "codehtml", insertText: "```html\n\n```", label: "```html```", cursorBack: 9 },
-                { trigger: "codesh", insertText: "```bash\n\n```", label: "```bash```", cursorBack: 7 },
-                { trigger: "inline", insertText: "`code`", label: "`code`", cursorBack: 1 },
-                { trigger: "bold", insertText: "**text**", label: "**bold**", cursorBack: 2 },
-                { trigger: "italic", insertText: "*text*", label: "*italic*", cursorBack: 1 },
-                { trigger: "bolditalic", insertText: "***text***", label: "***bold italic***", cursorBack: 3 },
-                { trigger: "strike", insertText: "~~text~~", label: "~~strike~~", cursorBack: 2 },
-                { trigger: "quote", insertText: "> ", label: "> quote" },
-                { trigger: "quoteblock", insertText: "> > ", label: ">> nested quote" },
-                { trigger: "list", insertText: "- ", label: "- list item" },
-                { trigger: "listsub", insertText: "  - ", label: "  - sublist" },
-                { trigger: "numlist", insertText: "1. ", label: "1. numbered list" },
-                { trigger: "numlistsub", insertText: "  1. ", label: "  1. sublist" },
-                { trigger: "check", insertText: "- [ ] ", label: "- [ ] checkbox" },
-                { trigger: "checked", insertText: "- [x] ", label: "- [x] checked" },
-                { trigger: "table", insertText: "| Header 1 | Header 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |", label: "| table |", cursorBack: 15 },
-                { trigger: "table2", insertText: "| Col1 | Col2 | Col3 |\n|------|------|------|\n| Data | Data | Data |", label: "| 3-col table |", cursorBack: 13 },
-                { trigger: "hr", insertText: "---", label: "--- horizontal rule" },
-                { trigger: "hr2", insertText: "***", label: "*** horizontal rule" },
-                { trigger: "toc", insertText: "## Table of Contents\n\n- [Section 1](#section-1)\n- [Section 2](#section-2)", label: "## Table of Contents", cursorBack: 25 },
-                { trigger: "footnote", insertText: "[^1]: Footnote text", label: "[^1]: Footnote" },
-                { trigger: "ref", insertText: "[^1]", label: "[^1] reference" },
-                { trigger: "details", insertText: "<details>\n<summary>Click to expand</summary>\n\nHidden content here\n\n</details>", label: "<details>...</details>", cursorBack: 10 },
-                { trigger: "kbd", insertText: "<kbd>Ctrl</kbd>", label: "<kbd>Ctrl</kbd>" },
-                { trigger: "mark", insertText: "<mark>highlighted text</mark>", label: "<mark>highlight</mark>", cursorBack: 9 },
-                { trigger: "sub", insertText: "<sub>subscript</sub>", label: "<sub>subscript</sub>", cursorBack: 4 },
-                { trigger: "sup", insertText: "<sup>superscript</sup>", label: "<sup>superscript</sup>", cursorBack: 4 },
-                { trigger: "math", insertText: "$E = mc^2$", label: "$LaTeX math$", cursorBack: 1 },
-                { trigger: "mathblock", insertText: "$$\nE = mc^2\n$$", label: "$$LaTeX block$$", cursorBack: 3 },
-                { trigger: "mermaid", insertText: "```mermaid\ngraph TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```", label: "```mermaid diagram```", cursorBack: 8 },
-                { trigger: "alert", insertText: "> [!NOTE]\n> Useful information", label: "> [!NOTE] alert", cursorBack: 8 },
-                { trigger: "warning", insertText: "> [!WARNING]\n> Important warning", label: "> [!WARNING] alert", cursorBack: 11 },
-                { trigger: "tip", insertText: "> [!TIP]\n> Helpful tip", label: "> [!TIP] alert", cursorBack: 6 },
-                { trigger: "emoji", insertText: ":smile:", label: ":smile: emoji" },
-                { trigger: "tasklist", insertText: "- [x] Finish task 1\n- [ ] Start task 2\n- [ ] Review task 3", label: "- [x] task list", cursorBack: 20 }
-            ],
-            ".py": [
-                { trigger: "def", insertText: "def ", label: "def " },
-                { trigger: "class", insertText: "class ", label: "class " },
-                { trigger: "import", insertText: "import ", label: "import " },
-                { trigger: "from", insertText: "from ", label: "from " },
-                { trigger: "ifm", insertText: "if __name__ == \"__main__\":\n    main()", label: "if __name__ == \"__main__\": ..." },
-                { trigger: "if", insertText: "if :\n    ", label: "if :", cursorBack: 1 },
-                { trigger: "elif", insertText: "elif :\n    ", label: "elif :", cursorBack: 1 },
-                { trigger: "else", insertText: "else:\n    ", label: "else:" },
-                { trigger: "for", insertText: "for  in :\n    ", label: "for in :", cursorBack: 6 },
-                { trigger: "while", insertText: "while :\n    ", label: "while :", cursorBack: 1 },
-                { trigger: "try", insertText: "try:\n    \nexcept :\n    ", label: "try-except", cursorBack: 12 },
-                { trigger: "with", insertText: "with  as :\n    ", label: "with as :", cursorBack: 6 },
-                { trigger: "lambda", insertText: "lambda : ", label: "lambda :", cursorBack: 1 },
-                { trigger: "return", insertText: "return ", label: "return " },
-                { trigger: "yield", insertText: "yield ", label: "yield " },
-                { trigger: "print", insertText: "print()", label: "print()", cursorBack: 1 },
-                { trigger: "len", insertText: "len()", label: "len()", cursorBack: 1 },
-                { trigger: "str", insertText: "str()", label: "str()", cursorBack: 1 },
-                { trigger: "int", insertText: "int()", label: "int()", cursorBack: 1 },
-                { trigger: "list", insertText: "list()", label: "list()", cursorBack: 1 },
-                { trigger: "dict", insertText: "dict()", label: "dict()", cursorBack: 1 },
-                { trigger: "set", insertText: "set()", label: "set()", cursorBack: 1 },
-                { trigger: "range", insertText: "range()", label: "range()", cursorBack: 1 },
-                { trigger: "enumerate", insertText: "enumerate()", label: "enumerate()", cursorBack: 1 },
-                { trigger: "zip", insertText: "zip()", label: "zip()", cursorBack: 1 },
-                { trigger: "map", insertText: "map()", label: "map()", cursorBack: 1 },
-                { trigger: "filter", insertText: "filter()", label: "filter()", cursorBack: 1 },
-                { trigger: "self", insertText: "self.", label: "self." },
-                { trigger: "init", insertText: "def __init__(self):\n    ", label: "def __init__(self):" },
-                { trigger: "doc", insertText: "\"\"\"\n\n\"\"\"", label: "\"\"\"docstring\"\"\"", cursorBack: 3 },
-                { trigger: "input", insertText: "input()", label: "input()", cursorBack: 1 },
-                { trigger: "open", insertText: "open('', 'r')", label: "open('file', 'r')", cursorBack: 6 },
-                { trigger: "read", insertText: ".read()", label: ".read()" },
-                { trigger: "write", insertText: ".write()", label: ".write()", cursorBack: 1 },
-                { trigger: "append", insertText: ".append()", label: ".append()", cursorBack: 1 },
-                { trigger: "extend", insertText: ".extend()", label: ".extend()", cursorBack: 1 },
-                { trigger: "sort", insertText: ".sort()", label: ".sort()" },
-                { trigger: "reverse", insertText: ".reverse()", label: ".reverse()" },
-                { trigger: "keys", insertText: ".keys()", label: ".keys()" },
-                { trigger: "values", insertText: ".values()", label: ".values()" },
-                { trigger: "items", insertText: ".items()", label: ".items()" },
-                { trigger: "get", insertText: ".get()", label: ".get()", cursorBack: 1 },
-                { trigger: "update", insertText: ".update()", label: ".update()", cursorBack: 1 },
-                { trigger: "pop", insertText: ".pop()", label: ".pop()", cursorBack: 1 },
-                { trigger: "remove", insertText: ".remove()", label: ".remove()", cursorBack: 1 },
-                { trigger: "add", insertText: ".add()", label: ".add()", cursorBack: 1 },
-                { trigger: "discard", insertText: ".discard()", label: ".discard()", cursorBack: 1 },
-                { trigger: "float", insertText: "float()", label: "float()", cursorBack: 1 },
-                { trigger: "bool", insertText: "bool()", label: "bool()", cursorBack: 1 },
-                { trigger: "tuple", insertText: "tuple()", label: "tuple()", cursorBack: 1 },
-                { trigger: "max", insertText: "max()", label: "max()", cursorBack: 1 },
-                { trigger: "min", insertText: "min()", label: "min()", cursorBack: 1 },
-                { trigger: "sum", insertText: "sum()", label: "sum()", cursorBack: 1 },
-                { trigger: "abs", insertText: "abs()", label: "abs()", cursorBack: 1 },
-                { trigger: "round", insertText: "round()", label: "round()", cursorBack: 1 },
-                { trigger: "isinstance", insertText: "isinstance()", label: "isinstance()", cursorBack: 1 },
-                { trigger: "type", insertText: "type()", label: "type()", cursorBack: 1 },
-                { trigger: "hasattr", insertText: "hasattr()", label: "hasattr()", cursorBack: 1 },
-                { trigger: "getattr", insertText: "getattr()", label: "getattr()", cursorBack: 1 },
-                { trigger: "setattr", insertText: "setattr()", label: "setattr()", cursorBack: 1 },
-                { trigger: "super", insertText: "super().", label: "super()." },
-                { trigger: "cls", insertText: "cls.", label: "cls." },
-                { trigger: "staticmethod", insertText: "@staticmethod\n", label: "@staticmethod" },
-                { trigger: "classmethod", insertText: "@classmethod\n", label: "@classmethod" },
-                { trigger: "property", insertText: "@property\n", label: "@property" },
-                { trigger: "assert", insertText: "assert ", label: "assert " },
-                { trigger: "raise", insertText: "raise ", label: "raise " },
-                { trigger: "exception", insertText: "except Exception as e:\n    ", label: "except Exception as e:" },
-                { trigger: "finally", insertText: "finally:\n    ", label: "finally:" },
-                { trigger: "break", insertText: "break", label: "break" },
-                { trigger: "continue", insertText: "continue", label: "continue" },
-                { trigger: "pass", insertText: "pass", label: "pass" },
-                { trigger: "global", insertText: "global ", label: "global " },
-                { trigger: "nonlocal", insertText: "nonlocal ", label: "nonlocal " },
-                { trigger: "del", insertText: "del ", label: "del " },
-                { trigger: "json", insertText: "import json", label: "import json" },
-                { trigger: "os", insertText: "import os", label: "import os" },
-                { trigger: "sys", insertText: "import sys", label: "import sys" },
-                { trigger: "time", insertText: "import time", label: "import time" },
-                { trigger: "datetime", insertText: "from datetime import datetime", label: "from datetime import datetime" },
-                { trigger: "random", insertText: "import random", label: "import random" },
-                { trigger: "re", insertText: "import re", label: "import re" },
-                { trigger: "math", insertText: "import math", label: "import math" },
-                { trigger: "collections", insertText: "from collections import defaultdict", label: "from collections import defaultdict" },
-                { trigger: "itertools", insertText: "import itertools", label: "import itertools" },
-                { trigger: "functools", insertText: "import functools", label: "import functools" },
-                { trigger: "threading", insertText: "import threading", label: "import threading" },
-                { trigger: "multiprocessing", insertText: "import multiprocessing", label: "import multiprocessing" },
-                { trigger: "unittest", insertText: "import unittest", label: "import unittest" },
-                { trigger: "logging", insertText: "import logging", label: "import logging" },
-                { trigger: "pathlib", insertText: "from pathlib import Path", label: "from pathlib import Path" },
-                { trigger: "typing", insertText: "from typing import List, Dict, Optional", label: "from typing import List, Dict, Optional" },
-                { trigger: "dataclass", insertText: "@dataclass\n", label: "@dataclass" },
-                { trigger: "decorator", insertText: "@", label: "@" },
-                { trigger: "listcomp", insertText: "[x for x in iterable]", label: "[x for x in iterable]" },
-                { trigger: "dictcomp", insertText: "{k: v for k, v in items}", label: "{k: v for k, v in items}" },
-                { trigger: "setcomp", insertText: "{x for x in iterable}", label: "{x for x in iterable}" },
-                { trigger: "genexp", insertText: "(x for x in iterable)", label: "(x for x in iterable)" },
-                { trigger: "slice", insertText: "[:]", label: "[:]" },
-                { trigger: "format", insertText: ".format()", label: ".format()", cursorBack: 1 },
-                { trigger: "fstring", insertText: "f\"{}\"", label: "f\"{}\"", cursorBack: 1 },
-                { trigger: "join", insertText: "\"\".join()", label: "\"\".join()", cursorBack: 2 },
-                { trigger: "split", insertText: ".split()", label: ".split()", cursorBack: 1 },
-                { trigger: "replace", insertText: ".replace()", label: ".replace()", cursorBack: 1 },
-                { trigger: "strip", insertText: ".strip()", label: ".strip()" },
-                { trigger: "startswith", insertText: ".startswith()", label: ".startswith()", cursorBack: 1 },
-                { trigger: "endswith", insertText: ".endswith()", label: ".endswith()", cursorBack: 1 },
-                { trigger: "find", insertText: ".find()", label: ".find()", cursorBack: 1 },
-                { trigger: "count", insertText: ".count()", label: ".count()", cursorBack: 1 },
-                { trigger: "upper", insertText: ".upper()", label: ".upper()" },
-                { trigger: "lower", insertText: ".lower()", label: ".lower()" },
-                { trigger: "title", insertText: ".title()", label: ".title()" },
-                { trigger: "capitalize", insertText: ".capitalize()", label: ".capitalize()" },
-                { trigger: "sleep", insertText: "time.sleep()", label: "time.sleep()", cursorBack: 1 },
-                { trigger: "timeit", insertText: "time.time()", label: "time.time()" },
-                { trigger: "datetime", insertText: "datetime.now()", label: "datetime.now()" },
-                { trigger: "randint", insertText: "random.randint()", label: "random.randint()", cursorBack: 1 },
-                { trigger: "choice", insertText: "random.choice()", label: "random.choice()", cursorBack: 1 },
-                { trigger: "shuffle", insertText: "random.shuffle()", label: "random.shuffle()", cursorBack: 1 },
-                { trigger: "re_match", insertText: "re.match()", label: "re.match()", cursorBack: 1 },
-                { trigger: "re_search", insertText: "re.search()", label: "re.search()", cursorBack: 1 },
-                { trigger: "re_findall", insertText: "re.findall()", label: "re.findall()", cursorBack: 1 },
-                { trigger: "re_sub", insertText: "re.sub()", label: "re.sub()", cursorBack: 1 }
-            ],
-            ".js": [
-                { trigger: "fn", insertText: "function name() {\n    \n}", label: "function name() {}", cursorBack: 3 },
-                { trigger: "const", insertText: "const ", label: "const " },
-                { trigger: "let", insertText: "let ", label: "let " },
-                { trigger: "var", insertText: "var ", label: "var " },
-                { trigger: "if", insertText: "if () {\n    \n}", label: "if () {}", cursorBack: 4 },
-                { trigger: "else", insertText: "else {\n    \n}", label: "else {}" },
-                { trigger: "elif", insertText: "else if () {\n    \n}", label: "else if () {}", cursorBack: 9 },
-                { trigger: "for", insertText: "for (let i = 0; i < ; i++) {\n    \n}", label: "for loop", cursorBack: 13 },
-                { trigger: "foreach", insertText: "for (const item of array) {\n    \n}", label: "for...of", cursorBack: 8 },
-                { trigger: "forin", insertText: "for (const key in object) {\n    \n}", label: "for...in", cursorBack: 8 },
-                { trigger: "while", insertText: "while () {\n    \n}", label: "while () {}", cursorBack: 7 },
-                { trigger: "dowhile", insertText: "do {\n    \n} while ();", label: "do-while", cursorBack: 8 },
-                { trigger: "switch", insertText: "switch () {\n    case :\n        break;\n    default:\n        break;\n}", label: "switch case", cursorBack: 15 },
-                { trigger: "case", insertText: "case :\n    break;", label: "case :", cursorBack: 5 },
-                { trigger: "default", insertText: "default:\n    break;", label: "default:" },
-                { trigger: "try", insertText: "try {\n    \n} catch (error) {\n    \n}", label: "try-catch", cursorBack: 15 },
-                { trigger: "tryfinally", insertText: "try {\n    \n} catch (error) {\n    \n} finally {\n    \n}", label: "try-catch-finally", cursorBack: 25 },
-                { trigger: "throw", insertText: "throw new Error('')", label: "throw new Error", cursorBack: 7 },
-                { trigger: "return", insertText: "return ", label: "return " },
-                { trigger: "console", insertText: "console.log()", label: "console.log()", cursorBack: 1 },
-                { trigger: "log", insertText: "console.log()", label: "console.log()", cursorBack: 1 },
-                { trigger: "error", insertText: "console.error()", label: "console.error()", cursorBack: 1 },
-                { trigger: "warn", insertText: "console.warn()", label: "console.warn()", cursorBack: 1 },
-                { trigger: "info", insertText: "console.info()", label: "console.info()", cursorBack: 1 },
-                { trigger: "debug", insertText: "console.debug()", label: "console.debug()", cursorBack: 1 },
-                { trigger: "table", insertText: "console.table()", label: "console.table()", cursorBack: 1 },
-                { trigger: "group", insertText: "console.group()", label: "console.group()", cursorBack: 1 },
-                { trigger: "groupend", insertText: "console.groupEnd()", label: "console.groupEnd()" },
-                { trigger: "trace", insertText: "console.trace()", label: "console.trace()" },
-                { trigger: "async", insertText: "async function name() {\n    \n}", label: "async function", cursorBack: 9 },
-                { trigger: "await", insertText: "await ", label: "await " },
-                { trigger: "promise", insertText: "new Promise((resolve, reject) => {\n    \n})", label: "new Promise", cursorBack: 15 },
-                { trigger: "promisethen", insertText: ".then(() => {\n    \n}).catch(() => {\n    \n})", label: ".then().catch()", cursorBack: 8 },
-                { trigger: "fetch", insertText: "fetch('', {\n    method: 'GET',\n    headers: {}\n})", label: "fetch()", cursorBack: 8 },
-                { trigger: "arrow", insertText: "() => {\n    \n}", label: "() => {}", cursorBack: 3 },
-                { trigger: "arrowshort", insertText: "() => ", label: "() => " },
-                { trigger: "class", insertText: "class ClassName {\n    constructor() {\n        \n    }\n}", label: "class ClassName {}", cursorBack: 20 },
-                { trigger: "constructor", insertText: "constructor() {\n    \n}", label: "constructor()", cursorBack: 3 },
-                { trigger: "extends", insertText: "extends ", label: "extends " },
-                { trigger: "super", insertText: "super()", label: "super()", cursorBack: 1 },
-                { trigger: "import", insertText: "import ", label: "import " },
-                { trigger: "importdefault", insertText: "import name from ''", label: "import name from", cursorBack: 6 },
-                { trigger: "importnamed", insertText: "import { } from ''", label: "import { } from", cursorBack: 9 },
-                { trigger: "importall", insertText: "import * as name from ''", label: "import * as name from", cursorBack: 11 },
-                { trigger: "require", insertText: "require('')", label: "require('')", cursorBack: 1 },
-                { trigger: "export", insertText: "export ", label: "export " },
-                { trigger: "default", insertText: "export default ", label: "export default " },
-                { trigger: "exportnamed", insertText: "export const ", label: "export const " },
-                { trigger: "array", insertText: "[]", label: "[]", cursorBack: 1 },
-                { trigger: "object", insertText: "{}", label: "{}", cursorBack: 1 },
-                { trigger: "json", insertText: "JSON.parse()", label: "JSON.parse()", cursorBack: 1 },
-                { trigger: "jsons", insertText: "JSON.stringify()", label: "JSON.stringify()", cursorBack: 1 },
-                { trigger: "math", insertText: "Math.", label: "Math." },
-                { trigger: "date", insertText: "new Date()", label: "new Date()" },
-                { trigger: "settimeout", insertText: "setTimeout(() => {\n    \n}, 1000)", label: "setTimeout", cursorBack: 8 },
-                { trigger: "setinterval", insertText: "setInterval(() => {\n    \n}, 1000)", label: "setInterval", cursorBack: 8 },
-                { trigger: "cleartimeout", insertText: "clearTimeout()", label: "clearTimeout()", cursorBack: 1 },
-                { trigger: "clearinterval", insertText: "clearInterval()", label: "clearInterval()", cursorBack: 1 },
-                { trigger: "addevent", insertText: ".addEventListener('', () => {\n    \n})", label: ".addEventListener()", cursorBack: 16 },
-                { trigger: "removeevent", insertText: ".removeEventListener()", label: ".removeEventListener()", cursorBack: 1 },
-                { trigger: "query", insertText: "document.querySelector()", label: "querySelector()", cursorBack: 1 },
-                { trigger: "queryall", insertText: "document.querySelectorAll()", label: "querySelectorAll()", cursorBack: 1 },
-                { trigger: "getid", insertText: "document.getElementById()", label: "getElementById()", cursorBack: 1 },
-                { trigger: "getclass", insertText: "document.getElementsByClassName()", label: "getElementsByClassName()", cursorBack: 1 },
-                { trigger: "gettag", insertText: "document.getElementsByTagName()", label: "getElementsByTagName()", cursorBack: 1 },
-                { trigger: "create", insertText: "document.createElement()", label: "createElement()", cursorBack: 1 },
-                { trigger: "append", insertText: ".appendChild()", label: ".appendChild()", cursorBack: 1 },
-                { trigger: "remove", insertText: ".remove()", label: ".remove()" },
-                { trigger: "inner", insertText: ".innerHTML", label: ".innerHTML" },
-                { trigger: "text", insertText: ".textContent", label: ".textContent" },
-                { trigger: "value", insertText: ".value", label: ".value" },
-                { trigger: "style", insertText: ".style.", label: ".style." },
-                { trigger: "classlist", insertText: ".classList", label: ".classList" },
-                { trigger: "addclass", insertText: ".classList.add()", label: ".classList.add()", cursorBack: 1 },
-                { trigger: "removeclass", insertText: ".classList.remove()", label: ".classList.remove()", cursorBack: 1 },
-                { trigger: "toggleclass", insertText: ".classList.toggle()", label: ".classList.toggle()", cursorBack: 1 },
-                { trigger: "hasclass", insertText: ".classList.contains()", label: ".classList.contains()", cursorBack: 1 },
-                { trigger: "dataset", insertText: ".dataset.", label: ".dataset." },
-                { trigger: "setattribute", insertText: ".setAttribute()", label: ".setAttribute()", cursorBack: 1 },
-                { trigger: "getattribute", insertText: ".getAttribute()", label: ".getAttribute()", cursorBack: 1 },
-                { trigger: "hasattribute", insertText: ".hasAttribute()", label: ".hasAttribute()", cursorBack: 1 },
-                { trigger: "localstorage", insertText: "localStorage.", label: "localStorage." },
-                { trigger: "sessionstorage", insertText: "sessionStorage.", label: "sessionStorage." },
-                { trigger: "getitem", insertText: ".getItem()", label: ".getItem()", cursorBack: 1 },
-                { trigger: "setitem", insertText: ".setItem()", label: ".setItem()", cursorBack: 1 },
-                { trigger: "removeitem", insertText: ".removeItem()", label: ".removeItem()", cursorBack: 1 },
-                { trigger: "clearstorage", insertText: ".clear()", label: ".clear()" },
-                { trigger: "push", insertText: ".push()", label: ".push()", cursorBack: 1 },
-                { trigger: "pop", insertText: ".pop()", label: ".pop()" },
-                { trigger: "shift", insertText: ".shift()", label: ".shift()" },
-                { trigger: "unshift", insertText: ".unshift()", label: ".unshift()", cursorBack: 1 },
-                { trigger: "splice", insertText: ".splice()", label: ".splice()", cursorBack: 1 },
-                { trigger: "slice", insertText: ".slice()", label: ".slice()", cursorBack: 1 },
-                { trigger: "map", insertText: ".map(() => {\n    \n})", label: ".map()", cursorBack: 8 },
-                { trigger: "filter", insertText: ".filter(() => {\n    \n})", label: ".filter()", cursorBack: 10 },
-                { trigger: "reduce", insertText: ".reduce((acc, curr) => {\n    \n}, initialValue)", label: ".reduce()", cursorBack: 15 },
-                { trigger: "find", insertText: ".find(() => {\n    \n})", label: ".find()", cursorBack: 8 },
-                { trigger: "findindex", insertText: ".findIndex(() => {\n    \n})", label: ".findIndex()", cursorBack: 12 },
-                { trigger: "some", insertText: ".some(() => {\n    \n})", label: ".some()", cursorBack: 8 },
-                { trigger: "every", insertText: ".every(() => {\n    \n})", label: ".every()", cursorBack: 8 },
-                { trigger: "foreach", insertText: ".forEach(() => {\n    \n})", label: ".forEach()", cursorBack: 10 },
-                { trigger: "includes", insertText: ".includes()", label: ".includes()", cursorBack: 1 },
-                { trigger: "indexof", insertText: ".indexOf()", label: ".indexOf()", cursorBack: 1 },
-                { trigger: "join", insertText: ".join()", label: ".join()", cursorBack: 1 },
-                { trigger: "split", insertText: ".split()", label: ".split()", cursorBack: 1 },
-                { trigger: "replace", insertText: ".replace()", label: ".replace()", cursorBack: 1 },
-                { trigger: "replaceall", insertText: ".replaceAll()", label: ".replaceAll()", cursorBack: 1 },
-                { trigger: "toupper", insertText: ".toUpperCase()", label: ".toUpperCase()" },
-                { trigger: "tolower", insertText: ".toLowerCase()", label: ".toLowerCase()" },
-                { trigger: "trim", insertText: ".trim()", label: ".trim()" },
-                { trigger: "trimstart", insertText: ".trimStart()", label: ".trimStart()" },
-                { trigger: "trimend", insertText: ".trimEnd()", label: ".trimEnd()" },
-                { trigger: "padstart", insertText: ".padStart()", label: ".padStart()", cursorBack: 1 },
-                { trigger: "padend", insertText: ".padEnd()", label: ".padEnd()", cursorBack: 1 },
-                { trigger: "charat", insertText: ".charAt()", label: ".charAt()", cursorBack: 1 },
-                { trigger: "charcodeat", insertText: ".charCodeAt()", label: ".charCodeAt()", cursorBack: 1 },
-                { trigger: "substring", insertText: ".substring()", label: ".substring()", cursorBack: 1 },
-                { trigger: "substr", insertText: ".substr()", label: ".substr()", cursorBack: 1 },
-                { trigger: "match", insertText: ".match()", label: ".match()", cursorBack: 1 },
-                { trigger: "search", insertText: ".search()", label: ".search()", cursorBack: 1 },
-                { trigger: "test", insertText: ".test()", label: ".test()", cursorBack: 1 },
-                { trigger: "exec", insertText: ".exec()", label: ".exec()", cursorBack: 1 },
-                { trigger: "keys", insertText: "Object.keys()", label: "Object.keys()", cursorBack: 1 },
-                { trigger: "values", insertText: "Object.values()", label: "Object.values()", cursorBack: 1 },
-                { trigger: "entries", insertText: "Object.entries()", label: "Object.entries()", cursorBack: 1 },
-                { trigger: "assign", insertText: "Object.assign()", label: "Object.assign()", cursorBack: 1 },
-                { trigger: "create", insertText: "Object.create()", label: "Object.create()", cursorBack: 1 },
-                { trigger: "freeze", insertText: "Object.freeze()", label: "Object.freeze()", cursorBack: 1 },
-                { trigger: "seal", insertText: "Object.seal()", label: "Object.seal()", cursorBack: 1 },
-                { trigger: "is", insertText: "Object.is()", label: "Object.is()", cursorBack: 1 },
-                { trigger: "parseint", insertText: "parseInt()", label: "parseInt()", cursorBack: 1 },
-                { trigger: "parsefloat", insertText: "parseFloat()", label: "parseFloat()", cursorBack: 1 },
-                { trigger: "isnan", insertText: "isNaN()", label: "isNaN()", cursorBack: 1 },
-                { trigger: "isfinite", insertText: "isFinite()", label: "isFinite()", cursorBack: 1 },
-                { trigger: "encodeuri", insertText: "encodeURI()", label: "encodeURI()", cursorBack: 1 },
-                { trigger: "decodeuri", insertText: "decodeURI()", label: "decodeURI()", cursorBack: 1 },
-                { trigger: "encodeuricomponent", insertText: "encodeURIComponent()", label: "encodeURIComponent()", cursorBack: 1 },
-                { trigger: "decodeuricomponent", insertText: "decodeURIComponent()", label: "decodeURIComponent()", cursorBack: 1 },
-                { trigger: "typeof", insertText: "typeof ", label: "typeof " },
-                { trigger: "instanceof", insertText: "instanceof ", label: "instanceof " },
-                { trigger: "void", insertText: "void ", label: "void " },
-                { trigger: "delete", insertText: "delete ", label: "delete " },
-                { trigger: "in", insertText: " in ", label: " in " },
-                { trigger: "new", insertText: "new ", label: "new " },
-                { trigger: "this", insertText: "this.", label: "this." },
-                { trigger: "window", insertText: "window.", label: "window." },
-                { trigger: "document", insertText: "document.", label: "document." },
-                { trigger: "location", insertText: "location.", label: "location." },
-                { trigger: "history", insertText: "history.", label: "history." },
-                { trigger: "navigator", insertText: "navigator.", label: "navigator." },
-                { trigger: "screen", insertText: "screen.", label: "screen." },
-                { trigger: "alert", insertText: "alert()", label: "alert()", cursorBack: 1 },
-                { trigger: "confirm", insertText: "confirm()", label: "confirm()", cursorBack: 1 },
-                { trigger: "prompt", insertText: "prompt()", label: "prompt()", cursorBack: 1 },
-                { trigger: "template", insertText: "``", label: "``", cursorBack: 1 },
-                { trigger: "regex", insertText: "/pattern/", label: "/pattern/", cursorBack: 1 },
-                { trigger: "regexglobal", insertText: "/pattern/g", label: "/pattern/g", cursorBack: 1 },
-                { trigger: "regexcase", insertText: "/pattern/i", label: "/pattern/i", cursorBack: 1 },
-                { trigger: "regexmultiline", insertText: "/pattern/m", label: "/pattern/m", cursorBack: 1 },
-                { trigger: "spread", insertText: "...", label: "... spread" },
-                { trigger: "rest", insertText: "...args", label: "...args" },
-                { trigger: "destructure", insertText: "const { } = object", label: "const { } = object", cursorBack: 5 },
-                { trigger: "destructurearray", insertText: "const [ ] = array", label: "const [ ] = array", cursorBack: 5 },
-                { trigger: "optional", insertText: "obj?.property", label: "obj?.property" },
-                { trigger: "nullish", insertText: "?? ", label: "?? nullish" },
-                { trigger: "ternary", insertText: "condition ? true : false", label: "condition ? true : false" },
-                { trigger: "debugger", insertText: "debugger", label: "debugger" },
-                { trigger: "strict", insertText: "\"use strict\"", label: "\"use strict\"" }
-            ],
-            ".css": [
-                { trigger: "disp", insertText: "display: ;", label: "display: ;", cursorBack: 1 },
-                { trigger: "pos", insertText: "position: ;", label: "position: ;", cursorBack: 1 },
-                { trigger: "bg", insertText: "background: ;", label: "background: ;", cursorBack: 1 },
-                { trigger: "media", insertText: "@media (max-width: 768px) {\n    \n}", label: "@media (...)", cursorBack: 3 },
-                { trigger: "width", insertText: "width: ;", label: "width: ;", cursorBack: 1 },
-                { trigger: "height", insertText: "height: ;", label: "height: ;", cursorBack: 1 },
-                { trigger: "margin", insertText: "margin: ;", label: "margin: ;", cursorBack: 1 },
-                { trigger: "padding", insertText: "padding: ;", label: "padding: ;", cursorBack: 1 },
-                { trigger: "border", insertText: "border: 1px solid #000;", label: "border: 1px solid #000;" },
-                { trigger: "color", insertText: "color: ;", label: "color: ;", cursorBack: 1 },
-                { trigger: "font", insertText: "font-size: ;", label: "font-size: ;", cursorBack: 1 },
-                { trigger: "text", insertText: "text-align: ;", label: "text-align: ;", cursorBack: 1 },
-                { trigger: "flex", insertText: "display: flex;", label: "display: flex;" },
-                { trigger: "grid", insertText: "display: grid;", label: "display: grid;" },
-                { trigger: "block", insertText: "display: block;", label: "display: block;" },
-                { trigger: "inline", insertText: "display: inline;", label: "display: inline;" },
-                { trigger: "inlineblock", insertText: "display: inline-block;", label: "display: inline-block;" },
-                { trigger: "none", insertText: "display: none;", label: "display: none;" },
-                { trigger: "absolute", insertText: "position: absolute;", label: "position: absolute;" },
-                { trigger: "relative", insertText: "position: relative;", label: "position: relative;" },
-                { trigger: "fixed", insertText: "position: fixed;", label: "position: fixed;" },
-                { trigger: "static", insertText: "position: static;", label: "position: static;" },
-                { trigger: "center", insertText: "text-align: center;", label: "text-align: center;" },
-                { trigger: "left", insertText: "text-align: left;", label: "text-align: left;" },
-                { trigger: "right", insertText: "text-align: right;", label: "text-align: right;" },
-                { trigger: "justify", insertText: "text-align: justify;", label: "text-align: justify;" },
-                { trigger: "top", insertText: "top: ;", label: "top: ;", cursorBack: 1 },
-                { trigger: "bottom", insertText: "bottom: ;", label: "bottom: ;", cursorBack: 1 },
-                { trigger: "leftpos", insertText: "left: ;", label: "left: ;", cursorBack: 1 },
-                { trigger: "rightpos", insertText: "right: ;", label: "right: ;", cursorBack: 1 },
-                { trigger: "zindex", insertText: "z-index: ;", label: "z-index: ;", cursorBack: 1 },
-                { trigger: "opacity", insertText: "opacity: ;", label: "opacity: ;", cursorBack: 1 },
-                { trigger: "shadow", insertText: "box-shadow: 0 2px 4px rgba(0,0,0,0.1);", label: "box-shadow: ..." },
-                { trigger: "transition", insertText: "transition: all 0.3s ease;", label: "transition: all 0.3s ease;" },
-                { trigger: "transform", insertText: "transform: ;", label: "transform: ;", cursorBack: 1 },
-                { trigger: "hover", insertText: ":hover {\n    \n}", label: ":hover {}", cursorBack: 3 },
-                { trigger: "before", insertText: "::before {\n    \n}", label: "::before {}", cursorBack: 3 },
-                { trigger: "after", insertText: "::after {\n    \n}", label: "::after {}", cursorBack: 3 },
-                { trigger: "important", insertText: "!important", label: "!important" }
-            ],
-            ".json": [
-                { trigger: "true", insertText: "true", label: "true" },
-                { trigger: "false", insertText: "false", label: "false" },
-                { trigger: "null", insertText: "null", label: "null" },
-                { trigger: "obj", insertText: "{\n  \n}", label: "{ ... }", cursorBack: 3 },
-                { trigger: "arr", insertText: "[\n  \n]", label: "[ ... ]", cursorBack: 3 },
-                { trigger: "string", insertText: "\"\"", label: "\"\"", cursorBack: 1 },
-                { trigger: "number", insertText: "0", label: "0" },
-                { trigger: "key", insertText: "\"key\": \"value\"", label: "\"key\": \"value\"", cursorBack: 7 }
-            ],
-            ".html": [
-                { trigger: "div", insertText: "<div></div>", label: "<div></div>", cursorBack: 6 },
-                { trigger: "span", insertText: "<span></span>", label: "<span></span>", cursorBack: 7 },
-                { trigger: "script", insertText: "<script></script>", label: "<script></script>", cursorBack: 9 },
-                { trigger: "linkcss", insertText: "<link rel=\"stylesheet\" href=\"style.css\">", label: "<link rel=\"stylesheet\" ...>" },
-                { trigger: "p", insertText: "<p></p>", label: "<p></p>", cursorBack: 4 },
-                { trigger: "a", insertText: "<a href=\"\"></a>", label: "<a href=\"\"></a>", cursorBack: 3 },
-                { trigger: "img", insertText: "<img src=\"\" alt=\"\">", label: "<img src=\"\" alt=\"\">", cursorBack: 6 },
-                { trigger: "ul", insertText: "<ul>\n  <li></li>\n</ul>", label: "<ul><li></li></ul>", cursorBack: 5 },
-                { trigger: "ol", insertText: "<ol>\n  <li></li>\n</ol>", label: "<ol><li></li></ol>", cursorBack: 5 },
-                { trigger: "li", insertText: "<li></li>", label: "<li></li>", cursorBack: 5 },
-                { trigger: "table", insertText: "<table>\n  <tr>\n    <th></th>\n  </tr>\n  <tr>\n    <td></td>\n  </tr>\n</table>", label: "<table>...</table>", cursorBack: 8 },
-                { trigger: "tr", insertText: "<tr>\n  \n</tr>", label: "<tr></tr>", cursorBack: 3 },
-                { trigger: "th", insertText: "<th></th>", label: "<th></th>", cursorBack: 5 },
-                { trigger: "td", insertText: "<td></td>", label: "<td></td>", cursorBack: 5 },
-                { trigger: "form", insertText: "<form>\n  \n</form>", label: "<form></form>", cursorBack: 3 },
-                { trigger: "input", insertText: "<input type=\"text\" name=\"\">", label: "<input type=\"text\" ...>", cursorBack: 6 },
-                { trigger: "button", insertText: "<button></button>", label: "<button></button>", cursorBack: 9 },
-                { trigger: "select", insertText: "<select>\n  <option></option>\n</select>", label: "<select>...</select>", cursorBack: 9 },
-                { trigger: "option", insertText: "<option></option>", label: "<option></option>", cursorBack: 9 },
-                { trigger: "textarea", insertText: "<textarea></textarea>", label: "<textarea></textarea>", cursorBack: 11 },
-                { trigger: "header", insertText: "<header></header>", label: "<header></header>", cursorBack: 9 },
-                { trigger: "footer", insertText: "<footer></footer>", label: "<footer></footer>", cursorBack: 9 },
-                { trigger: "nav", insertText: "<nav></nav>", label: "<nav></nav>", cursorBack: 6 },
-                { trigger: "main", insertText: "<main></main>", label: "<main></main>", cursorBack: 7 },
-                { trigger: "section", insertText: "<section></section>", label: "<section></section>", cursorBack: 10 },
-                { trigger: "article", insertText: "<article></article>", label: "<article></article>", cursorBack: 10 },
-                { trigger: "aside", insertText: "<aside></aside>", label: "<aside></aside>", cursorBack: 8 },
-                { trigger: "h1", insertText: "<h1></h1>", label: "<h1></h1>", cursorBack: 5 },
-                { trigger: "h2", insertText: "<h2></h2>", label: "<h2></h2>", cursorBack: 5 },
-                { trigger: "h3", insertText: "<h3></h3>", label: "<h3></h3>", cursorBack: 5 },
-                { trigger: "meta", insertText: "<meta charset=\"UTF-8\">", label: "<meta charset=\"UTF-8\">" },
-                { trigger: "doctype", insertText: "<!DOCTYPE html>", label: "<!DOCTYPE html>" },
-                { trigger: "html", insertText: "<html lang=\"ko\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title></title>\n</head>\n<body>\n  \n</body>\n</html>", label: "<html>...</html>", cursorBack: 8 },
-                { trigger: "head", insertText: "<head>\n  \n</head>", label: "<head></head>", cursorBack: 3 },
-                { trigger: "body", insertText: "<body>\n  \n</body>", label: "<body></body>", cursorBack: 3 },
-                { trigger: "style", insertText: "<style>\n  \n</style>", label: "<style></style>", cursorBack: 3 },
-                { trigger: "title", insertText: "<title></title>", label: "<title></title>", cursorBack: 8 },
-                { trigger: "link", insertText: "<link rel=\"stylesheet\" href=\"\">", label: "<link rel=\"stylesheet\" ...>", cursorBack: 6 },
-                { trigger: "metautf", insertText: "<meta charset=\"UTF-8\">", label: "<meta charset=\"UTF-8\">" },
-                { trigger: "metaview", insertText: "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">", label: "<meta name=\"viewport\" ...>" },
-                { trigger: "class", insertText: "class=\"\"", label: "class=\"\"", cursorBack: 1 },
-                { trigger: "id", insertText: "id=\"\"", label: "id=\"\"", cursorBack: 1 },
-                { trigger: "src", insertText: "src=\"\"", label: "src=\"\"", cursorBack: 1 },
-                { trigger: "href", insertText: "href=\"\"", label: "href=\"\"", cursorBack: 1 },
-                { trigger: "alt", insertText: "alt=\"\"", label: "alt=\"\"", cursorBack: 1 },
-                { trigger: "placeholder", insertText: "placeholder=\"\"", label: "placeholder=\"\"", cursorBack: 1 },
-                { trigger: "value", insertText: "value=\"\"", label: "value=\"\"", cursorBack: 1 },
-                { trigger: "name", insertText: "name=\"\"", label: "name=\"\"", cursorBack: 1 },
-                { trigger: "type", insertText: "type=\"\"", label: "type=\"\"", cursorBack: 1 }
-            ]
-        };
-
-        window.__docsEditorCompletionMap = editorCompletionMap;
+        let activeEditorSuggestions = [];
+        let activeEditorSuggestionIndex = -1;
+        let writeSuggestEventsBound = false;
+        // 자동완성 단어 리스트는 전역 단일 맵(window.__docsEditorCompletionMap)만 사용
+        const editorCompletionMap = window.__docsEditorCompletionMap || {};
 
         function markCurrentAsSaved() {
             savedFilenameValue = filenameInput ? filenameInput.value : "";
@@ -4378,7 +4144,7 @@
             } else if (extension === ".html") {
                 if (snippetType === "html_basic") {
                     snippet = {
-                        text: "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Document</title>\n</head>\n<body>\n  \n</body>\n</html>",
+                        text: "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>File</title>\n</head>\n<body>\n  \n</body>\n</html>",
                         selectStart: 82,
                         selectEnd: 90
                     };
@@ -4602,24 +4368,24 @@
         function resolveWriteEditorRenderClass() {
             const extension = resolveWriteFilenameExtension();
             if (extension === ".md") {
-                return "docs-editor-md";
+                return "ide-editor-md";
             }
             if (extension === ".js") {
-                return "docs-js";
+                return "ide-js";
             }
             if (extension === ".css") {
-                return "docs-css";
+                return "ide-css";
             }
             if (extension === ".json") {
-                return "docs-json";
+                return "ide-json";
             }
             if (extension === ".py") {
-                return "docs-py";
+                return "ide-py";
             }
             if (extension === ".html") {
-                return "docs-editor-html";
+                return "ide-editor-html";
             }
-            return "docs-plain-text";
+            return "ide-plain-text";
         }
 
         function syncEditorHighlightScroll() {
@@ -4631,36 +4397,69 @@
         }
 
         function clearEditorSuggestion() {
-            activeEditorSuggestion = null;
+            activeEditorSuggestions = [];
+            activeEditorSuggestionIndex = -1;
             if (editorSuggest) {
                 editorSuggest.hidden = true;
                 // 위치 스타일 초기화
                 editorSuggest.style.left = '';
                 editorSuggest.style.top = '';
+                editorSuggest.innerHTML = "";
             }
             if (editorSuggestLabel) {
                 editorSuggestLabel.textContent = "";
             }
         }
 
-        function findEditorSuggestion(extension, tokenText) {
+        function findEditorSuggestions(extension, tokenText) {
             const items = editorCompletionMap[extension] || [];
-            const normalizedToken = String(tokenText || "").toLowerCase();
-            if (!normalizedToken) {
-                return null;
+            return findEditorCompletionItems(items, tokenText, 8);
+        }
+
+        function renderWriteEditorSuggestDropdown() {
+            if (!editorSuggest) {
+                return;
             }
-            for (let i = 0; i < items.length; i += 1) {
-                const item = items[i];
-                const trigger = String(item.trigger || "").toLowerCase();
-                if (trigger && trigger.startsWith(normalizedToken)) {
-                    return item;
-                }
+            editorSuggest.innerHTML = "";
+            const list = document.createElement("div");
+            list.className = "ide-editor-suggest-list";
+            for (let i = 0; i < activeEditorSuggestions.length; i += 1) {
+                const item = activeEditorSuggestions[i] || {};
+                const option = document.createElement("button");
+                option.type = "button";
+                option.className = "ide-editor-suggest-item" + (i === activeEditorSuggestionIndex ? " is-active" : "");
+                option.setAttribute("data-suggest-index", String(i));
+
+                const labelNode = document.createElement("span");
+                labelNode.className = "ide-editor-suggest-item-label";
+                labelNode.textContent = item.label || item.insertText || "";
+
+                const triggerNode = document.createElement("span");
+                triggerNode.className = "ide-editor-suggest-item-trigger";
+                triggerNode.textContent = item.trigger || "";
+
+                option.appendChild(labelNode);
+                option.appendChild(triggerNode);
+                list.appendChild(option);
             }
-            return null;
+            const footer = document.createElement("div");
+            footer.className = "ide-editor-suggest-footer";
+            footer.textContent = "↑↓ 이동 · Enter/Tab 적용";
+            editorSuggest.appendChild(list);
+            editorSuggest.appendChild(footer);
+        }
+
+        function moveWriteEditorSuggestion(step) {
+            if (!activeEditorSuggestions.length) {
+                return;
+            }
+            const count = activeEditorSuggestions.length;
+            activeEditorSuggestionIndex = (activeEditorSuggestionIndex + step + count) % count;
+            renderWriteEditorSuggestDropdown();
         }
 
         function updateEditorSuggestion() {
-            if (!contentInput || !editorSuggest || !editorSuggestLabel) {
+            if (!contentInput || !editorSuggest) {
                 return;
             }
             const start = contentInput.selectionStart || 0;
@@ -4671,26 +4470,29 @@
             }
 
             const extension = getCurrentEditorExtension();
-            const linePrefix = (contentInput.value || "").slice(0, start);
-            const wordMatch = linePrefix.match(/[A-Za-z_][A-Za-z0-9_-]*$/);
-            if (!wordMatch) {
+            const tokenInfo = extractEditorCompletionToken(contentInput.value || "", start);
+            if (!tokenInfo) {
                 clearEditorSuggestion();
                 return;
             }
-            const token = wordMatch[0] || "";
-            const suggestion = findEditorSuggestion(extension, token);
-            if (!suggestion) {
+            const suggestions = findEditorSuggestions(extension, tokenInfo.token);
+            if (!suggestions.length) {
                 clearEditorSuggestion();
                 return;
             }
 
-            activeEditorSuggestion = {
-                start: start - token.length,
-                end: start,
-                insertText: suggestion.insertText,
-                cursorBack: Number(suggestion.cursorBack || 0),
-                label: suggestion.label || suggestion.insertText
-            };
+            activeEditorSuggestions = suggestions.map(function (suggestion) {
+                return {
+                    start: tokenInfo.start,
+                    end: tokenInfo.end,
+                    insertText: suggestion.insertText,
+                    cursorBack: Number(suggestion.cursorBack || 0),
+                    label: suggestion.label || suggestion.insertText,
+                    trigger: suggestion.trigger || "",
+                };
+            });
+            activeEditorSuggestionIndex = 0;
+            renderWriteEditorSuggestDropdown();
             
             // 커서 위치 계산
             const cursorPosition = calculateCursorPosition(contentInput, start);
@@ -4699,48 +4501,29 @@
                 const editorRect = contentInput.getBoundingClientRect();
                 const surfaceRect = editorSurface ? editorSurface.getBoundingClientRect() : null;
                 
-                // 커서 기준으로 오른쪽 4픽셀, 수직으로 (suggest 상단 높이 - 커서 상단 높이)/2 만큼 조정
-                let left = cursorPosition.left + 4;
-                let top = cursorPosition.top;
+                // 커서 기준으로 오른쪽 12픽셀, 아래 6픽셀
+                let left = cursorPosition.left + 12;
+                let top = cursorPosition.top + (cursorPosition.lineHeight || 20) + 6;
                 
                 // 에디터 서페이스가 있으면 상대 위치 조정
                 if (surfaceRect) {
-                    left = (cursorPosition.left + 4) - surfaceRect.left;
-                    top = cursorPosition.top - surfaceRect.top;
+                    left = (cursorPosition.left + 12) - surfaceRect.left;
+                    top = (cursorPosition.top + (cursorPosition.lineHeight || 20) + 6) - surfaceRect.top;
                 }
-                
-                // 화면 밖으로 나가지 않도록 조정
-                const suggestWidth = 200; // 예상 너비
-                const suggestHeight = 30; // 예상 높이
-                
-                if (left + suggestWidth > (surfaceRect ? surfaceRect.width : window.innerWidth)) {
-                    left = (surfaceRect ? surfaceRect.width : window.innerWidth) - suggestWidth - 10;
-                }
-                
-                if (top + suggestHeight > (surfaceRect ? surfaceRect.height : window.innerHeight)) {
-                    top = top - suggestHeight - 5;
-                }
-                
-                // suggest 상단과 커서 상단이 일치하도록 높이 조정: (suggest 높이 - 커서 높이)/2
-                const suggestElement = editorSuggest;
-                if (suggestElement) {
-                    const suggestRect = suggestElement.getBoundingClientRect();
-                    const lineHeight = cursorPosition.lineHeight || 20; // 커서 라인 높이
-                    
-                    // suggest의 상단이 커서 상단과 일치하도록 조정
-                    top = top - (suggestRect.height - lineHeight) / 2;
-                    
-                    // 에디터 서페이스가 있으면 상대 위치 재조정
-                    if (surfaceRect) {
-                        top = (cursorPosition.top - (suggestRect.height - lineHeight) / 2) - surfaceRect.top;
-                    }
+
+                const suggestRect = editorSuggest.getBoundingClientRect();
+                if (surfaceRect) {
+                    const minLeft = 8;
+                    const minTop = 8;
+                    const maxLeft = Math.max(minLeft, surfaceRect.width - suggestRect.width - 8);
+                    const maxTop = Math.max(minTop, surfaceRect.height - suggestRect.height - 8);
+                    left = Math.min(Math.max(minLeft, left), maxLeft);
+                    top = Math.min(Math.max(minTop, top), maxTop);
                 }
                 
                 editorSuggest.style.left = left + 'px';
                 editorSuggest.style.top = top + 'px';
             }
-            
-            editorSuggestLabel.textContent = activeEditorSuggestion.label;
             editorSuggest.hidden = false;
         }
 
@@ -4791,10 +4574,13 @@
         window.__docsCalculateCursorPosition = calculateCursorPosition;
 
         function acceptEditorSuggestion() {
-            if (!contentInput || !activeEditorSuggestion) {
+            if (!contentInput) {
                 return false;
             }
-            const suggestion = activeEditorSuggestion;
+            const suggestion = activeEditorSuggestions[activeEditorSuggestionIndex] || null;
+            if (!suggestion) {
+                return false;
+            }
             contentInput.setRangeText(suggestion.insertText, suggestion.start, suggestion.end, "end");
             const cursorPos = (suggestion.start + suggestion.insertText.length) - Math.max(0, suggestion.cursorBack);
             contentInput.setSelectionRange(cursorPos, cursorPos);
@@ -4814,22 +4600,22 @@
             let highlightedHtml = escapeHtml(source);
             
             // .md 파일일 때는 마크다운 렌더링을 하지 않음
-            if (renderClass === "docs-js") {
+            if (renderClass === "ide-js") {
                 highlightedHtml = highlightJavaScriptCode(source);
-            } else if (renderClass === "docs-editor-md") {
+            } else if (renderClass === "ide-editor-md") {
                 // .md 파일은 plain text로 표시
                 highlightedHtml = escapeHtml(source);
-            } else if (renderClass === "docs-css") {
+            } else if (renderClass === "ide-css") {
                 highlightedHtml = highlightCssCode(source);
-            } else if (renderClass === "docs-json") {
+            } else if (renderClass === "ide-json") {
                 highlightedHtml = highlightJsonCode(source);
-            } else if (renderClass === "docs-py") {
+            } else if (renderClass === "ide-py") {
                 highlightedHtml = highlightPythonCode(source);
-            } else if (renderClass === "docs-editor-html") {
+            } else if (renderClass === "ide-editor-html") {
                 highlightedHtml = highlightHtmlCode(source);
             }
 
-            editorHighlight.classList.remove("docs-plain-text", "docs-editor-md", "docs-js", "docs-css", "docs-json", "docs-py", "docs-editor-html");
+            editorHighlight.classList.remove("ide-plain-text", "ide-editor-md", "ide-js", "ide-css", "ide-json", "ide-py", "ide-editor-html");
             editorHighlight.classList.add(renderClass);
             editorHighlightCode.innerHTML = highlightedHtml + (source.endsWith("\n") ? "\u200b" : "");
             syncEditorHighlightScroll();
@@ -4909,7 +4695,7 @@
             function addCrumb(label, pathValue, isCurrent) {
                 const crumbButton = document.createElement("button");
                 crumbButton.type = "button";
-                crumbButton.className = "docs-save-crumb-btn";
+                crumbButton.className = "ide-save-crumb-btn";
                 if (isCurrent) {
                     crumbButton.classList.add("is-current");
                 }
@@ -4923,14 +4709,14 @@
             }
 
             const currentPath = normalizePath(state.selectedDir || state.browserDir, true);
-            addCrumb("/docs", "", !currentPath);
+            addCrumb("/ide", "", !currentPath);
 
             if (currentPath) {
                 const parts = currentPath.split("/");
                 const accumulated = [];
                 parts.forEach(function (part) {
                     const separator = document.createElement("span");
-                    separator.className = "docs-save-crumb-sep";
+                    separator.className = "ide-save-crumb-sep";
                     separator.textContent = "/";
                     fragment.appendChild(separator);
 
@@ -4954,13 +4740,13 @@
                 const item = document.createElement("li");
                 const button = document.createElement("button");
                 button.type = "button";
-                button.className = "docs-save-side-row";
+                button.className = "ide-save-side-row";
                 if (pathValue === state.browserDir) {
                     button.classList.add("is-active");
                 }
-                button.textContent = pathValue ? pathValue.split("/").slice(-1)[0] : "docs 루트";
+                button.textContent = pathValue ? pathValue.split("/").slice(-1)[0] : "IDE 루트";
                 if (!pathValue) {
-                    button.textContent = t("js_docs_root_label", "docs 루트");
+                    button.textContent = t("js_docs_root_label", "IDE 루트");
                 }
                 button.addEventListener("click", function () {
                     state.browserDir = pathValue;
@@ -4981,7 +4767,7 @@
             const childDirs = getChildDirectories(state.browserDir);
             if (childDirs.length === 0) {
                 const emptyItem = document.createElement("li");
-                emptyItem.className = "docs-save-folder-empty";
+                emptyItem.className = "ide-save-folder-empty";
                 emptyItem.textContent = t("js_no_child_folders", "하위 폴더가 없습니다.");
                 saveFolderList.appendChild(emptyItem);
                 return;
@@ -4991,17 +4777,17 @@
                 const item = document.createElement("li");
                 const row = document.createElement("button");
                 row.type = "button";
-                row.className = "docs-save-folder-row";
+                row.className = "ide-save-folder-row";
                 if (dirPath === state.selectedDir) {
                     row.classList.add("is-selected");
                 }
 
                 const icon = document.createElement("span");
-                icon.className = "docs-save-folder-icon";
+                icon.className = "ide-save-folder-icon";
                 icon.setAttribute("aria-hidden", "true");
 
                 const name = document.createElement("span");
-                name.className = "docs-save-folder-name";
+                name.className = "ide-save-folder-name";
                 name.textContent = dirPath.split("/").slice(-1)[0];
 
                 row.appendChild(icon);
@@ -5038,7 +4824,7 @@
 
         function getDocsPathLabel(pathValue) {
             const normalized = normalizePath(pathValue, true);
-            return normalized ? "/docs/" + normalized : "/docs";
+            return normalized ? "/ide/" + normalized : "/ide";
         }
 
         function getFolderCreateBasePath() {
@@ -5088,7 +4874,7 @@
                 return;
             }
 
-            applyDocsRenderedContentModeClass(markdownPreviewContent, "plain_text", "docs-plain-text");
+            applyDocsRenderedContentModeClass(markdownPreviewContent, "plain_text", "ide-plain-text");
             markdownPreviewContent.innerHTML = "<p>" + t("markdown_preview_loading", "Loading preview...") + "</p>";
             setMarkdownPreviewModalOpen(true);
 
@@ -5119,9 +4905,9 @@
                 const renderClass = data && typeof data.render_class === "string" ? data.render_class : "";
                 applyDocsRenderedContentModeClass(markdownPreviewContent, renderMode, renderClass);
                 markdownPreviewContent.innerHTML = data && typeof data.html === "string" ? data.html : "";
-                applyDocsCodeHighlighting(markdownPreviewContent, renderClass || "docs-markdown");
+                applyDocsCodeHighlighting(markdownPreviewContent, renderClass || "ide-markdown");
             } catch (error) {
-                applyDocsRenderedContentModeClass(markdownPreviewContent, "plain_text", "docs-plain-text");
+                applyDocsRenderedContentModeClass(markdownPreviewContent, "plain_text", "ide-plain-text");
                 markdownPreviewContent.innerHTML =
                     "<p>" +
                     (error && error.message ? error.message : t("js_error_processing_failed", "처리 중 오류가 발생했습니다.")) +
@@ -5244,12 +5030,12 @@
 
                 if (data && data.slug_path) {
                     runWithBeforeUnloadBypass(function () {
-                        window.location.href = buildViewUrl(docsBaseUrl, data.slug_path);
+                        window.location.href = buildViewUrl(ideBaseUrl, data.slug_path);
                     });
                     return data || {};
                 }
                 runWithBeforeUnloadBypass(function () {
-                    window.location.href = docsBaseUrl;
+                    window.location.href = ideBaseUrl;
                 });
                 return data || {};
             } catch (error) {
@@ -5328,7 +5114,7 @@
             cancelButton.addEventListener("click", function () {
                 const targetDir = getCancelTargetDirectory();
                 attemptLeaveWithUnsavedGuard(function () {
-                    window.location.assign(buildListUrl(docsBaseUrl, targetDir));
+                    window.location.assign(buildListUrl(ideBaseUrl, targetDir));
                 });
             });
         }
@@ -5395,7 +5181,13 @@
             contentInput.addEventListener("scroll", syncEditorHighlightScroll, { passive: true });
             contentInput.addEventListener("click", updateEditorSuggestion);
             contentInput.addEventListener("keyup", function (event) {
-                if (event.key === "Tab") {
+                if (
+                    event.key === "Tab" ||
+                    event.key === "ArrowDown" ||
+                    event.key === "ArrowUp" ||
+                    event.key === "Enter" ||
+                    event.key === "Escape"
+                ) {
                     return;
                 }
                 updateEditorSuggestion();
@@ -5403,6 +5195,22 @@
             contentInput.addEventListener("keydown", function (event) {
                 if (event.key === "Escape") {
                     clearEditorSuggestion();
+                    return;
+                }
+                if (!editorSuggest.hidden && event.key === "ArrowDown") {
+                    event.preventDefault();
+                    moveWriteEditorSuggestion(1);
+                    return;
+                }
+                if (!editorSuggest.hidden && event.key === "ArrowUp") {
+                    event.preventDefault();
+                    moveWriteEditorSuggestion(-1);
+                    return;
+                }
+                if (!editorSuggest.hidden && event.key === "Enter") {
+                    if (acceptEditorSuggestion()) {
+                        event.preventDefault();
+                    }
                     return;
                 }
                 if (event.key !== "Tab" || event.shiftKey) {
@@ -5414,6 +5222,29 @@
                 }
                 event.preventDefault();
                 replaceTextareaSelection("    ", 4, 4);
+            });
+        }
+
+        if (editorSuggest && !writeSuggestEventsBound) {
+            writeSuggestEventsBound = true;
+            editorSuggest.addEventListener("mousedown", function (event) {
+                event.preventDefault();
+            });
+            editorSuggest.addEventListener("click", function (event) {
+                const target = event.target instanceof Element
+                    ? event.target.closest("[data-suggest-index]")
+                    : null;
+                if (!target) {
+                    return;
+                }
+                const index = Number(target.getAttribute("data-suggest-index"));
+                if (!Number.isInteger(index)) {
+                    return;
+                }
+                activeEditorSuggestionIndex = index;
+                if (acceptEditorSuggestion()) {
+                    event.preventDefault();
+                }
             });
         }
 
@@ -5693,7 +5524,7 @@
         if (window.ResizeObserver) {
             const autoHeightObserver = new ResizeObserver(scheduleContentInputAutoHeight);
             autoHeightObserver.observe(root);
-            const toolbarWrap = document.querySelector(".docs-toolbar-wrap");
+            const toolbarWrap = document.querySelector(".ide-toolbar-wrap");
             if (toolbarWrap) {
                 autoHeightObserver.observe(toolbarWrap);
             }

@@ -1,31 +1,31 @@
 {% extends 'base.html' %}
-{% block body_class %}docs-page{% endblock %}
+{% block body_class %}ide-page{% endblock %}
 {% block content %}
 {% include 'docs/_assets_head.html' %}
 
-<div class="docs-toolbar-wrap">
-    <div class="docs-shell docs-toolbar">
-        <div class="docs-toolbar-left">
-            <h1 class="docs-title">{{ docs_text.auth_login_title }}</h1>
-            <div class="docs-subtitle docs-path-breadcrumbs">
-                <a class="docs-path-link" href="{{ docs_base_url }}">docs</a>
-                <span class="docs-path-sep">/</span>
-                <span class="docs-path-current">{{ docs_text.auth_login_button }}</span>
+<div class="ide-toolbar-wrap ui-toolbar-wrap">
+    <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
+        <div class="ide-toolbar-left ui-toolbar-left">
+            <h1 class="ide-title ui-title">{{ docs_text.auth_login_title }}</h1>
+            <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
+                <a class="ide-path-link ui-path-link" href="{{ docs_base_url }}">ide</a>
+                <span class="ide-path-sep ui-path-sep">/</span>
+                <span class="ide-path-current ui-path-current">{{ docs_text.auth_login_button }}</span>
             </div>
         </div>
     </div>
 </div>
 
-<main class="docs-shell docs-content">
-    <form method="post" class="docs-login-form" id="docs-login-form">
+<main class="ide-shell ui-shell ide-content ui-content">
+    <form method="post" class="ide-login-form" id="ide-login-form">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ docs_login_next }}">
 
         {% if docs_login_error_message or docs_login_form.non_field_errors %}
-            <div class="docs-login-error">{{ docs_login_error_message|default:docs_text.auth_login_error }}</div>
+            <div class="ide-login-error">{{ docs_login_error_message|default:docs_text.auth_login_error }}</div>
         {% endif %}
 
-        <label class="docs-field docs-field-full">
+        <label class="ide-field ide-field-full">
             <span>{{ docs_text.auth_username_label }}</span>
             <input
                 type="text"
@@ -37,7 +37,7 @@
             >
         </label>
 
-        <label class="docs-field docs-field-full">
+        <label class="ide-field ide-field-full">
             <span>{{ docs_text.auth_password_label }}</span>
             <input
                 type="password"
@@ -47,34 +47,34 @@
             >
         </label>
 
-        <label class="docs-field docs-field-full" id="docs-login-captcha-block"{% if not docs_login_show_captcha %} hidden{% endif %}>
+        <label class="ide-field ide-field-full" id="ide-login-captcha-block"{% if not docs_login_show_captcha %} hidden{% endif %}>
                 <span>{{ docs_text.auth_login_captcha_label }}</span>
-                <span class="docs-subtitle">{{ docs_text.auth_login_captcha_hint }}</span>
-                <span id="docs-login-captcha-question">{{ docs_login_captcha_question }}</span>
+                <span class="ide-subtitle">{{ docs_text.auth_login_captcha_hint }}</span>
+                <span id="ide-login-captcha-question">{{ docs_login_captcha_question }}</span>
                 <input
                     type="text"
-                    name="docs-captcha-answer"
+                    name="ide-captcha-answer"
                     inputmode="numeric"
                     autocomplete="off"
                     placeholder="{{ docs_text.auth_login_captcha_placeholder }}"
                     {% if docs_login_show_captcha %}required{% endif %}
                 >
                 {% if docs_turnstile_site_key %}
-                    <div id="docs-turnstile-widget"></div>
+                    <div id="ide-turnstile-widget"></div>
                 {% endif %}
         </label>
 
-        <div class="docs-login-actions">
-            <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.cancel }}</a>
-            <button class="docs-btn docs-btn-primary" type="submit" id="docs-login-submit-btn">{{ docs_text.auth_login_submit }}</button>
+        <div class="ide-login-actions">
+            <a class="ide-btn" href="{{ docs_base_url }}">{{ docs_text.cancel }}</a>
+            <button class="ide-btn ide-btn-primary" type="submit" id="ide-login-submit-btn">{{ docs_text.auth_login_submit }}</button>
         </div>
     </form>
 </main>
 
 <script>
     (function () {
-        const loginForm = document.getElementById("docs-login-form");
-        const submitButton = document.getElementById("docs-login-submit-btn");
+        const loginForm = document.getElementById("ide-login-form");
+        const submitButton = document.getElementById("ide-login-submit-btn");
         if (!loginForm || !submitButton) {
             return;
         }
@@ -96,10 +96,10 @@
         });
 
         const usernameInput = loginForm.querySelector('input[name="username"]');
-        const captchaBlock = document.getElementById("docs-login-captcha-block");
-        const captchaQuestionNode = document.getElementById("docs-login-captcha-question");
-        const captchaAnswerInput = loginForm.querySelector('input[name="docs-captcha-answer"]');
-        const turnstileContainer = document.getElementById("docs-turnstile-widget");
+        const captchaBlock = document.getElementById("ide-login-captcha-block");
+        const captchaQuestionNode = document.getElementById("ide-login-captcha-question");
+        const captchaAnswerInput = loginForm.querySelector('input[name="ide-captcha-answer"]');
+        const turnstileContainer = document.getElementById("ide-turnstile-widget");
         const captchaStatusUrl = "{{ docs_api_login_captcha_status_url|escapejs }}";
         const turnstileSiteKey = "{{ docs_turnstile_site_key|escapejs }}";
 
@@ -141,7 +141,7 @@
                 return;
             }
             removeTurnstile();
-            turnstileWidgetId = window.turnstile.render("#docs-turnstile-widget", {
+            turnstileWidgetId = window.turnstile.render("#ide-turnstile-widget", {
                 sitekey: turnstileSiteKey,
                 theme: nextTheme
             });
@@ -217,7 +217,7 @@
                 });
         };
 
-        window.docsTurnstileOnload = function () {
+        window.ideTurnstileOnload = function () {
             if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
                 renderTurnstile();
             }
@@ -241,7 +241,7 @@
         };
 
         if (window.turnstile && typeof window.turnstile.render === "function") {
-            window.docsTurnstileOnload();
+            window.ideTurnstileOnload();
         }
 
         if (usernameInput) {
@@ -261,6 +261,6 @@
     })();
 </script>
 {% if docs_turnstile_site_key %}
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=docsTurnstileOnload&render=explicit" async defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=ideTurnstileOnload&render=explicit" async defer></script>
 {% endif %}
 {% endblock %}
