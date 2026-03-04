@@ -2369,57 +2369,57 @@
         });
     };
 
-    const navItemsMeasure = document.createElement('div');
-    navItemsMeasure.setAttribute('aria-hidden', 'true');
-    Object.assign(navItemsMeasure.style, {
-        position: 'fixed',
-        left: '-99999px',
-        top: '-99999px',
-        visibility: 'hidden',
-        pointerEvents: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0',
-        flexWrap: 'nowrap',
-        width: 'auto',
-        maxWidth: 'none',
-        margin: '0',
-        padding: '0'
-    });
-    const navLinksMeasure = navLinks.cloneNode(true);
-    Object.assign(navLinksMeasure.style, {
-        display: 'flex',
-        flexDirection: 'row',
-        flexWrap: 'nowrap',
-        width: 'auto',
-        maxWidth: 'none',
-        margin: '0',
-        padding: '0',
-        listStyle: 'none'
-    });
-    Array.from(navLinksMeasure.children).forEach(function (item) {
-        item.style.flex = '0 0 auto';
-    });
-    navItemsMeasure.appendChild(navLinksMeasure);
-
-    if (navControls) {
-        const navControlsMeasure = navControls.cloneNode(true);
-        Object.assign(navControlsMeasure.style, {
-            display: 'inline-flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            margin: '0',
-            padding: '0'
-        });
-        navItemsMeasure.appendChild(navControlsMeasure);
-    }
-
-    document.body.appendChild(navItemsMeasure);
-
     let rafId = null;
 
+    const measureInlineWidth = function (sourceNode, styleOverrides) {
+        if (!sourceNode) {
+            return 0;
+        }
+
+        const measureNode = sourceNode.cloneNode(true);
+        Object.assign(measureNode.style, {
+            position: 'fixed',
+            left: '-99999px',
+            top: '-99999px',
+            visibility: 'hidden',
+            pointerEvents: 'none',
+            width: 'auto',
+            maxWidth: 'none',
+            margin: '0',
+            padding: '0',
+            ...styleOverrides
+        });
+
+        const liveInstallBtn = sourceNode.querySelector('[data-pwa-install]');
+        const cloneInstallBtn = measureNode.querySelector('[data-pwa-install]');
+        if (liveInstallBtn && cloneInstallBtn) {
+            const installDisplay = window.getComputedStyle(liveInstallBtn).display;
+            cloneInstallBtn.style.display = installDisplay === 'none' ? 'none' : 'inline-flex';
+        }
+
+        document.body.appendChild(measureNode);
+        const width = Math.ceil(measureNode.getBoundingClientRect().width);
+        measureNode.remove();
+        return width;
+    };
+
     const getMeasuredNavItemsWidth = function () {
-        return Math.ceil(navItemsMeasure.getBoundingClientRect().width);
+        const linksWidth = measureInlineWidth(navLinks, {
+            display: 'inline-flex',
+            flexDirection: 'row',
+            flexWrap: 'nowrap',
+            alignItems: 'center',
+            listStyle: 'none',
+            gap: '0'
+        });
+        const controlsWidth = navControls ? measureInlineWidth(navControls, {
+            display: 'inline-flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: '0'
+        }) : 0;
+
+        return linksWidth + controlsWidth;
     };
 
     const forceCloseNavMenu = function () {
@@ -2447,7 +2447,7 @@
         const availableWidth = navContainer.getBoundingClientRect().width;
         const brandWidth = navBrandGroup.getBoundingClientRect().width;
         const navItemsBlockWidth = getMeasuredNavItemsWidth();
-        const requiredWidth = brandWidth + navItemsBlockWidth;
+        const requiredWidth = brandWidth + navItemsBlockWidth + 22;
         const shouldCollapseByOverlap = requiredWidth > availableWidth;
 
         if (shouldCollapseByOverlap) {
@@ -2468,6 +2468,8 @@
 
     window.addEventListener('resize', scheduleNavModeUpdate, { passive: true });
     window.addEventListener('orientationchange', scheduleNavModeUpdate, { passive: true });
+    window.addEventListener('beforeinstallprompt', scheduleNavModeUpdate);
+    window.addEventListener('appinstalled', scheduleNavModeUpdate);
     navToggler.addEventListener('click', function () {
         window.requestAnimationFrame(forceClearNavContainerDecorations);
     });
@@ -2492,5 +2494,14 @@
 
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(scheduleNavModeUpdate).catch(function () {});
+    }
+
+    const installButton = nav.querySelector('[data-pwa-install]');
+    if (installButton && window.MutationObserver) {
+        const installButtonObserver = new MutationObserver(scheduleNavModeUpdate);
+        installButtonObserver.observe(installButton, {
+            attributes: true,
+            attributeFilter: ['style', 'class', 'hidden', 'aria-disabled']
+        });
     }
 });

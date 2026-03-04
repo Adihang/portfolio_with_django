@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Career, Hobby, NavLink, Project, Stratagem, Stratagem_Hero_Score
+from .models import Career, Hobby, NavLink, Project, QuickLink, Stratagem, Stratagem_Hero_Score
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
@@ -18,6 +18,9 @@ from django.conf import settings
 from django.core.cache import cache
 import httpx
 from django.db.utils import OperationalError, ProgrammingError
+from django.db.models import Max
+from django.db import transaction
+from urllib.parse import urlparse
 
 MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists", "tables", "fenced_code"]
 SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
@@ -399,6 +402,8 @@ def none(request, ui_lang=None):
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
+    context["docs_login_url"] = reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang})
+    context["docs_signup_url"] = reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang})
     return render(request, 'none.html', context)
 
 
@@ -609,6 +614,151 @@ def add_score(request, ui_lang=None):
     new_score = Stratagem_Hero_Score(name=name, score=round(score, 2))
     new_score.save()
     return JsonResponse({"message": "Score added successfully"}, status=200)
+
+
+def _root_shortcuts_unauthorized_message(ui_lang):
+    return "Login required." if ui_lang == "en" else "로그인이 필요합니다."
+
+
+def _normalize_shortcut_url(raw_url):
+    value = str(raw_url or "").strip()
+    if not value:
+        return None
+
+    candidate = value if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", value) else f"https://{value}"
+    try:
+        parsed = urlparse(candidate)
+    except ValueError:
+        return None
+
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    return candidate
+
+
+def _build_shortcut_icon_url(shortcut_url):
+    parsed = urlparse(shortcut_url)
+    host = parsed.netloc
+    if not host:
+        return ""
+    return f"https://www.google.com/s2/favicons?domain={host}&sz=64"
+
+
+def _serialize_quick_link(quick_link):
+    return {
+        "id": quick_link.id,
+        "name": quick_link.name,
+        "url": quick_link.url,
+        "icon_url": quick_link.icon_url or _build_shortcut_icon_url(quick_link.url),
+    }
+
+
+@require_http_methods(["GET", "POST"])
+@csrf_protect
+def root_shortcuts(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": _root_shortcuts_unauthorized_message(resolved_lang)},
+            status=401,
+        )
+
+    if request.method == "GET":
+        items = QuickLink.objects.filter(user=request.user).order_by("display_order", "id")
+        return JsonResponse({"items": [_serialize_quick_link(item) for item in items]}, status=200)
+
+    try:
+        data = json.loads(request.body or "{}")
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    name = str(data.get("name", "")).strip()
+    if not name:
+        return JsonResponse({"error": "Name is required."}, status=400)
+    if len(name) > 80:
+        return JsonResponse({"error": "Name is too long."}, status=400)
+
+    normalized_url = _normalize_shortcut_url(data.get("url", ""))
+    if not normalized_url:
+        return JsonResponse({"error": "Invalid URL."}, status=400)
+
+    max_order = QuickLink.objects.filter(user=request.user).aggregate(max_value=Max("display_order"))["max_value"] or 0
+    new_item = QuickLink.objects.create(
+        user=request.user,
+        name=name,
+        url=normalized_url,
+        icon_url="",
+        display_order=max_order + 1,
+    )
+    return JsonResponse({"item": _serialize_quick_link(new_item)}, status=201)
+
+
+@require_http_methods(["DELETE"])
+@csrf_protect
+def root_shortcuts_detail(request, shortcut_id, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": _root_shortcuts_unauthorized_message(resolved_lang)},
+            status=401,
+        )
+
+    item = get_object_or_404(QuickLink, id=shortcut_id, user=request.user)
+    item.delete()
+    return JsonResponse({"deleted": True}, status=200)
+
+
+@require_http_methods(["POST"])
+@csrf_protect
+def root_shortcuts_reorder(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": _root_shortcuts_unauthorized_message(resolved_lang)},
+            status=401,
+        )
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    ordered_ids_raw = payload.get("ordered_ids")
+    if not isinstance(ordered_ids_raw, list):
+        return JsonResponse({"error": "ordered_ids must be a list."}, status=400)
+
+    ordered_ids = []
+    seen = set()
+    for value in ordered_ids_raw:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "ordered_ids contains invalid value."}, status=400)
+        if parsed in seen:
+            continue
+        seen.add(parsed)
+        ordered_ids.append(parsed)
+
+    user_items = list(QuickLink.objects.filter(user=request.user).order_by("display_order", "id"))
+    if not user_items:
+        return JsonResponse({"items": []}, status=200)
+
+    item_by_id = {item.id: item for item in user_items}
+    normalized_order = [item_id for item_id in ordered_ids if item_id in item_by_id]
+    missing_ids = [item.id for item in user_items if item.id not in normalized_order]
+    final_order = normalized_order + missing_ids
+
+    with transaction.atomic():
+        for index, item_id in enumerate(final_order):
+            item = item_by_id[item_id]
+            item.display_order = index + 1
+        QuickLink.objects.bulk_update(item_by_id.values(), ["display_order"])
+
+    refreshed_items = QuickLink.objects.filter(user=request.user).order_by("display_order", "id")
+    return JsonResponse({"items": [_serialize_quick_link(item) for item in refreshed_items]}, status=200)
 
 logger = logging.getLogger(__name__)
 
