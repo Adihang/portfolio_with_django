@@ -631,8 +631,8 @@ body.theme-dark .docs-help-icon-symbol {
     position: absolute;
     inset: 0;
     margin: 0;
-    border: 0;
-    border-radius: 0;
+    border: 1px solid var(--docs-border-heavy);
+    border-radius: var(--docs-radius-sm);
     background: transparent;
     color: transparent;
     caret-color: var(--docs-text-stronger);
@@ -645,10 +645,28 @@ body.theme-dark .docs-help-icon-symbol {
     resize: none;
     overflow: auto;
     z-index: 1;
+    outline: none;
+    box-shadow: inset 0 0 0 0 transparent;
 }
 
 .docs-editor-surface > #docs-list-content-input::selection {
     background: var(--docs-selected-bg);
+}
+
+.docs-editor-surface > #docs-list-content-input:focus {
+    outline: none;
+    border-color: var(--theme-accent-strong, #3b82f6);
+    box-shadow: inset 0 0 0 1px var(--theme-accent-strong, #3b82f6);
+}
+
+.docs-list-editor-body .docs-editor-surface {
+    border: 0;
+    background: transparent;
+}
+
+.docs-list-editor-body .docs-editor-surface:focus-within {
+    border-color: transparent;
+    box-shadow: none;
 }
 
 .docs-list-editor-body {
@@ -1917,10 +1935,17 @@ body.docs-page.theme-dark .docs-md-src-token-codeblock {
     resize: none;
     overflow: auto;
     z-index: 1;
+    outline: none;
+    box-shadow: none;
 }
 
 .docs-editor-surface > #docs-content-input::selection {
     background: var(--docs-selected-bg);
+}
+
+.docs-editor-surface > #docs-content-input:focus {
+    outline: none;
+    box-shadow: none;
 }
 
 .docs-editor-suggest {

@@ -1518,9 +1518,23 @@ def docs_login(request, ui_lang=None):
             "docs_login_show_captcha": show_captcha,
             "docs_turnstile_site_key": turnstile_site_key,
             "docs_login_captcha_question": captcha_question,
+            "docs_api_login_captcha_status_url": reverse("main:docs_api_login_captcha_status"),
         }
     )
     return render(request, "docs/login.html", context)
+
+
+@require_http_methods(["GET"])
+def docs_api_login_captcha_status(request):
+    username_value = request.GET.get("username", "")
+    target_user = _resolve_docs_login_target_user(username_value)
+    required = _is_docs_login_captcha_required(target_user)
+    question = ""
+    if required:
+        question = _build_docs_login_captcha(request)
+    else:
+        _clear_docs_login_captcha(request)
+    return JsonResponse({"ok": True, "required": required, "question": question})
 
 
 @require_http_methods(["POST"])
