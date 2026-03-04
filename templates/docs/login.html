@@ -47,24 +47,22 @@
             >
         </label>
 
-        {% if docs_login_show_captcha %}
-            <label class="docs-field docs-field-full">
+        <label class="docs-field docs-field-full" id="docs-login-captcha-block"{% if not docs_login_show_captcha %} hidden{% endif %}>
                 <span>{{ docs_text.auth_login_captcha_label }}</span>
                 <span class="docs-subtitle">{{ docs_text.auth_login_captcha_hint }}</span>
-                <span>{{ docs_login_captcha_question }}</span>
+                <span id="docs-login-captcha-question">{{ docs_login_captcha_question }}</span>
                 <input
                     type="text"
                     name="docs-captcha-answer"
                     inputmode="numeric"
                     autocomplete="off"
                     placeholder="{{ docs_text.auth_login_captcha_placeholder }}"
-                    required
+                    {% if docs_login_show_captcha %}required{% endif %}
                 >
                 {% if docs_turnstile_site_key %}
                     <div id="docs-turnstile-widget"></div>
                 {% endif %}
-            </label>
-        {% endif %}
+        </label>
 
         <div class="docs-login-actions">
             <a class="docs-btn" href="{{ docs_base_url }}">{{ docs_text.cancel }}</a>
@@ -97,43 +95,141 @@
             input.addEventListener("keydown", handleEnterSubmit);
         });
 
+        const usernameInput = loginForm.querySelector('input[name="username"]');
+        const captchaBlock = document.getElementById("docs-login-captcha-block");
+        const captchaQuestionNode = document.getElementById("docs-login-captcha-question");
+        const captchaAnswerInput = loginForm.querySelector('input[name="docs-captcha-answer"]');
         const turnstileContainer = document.getElementById("docs-turnstile-widget");
-        if (!turnstileContainer) {
-            return;
-        }
+        const captchaStatusUrl = "{{ docs_api_login_captcha_status_url|escapejs }}";
+        const turnstileSiteKey = "{{ docs_turnstile_site_key|escapejs }}";
 
         const getTurnstileTheme = function () {
             return document.body.classList.contains("theme-dark") ? "dark" : "light";
         };
 
         let lastTheme = "";
+        let turnstileWidgetId = null;
         let mutationObserver = null;
+        let usernameCheckTimer = null;
+        let lastCheckedUsername = "";
+
+        const removeTurnstile = function () {
+            if (!window.turnstile || turnstileWidgetId === null) {
+                if (turnstileContainer) {
+                    turnstileContainer.innerHTML = "";
+                }
+                return;
+            }
+            try {
+                window.turnstile.remove(turnstileWidgetId);
+            } catch (error) {
+                turnstileContainer.innerHTML = "";
+            }
+            turnstileWidgetId = null;
+        };
 
         const renderTurnstile = function () {
-            if (!window.turnstile || !turnstileContainer) {
+            if (!window.turnstile || !turnstileContainer || !turnstileSiteKey) {
                 return;
             }
             const nextTheme = getTurnstileTheme();
-            if (lastTheme === nextTheme && turnstileContainer.childElementCount > 0) {
+            if (
+                lastTheme === nextTheme &&
+                turnstileWidgetId !== null &&
+                turnstileContainer.childElementCount > 0
+            ) {
                 return;
             }
-            turnstileContainer.innerHTML = "";
-            window.turnstile.render("#docs-turnstile-widget", {
-                sitekey: "{{ docs_turnstile_site_key|escapejs }}",
+            removeTurnstile();
+            turnstileWidgetId = window.turnstile.render("#docs-turnstile-widget", {
+                sitekey: turnstileSiteKey,
                 theme: nextTheme
             });
             lastTheme = nextTheme;
         };
 
+        const setCaptchaVisible = function (visible, questionText) {
+            if (!captchaBlock) {
+                return;
+            }
+            if (visible) {
+                captchaBlock.removeAttribute("hidden");
+            } else {
+                captchaBlock.setAttribute("hidden", "");
+            }
+            if (captchaQuestionNode) {
+                captchaQuestionNode.textContent = visible ? (questionText || "") : "";
+            }
+            if (captchaAnswerInput) {
+                captchaAnswerInput.required = Boolean(visible);
+                if (!visible) {
+                    captchaAnswerInput.value = "";
+                }
+            }
+            if (visible) {
+                renderTurnstile();
+                return;
+            }
+            removeTurnstile();
+            lastTheme = "";
+        };
+
+        const fetchCaptchaStatus = function (force) {
+            if (!usernameInput || !captchaStatusUrl) {
+                return;
+            }
+            const usernameValue = usernameInput.value.trim();
+            if (!usernameValue) {
+                lastCheckedUsername = "";
+                setCaptchaVisible(false, "");
+                return;
+            }
+            if (!force && usernameValue === lastCheckedUsername) {
+                return;
+            }
+            lastCheckedUsername = usernameValue;
+
+            fetch(captchaStatusUrl + "?username=" + encodeURIComponent(usernameValue), {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("captcha status request failed");
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data || data.ok !== true) {
+                        return;
+                    }
+                    if (data.required) {
+                        setCaptchaVisible(true, data.question || "");
+                        return;
+                    }
+                    setCaptchaVisible(false, "");
+                })
+                .catch(function () {
+                    return;
+                });
+        };
+
         window.docsTurnstileOnload = function () {
-            renderTurnstile();
+            if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
+                renderTurnstile();
+            }
             if (mutationObserver) {
                 mutationObserver.disconnect();
             }
             mutationObserver = new MutationObserver(function (mutations) {
                 for (const mutation of mutations) {
                     if (mutation.attributeName === "class") {
-                        renderTurnstile();
+                        if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
+                            renderTurnstile();
+                        }
                         break;
                     }
                 }
@@ -147,9 +243,24 @@
         if (window.turnstile && typeof window.turnstile.render === "function") {
             window.docsTurnstileOnload();
         }
+
+        if (usernameInput) {
+            usernameInput.addEventListener("blur", function () {
+                fetchCaptchaStatus(true);
+            });
+            usernameInput.addEventListener("input", function () {
+                if (usernameCheckTimer) {
+                    window.clearTimeout(usernameCheckTimer);
+                }
+                usernameCheckTimer = window.setTimeout(function () {
+                    fetchCaptchaStatus(false);
+                }, 300);
+            });
+            fetchCaptchaStatus(true);
+        }
     })();
 </script>
-{% if docs_login_show_captcha and docs_turnstile_site_key %}
+{% if docs_turnstile_site_key %}
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=docsTurnstileOnload&render=explicit" async defer></script>
 {% endif %}
 {% endblock %}

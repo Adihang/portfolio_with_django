@@ -941,6 +941,7 @@
     function initializeListPage() {
         const docsBaseUrl = root.dataset.docsBaseUrl || "/docs";
         const listApiUrl = root.dataset.listApiUrl;
+        const saveApiUrl = root.dataset.saveApiUrl;
         const renameApiUrl = root.dataset.renameApiUrl;
         const deleteApiUrl = root.dataset.deleteApiUrl;
         const mkdirApiUrl = root.dataset.mkdirApiUrl;
@@ -1364,6 +1365,28 @@
             scheduleSyncCurrentDirRowHeightWithSideHead();
         }
 
+        function scrollPreviewIntoViewIfPortrait() {
+            if (!previewPanel || previewPanel.hidden) {
+                return;
+            }
+            const isPortrait = window.innerHeight > window.innerWidth;
+            if (!isPortrait) {
+                return;
+            }
+            const scrollToPreviewTop = function () {
+                const previewTop = previewPanel.getBoundingClientRect().top + window.pageYOffset;
+                window.scrollTo({
+                    top: Math.max(0, Math.floor(previewTop)),
+                    behavior: "smooth",
+                });
+            };
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    scrollToPreviewTop();
+                });
+            });
+        }
+
         function isPreviewableFileEntry(entry) {
             return Boolean(entry && entry.type === "file" && !entry.isCurrentFolder);
         }
@@ -1568,49 +1591,117 @@
                 });
             }
             
-            // 저장 버튼 이벤트
-            editorSaveButton.addEventListener("click", function(e) {
-                e.preventDefault();
-                saveEditorContent(entry);
-            });
-            
-            // 취소 버튼 이벤트
-            editorCancelButton.addEventListener("click", function(e) {
-                e.preventDefault();
+            // 저장/취소 버튼 이벤트를 현재 편집 대상(entry)에 바인딩
+            editorSaveButton.onclick = function (event) {
+                event.preventDefault();
+                saveEditorContent(entry).catch(alertError);
+            };
+            editorCancelButton.onclick = function (event) {
+                event.preventDefault();
                 switchToPreview();
-            });
+            };
         }
 
         function cleanupEditorEvents() {
             clearListEditorSuggestion();
+            if (editorSaveButton) {
+                editorSaveButton.onclick = null;
+            }
+            if (editorCancelButton) {
+                editorCancelButton.onclick = null;
+            }
         }
 
-        function saveEditorContent(entry) {
+        // 입력된 파일명(확장자 포함 가능)을 API 저장 형식(filename + extension)으로 분리
+        function resolveListEditorFilenameAndExtension(rawFilename, sourcePath) {
+            const fallbackMatch = String(sourcePath || "").match(/\.([A-Za-z0-9]+)$/);
+            const fallbackExtension = fallbackMatch ? ("." + fallbackMatch[1].toLowerCase()) : ".md";
+            const trimmed = String(rawFilename || "").trim();
+            if (!trimmed) {
+                throw new Error(t("js_filename_required", "파일명을 입력해주세요."));
+            }
+            if (trimmed.includes("/") || trimmed.includes("\\")) {
+                throw new Error(t("js_error_path_required", "경로를 입력해주세요."));
+            }
+
+            const extMatch = trimmed.match(/^(.*?)(\.[A-Za-z0-9]+)$/);
+            if (extMatch && extMatch[1] && !extMatch[1].endsWith(".")) {
+                return {
+                    filename: extMatch[1].trim(),
+                    extension: extMatch[2].toLowerCase(),
+                };
+            }
+
+            if (trimmed.endsWith(".")) {
+                throw new Error(t("js_extension_invalid", "확장자 형식이 올바르지 않습니다. 예: .md"));
+            }
+
+            return {
+                filename: trimmed,
+                extension: fallbackExtension,
+            };
+        }
+
+        async function saveEditorContent(entry) {
             if (!editorContentInput || !editorFilenameInput) {
                 return;
             }
-            
-            const content = editorContentInput.value;
-            const filename = editorFilenameInput.value.trim();
-            
-            if (!filename) {
-                alert(t("js_error_filename_required", "파일 이름을 입력해주세요."));
-                return;
+
+            if (!saveApiUrl) {
+                throw new Error(t("js_error_request_failed", "요청 처리 중 오류가 발생했습니다."));
             }
-            
-            // API 호출하여 저장
-            // TODO: 실제 저장 API 구현 필요
-            console.log("Saving:", { path: entry.path, filename: filename, content: content });
-            
-            // 임시로 저장 성공 처리 (실제 API 연동 필요)
-            setTimeout(() => {
-                alert("파일이 저장되었습니다.");
-                // 저장 후 미리보기로 전환
+
+            const content = editorContentInput.value;
+            const resolved = resolveListEditorFilenameAndExtension(editorFilenameInput.value, entry.path);
+            const sourcePath = normalizePath(entry.path, false);
+            const targetDir = getParentDirectory(sourcePath);
+
+            // 중복 저장 방지를 위해 저장 중 버튼 비활성화
+            if (editorSaveButton) {
+                editorSaveButton.disabled = true;
+            }
+            try {
+                // 쓰기 화면 저장 버튼과 동일한 docs_api_save payload로 저장
+                const payload = {
+                    original_path: sourcePath,
+                    target_dir: targetDir,
+                    filename: resolved.filename,
+                    extension: resolved.extension,
+                    content: content,
+                };
+                const data = await requestJson(saveApiUrl, buildPostOptions(payload));
+
+                // 저장 후에는 취소 버튼 동작처럼 편집기를 닫고, 해당 파일 미리보기를 다시 연다.
+                const savedPath = data && typeof data.path === "string" && data.path.trim()
+                    ? normalizePath(data.path, true)
+                    : sourcePath;
+                await refreshCurrentDirectory();
                 switchToPreview();
-            }, 500);
-            
-            // 미리보기 새로고침
-            loadPreviewForEntry(entry);
+
+                const savedEntryFromList = state.entryByPath.get(savedPath) || null;
+                const savedEntry = savedEntryFromList || {
+                    type: "file",
+                    isCurrentFolder: false,
+                    can_edit: Boolean(entry && entry.can_edit),
+                    path: savedPath,
+                    name: savedPath.split("/").pop() || (entry && entry.name) || "",
+                };
+
+                if (savedEntryFromList) {
+                    applySelection([savedPath], {
+                        primaryPath: savedPath,
+                        anchorPath: savedPath,
+                    });
+                } else {
+                    setPreviewVisibility(true);
+                }
+
+                await loadPreviewForEntry(savedEntry);
+            } finally {
+                if (editorSaveButton) {
+                    editorSaveButton.disabled = false;
+                }
+            }
         }
 
         function clearPreviewPane() {
@@ -1686,9 +1777,11 @@
                 const cached = state.previewCache.get(pathValue);
                 if (cached && typeof cached === "object") {
                     renderPreviewHtml(entry, cached.html, cached.renderMode, cached.renderClass);
+                    scrollPreviewIntoViewIfPortrait();
                     return;
                 }
                 renderPreviewHtml(entry, cached, "markdown", "docs-markdown");
+                scrollPreviewIntoViewIfPortrait();
                 return;
             }
 
@@ -1715,6 +1808,7 @@
                     previewTitle.textContent = data.title;
                 }
                 renderPreviewHtml(entry, html, renderMode, renderClass);
+                scrollPreviewIntoViewIfPortrait();
             } catch (error) {
                 if (requestToken !== state.previewRequestToken || state.activePreviewPath !== pathValue) {
                     return;
@@ -1725,6 +1819,7 @@
                         ? error.message
                         : t("list_preview_error", "미리보기를 불러오지 못했습니다.")
                 );
+                scrollPreviewIntoViewIfPortrait();
             }
         }
 
@@ -2033,6 +2128,7 @@
         }
 
         async function refreshCurrentDirectory() {
+            const expandedBeforeRefresh = Array.from(state.expandedFolders);
             const data = await requestJson(
                 listApiUrl + "?path=" + encodeURIComponent(currentDir)
             );
@@ -2041,8 +2137,73 @@
             const preserved = new Map();
             preserved.set(currentDir, state.directoryCache.get(currentDir));
             state.directoryCache = preserved;
-            state.expandedFolders.clear();
+
+            const restoredExpandedFolders = new Set();
+            for (let index = 0; index < expandedBeforeRefresh.length; index += 1) {
+                const expandedPath = normalizePath(expandedBeforeRefresh[index], true);
+                if (!expandedPath || expandedPath === currentDir) {
+                    continue;
+                }
+                try {
+                    await loadDirectory(expandedPath);
+                    restoredExpandedFolders.add(expandedPath);
+                } catch (error) {}
+            }
+            state.expandedFolders = restoredExpandedFolders;
             renderList();
+        }
+
+        function remapExpandedFoldersForRename(fromPath, toPath) {
+            const normalizedFromPath = normalizePath(fromPath, true);
+            const normalizedToPath = normalizePath(toPath, true);
+            if (!normalizedFromPath || !normalizedToPath || normalizedFromPath === normalizedToPath) {
+                return;
+            }
+            const remapped = new Set();
+            state.expandedFolders.forEach(function (folderPath) {
+                const normalizedFolderPath = normalizePath(folderPath, true);
+                if (!normalizedFolderPath) {
+                    return;
+                }
+                if (normalizedFolderPath === normalizedFromPath) {
+                    remapped.add(normalizedToPath);
+                    return;
+                }
+                if (normalizedFolderPath.startsWith(normalizedFromPath + "/")) {
+                    remapped.add(normalizedToPath + normalizedFolderPath.slice(normalizedFromPath.length));
+                    return;
+                }
+                remapped.add(normalizedFolderPath);
+            });
+            state.expandedFolders = remapped;
+        }
+
+        function removeExpandedFoldersByDeletedPaths(pathValues) {
+            const targets = (Array.isArray(pathValues) ? pathValues : [])
+                .map(function (value) {
+                    return normalizePath(value, true);
+                })
+                .filter(function (value) {
+                    return Boolean(value);
+                });
+            if (targets.length === 0) {
+                return;
+            }
+
+            const nextExpandedFolders = new Set();
+            state.expandedFolders.forEach(function (folderPath) {
+                const normalizedFolderPath = normalizePath(folderPath, true);
+                if (!normalizedFolderPath) {
+                    return;
+                }
+                const shouldRemove = targets.some(function (targetPath) {
+                    return normalizedFolderPath === targetPath || normalizedFolderPath.startsWith(targetPath + "/");
+                });
+                if (!shouldRemove) {
+                    nextExpandedFolders.add(normalizedFolderPath);
+                }
+            });
+            state.expandedFolders = nextExpandedFolders;
         }
 
         function getEntryEditableName(entry) {
@@ -2621,6 +2782,10 @@
                 path: entry.path,
                 new_name: trimmed
             }));
+            const renamedPath = data && data.path ? data.path : "";
+            if (entry.type === "dir" && renamedPath) {
+                remapExpandedFoldersForRename(entry.path, renamedPath);
+            }
             applySelection([data && data.path ? data.path : ""], {
                 primaryPath: data && data.path ? data.path : "",
                 anchorPath: data && data.path ? data.path : "",
@@ -2692,6 +2857,7 @@
                     paths: isMultiple ? targetPaths : undefined,
                 })
             );
+            removeExpandedFoldersByDeletedPaths(targetPaths);
             applySelection([], { render: false });
             await refreshCurrentDirectory();
         }
