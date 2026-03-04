@@ -406,22 +406,34 @@ def none(request, ui_lang=None):
 def pwa_manifest(request):
     # Browser install metadata for "Add to Home screen" / app install prompts.
     manifest = {
-        "name": "Hanplanet Portfolio",
+        "id": "/",
+        "name": "Hanplanet",
         "short_name": "Hanplanet",
-        "description": "Hanplanet portfolio web app",
-        "start_url": "/portfolio/",
+        "description": "Hanplanet web app",
+        "start_url": "/",
         "scope": "/",
         "display": "standalone",
         "background_color": "#ffffff",
         "theme_color": "#0d6efd",
         "icons": [
             {
-                "src": "/static/favicon.png",
+                "src": "/static/icons/pwa-192.png",
                 "type": "image/png",
+                "sizes": "192x192",
+                "purpose": "any maskable",
+            },
+            {
+                "src": "/static/icons/pwa-512.png",
+                "type": "image/png",
+                "sizes": "512x512",
+                "purpose": "any maskable",
             },
         ],
     }
-    return JsonResponse(manifest)
+    return HttpResponse(
+        json.dumps(manifest),
+        content_type="application/manifest+json; charset=utf-8",
+    )
 
 
 @cache_control(public=True, max_age=0, must_revalidate=True)

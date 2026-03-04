@@ -40,7 +40,7 @@
     <meta property="og:title" content="{{ meta_og_title|default:'Hanplanet' }}">
     <meta property="og:site_name" content="{{ meta_site_name|default:'Hanplanet' }}">
     <meta property="og:description" content="{{ meta_og_description|default:'Django로 작성한 포트폴리오 입니다.' }}">
-    <meta property="og:image" content="https://github.com/Adihang/portfolio_with_django/assets/56463432/85411b54-68be-4ece-b21f-b531794020c0">
+    <meta property="og:image" content="https://www.hanplanet.com/static/icons/hanplanet-og-1200.png">
     {% include "partials/pwa.html" %}
     {% include "partials/static_script_fallback.html" %}
     <link rel="icon" href="{% static_v 'favicon.png' %}">
@@ -82,6 +82,15 @@
                         </li>
                     {% endfor %}
                 </ul>
+                <button
+                    type="button"
+                    class="ui-pwa-install-btn"
+                    data-pwa-install
+                    aria-label="{% if ui_lang|default:'ko' == 'en' %}Install app{% else %}앱 설치{% endif %}"
+                    title="{% if ui_lang|default:'ko' == 'en' %}Install app{% else %}앱 설치{% endif %}"
+                >
+                    <span class="ui-pwa-install-icon" aria-hidden="true"></span>
+                </button>
                 <div class="ui-controls-stack">
                     <div class="ui-lang-toggle ui-control-toggle ui-lang-toggle-inline" aria-label="Language Toggle">
                         <a class="ui-lang-link ui-control-link{% if ui_lang|default:'ko' == 'ko' %} is-active{% endif %}" href="{{ lang_switch_ko_url }}">KO</a>

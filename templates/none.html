@@ -1,5 +1,66 @@
 {% extends 'base.html' %}
+{% load static_versioned %}
 {% block body_class %}root-page{% endblock %}
 {% block content %}
-<main class="main main-surface-layer"></main>
+<main class="main main-surface-layer root-search-page">
+    <section class="root-search-shell" aria-label="{% if ui_lang|default:'ko' == 'en' %}Smart Search{% else %}스마트 검색{% endif %}">
+        <h1 class="root-search-title">Hanplanet</h1>
+        <form class="root-search-form" data-root-search-form>
+            <button
+                type="submit"
+                class="root-search-submit"
+                aria-label="{% if ui_lang|default:'ko' == 'en' %}Search{% else %}검색{% endif %}"
+                title="{% if ui_lang|default:'ko' == 'en' %}Search{% else %}검색{% endif %}"
+            >
+                <span class="root-search-submit-icon" aria-hidden="true"></span>
+            </button>
+            <label for="rootSmartSearchInput" class="root-search-sr-only">
+                {% if ui_lang|default:'ko' == 'en' %}Search or URL{% else %}검색어 또는 URL{% endif %}
+            </label>
+            <input
+                id="rootSmartSearchInput"
+                class="root-search-input"
+                type="text"
+                inputmode="search"
+                autocomplete="off"
+                placeholder="{% if ui_lang|default:'ko' == 'en' %}Search keyword or enter URL{% else %}검색어 또는 URL 입력{% endif %}"
+                data-root-search-input
+            >
+            <div class="root-search-engine root-search-engine-picker" data-root-engine-picker>
+                <input type="hidden" value="google" data-root-search-engine>
+                <button
+                    type="button"
+                    class="root-search-engine-toggle"
+                    data-root-engine-toggle
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-label="{% if ui_lang|default:'ko' == 'en' %}Search engine{% else %}검색 엔진{% endif %}"
+                >
+                    <span class="root-search-engine-icon" data-root-engine-icon aria-hidden="true"></span>
+                    <span class="root-search-engine-label" data-root-engine-label>Google</span>
+                    <span class="root-search-engine-caret" aria-hidden="true"></span>
+                </button>
+            </div>
+        </form>
+    </section>
+</main>
+<div class="root-search-engine-popup" data-root-engine-popup role="listbox" aria-hidden="true">
+    <button type="button" class="root-search-engine-option is-active" data-engine-option data-engine-value="google">
+        <span class="root-search-engine-option-icon" data-engine-icon="google" aria-hidden="true"></span>
+        <span>Google</span>
+    </button>
+    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="duckduckgo">
+        <span class="root-search-engine-option-icon" data-engine-icon="duckduckgo" aria-hidden="true"></span>
+        <span>DuckDuckGo</span>
+    </button>
+    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="bing">
+        <span class="root-search-engine-option-icon" data-engine-icon="bing" aria-hidden="true"></span>
+        <span>Bing</span>
+    </button>
+    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="naver">
+        <span class="root-search-engine-option-icon" data-engine-icon="naver" aria-hidden="true"></span>
+        <span>Naver</span>
+    </button>
+</div>
+<script src="{% static_v 'js/root_search.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
 {% endblock %}
