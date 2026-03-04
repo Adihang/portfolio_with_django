@@ -44,6 +44,9 @@ DEBUG = env_bool("DJANGO_DEBUG", default=False)
 RUNNING_TESTS = "test" in sys.argv
 DEFAULT_SECURE_TRANSPORT = not DEBUG and not RUNNING_TESTS
 
+if DEBUG:
+    INTERNAL_IPS = ["127.0.0.1", "::1"]
+
 
 def load_secret_key():
     secret_key = os.environ.get("DJANGO_SECRET_KEY")
