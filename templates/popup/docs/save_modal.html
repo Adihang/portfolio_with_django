@@ -1,36 +1,36 @@
-<div id="docs-save-modal" class="docs-save-modal" hidden>
-    <div class="docs-save-modal-backdrop" id="docs-save-modal-backdrop"></div>
-    <div class="docs-save-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="docs-save-modal-title">
-        <div class="docs-save-modal-head">
-            <h2 id="docs-save-modal-title" class="docs-save-modal-title">{{ docs_text.save_location_title }}</h2>
-            <button type="button" class="docs-save-close-btn" id="docs-save-close-btn" aria-label="{{ docs_text.close_label }}">x</button>
+<div id="ide-save-modal" class="ide-save-modal" hidden>
+    <div class="ide-save-modal-backdrop" id="ide-save-modal-backdrop"></div>
+    <div class="ide-save-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ide-save-modal-title">
+        <div class="ide-save-modal-head">
+            <h2 id="ide-save-modal-title" class="ide-save-modal-title">{{ docs_text.save_location_title }}</h2>
+            <button type="button" class="ide-save-close-btn" id="ide-save-close-btn" aria-label="{{ docs_text.close_label }}">x</button>
         </div>
-        <div class="docs-save-location-bar">
-            <button type="button" class="docs-btn" id="docs-save-up-btn">{{ docs_text.up_button }}</button>
-            <div class="docs-save-breadcrumb" id="docs-save-breadcrumb"></div>
+        <div class="ide-save-location-bar">
+            <button type="button" class="ide-btn" id="ide-save-up-btn">{{ docs_text.up_button }}</button>
+            <div class="ide-save-breadcrumb" id="ide-save-breadcrumb"></div>
         </div>
-        <div class="docs-save-browser">
-            <aside class="docs-save-sidebar">
-                <div class="docs-save-sidebar-title">{{ docs_text.quick_paths_title }}</div>
-                <ul class="docs-save-sidebar-list" id="docs-save-quick-list"></ul>
+        <div class="ide-save-browser">
+            <aside class="ide-save-sidebar">
+                <div class="ide-save-sidebar-title">{{ docs_text.quick_paths_title }}</div>
+                <ul class="ide-save-sidebar-list" id="ide-save-quick-list"></ul>
             </aside>
-            <section class="docs-save-folder-pane">
-                <div class="docs-save-folder-head">{{ docs_text.folder_title }}</div>
-                <ul class="docs-save-folder-list" id="docs-save-folder-list"></ul>
+            <section class="ide-save-folder-pane">
+                <div class="ide-save-folder-head">{{ docs_text.folder_title }}</div>
+                <ul class="ide-save-folder-list" id="ide-save-folder-list"></ul>
             </section>
         </div>
-        <div class="docs-save-file-meta-grid">
-            <label id="docs-save-name-field">
+        <div class="ide-save-file-meta-grid">
+            <label id="ide-save-name-field">
                 <span>
-                    <span class="docs-save-name-label-main">{{ docs_text.save_filename_label_main|default:"파일명" }}</span>
-                    <span class="docs-save-name-label-sub">{{ docs_text.save_filename_label_sub|default:"(확장자 포함)" }}</span>
+                    <span class="ide-save-name-label-main">{{ docs_text.save_filename_label_main|default:"파일명" }}</span>
+                    <span class="ide-save-name-label-sub">{{ docs_text.save_filename_label_sub|default:"(확장자 포함)" }}</span>
                 </span>
-                <input type="text" id="docs-save-filename-input" value="{{ initial_filename }}" placeholder="{{ docs_text.save_filename_placeholder }}">
+                <input type="text" id="ide-save-filename-input" value="{{ initial_filename }}" placeholder="{{ docs_text.save_filename_placeholder }}">
             </label>
-            <label id="docs-save-extension-field">
+            <label id="ide-save-extension-field">
                 <span>{{ docs_text.file_extension_label }}</span>
-                <div class="docs-save-extension-controls">
-                    <select id="docs-save-extension-select" aria-label="{{ docs_text.file_extension_quick_label }}">
+                <div class="ide-save-extension-controls">
+                    <select id="ide-save-extension-select" aria-label="{{ docs_text.file_extension_quick_label }}">
                         {% for ext in docs_file_extension_options %}
                             <option value="{{ ext }}"{% if ext == initial_extension %} selected{% endif %}>{{ ext }}</option>
                         {% endfor %}
@@ -39,11 +39,11 @@
                 </div>
             </label>
         </div>
-        <div class="docs-save-modal-actions">
-            <button type="button" class="docs-btn" id="docs-create-folder-btn">{{ docs_text.create_folder_button }}</button>
-            <div class="docs-save-modal-actions-right">
-                <button type="button" class="docs-btn" id="docs-save-cancel-btn">{{ docs_text.cancel }}</button>
-                <button type="button" class="docs-btn docs-btn-primary" id="docs-save-confirm-btn">{{ docs_text.save_confirm_button }}</button>
+        <div class="ide-save-modal-actions">
+            <button type="button" class="ide-btn" id="ide-create-folder-btn">{{ docs_text.create_folder_button }}</button>
+            <div class="ide-save-modal-actions-right">
+                <button type="button" class="ide-btn" id="ide-save-cancel-btn">{{ docs_text.cancel }}</button>
+                <button type="button" class="ide-btn ide-btn-primary" id="ide-save-confirm-btn">{{ docs_text.save_confirm_button }}</button>
             </div>
         </div>
 

@@ -68,9 +68,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const sendButton = document.getElementById('send-button');
     const footer = document.querySelector('.foot');
     const printButton = document.querySelector('[data-portfolio-print]');
+    const widgetAnchorButtons = [];
+    if (printButton) {
+        widgetAnchorButtons.push(printButton);
+    }
+    const extraWidgetAnchorButtons = Array.from(document.querySelectorAll('[data-chat-widget-anchor]'));
+    extraWidgetAnchorButtons.forEach(function(button) {
+        if (!widgetAnchorButtons.includes(button)) {
+            widgetAnchorButtons.push(button);
+        }
+    });
+    widgetAnchorButtons.sort(function(a, b) {
+        const orderA = Number.parseInt(a.getAttribute('data-chat-widget-anchor-order') || '0', 10) || 0;
+        const orderB = Number.parseInt(b.getAttribute('data-chat-widget-anchor-order') || '0', 10) || 0;
+        return orderA - orderB;
+    });
     const footerClearance = 0;
     const printButtonGap = -44;
     const printButtonLeftOffset = 5;
+    const anchorButtonsSpacing = 8;
     const computedBottom = parseFloat(window.getComputedStyle(chatWidget).bottom || String(DEFAULT_WIDGET_BOTTOM_PX));
     const widgetBaseBottom = Number.isNaN(computedBottom) ? DEFAULT_WIDGET_BOTTOM_PX : computedBottom;
     const widgetMotionFollowDurationMs = 420;
@@ -83,29 +99,49 @@ document.addEventListener('DOMContentLoaded', function() {
     function updatePrintButtonAnchor() {
         printButtonAnchorRafId = null;
 
-        if (!printButton) {
+        if (!widgetAnchorButtons.length) {
             return;
         }
 
-        printButton.classList.add('is-chat-widget-anchor');
-
         const widgetRect = chatWidget.getBoundingClientRect();
-        const buttonRect = printButton.getBoundingClientRect();
         const minViewportInset = 8;
-        const maxLeft = window.innerWidth - buttonRect.width - minViewportInset;
-        const targetLeft = Math.min(
-            Math.max(minViewportInset, widgetRect.left),
-            Math.max(minViewportInset, maxLeft)
-        );
-        const targetTop = Math.max(minViewportInset, widgetRect.top - buttonRect.height - printButtonGap);
+        const buttonWidths = [];
+        const buttonHeights = [];
 
-        printButton.style.left = `${targetLeft + printButtonLeftOffset}px`;
-        printButton.style.top = `${targetTop}px`;
+        widgetAnchorButtons.forEach(function(button) {
+            button.classList.add('is-chat-widget-anchor');
+            const rect = button.getBoundingClientRect();
+            buttonWidths.push(rect.width);
+            buttonHeights.push(rect.height);
+        });
+
+        const groupWidth = buttonWidths.reduce(function(total, width) {
+            return total + width;
+        }, 0) + Math.max(0, widgetAnchorButtons.length - 1) * anchorButtonsSpacing;
+        const maxButtonHeight = buttonHeights.reduce(function(maxHeight, currentHeight) {
+            return Math.max(maxHeight, currentHeight);
+        }, 0);
+
+        const maxGroupLeft = Math.max(minViewportInset, window.innerWidth - groupWidth - minViewportInset);
+        const groupLeft = Math.min(
+            Math.max(minViewportInset, widgetRect.left + printButtonLeftOffset),
+            maxGroupLeft
+        );
+        const groupTop = Math.max(minViewportInset, widgetRect.top - maxButtonHeight - printButtonGap);
+
+        let currentLeft = groupLeft;
+        widgetAnchorButtons.forEach(function(button, index) {
+            const buttonHeight = buttonHeights[index] || maxButtonHeight;
+            const alignedTop = groupTop + (maxButtonHeight - buttonHeight);
+            button.style.left = `${currentLeft}px`;
+            button.style.top = `${alignedTop}px`;
+            currentLeft += (buttonWidths[index] || 0) + anchorButtonsSpacing;
+        });
     }
 
     // 인쇄 버튼 앵커 업데이트를 스케줄링하는 함수
     function schedulePrintButtonAnchorUpdate() {
-        if (!printButton || printButtonAnchorRafId !== null) {
+        if (!widgetAnchorButtons.length || printButtonAnchorRafId !== null) {
             return;
         }
 

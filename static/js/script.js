@@ -19,11 +19,11 @@
         currentPath.startsWith('/project/') ||
         localizedLightBgPattern.test(currentPath);
     const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');
-    const portfolioMainLayer = document.querySelector('.main-has-bubble-bg');
+    const portfolioMainLayer = document.querySelector('.main-surface-layer');
     const bubbleLayer = document.querySelector('.bubble-bg-layer');
-    const themeToggle = document.querySelector('.portfolio-theme-toggle');
+    const themeToggle = document.querySelector('.ui-theme-toggle');
     const themeToggleButtons = themeToggle
-        ? Array.from(themeToggle.querySelectorAll('.portfolio-control-link[data-theme-mode]'))
+        ? Array.from(themeToggle.querySelectorAll('.ui-control-link[data-theme-mode]'))
         : [];
     const THEME_MODE_STORAGE_KEY = 'portfolio_theme_mode';
     const printSurfaceSnapshot = {
@@ -38,7 +38,7 @@
     let manualThemeMode = null;
 
     // 메뉴바 스크롤 관련 변수
-    const navbar = document.querySelector('.portfolio-nav');
+    const navbar = document.querySelector('.ui-nav');
     let lastScrollTop = 0;
     let scrollTimer = null;
     let isNavbarHidden = false;
@@ -601,7 +601,7 @@
 
         // 상단 인셋 값을 계산하는 함수
         const getTopInset = function () {
-            const navElement = document.querySelector('.portfolio-nav');
+            const navElement = document.querySelector('.ui-nav');
 
             if (!navElement) {
                 return 0;
@@ -2194,7 +2194,7 @@
             'body::before{content:"www.hanplanet.com/portfolio/";position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-45deg);font-weight:900;font-size:clamp(24px,4.8vw,62px);letter-spacing:.06em;color:rgba(0,0,0,.11);pointer-events:none;z-index:0;white-space:nowrap;}' +
             '.print-root{position:relative;z-index:1;padding:3mm;box-sizing:border-box;}' +
             '.print-summary,.print-project{padding-top:8mm;padding-bottom:8mm;padding-left:0;padding-right:0;box-sizing:border-box;border:none;border-radius:0;background:transparent;overflow:visible;}' +
-            '.print-summary .main_projects,.print-summary .main_hobbys,.print-summary .foot,.print-summary .portfolio-print-btn,.print-summary .chat-widget,.print-summary .portfolio-nav{display:none;}' +
+            '.print-summary .main_projects,.print-summary .main_hobbys,.print-summary .foot,.print-summary .portfolio-print-btn,.print-summary .chat-widget,.print-summary .ui-nav{display:none;}' +
             '.print-summary .main_banner,.print-summary .main_contents{width:100%;max-width:none;margin:0 auto;padding-left:0;padding-right:0;box-sizing:border-box;}' +
             '.print-summary .main_banner,.print-summary .main_text{padding-top:0;margin-top:0;}' +
             '.print-summary .main_title{margin-top:0;}' +
@@ -2314,18 +2314,18 @@
         });
     }
 
-    const nav = document.querySelector('.portfolio-nav');
+    const nav = document.querySelector('.ui-nav');
 
     if (!nav) {
         return;
     }
 
     const navContainer = nav.querySelector('.container-fluid');
-    const navBrandGroup = nav.querySelector('.portfolio-brand-group');
-    const navLinks = nav.querySelector('.portfolio-nav-links');
-    const navCollapse = nav.querySelector('.portfolio-nav-collapse');
-    const navControls = navCollapse ? navCollapse.querySelector('.portfolio-controls-stack') : null;
-    const navToggler = nav.querySelector('.portfolio-nav-toggler');
+    const navBrandGroup = nav.querySelector('.ui-brand-group');
+    const navLinks = nav.querySelector('.ui-nav-links');
+    const navCollapse = nav.querySelector('.ui-nav-collapse');
+    const navControls = navCollapse ? navCollapse.querySelector('.ui-controls-stack') : null;
+    const navToggler = nav.querySelector('.ui-nav-toggler');
 
     if (!navContainer || !navBrandGroup || !navLinks || !navCollapse || !navToggler) {
         return;
@@ -2336,7 +2336,7 @@
             navContainer,
             navCollapse,
             navLinks,
-            navCollapse.querySelector('.portfolio-nav-links')
+            navCollapse.querySelector('.ui-nav-links')
         ];
         const navItems = nav.querySelectorAll('.nav-item');
 

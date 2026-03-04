@@ -1,19 +1,115 @@
 import gzip
 import json
+import secrets
 from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import httpx
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.admin.forms import AdminAuthenticationForm
 from django.core.paginator import Paginator
+from django import forms
 from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_markdown
 from .models import Career, DocsAccessRule, Hobby, NavLink, Project, Project_Tag, Stratagem, Stratagem_Class, Stratagem_Hero_Score
+
+
+ADMIN_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "admin_login_captcha_question"
+ADMIN_LOGIN_CAPTCHA_ANSWER_SESSION_KEY = "admin_login_captcha_answer"
+
+
+def _build_admin_login_captcha(request, refresh=False):
+    if request is None:
+        return ""
+    session = getattr(request, "session", None)
+    if session is None:
+        return ""
+
+    question = session.get(ADMIN_LOGIN_CAPTCHA_QUESTION_SESSION_KEY, "")
+    answer = session.get(ADMIN_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "")
+    if not refresh and question and answer:
+        return question
+
+    left = secrets.randbelow(9) + 1
+    right = secrets.randbelow(9) + 1
+    session[ADMIN_LOGIN_CAPTCHA_QUESTION_SESSION_KEY] = f"{left} + {right} = ?"
+    session[ADMIN_LOGIN_CAPTCHA_ANSWER_SESSION_KEY] = str(left + right)
+    session.modified = True
+    return session[ADMIN_LOGIN_CAPTCHA_QUESTION_SESSION_KEY]
+
+
+def _verify_admin_turnstile_token(token, remote_ip):
+    site_key = str(getattr(settings, "TURNSTILE_SITE_KEY", "") or "").strip()
+    secret_key = str(getattr(settings, "TURNSTILE_SECRET_KEY", "") or "").strip()
+    if not site_key or not secret_key:
+        return False
+    if not token:
+        return False
+
+    payload = {"secret": secret_key, "response": token}
+    if remote_ip:
+        payload["remoteip"] = remote_ip
+
+    try:
+        response = httpx.post(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data=payload,
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        result = response.json()
+    except (httpx.HTTPError, ValueError):
+        return False
+    return bool(result.get("success"))
+
+
+class AdminCaptchaAuthenticationForm(AdminAuthenticationForm):
+    captcha_answer = forms.CharField(label="Captcha", required=True)
+
+    def __init__(self, request=None, *args, **kwargs):
+        super().__init__(request, *args, **kwargs)
+        self._request = request
+        self.turnstile_site_key = str(getattr(settings, "TURNSTILE_SITE_KEY", "") or "").strip()
+        self.fields["captcha_answer"].widget.attrs["autocomplete"] = "off"
+        self.fields["captcha_answer"].widget.attrs["autocapitalize"] = "off"
+        self.fields["captcha_answer"].widget.attrs["spellcheck"] = "false"
+        self.captcha_question = _build_admin_login_captcha(request, refresh=False)
+
+    def clean(self):
+        if not self.turnstile_site_key:
+            raise ValidationError("Captcha is not configured. Please contact the administrator.")
+
+        expected = ""
+        session = getattr(self._request, "session", None)
+        if session is not None:
+            expected = str(session.get(ADMIN_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
+        provided = str(self.cleaned_data.get("captcha_answer", "") or "").strip()
+        if not expected or provided != expected:
+            _build_admin_login_captcha(self._request, refresh=True)
+            raise ValidationError("Captcha verification failed. Please try again.")
+
+        token = ""
+        remote_ip = ""
+        if self._request is not None:
+            token = self._request.POST.get("cf-turnstile-response", "")
+            remote_ip = (self._request.META.get("HTTP_CF_CONNECTING_IP") or self._request.META.get("REMOTE_ADDR") or "").strip()
+        if not _verify_admin_turnstile_token(token, remote_ip):
+            _build_admin_login_captcha(self._request, refresh=True)
+            raise ValidationError("Captcha verification failed. Please try again.")
+
+        cleaned = super().clean()
+        _build_admin_login_captcha(self._request, refresh=True)
+        return cleaned
+
+
+admin.site.login_form = AdminCaptchaAuthenticationForm
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):

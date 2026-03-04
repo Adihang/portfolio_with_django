@@ -1,8 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Career, Hobby, NavLink, Project, Stratagem, Stratagem_Hero_Score
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.cache import cache_control
 from django.urls import reverse
 import json
 import re
@@ -263,8 +264,6 @@ def build_lang_switch_url(request, target_lang):
     stripped_path = UI_LANG_PATH_PREFIX_PATTERN.sub("/", current_path, count=1)
     if not stripped_path.startswith("/"):
         stripped_path = f"/{stripped_path}"
-    if stripped_path == "/":
-        stripped_path = "/portfolio/"
 
     localized_path = f"/{normalized_target_lang}{stripped_path}"
     query_params = request.GET.copy()
@@ -277,15 +276,26 @@ def build_lang_switch_url(request, target_lang):
 
 def apply_ui_context(request, context, ui_lang):
     context["ui_lang"] = ui_lang
+    context["show_chat_widget"] = False
     context["lang_switch_ko_url"] = build_lang_switch_url(request, "ko")
     context["lang_switch_en_url"] = build_lang_switch_url(request, "en")
     try:
-        context["nav_links"] = list(NavLink.objects.all())
+        nav_links = list(NavLink.objects.all())
+        removed_nav_names = {"github", "thingiverse"}
+        for link in nav_links:
+            name_value = str(getattr(link, "name", "") or "")
+            url_value = str(getattr(link, "url", "") or "")
+            if name_value.strip().lower() == "docs":
+                link.name = "IDE"
+            if url_value.startswith("/docs"):
+                link.url = "/ide" + url_value[len("/docs"):]
+        context["nav_links"] = [
+            link for link in nav_links
+            if str(getattr(link, "name", "") or "").strip().lower() not in removed_nav_names
+        ]
     except (OperationalError, ProgrammingError):
         context["nav_links"] = [
-            {"name": "GitHub", "url": "https://github.com/Adihang"},
-            {"name": "Thingiverse", "url": "https://www.thingiverse.com/hanbyel/designs"},
-            {"name": "Docs", "url": "/docs/list"},
+            {"name": "IDE", "url": "/ide/list"},
             {"name": "Mini Game", "url": "/fun/minigame/"},
         ]
 
@@ -357,10 +367,11 @@ def minigame_page(request, ui_lang=None):
     ]
 
     context = {
-        "ui_lang": resolved_lang,
         "page_title": "Mini Game" if is_english else "미니게임",
         "minigame_links": links,
+        "minigame_home_label": "Home" if is_english else "홈",
     }
+    apply_ui_context(request, context, resolved_lang)
     response = render(request, "fun/minigame.html", context)
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
@@ -389,12 +400,105 @@ def none(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
     return render(request, 'none.html', context)
-    
+
+
+@cache_control(public=True, max_age=86400)
+def pwa_manifest(request):
+    # Browser install metadata for "Add to Home screen" / app install prompts.
+    manifest = {
+        "name": "Hanplanet Portfolio",
+        "short_name": "Hanplanet",
+        "description": "Hanplanet portfolio web app",
+        "start_url": "/portfolio/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#0d6efd",
+        "icons": [
+            {
+                "src": "/static/favicon.png",
+                "type": "image/png",
+            },
+        ],
+    }
+    return JsonResponse(manifest)
+
+
+@cache_control(public=True, max_age=0, must_revalidate=True)
+def service_worker(request):
+    # Keep service worker script dynamic at root scope so it can control "/".
+    script = """
+const STATIC_CACHE = 'hanplanet-static-v1';
+const PAGE_CACHE = 'hanplanet-page-v1';
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => ![STATIC_CACHE, PAGE_CACHE].includes(key))
+          .map((key) => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+
+  if (request.method !== 'GET' || url.origin !== self.location.origin) {
+    return;
+  }
+
+  if (url.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          const fetched = fetch(request)
+            .then((response) => {
+              if (response && response.ok) {
+                cache.put(request, response.clone());
+              }
+              return response;
+            })
+            .catch(() => cached);
+          return cached || fetched;
+        })
+      )
+    );
+    return;
+  }
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(PAGE_CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.open(PAGE_CACHE).then((cache) => cache.match(request)))
+    );
+  }
+});
+""".strip()
+    response = HttpResponse(script, content_type="application/javascript; charset=utf-8")
+    response["Service-Worker-Allowed"] = "/"
+    return response
+
 
 def main(request, ui_lang=None):
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
+    context["show_chat_widget"] = True
 
     careers = list(Career.objects.all().order_by('-order', '-id'))
     for career in careers:

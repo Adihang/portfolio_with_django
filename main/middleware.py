@@ -86,4 +86,5 @@ class GlobalRateLimitMiddleware:
             or requested_with.lower() == "xmlhttprequest"
             or path.startswith("/api/")
             or "/docs/api/" in path
+            or "/ide/api/" in path
         )

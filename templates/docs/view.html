@@ -1,34 +1,37 @@
 {% extends 'base.html' %}
-{% block body_class %}docs-page{% endblock %}
+{% block body_class %}ide-page{% endblock %}
 {% block content %}
 {% include 'docs/_assets_head.html' %}
 
-<div class="docs-toolbar-wrap">
-    <div class="docs-shell docs-toolbar">
-        <div class="docs-toolbar-left">
-            <div class="docs-title-row">
-                <h1 class="docs-title">{{ doc_title }}</h1>
-                <button class="docs-help-icon-link" type="button" id="docs-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="docs-help-icon-symbol" aria-hidden="true"></span></button>
+<div class="ide-toolbar-wrap ui-toolbar-wrap">
+    <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
+        <div class="ide-toolbar-left ui-toolbar-left">
+            <div class="ide-title-row ui-title-row">
+                <h1 class="ide-title ui-title">{{ doc_title }}</h1>
+                <button class="ide-help-icon-link" type="button" id="ide-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="ide-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
-            <div class="docs-subtitle docs-path-breadcrumbs">
+            <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
                 {% for crumb in view_breadcrumbs %}
-                    {% if not forloop.first %}<span class="docs-path-sep">/</span>{% endif %}
-                    <a class="docs-path-link" href="{{ crumb.url }}">{{ crumb.label }}</a>
+                    {% if not forloop.first %}<span class="ide-path-sep ui-path-sep">/</span>{% endif %}
+                    <a class="ide-path-link ui-path-link" href="{{ crumb.url }}">{{ crumb.label }}</a>
                 {% endfor %}
-                <span class="docs-path-sep">/</span>
-                <span class="docs-path-current">{{ view_current_file_name }}</span>
+                <span class="ide-path-sep ui-path-sep">/</span>
+                <span class="ide-path-current ui-path-current">{{ view_current_file_name }}</span>
             </div>
         </div>
-        <div class="docs-toolbar-right">
+        <div class="ide-toolbar-right ui-toolbar-right">
             {% include "docs/_auth_account.html" %}
-            <div class="docs-toolbar-actions">
+            <div class="ide-toolbar-actions ui-toolbar-actions">
                 {% include "docs/_auth_button.html" %}
-                <a class="docs-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
+                {% if user.is_staff %}
+                    <a class="ide-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
+                {% endif %}
+                <a class="ide-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
                 {% if doc_can_edit %}
-                    <a class="docs-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
+                    <a class="ide-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
                 {% endif %}
                 {% if doc_can_edit %}
-                    <button class="docs-btn" type="button" id="docs-delete-btn">{{ docs_text.delete_button }}</button>
+                    <button class="ide-btn" type="button" id="ide-delete-btn">{{ docs_text.delete_button }}</button>
                 {% endif %}
             </div>
         </div>
@@ -36,9 +39,9 @@
 </div>
 
 <main
-    class="docs-shell docs-content"
-    data-docs-page="view"
-    data-docs-base-url="{{ docs_base_url }}"
+    class="ide-shell ui-shell ide-content ui-content"
+    data-ide-page="view"
+    data-ide-base-url="{{ docs_base_url }}"
     data-delete-api-url="{{ docs_api_delete_url }}"
     data-doc-path="{{ doc_relative_path }}"
     data-parent-dir="{{ doc_parent_dir }}"
@@ -51,6 +54,6 @@
 {% include "popup/docs/auth_logout_modal.html" %}
 {% include "popup/docs/page_help_modal.html" %}
 
-{{ docs_text|json_script:"docs-i18n" }}
+{{ docs_text|json_script:"ide-i18n" }}
 {% include 'docs/_assets_script.html' %}
 {% endblock %}
