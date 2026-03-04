@@ -31,6 +31,8 @@ staticfiles/
 # Virtual Environment
 venv/
 env/
+.venv/
+django/
 
 # IDE
 .idea/
