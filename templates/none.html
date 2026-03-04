@@ -2,6 +2,7 @@
 {% load static_versioned %}
 {% block body_class %}root-page{% endblock %}
 {% block content %}
+<div class="root-shell-controls root-shell-controls-fixed" data-root-controls-host></div>
 <main class="main main-surface-layer root-search-page">
     <section class="root-search-shell" aria-label="{% if ui_lang|default:'ko' == 'en' %}Smart Search{% else %}스마트 검색{% endif %}">
         <h1 class="root-search-title">Hanplanet</h1>
@@ -42,6 +43,35 @@
                 </button>
             </div>
         </form>
+        <div class="root-shell-links" data-root-nav-links-host></div>
+        <section
+            class="root-shortcuts"
+            data-root-shortcuts
+            data-authenticated="{% if request.user.is_authenticated %}1{% else %}0{% endif %}"
+            data-login-hint="{% if ui_lang|default:'ko' == 'en' %}Sign in to save personal shortcuts.{% else %}로그인하면 개인 바로가기를 저장할 수 있습니다.{% endif %}"
+            data-empty-message="{% if ui_lang|default:'ko' == 'en' %}No shortcuts yet.{% else %}아직 등록된 바로가기가 없습니다.{% endif %}"
+            data-add-label="{% if ui_lang|default:'ko' == 'en' %}Add{% else %}추가{% endif %}"
+            data-name-placeholder="{% if ui_lang|default:'ko' == 'en' %}Name{% else %}이름{% endif %}"
+            data-url-placeholder="{% if ui_lang|default:'ko' == 'en' %}https://example.com{% else %}https://example.com{% endif %}"
+        >
+            <p class="root-shortcuts-hint" data-root-shortcuts-hint></p>
+            {% if not request.user.is_authenticated %}
+            <div class="root-shortcuts-auth-actions">
+                <a class="root-shortcuts-auth-btn" href="{{ docs_login_url }}">
+                    {% if ui_lang|default:'ko' == 'en' %}Login{% else %}로그인{% endif %}
+                </a>
+                <a class="root-shortcuts-auth-btn root-shortcuts-auth-btn-primary" href="{{ docs_signup_url }}">
+                    {% if ui_lang|default:'ko' == 'en' %}Sign Up{% else %}회원가입{% endif %}
+                </a>
+            </div>
+            {% endif %}
+            <form class="root-shortcuts-form" data-root-shortcut-form hidden>
+                <input type="text" class="root-shortcuts-input" data-root-shortcut-name maxlength="80" required>
+                <input type="text" class="root-shortcuts-input" data-root-shortcut-url maxlength="500" required>
+                <button type="submit" class="root-shortcuts-submit">{% if ui_lang|default:'ko' == 'en' %}Save{% else %}저장{% endif %}</button>
+            </form>
+            <div class="root-shortcuts-grid" data-root-shortcuts-grid></div>
+        </section>
     </section>
 </main>
 <div class="root-search-engine-popup" data-root-engine-popup role="listbox" aria-hidden="true">

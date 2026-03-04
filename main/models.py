@@ -258,6 +258,29 @@ class DocsLoginAttemptGuard(models.Model):
         verbose_name = "Docs 로그인 보호 상태"
         verbose_name_plural = "Docs 로그인 보호 상태"
 
+
+class QuickLink(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="quick_links",
+        verbose_name="사용자",
+    )
+    name = models.CharField("이름", max_length=80)
+    url = models.URLField("URL", max_length=500)
+    icon_url = models.URLField("아이콘 URL", max_length=500, blank=True, default="")
+    display_order = models.PositiveIntegerField("표시 순서", default=0)
+    created_at = models.DateTimeField("생성일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+        verbose_name = "루트 바로가기"
+        verbose_name_plural = "루트 바로가기"
+
+    def __str__(self):
+        return f"{self.user}: {self.name}"
+
     def __str__(self):
         return f"{self.user} ({self.failed_attempts})"
         

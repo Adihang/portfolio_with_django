@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_markdown
-from .models import Career, DocsAccessRule, Hobby, NavLink, Project, Project_Tag, Stratagem, Stratagem_Class, Stratagem_Hero_Score
+from .models import Career, DocsAccessRule, Hobby, NavLink, Project, Project_Tag, QuickLink, Stratagem, Stratagem_Class, Stratagem_Hero_Score
 
 
 ADMIN_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "admin_login_captcha_question"
@@ -155,6 +155,14 @@ class NavLinkAdmin(admin.ModelAdmin):
     list_display = ["order", "name", "url"]
     list_editable = ["name", "url"]
     ordering = ["order", "id"]
+
+
+@admin.register(QuickLink)
+class QuickLinkAdmin(admin.ModelAdmin):
+    list_display = ["user", "display_order", "name", "url", "updated_at"]
+    list_filter = ["user"]
+    search_fields = ["name", "url", "user__username"]
+    ordering = ["user__username", "display_order", "id"]
 
 
 @admin.register(DocsAccessRule)

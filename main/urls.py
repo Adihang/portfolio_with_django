@@ -85,6 +85,9 @@ urlpatterns = [
     re_path(r'^(?P<ui_lang>ko|en)/bubble/?$', views.bubble_legacy_redirect),
     re_path(r'^(?P<ui_lang>ko|en)/Stratagem_Hero/add_score/$', views.add_score),
     re_path(r'^(?P<ui_lang>ko|en)/comment/create/(?P<project_id>\d+)/$', views.ProjectComment_create, name='ProjectComment_create_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/api/root-shortcuts/$', views.root_shortcuts, name='root_shortcuts_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/api/root-shortcuts/reorder/$', views.root_shortcuts_reorder, name='root_shortcuts_reorder_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/api/root-shortcuts/(?P<shortcut_id>\d+)/$', views.root_shortcuts_detail, name='root_shortcuts_detail_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/chat/$', views.chat_with_ai, name='chat_with_ai_lang'),
     path('portfolio/', views.main_legacy_redirect, name='main'),
     path('project/<int:project_id>/', views.project_detail_legacy_redirect, name='ProjectDetail'),
@@ -105,5 +108,8 @@ urlpatterns = [
     path('bubble/', views.bubble_legacy_redirect),
     path('Stratagem_Hero/add_score/', views.add_score),
     path('comment/create/<int:project_id>/', views.ProjectComment_create, name='ProjectComment_create'),
+    path('api/root-shortcuts/', views.root_shortcuts, name='root_shortcuts'),
+    path('api/root-shortcuts/reorder/', views.root_shortcuts_reorder, name='root_shortcuts_reorder'),
+    path('api/root-shortcuts/<int:shortcut_id>/', views.root_shortcuts_detail, name='root_shortcuts_detail'),
     path('api/chat/', views.chat_with_ai, name='chat_with_ai')
 ]

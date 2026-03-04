@@ -584,7 +584,7 @@ body.theme-dark .ide-help-icon-symbol {
     box-sizing: border-box;
     border: 0;
     box-shadow: inset 0 -1px 0 var(--ide-border-soft);
-    background: var(--ide-surface-muted);
+    background: var(--ide-hover-soft);
 }
 
 .ide-list-editor-head {
@@ -601,7 +601,6 @@ body.theme-dark .ide-help-icon-symbol {
     background: var(--ide-surface-muted);
 }
 
-body.ide-page:not(.theme-dark) .ide-list-preview-head,
 body.ide-page:not(.theme-dark) .ide-list-editor-head {
     background: #eeeeee;
 }
@@ -911,17 +910,12 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 }
 
 .ide-current-dir-row {
-    background: var(--ide-surface-muted);
+    background: var(--ide-hover-soft);
     padding: var(--ide-list-head-pad-y) var(--ide-list-head-pad-x);
     min-height: 48px;
     box-sizing: border-box;
     font-size: 0.9rem;
     line-height: 1.2;
-}
-
-body.ide-page:not(.theme-dark) .ide-current-dir-item,
-body.ide-page:not(.theme-dark) .ide-current-dir-row {
-    background: #eeeeee;
 }
 
 .ide-current-dir-name {
