@@ -70,11 +70,20 @@
     <meta name="description" content="{{ meta_description|default:'Django로 작성한 포트폴리오 입니다.' }}">
     <meta name="author" content="{{ meta_author|default:'Hanplanet' }}">
     <meta name="generator" content="Django">
-    <meta name="robots" content="noindex">
+    <meta name="robots" content="{{ meta_robots|default:'index,follow' }}">
     <meta property="og:title" content="{{ meta_og_title|default:'Hanplanet' }}">
     <meta property="og:site_name" content="{{ meta_site_name|default:'Hanplanet' }}">
     <meta property="og:description" content="{{ meta_og_description|default:'Django로 작성한 포트폴리오 입니다.' }}">
+    <meta property="og:url" content="{{ meta_og_url|default:meta_canonical_url|default:request.build_absolute_uri }}">
     <meta property="og:image" content="https://www.hanplanet.com/static/icons/hanplanet-og-1200.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ meta_og_title|default:'Hanplanet' }}">
+    <meta name="twitter:description" content="{{ meta_og_description|default:'Django로 작성한 포트폴리오 입니다.' }}">
+    <meta name="twitter:image" content="https://www.hanplanet.com/static/icons/hanplanet-og-1200.png">
+    <link rel="canonical" href="{{ meta_canonical_url|default:request.build_absolute_uri }}">
+    {% if meta_json_ld %}
+    <script type="application/ld+json">{{ meta_json_ld|safe }}</script>
+    {% endif %}
     {% include "partials/pwa.html" %}
     {% include "partials/static_script_fallback.html" %}
     
@@ -83,10 +92,13 @@
     <link rel="icon" type="image/png" href="{% static_v 'icons/pwa-192.png' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/style.css' %}">
+    {% if not is_root_entry %}
     <script src="{% static_v 'js/bootstrap.min.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
     <script src="{% static_v 'js/script.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
-    <!-- 채팅 위젯 스타일 -->
+    {% endif %}
+    {% if show_chat_widget %}
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/chat_widget.css' %}">
+    {% endif %}
     <title>{{ meta_title|default:'Hanplanet' }}</title>
     <!-- CSRF Token for AJAX -->
     <meta name="csrf-token" content="{{ csrf_token }}">
@@ -95,6 +107,7 @@
     class="page {% block body_class %}{% endblock %}"
     data-authenticated="{% if request.user.is_authenticated %}1{% else %}0{% endif %}"
     data-theme-preference-url="{{ theme_preference_url|default:'' }}"
+    data-user-preference-url="{{ user_preference_url|default:'' }}"
     data-portfolio-owner-username="{{ portfolio_owner_username|default:'' }}"
 >
     <!-- 네비게이션바 -->
@@ -128,8 +141,8 @@
                     type="button"
                     class="ui-pwa-install-btn"
                     data-pwa-install
-                    aria-label="{% if ui_lang|default:'ko' == 'en' %}Install app{% else %}앱 설치{% endif %}"
-                    title="{% if ui_lang|default:'ko' == 'en' %}Install app{% else %}앱 설치{% endif %}"
+                    aria-label="{% include 'partials/ui_i18n.html' with key='install_app' %}"
+                    title="{% include 'partials/ui_i18n.html' with key='install_app' %}"
                 >
                     <span class="ui-pwa-install-icon" aria-hidden="true"></span>
                 </button>

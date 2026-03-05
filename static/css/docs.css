@@ -120,6 +120,7 @@ body.ui-page .portfolio-print-btn {
 
 .ide-toolbar-wrap,
 .ui-toolbar-wrap {
+    position: relative;
     flex: 0 0 auto;
     border-bottom: 1px solid var(--ide-border-soft);
     background: var(--ide-surface-toolbar);
@@ -256,6 +257,7 @@ body.ui-page .portfolio-print-btn {
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    position: relative;
     margin: 0;
 }
 
@@ -268,7 +270,7 @@ body.ui-page .portfolio-print-btn {
     border-radius: 999px;
     background: transparent;
     color: var(--ide-text-stronger);
-    font-size: 0.98rem;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.1;
     min-height: 30px;
@@ -311,6 +313,65 @@ body.theme-dark .ide-auth-account-avatar {
 
 .ide-auth-account-name {
     color: var(--ide-text-stronger);
+}
+
+.ide-auth-account-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 168px;
+    border: 0;
+    border-radius: 10px;
+    background: #ffffff;
+    background-color: #ffffff;
+    background-image: none;
+    opacity: 1;
+    box-shadow: var(--ide-shadow-md);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 4200;
+}
+
+body.theme-dark .ide-auth-account-menu {
+    background: #2e2e2e;
+    background-color: #2e2e2e;
+    background-image: none;
+    opacity: 1;
+}
+
+.ide-auth-account-menu[hidden] {
+    display: none;
+}
+
+.ide-auth-account-menu-item {
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ide-text);
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 16px;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.ide-auth-account-menu-item:hover,
+.ide-auth-account-menu-item:focus-visible {
+    background: var(--ide-hover);
+    color: var(--ide-text-stronger);
+}
+
+.ide-context-menu,
+.ide-auth-account-menu,
+.ide-rename-modal-dialog,
+.ide-save-modal-dialog,
+.ide-folder-modal-dialog,
+.ide-help-modal-dialog,
+.ide-permission-modal-dialog {
+    border: 0;
 }
 
 .ide-title,
@@ -392,7 +453,7 @@ body.theme-dark .ide-help-icon-symbol {
 .ide-subtitle,
 .ui-subtitle {
     margin-top: 2px;
-    font-size: 0.85rem;
+    font-size: 16px;
     color: var(--ide-text-muted);
 }
 
@@ -678,7 +739,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     caret-color: var(--ide-text-stronger);
     padding: 10px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.94rem;
+    font-size: 16px;
     line-height: 1.45;
     tab-size: 4;
     font-variant-ligatures: none;
@@ -768,7 +829,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 .ide-list-preview-placeholder {
     margin: 0;
     color: var(--ide-text-muted);
-    font-size: 0.9rem;
+    font-size: 16px;
     line-height: 1.55;
 }
 
@@ -785,7 +846,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     background: var(--ide-btn-current-bg);
     color: var(--ide-btn-current-color);
     padding: 8px 12px;
-    font-size: 0.92rem;
+    font-size: 16px;
     line-height: 1;
     white-space: nowrap;
     text-decoration: none;
@@ -914,7 +975,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     padding: var(--ide-list-head-pad-y) var(--ide-list-head-pad-x);
     min-height: 48px;
     box-sizing: border-box;
-    font-size: 0.9rem;
+    font-size: 16px;
     line-height: 1.2;
 }
 
@@ -1012,7 +1073,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     border-radius: 999px;
     background: transparent;
     color: var(--ide-text-subtle);
-    font-size: 0.68rem;
+    font-size: 16px;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
@@ -1037,7 +1098,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     border: 0;
     background: transparent;
     color: var(--ide-text-subtle);
-    font-size: 0.72rem;
+    font-size: 16px;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
@@ -1149,7 +1210,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 }
 
 .ide-markdown-context-menu .ide-md-snippet-btn {
-    font-size: 0.82rem;
+    font-size: 16px;
     line-height: 1.2;
 }
 
@@ -1189,12 +1250,12 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 
 .ide-rename-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 16px;
     font-weight: 700;
 }
 
 .ide-rename-target {
-    font-size: 0.84rem;
+    font-size: 16px;
     color: var(--ide-text-secondary);
     border: 1px solid var(--ide-border-mid);
     border-radius: var(--ide-radius-sm);
@@ -1207,9 +1268,13 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 
 .ide-auth-logout-message {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: 16px;
     color: var(--ide-text-secondary);
     line-height: 1.45;
+}
+
+#ide-auth-logout-title {
+    font-size: 18px;
 }
 
 .ide-rename-actions {
@@ -1234,7 +1299,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 }
 
 .ide-permission-col-title {
-    font-size: 0.84rem;
+    font-size: 16px;
     font-weight: 700;
     color: var(--ide-text-subtle);
     margin-bottom: 6px;
@@ -1259,7 +1324,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     gap: 8px;
     border-radius: 7px;
     padding: 6px 8px;
-    font-size: 0.9rem;
+    font-size: 16px;
     color: var(--ide-text);
     cursor: pointer;
 }
@@ -1276,14 +1341,14 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
 
 .ide-permission-empty {
     padding: 8px 10px;
-    font-size: 0.86rem;
+    font-size: 16px;
     color: var(--ide-text-subtle);
 }
 
 .ide-permission-help {
     margin: 0;
     color: var(--ide-text-secondary);
-    font-size: 0.84rem;
+    font-size: 16px;
     line-height: 1.4;
 }
 
@@ -1328,20 +1393,20 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     text-align: left;
     vertical-align: top;
     padding: 8px 10px;
-    font-size: 0.9rem;
+    font-size: 16px;
     line-height: 1.45;
 }
 
 .ide-markdown th {
     background: var(--ide-surface-muted);
     color: var(--ide-text-subtle);
-    font-size: 0.84rem;
+    font-size: 16px;
     font-weight: 700;
 }
 
 .ide-markdown code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.84rem;
+    font-size: 16px;
     border: 0;
     border-radius: 6px;
     background: var(--ide-surface-muted);
@@ -1363,7 +1428,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     border-radius: 0;
     background: transparent;
     padding: 0;
-    font-size: 0.84rem;
+    font-size: 16px;
     line-height: 1.45;
 }
 
@@ -1399,7 +1464,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     padding: 0;
     color: inherit;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.84rem;
+    font-size: 16px;
     line-height: 1.45;
     white-space: pre;
 }
@@ -1443,7 +1508,7 @@ body.ide-page:not(.theme-dark) .ide-list-editor-head {
     padding: 0;
     color: inherit;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.84rem;
+    font-size: 16px;
     line-height: 1.45;
     white-space: pre;
 }
@@ -1856,7 +1921,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: 0.9rem;
+    font-size: 16px;
 }
 
 .ide-field-head {
@@ -1898,7 +1963,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
     color: var(--ide-text);
     caret-color: var(--ide-text-stronger);
     padding: 10px;
-    font-size: 0.94rem;
+    font-size: 16px;
     width: 100%;
     box-sizing: border-box;
 }
@@ -1943,7 +2008,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
     overflow: auto;
     pointer-events: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.94rem;
+    font-size: 16px;
     line-height: 1.45;
     white-space: pre;
     tab-size: 4;
@@ -1970,7 +2035,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
     caret-color: var(--ide-text-stronger);
     padding: 10px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.94rem;
+    font-size: 16px;
     line-height: 1.45;
     resize: none;
     overflow: auto;
@@ -2043,7 +2108,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
 
 .ide-editor-suggest-item-label {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.81rem;
+    font-size: 16px;
     color: var(--ide-text-strong);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2051,7 +2116,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
 }
 
 .ide-editor-suggest-item-trigger {
-    font-size: 0.72rem;
+    font-size: 16px;
     color: var(--ide-text-muted);
     border: 1px solid var(--ide-border-mid);
     border-radius: 4px;
@@ -2060,14 +2125,14 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
 }
 
 .ide-editor-suggest-footer {
-    font-size: 0.72rem;
+    font-size: 16px;
     color: var(--ide-text-muted);
     padding: 2px 4px 0;
 }
 
 .ide-editor-suggest-label {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.82rem;
+    font-size: 16px;
     line-height: 1.2;
     color: var(--ide-text-strong);
     overflow: hidden;
@@ -2076,7 +2141,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
 }
 
 .ide-editor-suggest-hint {
-    font-size: 0.75rem;
+    font-size: 16px;
     color: var(--ide-text-muted);
     white-space: nowrap;
 }
@@ -2085,7 +2150,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
     border: 1px solid var(--ide-border-mid);
     border-radius: 4px;
     padding: 1px 4px;
-    font-size: 0.72rem;
+    font-size: 16px;
     font-family: inherit;
     color: var(--ide-text-strong);
     background: var(--ide-bg);
@@ -2110,7 +2175,7 @@ body.ide-page.theme-dark .ide-md-src-token-codeblock {
     background: var(--ide-surface-muted-strong);
     color: var(--ide-text-strong);
     padding: 8px 10px;
-    font-size: 0.88rem;
+    font-size: 16px;
 }
 
 .ide-login-actions {
@@ -2182,7 +2247,7 @@ body.ide-modal-open {
 
 .ide-save-modal-title {
     margin: 0;
-    font-size: 1.04rem;
+    font-size: 16px;
     font-weight: 700;
 }
 
@@ -2194,7 +2259,7 @@ body.ide-modal-open {
     height: 28px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 16px;
     line-height: 1;
 }
 
@@ -2232,7 +2297,7 @@ body.ide-modal-open {
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
-    font-size: 0.88rem;
+    font-size: 16px;
 }
 
 .ide-save-crumb-btn:hover,
@@ -2248,7 +2313,7 @@ body.ide-modal-open {
 
 .ide-save-crumb-sep {
     color: var(--ide-crumb-sep-color);
-    font-size: 0.85rem;
+    font-size: 16px;
     user-select: none;
 }
 
@@ -2270,7 +2335,7 @@ body.ide-modal-open {
 }
 
 .ide-save-sidebar-title {
-    font-size: 0.82rem;
+    font-size: 16px;
     font-weight: 700;
     color: var(--ide-text-subtle);
     margin-bottom: 8px;
@@ -2293,7 +2358,7 @@ body.ide-modal-open {
     color: var(--ide-save-row-color);
     text-align: left;
     padding: 7px 9px;
-    font-size: 0.9rem;
+    font-size: 16px;
     cursor: pointer;
 }
 
@@ -2319,7 +2384,7 @@ body.ide-modal-open {
     border-bottom: 0;
     margin-top: 0;
     padding: 10px 6px;
-    font-size: 0.82rem;
+    font-size: 16px;
     font-weight: 700;
     color: var(--ide-text-subtle);
 }
@@ -2376,7 +2441,7 @@ body.ide-modal-open {
 }
 
 .ide-save-folder-name {
-    font-size: 0.9rem;
+    font-size: 16px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2386,7 +2451,7 @@ body.ide-modal-open {
 .ide-save-folder-empty {
     padding: 10px;
     color: var(--ide-text-subtle);
-    font-size: 0.9rem;
+    font-size: 16px;
 }
 
 #ide-save-name-field,
@@ -2396,7 +2461,7 @@ body.ide-modal-open {
     gap: 6px;
     width: 100%;
     min-width: 0;
-    font-size: 0.9rem;
+    font-size: 16px;
 }
 
 #ide-save-name-field {
@@ -2405,7 +2470,7 @@ body.ide-modal-open {
 
 #ide-save-name-field > span,
 #ide-save-extension-field > span {
-    font-size: 0.84rem;
+    font-size: 16px;
     font-weight: 600;
     color: var(--ide-text-muted);
 }
@@ -2432,7 +2497,7 @@ body.ide-modal-open {
     color: var(--ide-text);
     caret-color: var(--ide-text-stronger);
     padding: 10px;
-    font-size: 0.94rem;
+    font-size: 16px;
     width: 100%;
     box-sizing: border-box;
 }
@@ -2520,12 +2585,12 @@ body.ide-modal-open {
 
 .ide-folder-modal-title {
     margin: 0;
-    font-size: 0.98rem;
+    font-size: 16px;
     font-weight: 700;
 }
 
 .ide-folder-modal-path {
-    font-size: 0.84rem;
+    font-size: 16px;
     color: var(--ide-text-secondary);
     border: 1px solid var(--ide-border-mid);
     border-radius: var(--ide-radius-sm);
@@ -2584,7 +2649,7 @@ body.ide-modal-open {
 
 .ide-help-title {
     margin: 0 0 10px;
-    font-size: 1.04rem;
+    font-size: 16px;
     font-weight: 700;
 }
 
@@ -2606,14 +2671,14 @@ body.ide-modal-open {
     text-align: left;
     vertical-align: top;
     padding: 8px 10px;
-    font-size: 0.9rem;
+    font-size: 16px;
     line-height: 1.45;
 }
 
 .ide-help-markdown th {
     background: var(--ide-surface-muted);
     color: var(--ide-text-subtle);
-    font-size: 0.84rem;
+    font-size: 16px;
     font-weight: 700;
 }
 
@@ -2624,7 +2689,7 @@ body.ide-modal-open {
 
 .ide-help-markdown code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.84rem;
+    font-size: 16px;
     border: 1px solid var(--ide-border-mid);
     border-radius: 6px;
     background: var(--ide-surface-muted);
@@ -2646,7 +2711,7 @@ body.ide-modal-open {
     border-radius: 0;
     background: transparent;
     padding: 0;
-    font-size: 0.84rem;
+    font-size: 16px;
     line-height: 1.45;
 }
 
@@ -2685,7 +2750,7 @@ body.ide-modal-open {
 
     .ide-markdown th,
     .ide-markdown td {
-        font-size: 0.85rem;
+        font-size: 16px;
         padding: 7px 8px;
     }
 

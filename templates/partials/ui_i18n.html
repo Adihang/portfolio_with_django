@@ -1,0 +1,28 @@
+{% if key == "install_app" %}{% if ui_lang|default:'ko' == 'en' %}Install app{% else %}앱 설치{% endif %}
+{% elif key == "search_and_favorites" %}{% if ui_lang|default:'ko' == 'en' %}Search and Favorites{% else %}검색과 즐겨찾기{% endif %}
+{% elif key == "search" %}{% if ui_lang|default:'ko' == 'en' %}Search{% else %}검색{% endif %}
+{% elif key == "search_or_url" %}{% if ui_lang|default:'ko' == 'en' %}Search or URL{% else %}검색어 또는 URL{% endif %}
+{% elif key == "search_keyword_or_url" %}{% if ui_lang|default:'ko' == 'en' %}Search keyword or enter URL{% else %}검색어 또는 URL 입력{% endif %}
+{% elif key == "search_engine" %}{% if ui_lang|default:'ko' == 'en' %}Search engine{% else %}검색 엔진{% endif %}
+{% elif key == "login_hint_shortcuts" %}{% if ui_lang|default:'ko' == 'en' %}Sign in to save personal shortcuts.{% else %}로그인하면 개인 바로가기를 저장할 수 있습니다.{% endif %}
+{% elif key == "empty_shortcuts" %}{% if ui_lang|default:'ko' == 'en' %}No shortcuts yet.{% else %}아직 등록된 바로가기가 없습니다.{% endif %}
+{% elif key == "add" %}{% if ui_lang|default:'ko' == 'en' %}Add{% else %}추가{% endif %}
+{% elif key == "edit" %}{% if ui_lang|default:'ko' == 'en' %}Edit{% else %}편집{% endif %}
+{% elif key == "name_placeholder" %}{% if ui_lang|default:'ko' == 'en' %}Name (optional, auto from URL if empty){% else %}이름 (선택, 비우면 URL로 자동 생성){% endif %}
+{% elif key == "url_placeholder" %}https://example.com
+{% elif key == "login" %}{% if ui_lang|default:'ko' == 'en' %}Login{% else %}로그인{% endif %}
+{% elif key == "signup" %}{% if ui_lang|default:'ko' == 'en' %}Sign Up{% else %}회원가입{% endif %}
+{% elif key == "save" %}{% if ui_lang|default:'ko' == 'en' %}Save{% else %}저장{% endif %}
+{% elif key == "cancel" %}{% if ui_lang|default:'ko' == 'en' %}Cancel{% else %}취소{% endif %}
+{% elif key == "logout" %}{% if ui_lang|default:'ko' == 'en' %}Logout{% else %}로그아웃{% endif %}
+{% elif key == "logout_confirm" %}{% if ui_lang|default:'ko' == 'en' %}Do you want to log out?{% else %}로그아웃 하시겠습니까?{% endif %}
+{% elif key == "dummy_notice" %}{% if ui_lang == "en" %}Add your information and complete your portfolio!{% else %}자신의 정보를 입력하고 포트폴리오를 완성 시켜보세요!{% endif %}
+{% elif key == "career_title" %}{% if ui_lang == 'en' %}Career{% else %}경력 사항{% endif %}
+{% elif key == "project_title" %}{% if ui_lang == 'en' %}Projects{% else %}프로젝트{% endif %}
+{% elif key == "project_desc" %}{% if ui_lang == 'en' %}A selection of projects I built with genuine curiosity.{% else %}흥미를 가지고 진행했던 프로젝트들을 소개합니다{% endif %}
+{% elif key == "hobby_title" %}{% if ui_lang == 'en' %}3D Design{% else %}3D설계{% endif %}
+{% elif key == "hobby_desc" %}{% if ui_lang == 'en' %}A collection of 3D designs made for practical use and fun.{% else %}실사용과 재미를 위해 제작한 3D 디자인 작업물입니다{% endif %}
+{% elif key == "portfolio_write_title" %}{% if ui_lang == 'en' %}Portfolio Write{% else %}포트폴리오 작성{% endif %}
+{% elif key == "edit_portfolio" %}{% if ui_lang == 'en' %}Edit Portfolio{% else %}포트폴리오 수정{% endif %}
+{% elif key == "print_summary" %}{% if ui_lang == 'en' %}Print Summary{% else %}요약 인쇄{% endif %}
+{% endif %}

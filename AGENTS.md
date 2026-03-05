@@ -27,6 +27,12 @@
 - Templates: keep page-specific templates under `templates/main/` or `templates/fun/`.
 - No formatter or linter is enforced in the repo; keep changes small and consistent with existing style.
 
+## UI Change Guardrails
+- Preserve existing visual design unless the user explicitly requests a redesign.
+- Do not break responsive mode-switch timing or breakpoint behavior when viewport size changes.
+- Keep existing transition/animation behavior intact (including resize-triggered interactions) unless explicitly requested.
+- For text/i18n refactors, avoid structural/CSS/JS behavior changes that can affect layout or animation.
+
 ## Testing Guidelines
 - Tests live in `main/tests.py` using Django’s test framework.
 - Run all tests with `python manage.py test`.

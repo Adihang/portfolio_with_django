@@ -10,7 +10,7 @@
                 type="button"
                 class="ide-auth-account-trigger"
                 data-ide-logout-trigger
-                data-confirm-message="{% if ui_lang|default:'ko' == 'en' %}Do you want to log out?{% else %}로그아웃 하시겠습니까?{% endif %}"
+                data-confirm-message="{% include 'partials/ui_i18n.html' with key='logout_confirm' %}"
             >
                 <span class="ide-auth-account-avatar" aria-hidden="true"></span>
                 <span class="ide-auth-account-name">{{ request.user.get_username }}</span>
@@ -24,7 +24,7 @@
     {% endif %}
 </div>
 <main class="main main-surface-layer root-search-page">
-    <section class="root-search-shell" aria-label="{% if ui_lang|default:'ko' == 'en' %}Smart Search{% else %}스마트 검색{% endif %}">
+    <section class="root-search-shell" aria-label="{% include 'partials/ui_i18n.html' with key='search_and_favorites' %}">
         <h1 class="root-search-title">Hanplanet</h1>
         <div class="root-shell-links">
             <div data-root-nav-links-host></div>
@@ -33,13 +33,13 @@
             <button
                 type="submit"
                 class="root-search-submit"
-                aria-label="{% if ui_lang|default:'ko' == 'en' %}Search{% else %}검색{% endif %}"
-                title="{% if ui_lang|default:'ko' == 'en' %}Search{% else %}검색{% endif %}"
+                aria-label="{% include 'partials/ui_i18n.html' with key='search' %}"
+                title="{% include 'partials/ui_i18n.html' with key='search' %}"
             >
                 <span class="root-search-submit-icon" aria-hidden="true"></span>
             </button>
             <label for="rootSmartSearchInput" class="root-search-sr-only">
-                {% if ui_lang|default:'ko' == 'en' %}Search or URL{% else %}검색어 또는 URL{% endif %}
+                {% include 'partials/ui_i18n.html' with key='search_or_url' %}
             </label>
             <input
                 id="rootSmartSearchInput"
@@ -47,18 +47,18 @@
                 type="text"
                 inputmode="search"
                 autocomplete="off"
-                placeholder="{% if ui_lang|default:'ko' == 'en' %}Search keyword or enter URL{% else %}검색어 또는 URL 입력{% endif %}"
+                placeholder="{% include 'partials/ui_i18n.html' with key='search_keyword_or_url' %}"
                 data-root-search-input
             >
             <div class="root-search-engine root-search-engine-picker" data-root-engine-picker>
-                <input type="hidden" value="google" data-root-search-engine>
+                <input type="hidden" value="{{ account_root_search_engine|default:'google' }}" data-root-search-engine>
                 <button
                     type="button"
                     class="root-search-engine-toggle"
                     data-root-engine-toggle
                     aria-haspopup="listbox"
                     aria-expanded="false"
-                    aria-label="{% if ui_lang|default:'ko' == 'en' %}Search engine{% else %}검색 엔진{% endif %}"
+                    aria-label="{% include 'partials/ui_i18n.html' with key='search_engine' %}"
                 >
                     <span class="root-search-engine-icon" data-root-engine-icon aria-hidden="true"></span>
                     <span class="root-search-engine-label" data-root-engine-label>Google</span>
@@ -70,28 +70,28 @@
             class="root-shortcuts"
             data-root-shortcuts
             data-authenticated="{% if request.user.is_authenticated %}1{% else %}0{% endif %}"
-            data-login-hint="{% if ui_lang|default:'ko' == 'en' %}Sign in to save personal shortcuts.{% else %}로그인하면 개인 바로가기를 저장할 수 있습니다.{% endif %}"
-            data-empty-message="{% if ui_lang|default:'ko' == 'en' %}No shortcuts yet.{% else %}아직 등록된 바로가기가 없습니다.{% endif %}"
-            data-add-label="{% if ui_lang|default:'ko' == 'en' %}Add{% else %}추가{% endif %}"
-            data-edit-label="{% if ui_lang|default:'ko' == 'en' %}Edit{% else %}편집{% endif %}"
-            data-name-placeholder="{% if ui_lang|default:'ko' == 'en' %}Name (optional, auto from URL if empty){% else %}이름 (선택, 비우면 URL로 자동 생성){% endif %}"
-            data-url-placeholder="{% if ui_lang|default:'ko' == 'en' %}https://example.com{% else %}https://example.com{% endif %}"
+            data-login-hint="{% include 'partials/ui_i18n.html' with key='login_hint_shortcuts' %}"
+            data-empty-message="{% include 'partials/ui_i18n.html' with key='empty_shortcuts' %}"
+            data-add-label="{% include 'partials/ui_i18n.html' with key='add' %}"
+            data-edit-label="{% include 'partials/ui_i18n.html' with key='edit' %}"
+            data-name-placeholder="{% include 'partials/ui_i18n.html' with key='name_placeholder' %}"
+            data-url-placeholder="{% include 'partials/ui_i18n.html' with key='url_placeholder' %}"
         >
             <p class="root-shortcuts-hint" data-root-shortcuts-hint></p>
             {% if not request.user.is_authenticated %}
             <div class="root-shortcuts-auth-actions">
                 <a class="root-shortcuts-auth-btn" href="{{ docs_login_url }}">
-                    {% if ui_lang|default:'ko' == 'en' %}Login{% else %}로그인{% endif %}
+                    {% include 'partials/ui_i18n.html' with key='login' %}
                 </a>
                 <a class="root-shortcuts-auth-btn root-shortcuts-auth-btn-primary" href="{{ docs_signup_url }}">
-                    {% if ui_lang|default:'ko' == 'en' %}Sign Up{% else %}회원가입{% endif %}
+                    {% include 'partials/ui_i18n.html' with key='signup' %}
                 </a>
             </div>
             {% endif %}
             <form class="root-shortcuts-form" data-root-shortcut-form hidden>
                 <input type="text" class="root-shortcuts-input" data-root-shortcut-name maxlength="80">
                 <input type="text" class="root-shortcuts-input" data-root-shortcut-url maxlength="500" required>
-                <button type="submit" class="root-shortcuts-submit">{% if ui_lang|default:'ko' == 'en' %}Save{% else %}저장{% endif %}</button>
+                <button type="submit" class="root-shortcuts-submit">{% include 'partials/ui_i18n.html' with key='save' %}</button>
             </form>
             <div class="root-shortcuts-grid" data-root-shortcuts-grid></div>
         </section>
@@ -99,8 +99,23 @@
 </main>
 <div class="root-shortcuts-context-menu" data-root-shortcut-menu hidden>
     <button type="button" class="root-shortcuts-context-item" data-shortcut-menu-edit>
-        {% if ui_lang|default:'ko' == 'en' %}Edit{% else %}편집{% endif %}
+        {% include 'partials/ui_i18n.html' with key='edit' %}
     </button>
+</div>
+<div class="root-auth-modal" id="root-auth-logout-modal" hidden>
+    <div class="root-auth-modal-backdrop" id="root-auth-logout-modal-backdrop"></div>
+    <div class="root-auth-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="root-auth-logout-title">
+        <h3 id="root-auth-logout-title">{% include 'partials/ui_i18n.html' with key='logout' %}</h3>
+        <p id="root-auth-logout-message" class="root-auth-modal-message">{% include 'partials/ui_i18n.html' with key='logout_confirm' %}</p>
+        <div class="root-auth-modal-actions">
+            <button type="button" class="root-auth-modal-btn" id="root-auth-logout-cancel-btn">
+                {% include 'partials/ui_i18n.html' with key='cancel' %}
+            </button>
+            <button type="button" class="root-auth-modal-btn root-auth-modal-btn-primary" id="root-auth-logout-confirm-btn">
+                {% include 'partials/ui_i18n.html' with key='logout' %}
+            </button>
+        </div>
+    </div>
 </div>
 <div class="root-search-engine-popup" data-root-engine-popup role="listbox" aria-hidden="true">
     <button type="button" class="root-search-engine-option is-active" data-engine-option data-engine-value="google">

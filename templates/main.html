@@ -18,14 +18,19 @@
     }
 </style>
 <div class="main main-surface-layer">
+    {% if is_dummy_portfolio %}
+    <a class="portfolio-dummy-notice" href="{{ portfolio_write_cta_url }}" role="button" aria-live="polite">
+        {% include 'partials/ui_i18n.html' with key='dummy_notice' %}
+    </a>
+    {% endif %}
     {% if is_own_portfolio and portfolio_write_url %}
     <a
         class="own-portfolio-edit-widget ui-nav-link"
         href="{{ portfolio_write_url }}"
-        aria-label="{% if ui_lang == 'en' %}Edit Portfolio{% else %}포트폴리오 수정{% endif %}"
-        title="{% if ui_lang == 'en' %}Edit Portfolio{% else %}포트폴리오 수정{% endif %}"
+        aria-label="{% include 'partials/ui_i18n.html' with key='edit_portfolio' %}"
+        title="{% include 'partials/ui_i18n.html' with key='edit_portfolio' %}"
     >
-        {% if ui_lang == 'en' %}Edit{% else %}수정{% endif %}
+        {% include 'partials/ui_i18n.html' with key='edit' %}
     </a>
     {% endif %}
     <div class = 'main_banner'>
@@ -68,8 +73,8 @@
             type="button"
             class="portfolio-print-btn ui-nav-link"
             data-portfolio-print
-            aria-label="{% if ui_lang == 'en' %}Print Summary{% else %}요약 인쇄{% endif %}"
-            title="{% if ui_lang == 'en' %}Print Summary{% else %}요약 인쇄{% endif %}"
+            aria-label="{% include 'partials/ui_i18n.html' with key='print_summary' %}"
+            title="{% include 'partials/ui_i18n.html' with key='print_summary' %}"
         >
             <svg class="portfolio-print-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M7 9V4h10v5"/>

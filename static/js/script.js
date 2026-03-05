@@ -2433,11 +2433,7 @@
             target.style.outlineColor = 'transparent';
             target.style.outlineStyle = 'none';
             target.style.outlineWidth = '0';
-            if (target === navLinks) {
-                target.style.removeProperty('box-shadow');
-            } else {
-                target.style.boxShadow = 'none';
-            }
+            target.style.removeProperty('box-shadow');
             target.style.listStyle = 'none';
         });
     };

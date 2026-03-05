@@ -16,7 +16,7 @@ from .models import (
     Stratagem_Hero_Score,
     UserProfile,
 )
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.cache import cache_control
@@ -38,6 +38,7 @@ from django.db.models import Max
 from django.db import transaction
 from django.templatetags.static import static
 from urllib.parse import quote, urlparse
+from pathlib import Path
 from types import SimpleNamespace
 
 PORTFOLIO_DEFAULT_USERNAME = "HanbyelLim"
@@ -47,6 +48,7 @@ SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
 MAX_SCORE_SECONDS = 3600.0
 SUPPORTED_UI_LANGS = {"ko", "en"}
 UI_LANG_SESSION_KEY = "portfolio_ui_lang"
+SUPPORTED_ROOT_SEARCH_ENGINES = {"google", "duckduckgo", "bing", "naver", "gpt", "claude", "gemini"}
 UI_LANG_PATH_PREFIX_PATTERN = re.compile(r"^/(ko|en)(/|$)")
 IDENTITY_IMPERSONATION_PATTERNS = [
     re.compile(
@@ -63,8 +65,141 @@ FENCED_BLOCK_END_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*$")
 
 
 class _DummyTagRelation:
+    def __init__(self, tags=None):
+        self._tags = [SimpleNamespace(tag=str(tag)) for tag in (tags or [])]
+
     def all(self):
-        return []
+        return self._tags
+
+
+def get_dummy_portfolio_projects(ui_lang):
+    is_english = ui_lang == "en"
+    if is_english:
+        return [
+            {
+                "title": "Hanplanet Search",
+                "tags": ["Django", "JavaScript", "PWA"],
+                "content": (
+                    "A smart search experience for Hanplanet root page.\n\n"
+                    "- Detects URL vs keyword input.\n"
+                    "- Supports multiple engines and quick switching.\n"
+                    "- Includes install flow for PWA users."
+                ),
+            },
+            {
+                "title": "Portfolio Editor",
+                "tags": ["Django", "SQLite", "UI/UX"],
+                "content": (
+                    "An editor workflow to manage profile, careers, and projects.\n\n"
+                    "- Inline editing for profile sections.\n"
+                    "- Ordered card management for projects.\n"
+                    "- Form validations for stable updates."
+                ),
+            },
+            {
+                "title": "Docs IDE",
+                "tags": ["Django", "Markdown", "ACL"],
+                "content": (
+                    "A browser-based writing workspace with folder controls.\n\n"
+                    "- Markdown editing with preview.\n"
+                    "- Access control for private/public docs.\n"
+                    "- Path-oriented file operations."
+                ),
+            },
+            {
+                "title": "Shortcut Grid",
+                "tags": ["Drag & Drop", "LocalStorage", "REST API"],
+                "content": (
+                    "A personalized shortcut launcher shown on the root page.\n\n"
+                    "- Drag to reorder cards with smooth feedback.\n"
+                    "- Context menu support for edit actions.\n"
+                    "- User-specific persistence for signed-in accounts."
+                ),
+            },
+            {
+                "title": "Mini Game Hub",
+                "tags": ["Canvas", "JavaScript", "Animation"],
+                "content": (
+                    "A collection page for small interactive web games.\n\n"
+                    "- Unified navigation and layout style.\n"
+                    "- Lightweight animation interactions.\n"
+                    "- Responsive behavior across devices."
+                ),
+            },
+            {
+                "title": "AI Chat Integration",
+                "tags": ["Ollama", "HTTP API", "Prompting"],
+                "content": (
+                    "Integrated AI endpoints for practical in-site usage.\n\n"
+                    "- Server-side request handling for model calls.\n"
+                    "- Safe parsing and fallback handling.\n"
+                    "- Prompt templates tuned for task response quality."
+                ),
+            },
+        ]
+
+    return [
+        {
+            "title": "Hanplanet 검색",
+            "tags": ["Django", "JavaScript", "PWA"],
+            "content": (
+                "Hanplanet 루트 페이지용 스마트 검색 기능입니다.\n\n"
+                "- 입력값이 URL인지 검색어인지 자동 판별합니다.\n"
+                "- 검색엔진 전환과 빠른 실행을 지원합니다.\n"
+                "- PWA 설치 흐름과 연동됩니다."
+            ),
+        },
+        {
+            "title": "포트폴리오 편집기",
+            "tags": ["Django", "SQLite", "UI/UX"],
+            "content": (
+                "프로필, 경력, 프로젝트를 관리하는 편집 워크플로우입니다.\n\n"
+                "- 섹션별 인라인 편집을 제공합니다.\n"
+                "- 프로젝트 카드 순서를 관리할 수 있습니다.\n"
+                "- 폼 검증으로 안정적인 저장을 보장합니다."
+            ),
+        },
+        {
+            "title": "문서 IDE",
+            "tags": ["Django", "Markdown", "ACL"],
+            "content": (
+                "브라우저에서 동작하는 문서 작성 작업공간입니다.\n\n"
+                "- 마크다운 편집과 미리보기를 지원합니다.\n"
+                "- 공개/비공개 접근제어를 제공합니다.\n"
+                "- 경로 기반 파일 작업을 수행합니다."
+            ),
+        },
+        {
+            "title": "바로가기 그리드",
+            "tags": ["Drag & Drop", "LocalStorage", "REST API"],
+            "content": (
+                "루트 페이지에서 쓰는 개인화 바로가기 런처입니다.\n\n"
+                "- 드래그로 카드 순서를 바꾸고 부드럽게 반응합니다.\n"
+                "- 우클릭 메뉴로 편집 작업을 지원합니다.\n"
+                "- 로그인 사용자는 계정별로 데이터가 저장됩니다."
+            ),
+        },
+        {
+            "title": "미니게임 허브",
+            "tags": ["Canvas", "JavaScript", "Animation"],
+            "content": (
+                "작은 웹 게임들을 모아 보여주는 허브 페이지입니다.\n\n"
+                "- 통일된 내비게이션과 레이아웃을 사용합니다.\n"
+                "- 가벼운 애니메이션 상호작용을 제공합니다.\n"
+                "- 다양한 디바이스에서 반응형으로 동작합니다."
+            ),
+        },
+        {
+            "title": "AI 채팅 연동",
+            "tags": ["Ollama", "HTTP API", "Prompting"],
+            "content": (
+                "사이트 내 실사용을 위한 AI 연동 기능입니다.\n\n"
+                "- 서버 사이드에서 모델 호출을 처리합니다.\n"
+                "- 예외 상황에서 안전한 폴백을 제공합니다.\n"
+                "- 작업 목적에 맞는 프롬프트 템플릿을 사용합니다."
+            ),
+        },
+    ]
 
 
 def _build_fenced_code_html(info: str, code_lines: list[str], base_indent: str) -> str:
@@ -242,6 +377,17 @@ def build_public_project_url(path):
     return f"{base_url}{path}"
 
 
+def get_public_base_url():
+    return str(getattr(settings, "PUBLIC_BASE_URL", "https://hanplanet.com") or "https://hanplanet.com").rstrip("/")
+
+
+def build_public_absolute_url(path):
+    normalized_path = str(path or "/").strip()
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    return f"{get_public_base_url()}{normalized_path}"
+
+
 def detect_preferred_ui_lang(request):
     accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
     for item in accept_language.split(","):
@@ -257,22 +403,56 @@ def detect_preferred_ui_lang(request):
     return "ko"
 
 
+def _save_profile_preferences(request, **fields):
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return
+    if not fields:
+        return
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    update_fields = []
+    for key, value in fields.items():
+        if not hasattr(profile, key):
+            continue
+        if getattr(profile, key) == value:
+            continue
+        setattr(profile, key, value)
+        update_fields.append(key)
+
+    if update_fields:
+        update_fields.append("updated_at")
+        profile.save(update_fields=update_fields)
+
+
 def resolve_ui_lang(request, url_lang=None):
     normalized_url_lang = (url_lang or "").strip().lower()
     if normalized_url_lang in SUPPORTED_UI_LANGS:
         request.session[UI_LANG_SESSION_KEY] = normalized_url_lang
+        _save_profile_preferences(request, preferred_ui_lang=normalized_url_lang)
         return normalized_url_lang
 
     requested_lang = (request.GET.get("lang") or "").strip().lower()
     if requested_lang in SUPPORTED_UI_LANGS:
         request.session[UI_LANG_SESSION_KEY] = requested_lang
+        _save_profile_preferences(request, preferred_ui_lang=requested_lang)
         return requested_lang
 
     path_lang_match = UI_LANG_PATH_PREFIX_PATTERN.match(request.path or "")
     if path_lang_match:
         path_lang = path_lang_match.group(1).lower()
         request.session[UI_LANG_SESSION_KEY] = path_lang
+        _save_profile_preferences(request, preferred_ui_lang=path_lang)
         return path_lang
+
+    if getattr(request, "user", None) is not None and request.user.is_authenticated:
+        account_ui_lang = (
+            UserProfile.objects.filter(user=request.user)
+            .values_list("preferred_ui_lang", flat=True)
+            .first()
+        )
+        if account_ui_lang in SUPPORTED_UI_LANGS:
+            request.session[UI_LANG_SESSION_KEY] = account_ui_lang
+            return account_ui_lang
 
     session_lang = request.session.get(UI_LANG_SESSION_KEY)
     if session_lang in SUPPORTED_UI_LANGS:
@@ -307,20 +487,30 @@ def apply_ui_context(request, context, ui_lang):
     context["show_chat_widget"] = False
     context["lang_switch_ko_url"] = build_lang_switch_url(request, "ko")
     context["lang_switch_en_url"] = build_lang_switch_url(request, "en")
+    canonical_url = build_public_absolute_url(request.path)
+    context["meta_robots"] = context.get("meta_robots", "index,follow")
+    context["meta_site_name"] = context.get("meta_site_name", "Hanplanet")
+    context["meta_canonical_url"] = context.get("meta_canonical_url", canonical_url)
+    context["meta_og_url"] = context.get("meta_og_url", canonical_url)
     context["account_theme_mode"] = ""
+    context["account_root_search_engine"] = "google"
     context["theme_preference_url"] = build_localized_url(request, "main:theme_preference_lang")
-    portfolio_nav_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
+    context["user_preference_url"] = build_localized_url(request, "main:user_preferences_lang")
     if request.user.is_authenticated:
-        account_theme_mode = (
+        profile_preferences = (
             UserProfile.objects.filter(user=request.user)
-            .values_list("theme_mode", flat=True)
+            .values("theme_mode", "preferred_root_search_engine")
             .first()
         )
+        account_theme_mode = (profile_preferences or {}).get("theme_mode")
         if account_theme_mode in ("light", "dark"):
             context["account_theme_mode"] = account_theme_mode
+        account_root_search_engine = (profile_preferences or {}).get("preferred_root_search_engine")
+        if account_root_search_engine in SUPPORTED_ROOT_SEARCH_ENGINES:
+            context["account_root_search_engine"] = account_root_search_engine
     try:
         nav_links = list(NavLink.objects.all())
-        removed_nav_names = {"github", "thingiverse"}
+        removed_nav_names = {"github", "thingiverse", "portfolio"}
         for link in nav_links:
             name_value = str(getattr(link, "name", "") or "")
             url_value = str(getattr(link, "url", "") or "")
@@ -332,34 +522,10 @@ def apply_ui_context(request, context, ui_lang):
             link for link in nav_links
             if str(getattr(link, "name", "") or "").strip().lower() not in removed_nav_names
         ]
-        portfolio_candidates = [
-            link for link in resolved_links
-            if str(getattr(link, "name", "") or "").strip().lower() == "portfolio"
-        ]
-        resolved_links = [
-            link for link in resolved_links
-            if str(getattr(link, "name", "") or "").strip().lower() != "portfolio"
-        ]
-        portfolio_link = portfolio_candidates[0] if portfolio_candidates else {"name": "Portfolio", "url": portfolio_nav_url}
-        try:
-            portfolio_link.url = portfolio_nav_url
-        except AttributeError:
-            portfolio_link["url"] = portfolio_nav_url
-
-        ide_index = next(
-            (
-                index for index, link in enumerate(resolved_links)
-                if str(getattr(link, "name", "") if not isinstance(link, dict) else link.get("name", "")).strip().lower() == "ide"
-            ),
-            -1,
-        )
-        insert_index = ide_index + 1 if ide_index >= 0 else len(resolved_links)
-        resolved_links.insert(insert_index, portfolio_link)
         context["nav_links"] = resolved_links
     except (OperationalError, ProgrammingError):
         context["nav_links"] = [
             {"name": "IDE", "url": "/ide/list"},
-            {"name": "Portfolio", "url": portfolio_nav_url},
             {"name": "Mini Game", "url": "/fun/minigame/"},
         ]
 
@@ -389,6 +555,25 @@ def _redirect_to_docs_login_with_next(request):
     return redirect(f"/docs/login/?next={encoded_next}")
 
 
+def favicon_ico(request):
+    static_root = Path(getattr(settings, "STATIC_ROOT", "") or "")
+    base_dir = Path(getattr(settings, "BASE_DIR", Path.cwd()))
+    candidates = [
+        static_root / "favicon.ico" if static_root else None,
+        base_dir / "static" / "favicon.ico",
+    ]
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if candidate.exists() and candidate.is_file():
+            response = FileResponse(candidate.open("rb"), content_type="image/x-icon")
+            response["Cache-Control"] = "public, max-age=86400"
+            return response
+
+    raise Http404("favicon.ico not found")
+
+
 def main_legacy_redirect(request):
     return portfolio_root_redirect(request)
 
@@ -412,6 +597,10 @@ def project_detail_user_legacy_redirect(request, user_id, project_number):
         user_id=user_id,
         project_number=project_number,
     )
+
+
+def dummy_project_detail_legacy_redirect(request, sample_id):
+    return redirect_to_localized_route(request, "main:DummyProjectDetail_lang", sample_id=sample_id)
 
 
 def salvations_edge_legacy_redirect(request, ui_lang=None):
@@ -486,13 +675,112 @@ def none(request, ui_lang=None):
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
+    context["is_root_entry"] = True
+    is_english = resolved_lang == "en"
+    context["meta_title"] = "Hanplanet | Search and Favorites" if is_english else "Hanplanet | 검색과 즐겨찾기"
+    context["meta_og_title"] = context["meta_title"]
+    context["meta_description"] = (
+        "Hanplanet home with search and favorites, quick shortcuts, and PWA install."
+        if is_english
+        else "검색과 즐겨찾기, 개인 바로가기, PWA 설치를 지원하는 Hanplanet 홈입니다."
+    )
+    context["meta_og_description"] = context["meta_description"]
+    context["meta_json_ld"] = json.dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "Hanplanet",
+            "url": get_public_base_url(),
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": f"{get_public_base_url()}/?q={{search_term_string}}",
+                "query-input": "required name=search_term_string",
+            },
+        },
+        ensure_ascii=False,
+    )
     context["docs_login_url"] = reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang})
     context["docs_signup_url"] = reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang})
     context["docs_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
     return render(request, 'none.html', context)
 
 
-@cache_control(public=True, max_age=86400)
+def robots_txt(request):
+    body = "\n".join(
+        [
+            "User-agent: *",
+            "Allow: /",
+            "Disallow: /admin/",
+            "Disallow: /api/",
+            f"Sitemap: {build_public_absolute_url('/sitemap.xml')}",
+            "",
+        ]
+    )
+    return HttpResponse(body, content_type="text/plain; charset=utf-8")
+
+
+def sitemap_xml(request):
+    now_iso = timezone.now().date().isoformat()
+    urls = [
+        {
+            "loc": build_public_absolute_url("/"),
+            "changefreq": "daily",
+            "priority": "1.0",
+            "lastmod": now_iso,
+        },
+        {
+            "loc": build_public_absolute_url("/ko/"),
+            "changefreq": "daily",
+            "priority": "0.9",
+            "lastmod": now_iso,
+        },
+        {
+            "loc": build_public_absolute_url("/en/"),
+            "changefreq": "daily",
+            "priority": "0.9",
+            "lastmod": now_iso,
+        },
+        {
+            "loc": build_public_absolute_url("/ko/ide/"),
+            "changefreq": "weekly",
+            "priority": "0.8",
+            "lastmod": now_iso,
+        },
+        {
+            "loc": build_public_absolute_url("/en/ide/"),
+            "changefreq": "weekly",
+            "priority": "0.8",
+            "lastmod": now_iso,
+        },
+    ]
+
+    owner_exists = get_user_model().objects.filter(username=PORTFOLIO_DEFAULT_USERNAME).exists()
+    if owner_exists:
+        for ui_lang in ("ko", "en"):
+            urls.append(
+                {
+                    "loc": build_public_absolute_url(f"/{ui_lang}/portfolio/{PORTFOLIO_DEFAULT_USERNAME}/"),
+                    "changefreq": "weekly",
+                    "priority": "0.8",
+                    "lastmod": now_iso,
+                }
+            )
+
+    pieces = ['<?xml version="1.0" encoding="UTF-8"?>']
+    pieces.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    for item in urls:
+        pieces.append("  <url>")
+        pieces.append(f"    <loc>{html.escape(item['loc'])}</loc>")
+        pieces.append(f"    <lastmod>{item['lastmod']}</lastmod>")
+        pieces.append(f"    <changefreq>{item['changefreq']}</changefreq>")
+        pieces.append(f"    <priority>{item['priority']}</priority>")
+        pieces.append("  </url>")
+    pieces.append("</urlset>")
+    xml = "\n".join(pieces)
+    return HttpResponse(xml, content_type="application/xml; charset=utf-8")
+
+
+@cache_control(public=True, max_age=300, must_revalidate=True)
 def pwa_manifest(request):
     # Browser install metadata for "Add to Home screen" / app install prompts.
     manifest = {
@@ -530,8 +818,8 @@ def pwa_manifest(request):
 def service_worker(request):
     # Keep service worker script dynamic at root scope so it can control "/".
     script = """
-const STATIC_CACHE = 'hanplanet-static-v1';
-const PAGE_CACHE = 'hanplanet-page-v1';
+const STATIC_CACHE = 'hanplanet-static-v5';
+const PAGE_CACHE = 'hanplanet-page-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -638,7 +926,9 @@ def _build_portfolio_view_context(request, ui_lang, owner):
 
     context["portfolio_owner"] = owner
     context["portfolio_profile"] = profile
-    context["profile_image_url"] = profile.profile_img.url if profile.profile_img else static("icons/hanplanet.svg")
+    context["profile_image_url"] = (
+        profile.profile_img.url if profile.profile_img else static("icons/profile-placeholder.svg")
+    )
     context["profile_main_title_html"] = render_markdown_with_raw_html(profile_main_title_source)
     context["profile_main_subtitle_html"] = render_markdown_with_raw_html(profile_main_subtitle_source)
     context["profile_phone_display"] = str(profile.phone or "").strip() or "+82-10-0000-0000"
@@ -654,6 +944,7 @@ def _build_portfolio_view_context(request, ui_lang, owner):
     )
 
     careers = list(PortfolioCareer.objects.filter(user=owner).order_by("-order", "-id"))
+    has_real_careers = bool(careers)
     for career in careers:
         use_english_content = ui_lang == "en" and bool((career.content_en or "").strip())
         use_english_company = ui_lang == "en" and bool((career.company_en or "").strip())
@@ -687,25 +978,47 @@ def _build_portfolio_view_context(request, ui_lang, owner):
     context["careers"] = careers
 
     projects = list(PortfolioProject.objects.filter(user=owner).order_by("-create_date", "-id"))
+    has_real_projects = bool(projects)
     for project in projects:
         use_english_title = ui_lang == "en" and bool((project.title_en or "").strip())
         project.display_title = project.title_en if use_english_title else project.title
     if not projects:
+        sample_projects = get_dummy_portfolio_projects(ui_lang)
         projects = [
             SimpleNamespace(
                 is_dummy=True,
-                dummy_href="#",
+                dummy_href=reverse(
+                    "main:DummyProjectDetail_lang",
+                    kwargs={"ui_lang": ui_lang, "sample_id": index + 1},
+                ),
                 banner_img=None,
-                dummy_banner_url=static("icons/hanplanet-og-1200.png"),
-                display_title="Sample Project" if ui_lang == "en" else "샘플 프로젝트",
-                tags=_DummyTagRelation(),
+                dummy_banner_url=static(f"icons/project-dummy-{index + 1}.svg"),
+                display_title=sample["title"],
+                tags=_DummyTagRelation(sample["tags"]),
             )
+            for index, sample in enumerate(sample_projects)
         ]
     context["projects"] = projects
     context["hobbys"] = Hobby.objects.all()
 
     action_buttons = list(PortfolioActionButton.objects.filter(user=owner).order_by("order", "id")[:3])
     context["portfolio_action_buttons"] = action_buttons
+    context["portfolio_write_cta_url"] = reverse("main:portfolio_write_lang", kwargs={"ui_lang": ui_lang})
+    has_profile_core_data = bool(
+        profile.profile_img
+        or str(profile.main_title or "").strip()
+        or str(profile.main_title_en or "").strip()
+        or str(profile.main_subtitle or "").strip()
+        or str(profile.main_subtitle_en or "").strip()
+        or str(profile.phone or "").strip()
+        or str(profile.email or "").strip()
+    )
+    context["is_dummy_portfolio"] = (
+        not has_real_careers
+        and not has_real_projects
+        and not action_buttons
+        and not has_profile_core_data
+    )
     return context
 
 
@@ -726,10 +1039,19 @@ def main(request, ui_lang=None):
 
 
 def portfolio_root_redirect(request, ui_lang=None):
-    if not request.user.is_authenticated:
-        return _redirect_to_docs_login_with_next(request)
-
     resolved_lang = resolve_ui_lang(request, ui_lang)
+    if not request.user.is_authenticated:
+        try:
+            get_user_model().objects.only("id").get(username=PORTFOLIO_DEFAULT_USERNAME)
+            return redirect(
+                reverse(
+                    "main:portfolio_user_lang",
+                    kwargs={"ui_lang": resolved_lang, "user_id": PORTFOLIO_DEFAULT_USERNAME},
+                )
+            )
+        except get_user_model().DoesNotExist:
+            return redirect(reverse("main:none_lang", kwargs={"ui_lang": resolved_lang}))
+
     target_path = reverse(
         "main:portfolio_user_lang",
         kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
@@ -746,6 +1068,17 @@ def portfolio_user(request, user_id, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     owner = get_object_or_404(get_user_model(), username=user_id)
     context = _build_portfolio_view_context(request, resolved_lang, owner)
+    is_english = resolved_lang == "en"
+    context["meta_title"] = (
+        f"{owner.username} Portfolio | Hanplanet" if is_english else f"{owner.username} 포트폴리오 | Hanplanet"
+    )
+    context["meta_og_title"] = context["meta_title"]
+    context["meta_description"] = (
+        f"{owner.username}'s portfolio on Hanplanet."
+        if is_english
+        else f"Hanplanet의 {owner.username} 포트폴리오 페이지입니다."
+    )
+    context["meta_og_description"] = context["meta_description"]
     return render(request, "main.html", context)
 
 
@@ -940,6 +1273,40 @@ def ProjectDetailByUser(request, user_id, project_number, ui_lang=None):
     context["portfolio_owner_username"] = owner.username
     return render(request, "main/ProjectDetail.html", context)
 
+
+def DummyProjectDetail(request, sample_id, ui_lang=None):
+    context = dict()
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    apply_ui_context(request, context, resolved_lang)
+
+    try:
+        sample_index = int(sample_id)
+    except (TypeError, ValueError):
+        raise Http404("dummy project not found")
+
+    dummy_projects = get_dummy_portfolio_projects(resolved_lang)
+    if sample_index < 1 or sample_index > len(dummy_projects):
+        raise Http404("dummy project not found")
+
+    sample = dummy_projects[sample_index - 1]
+    project = SimpleNamespace(
+        id=0,
+        display_title=sample["title"],
+        tags=_DummyTagRelation(sample["tags"]),
+        content=render_markdown_with_raw_html(sample["content"]),
+    )
+    context["project"] = project
+    context["meta_title"] = f"{sample['title']} | Hanplanet"
+    context["meta_og_title"] = context["meta_title"]
+    context["meta_description"] = (
+        f"Sample project detail for {sample['title']}."
+        if resolved_lang == "en"
+        else f"{sample['title']} 샘플 프로젝트 상세 페이지입니다."
+    )
+    context["meta_og_description"] = context["meta_description"]
+    return render(request, "main/ProjectDetail.html", context)
+
+
 def ProjectComment_create(request, project_id, ui_lang=None):
     project = get_object_or_404(Project, pk=project_id)
     project.project_comment_set.create(content=request.POST.get('content'), create_date=timezone.now())
@@ -1006,6 +1373,13 @@ def _normalize_theme_mode(raw_mode):
     return ""
 
 
+def _normalize_root_search_engine(raw_value):
+    value = str(raw_value or "").strip().lower()
+    if value in SUPPORTED_ROOT_SEARCH_ENGINES:
+        return value
+    return ""
+
+
 @require_http_methods(["GET", "PATCH"])
 @csrf_protect
 def theme_preference(request, ui_lang=None):
@@ -1029,6 +1403,64 @@ def theme_preference(request, ui_lang=None):
     profile.theme_mode = mode
     profile.save(update_fields=["theme_mode", "updated_at"])
     return JsonResponse({"mode": mode or None}, status=200)
+
+
+@require_http_methods(["GET", "PATCH"])
+@csrf_protect
+def user_preferences(request, ui_lang=None):
+    resolve_ui_lang(request, ui_lang)
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Login required."}, status=401)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "GET":
+        return JsonResponse(
+            {
+                "ui_lang": profile.preferred_ui_lang or None,
+                "root_search_engine": profile.preferred_root_search_engine or None,
+            },
+            status=200,
+        )
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    update_fields = []
+
+    if "ui_lang" in payload:
+        next_ui_lang = str(payload.get("ui_lang") or "").strip().lower()
+        if next_ui_lang and next_ui_lang not in SUPPORTED_UI_LANGS:
+            return JsonResponse({"error": "Invalid ui_lang."}, status=400)
+        if profile.preferred_ui_lang != next_ui_lang:
+            profile.preferred_ui_lang = next_ui_lang
+            update_fields.append("preferred_ui_lang")
+        if next_ui_lang in SUPPORTED_UI_LANGS:
+            request.session[UI_LANG_SESSION_KEY] = next_ui_lang
+
+    if "root_search_engine" in payload:
+        next_engine = _normalize_root_search_engine(payload.get("root_search_engine"))
+        raw_engine = payload.get("root_search_engine")
+        if raw_engine not in ("", None) and not next_engine:
+            return JsonResponse({"error": "Invalid root_search_engine."}, status=400)
+        if profile.preferred_root_search_engine != next_engine:
+            profile.preferred_root_search_engine = next_engine
+            update_fields.append("preferred_root_search_engine")
+
+    if update_fields:
+        update_fields.append("updated_at")
+        profile.save(update_fields=update_fields)
+
+    return JsonResponse(
+        {
+            "ui_lang": profile.preferred_ui_lang or None,
+            "root_search_engine": profile.preferred_root_search_engine or None,
+        },
+        status=200,
+    )
 
 
 def _normalize_shortcut_url(raw_url):

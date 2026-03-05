@@ -981,9 +981,11 @@
 
     // 문서 인증 상호작용을 초기화하는 함수
     function initializeDocsAuthInteraction() {
-        const logoutTrigger = document.querySelector("[data-ide-logout-trigger]");
+        const accountTrigger = document.querySelector("[data-ide-account-trigger]");
+        const accountMenu = document.querySelector("[data-ide-auth-account-menu]");
+        const accountLogoutButton = document.querySelector("[data-ide-account-logout]");
         const logoutForm = document.getElementById("ide-auth-logout-form");
-        if (!logoutTrigger || !logoutForm) {
+        if (!accountTrigger || !logoutForm) {
             return;
         }
 
@@ -994,6 +996,14 @@
         const logoutMessage = document.getElementById("ide-auth-logout-message");
 
         let lastFocusedElement = null;
+
+        function setAccountMenuOpen(opened) {
+            if (!accountMenu) {
+                return;
+            }
+            accountMenu.hidden = !opened;
+            accountTrigger.setAttribute("aria-expanded", opened ? "true" : "false");
+        }
 
         // 로그아웃 모달 열림 상태를 설정하는 함수
         function setLogoutModalOpen(opened) {
@@ -1012,9 +1022,9 @@
             }
         }
 
-        logoutTrigger.addEventListener("click", async function () {
+        async function requestLogout() {
             const message =
-                logoutTrigger.getAttribute("data-confirm-message") ||
+                (accountLogoutButton ? accountLogoutButton.getAttribute("data-confirm-message") : "") ||
                 t("auth_logout_confirm", "로그아웃 하시겠습니까?");
             if (!logoutModal || !logoutModalBackdrop || !logoutCancelButton || !logoutConfirmButton || !logoutMessage) {
                 const confirmed = await requestConfirmDialog({
@@ -1033,6 +1043,35 @@
             lastFocusedElement = document.activeElement;
             logoutMessage.textContent = message;
             setLogoutModalOpen(true);
+        }
+
+        accountTrigger.addEventListener("click", function (event) {
+            event.preventDefault();
+            if (!accountMenu) {
+                requestLogout();
+                return;
+            }
+            const isOpen = !accountMenu.hidden;
+            setAccountMenuOpen(!isOpen);
+        });
+
+        if (accountLogoutButton) {
+            accountLogoutButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                setAccountMenuOpen(false);
+                requestLogout();
+            });
+        }
+
+        document.addEventListener("click", function (event) {
+            if (!accountMenu || accountMenu.hidden) {
+                return;
+            }
+            const target = event.target;
+            if (accountMenu.contains(target) || accountTrigger.contains(target)) {
+                return;
+            }
+            setAccountMenuOpen(false);
         });
 
         if (logoutModalBackdrop) {
@@ -1054,7 +1093,15 @@
         }
 
         document.addEventListener("keydown", function (event) {
-            if (event.key !== "Escape" || !logoutModal || logoutModal.hidden) {
+            if (event.key !== "Escape") {
+                return;
+            }
+            if (accountMenu && !accountMenu.hidden) {
+                event.preventDefault();
+                setAccountMenuOpen(false);
+                return;
+            }
+            if (!logoutModal || logoutModal.hidden) {
                 return;
             }
             event.preventDefault();
