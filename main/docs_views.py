@@ -265,6 +265,7 @@ DOCS_TEXT = {
         "js_folder_create_requires_folder": "폴더에서만 새 폴더를 만들 수 있습니다.",
         "js_permission_save_failed": "권한 저장 중 오류가 발생했습니다.",
         "auth_login_button": "로그인",
+        "auth_my_portfolio_button": "내 포트폴리오",
         "auth_logout_button": "로그아웃",
         "admin_button": "Admin",
         "auth_login_title": "IDE 로그인",
@@ -428,6 +429,7 @@ DOCS_TEXT = {
         "js_folder_create_requires_folder": "New folders can only be created inside a folder.",
         "js_permission_save_failed": "Failed to save permissions.",
         "auth_login_button": "Login",
+        "auth_my_portfolio_button": "My Portfolio",
         "auth_logout_button": "Logout",
         "admin_button": "Admin",
         "auth_login_title": "IDE Login",
@@ -1392,6 +1394,13 @@ def docs_common_context(request, ui_lang):
         docs_signup_url = reverse("main:docs_signup")
         docs_logout_url = reverse("main:docs_logout")
     docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
+    if request.user.is_authenticated:
+        docs_my_portfolio_url = reverse(
+            "main:portfolio_user_lang",
+            kwargs={"ui_lang": ui_lang, "user_id": request.user.username},
+        )
+    else:
+        docs_my_portfolio_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
 
     context.update(
         {
@@ -1400,6 +1409,7 @@ def docs_common_context(request, ui_lang):
             "meta_site_name": DOCS_META_TITLE,
             "meta_description": DOCS_META_DESCRIPTION,
             "meta_og_description": DOCS_META_DESCRIPTION,
+            "meta_robots": "index,follow",
             "docs_base_url": docs_base_url,
             "docs_write_url": docs_write_url,
             "docs_login_url": docs_login_url,
@@ -1408,6 +1418,7 @@ def docs_common_context(request, ui_lang):
             "docs_auth_next": request.get_full_path(),
             "docs_logout_next": docs_base_url,
             "docs_help_url": docs_help_url,
+            "docs_my_portfolio_url": docs_my_portfolio_url,
             "docs_api_list_url": reverse("main:docs_api_list"),
             "docs_api_save_url": reverse("main:docs_api_save"),
             "docs_api_preview_url": reverse("main:docs_api_preview"),

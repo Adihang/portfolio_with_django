@@ -10,6 +10,15 @@
     const engineLabel = document.querySelector('[data-root-engine-label]');
     const engineIcon = document.querySelector('[data-root-engine-icon]');
     const engineOptions = Array.from(document.querySelectorAll('[data-engine-option]'));
+    const isAuthenticatedUser = document.body.dataset.authenticated === '1';
+    const userPreferenceUrl = String(document.body.dataset.userPreferenceUrl || '').trim();
+    const themePreferenceUrl = String(document.body.dataset.themePreferenceUrl || '').trim();
+    const themeToggle = document.querySelector('.ui-theme-toggle');
+    const themeToggleButtons = themeToggle
+        ? Array.from(themeToggle.querySelectorAll('.ui-control-link[data-theme-mode]'))
+        : [];
+    const THEME_MODE_STORAGE_KEY = 'portfolio_theme_mode';
+    const accountThemeMode = (document.documentElement.getAttribute('data-account-theme-mode') || '').trim().toLowerCase();
 
     if (!form || !input || !engineSelect || !enginePicker || !engineToggle || !enginePopup || !engineLabel || !engineIcon || !engineOptions.length) {
         return;
@@ -44,15 +53,76 @@
     const wireRootLogoutAction = function () {
         const logoutTrigger = document.querySelector('#ide-auth-account-root [data-ide-logout-trigger]');
         const logoutForm = document.getElementById('ide-auth-logout-form-root');
+        const logoutModal = document.getElementById('root-auth-logout-modal');
+        const logoutModalBackdrop = document.getElementById('root-auth-logout-modal-backdrop');
+        const logoutCancelButton = document.getElementById('root-auth-logout-cancel-btn');
+        const logoutConfirmButton = document.getElementById('root-auth-logout-confirm-btn');
+        const logoutMessage = document.getElementById('root-auth-logout-message');
         if (!logoutTrigger || !logoutForm) {
             return;
         }
-        logoutTrigger.addEventListener('click', function () {
-            const confirmMessage = String(logoutTrigger.getAttribute('data-confirm-message') || '').trim();
-            if (confirmMessage && !window.confirm(confirmMessage)) {
+
+        let lastFocusedElement = null;
+
+        const setLogoutModalOpen = function (opened) {
+            if (!logoutModal) {
                 return;
             }
-            logoutForm.submit();
+            logoutModal.hidden = !opened;
+            if (opened) {
+                if (logoutCancelButton) {
+                    logoutCancelButton.focus();
+                }
+                return;
+            }
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus();
+            }
+        };
+
+        const requestLogout = function () {
+            const confirmMessage = String(logoutTrigger.getAttribute('data-confirm-message') || '').trim();
+            if (!logoutModal || !logoutModalBackdrop || !logoutCancelButton || !logoutConfirmButton || !logoutMessage) {
+                if (confirmMessage && !window.confirm(confirmMessage)) {
+                    return;
+                }
+                logoutForm.submit();
+                return;
+            }
+            lastFocusedElement = document.activeElement;
+            logoutMessage.textContent = confirmMessage;
+            setLogoutModalOpen(true);
+        };
+
+        logoutTrigger.addEventListener('click', function (event) {
+            event.preventDefault();
+            requestLogout();
+        });
+
+        if (logoutModalBackdrop) {
+            logoutModalBackdrop.addEventListener('click', function () {
+                setLogoutModalOpen(false);
+            });
+        }
+
+        if (logoutCancelButton) {
+            logoutCancelButton.addEventListener('click', function () {
+                setLogoutModalOpen(false);
+            });
+        }
+
+        if (logoutConfirmButton) {
+            logoutConfirmButton.addEventListener('click', function () {
+                logoutForm.submit();
+            });
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape' || !logoutModal || logoutModal.hidden) {
+                return;
+            }
+            event.preventDefault();
+            setLogoutModalOpen(false);
         });
     };
 
@@ -66,6 +136,129 @@
         gpt: function (query) { return 'https://chatgpt.com/?q=' + encodeURIComponent(query); },
         claude: function (query) { return 'https://claude.ai/new?q=' + encodeURIComponent(query); },
         gemini: function (query) { return 'https://gemini.google.com/app?prompt=' + encodeURIComponent(query); }
+    };
+
+    const getCsrfToken = function () {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    };
+
+    const readStoredThemeMode = function () {
+        try {
+            const stored = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+            if (stored === 'dark') {
+                return true;
+            }
+            if (stored === 'light') {
+                return false;
+            }
+        } catch (error) {}
+        return null;
+    };
+
+    const readAccountThemeMode = function () {
+        if (accountThemeMode === 'dark') {
+            return true;
+        }
+        if (accountThemeMode === 'light') {
+            return false;
+        }
+        return null;
+    };
+
+    const readSystemThemeMode = function () {
+        if (!window.matchMedia) {
+            return false;
+        }
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    };
+
+    const persistThemeModeLocal = function (isDark) {
+        try {
+            window.localStorage.setItem(THEME_MODE_STORAGE_KEY, isDark ? 'dark' : 'light');
+        } catch (error) {}
+    };
+
+    const persistThemeModeToAccount = function (isDark) {
+        if (!isAuthenticatedUser || !themePreferenceUrl || !window.fetch) {
+            return;
+        }
+        const csrfToken = getCsrfToken();
+        if (!csrfToken) {
+            return;
+        }
+        window.fetch(themePreferenceUrl, {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ mode: isDark ? 'dark' : 'light' })
+        }).catch(function () {});
+    };
+
+    const syncThemeToggleState = function (isDark) {
+        if (!themeToggleButtons.length) {
+            return;
+        }
+        themeToggleButtons.forEach(function (button) {
+            const isDarkButton = button.dataset.themeMode === 'dark';
+            const isActive = isDarkButton === isDark;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    };
+
+    const applyRootThemeMode = function (isDark) {
+        document.body.classList.toggle('theme-dark', isDark);
+        syncThemeToggleState(isDark);
+    };
+
+    const initRootThemeMode = function () {
+        let currentThemeMode = readAccountThemeMode();
+        if (currentThemeMode === null) {
+            currentThemeMode = readStoredThemeMode();
+        }
+        if (currentThemeMode === null) {
+            currentThemeMode = readSystemThemeMode();
+        }
+        applyRootThemeMode(Boolean(currentThemeMode));
+        persistThemeModeLocal(Boolean(currentThemeMode));
+
+        themeToggleButtons.forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                const useDarkTheme = button.dataset.themeMode === 'dark';
+                applyRootThemeMode(useDarkTheme);
+                persistThemeModeLocal(useDarkTheme);
+                persistThemeModeToAccount(useDarkTheme);
+            });
+        });
+    };
+
+    initRootThemeMode();
+
+    const persistRootSearchEngineToAccount = function (engineValue) {
+        if (!isAuthenticatedUser || !userPreferenceUrl || !window.fetch) {
+            return;
+        }
+
+        const normalized = engineValue in ENGINE_URLS ? engineValue : 'google';
+        const csrfToken = getCsrfToken();
+        if (!csrfToken) {
+            return;
+        }
+
+        window.fetch(userPreferenceUrl, {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ root_search_engine: normalized })
+        }).catch(function () {});
     };
 
     const hasScheme = function (text) {
@@ -235,7 +428,9 @@
 
     engineOptions.forEach(function (option) {
         option.addEventListener('click', function () {
-            syncEngineUI(option.dataset.engineValue || 'google');
+            const nextEngine = option.dataset.engineValue || 'google';
+            syncEngineUI(nextEngine);
+            persistRootSearchEngineToAccount(nextEngine);
             closeEngineMenu();
         });
     });
@@ -325,11 +520,6 @@
     let editingShortcutId = null;
     let contextTargetShortcutId = null;
     let currentShortcutItems = [];
-
-    const getCsrfToken = function () {
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        return meta ? meta.getAttribute('content') : '';
-    };
 
     const escapeHtml = function (value) {
         return String(value || '')

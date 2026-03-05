@@ -9,6 +9,7 @@ body {
     font-family: "Inter", 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
     color: white;
     background-color: rgb(54, 54, 54);
+    padding-bottom: 56px;
 }
 
 .stratagem_page {
@@ -258,14 +259,24 @@ ul{
     padding-top: 10px;
     padding-left: 10px;
     padding-right: 10px;
-    font-size: clamp(2rem, 3vw, 2.35rem);
+    font-size: clamp(2rem, 3vw, 38px);
 }
-.lowtext{
+.minigame-footer {
     position: fixed;
-    left: 12px;
-    bottom: 6px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    padding: 0 12px 6px;
+    background: linear-gradient(to top, rgba(54, 54, 54, 0.96), rgba(54, 54, 54, 0.55), transparent);
+}
+
+.minigame-footer .stratagem_hr {
+    margin: 0 0 4px;
+}
+
+.lowtext{
     padding-left: 0;
-    z-index: 2;
 }
 
 .global_scores {

@@ -292,6 +292,19 @@ class UserProfile(models.Model):
         (THEME_LIGHT, "라이트"),
         (THEME_DARK, "다크"),
     ]
+    UI_LANG_CHOICES = [
+        ("ko", "한국어"),
+        ("en", "English"),
+    ]
+    ROOT_SEARCH_ENGINE_CHOICES = [
+        ("google", "Google"),
+        ("duckduckgo", "DuckDuckGo"),
+        ("bing", "Bing"),
+        ("naver", "Naver"),
+        ("gpt", "GPT"),
+        ("claude", "Claude"),
+        ("gemini", "Gemini"),
+    ]
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -303,6 +316,20 @@ class UserProfile(models.Model):
         "테마 모드",
         max_length=5,
         choices=THEME_MODE_CHOICES,
+        blank=True,
+        default="",
+    )
+    preferred_ui_lang = models.CharField(
+        "선호 언어",
+        max_length=2,
+        choices=UI_LANG_CHOICES,
+        blank=True,
+        default="",
+    )
+    preferred_root_search_engine = models.CharField(
+        "루트 검색 엔진",
+        max_length=12,
+        choices=ROOT_SEARCH_ENGINE_CHOICES,
         blank=True,
         default="",
     )

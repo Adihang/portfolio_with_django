@@ -1,12 +1,13 @@
 from django.urls import path, re_path
-from django.views.generic import RedirectView
 
 from . import docs_views, views
 
 app_name = 'main'
 
 urlpatterns = [
-    path("favicon.ico", RedirectView.as_view(url="/static/favicon.ico", permanent=True)),
+    path("favicon.ico", views.favicon_ico, name="favicon_ico"),
+    path("robots.txt", views.robots_txt, name="robots_txt"),
+    path("sitemap.xml", views.sitemap_xml, name="sitemap_xml"),
     # PWA endpoints (manifest + service worker)
     path("manifest.webmanifest", views.pwa_manifest, name="pwa_manifest"),
     path("service-worker.js", views.service_worker, name="service_worker"),
@@ -76,6 +77,7 @@ urlpatterns = [
     re_path(r'^(?P<ui_lang>ko|en)/portfolio/write/?$', views.portfolio_write, name='portfolio_write_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/portfolio/(?P<user_id>[A-Za-z0-9_.-]+)/$', views.portfolio_user, name='portfolio_user_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/project/(?P<project_id>\d+)/$', views.ProjectDetail, name='ProjectDetail_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/project/sample/(?P<sample_id>\d+)/$', views.DummyProjectDetail, name='DummyProjectDetail_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/project/(?P<user_id>[A-Za-z0-9_.-]+)/(?P<project_number>\d+)/$', views.ProjectDetailByUser, name='ProjectDetail_user_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/fun/Salvations_Edge_4/$', views.Salvations_Edge_4, name='Salvations_Edge_4_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/fun/Stratagem_Hero/$', views.Stratagem_Hero_page, name='Stratagem_Hero_lang'),
@@ -94,6 +96,7 @@ urlpatterns = [
     re_path(r'^(?P<ui_lang>ko|en)/api/root-shortcuts/reorder/$', views.root_shortcuts_reorder, name='root_shortcuts_reorder_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/root-shortcuts/(?P<shortcut_id>\d+)/$', views.root_shortcuts_detail, name='root_shortcuts_detail_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/theme-preference/$', views.theme_preference, name='theme_preference_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/api/user-preferences/$', views.user_preferences, name='user_preferences_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/chat/$', views.chat_with_ai, name='chat_with_ai_lang'),
     path('portfolio/', views.main_legacy_redirect, name='main'),
     path('portfolio/write', views.portfolio_write_legacy_redirect, name='portfolio_write_no_slash'),
@@ -101,6 +104,7 @@ urlpatterns = [
     path('portfolio/<str:user_id>/', views.portfolio_user_legacy_redirect, name='portfolio_user'),
     path('project/<int:project_id>/', views.project_detail_legacy_redirect, name='ProjectDetail'),
     path('project/<str:user_id>/<int:project_number>/', views.project_detail_user_legacy_redirect, name='ProjectDetail_user'),
+    path('project/sample/<int:sample_id>/', views.dummy_project_detail_legacy_redirect, name='DummyProjectDetail'),
     path('fun/Salvations_Edge_4/', views.salvations_edge_legacy_redirect, name='Salvations_Edge_4'),
     path('fun/Stratagem_Hero/', views.stratagem_hero_legacy_redirect, name='Stratagem_Hero'),
     path('fun/Stratagem_Hero/Scoreboard/', views.stratagem_hero_scoreboard_legacy_redirect, name='Stratagem_Hero_Scoreboard'),
@@ -122,5 +126,6 @@ urlpatterns = [
     path('api/root-shortcuts/reorder/', views.root_shortcuts_reorder, name='root_shortcuts_reorder'),
     path('api/root-shortcuts/<int:shortcut_id>/', views.root_shortcuts_detail, name='root_shortcuts_detail'),
     path('api/theme-preference/', views.theme_preference, name='theme_preference'),
+    path('api/user-preferences/', views.user_preferences, name='user_preferences'),
     path('api/chat/', views.chat_with_ai, name='chat_with_ai')
 ]

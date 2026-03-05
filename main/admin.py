@@ -183,8 +183,8 @@ class QuickLinkAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ["user", "theme_mode", "updated_at"]
-    list_filter = ["theme_mode"]
+    list_display = ["user", "theme_mode", "preferred_ui_lang", "preferred_root_search_engine", "updated_at"]
+    list_filter = ["theme_mode", "preferred_ui_lang", "preferred_root_search_engine"]
     search_fields = ["user__username"]
     ordering = ["user__username"]
 

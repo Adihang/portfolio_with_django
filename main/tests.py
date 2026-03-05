@@ -21,6 +21,7 @@ from .models import (
     PortfolioProfile,
     PortfolioProject,
     Stratagem_Hero_Score,
+    UserProfile,
 )
 from .docs_views import (
     DOCS_EDIT_PERMISSION_CODE,
@@ -236,6 +237,17 @@ class LanguageUrlRoutingTests(TestCase):
         request.session = {}
 
         resolved = resolve_ui_lang(request, "en")
+
+        self.assertEqual(resolved, "en")
+
+    def test_resolve_ui_lang_uses_account_preference_before_browser_language(self):
+        user = get_user_model().objects.create_user(username="lang_pref_user", password="pw123456")
+        UserProfile.objects.create(user=user, preferred_ui_lang="en")
+        request = self.factory.get("/portfolio/")
+        request.session = {}
+        request.user = user
+
+        resolved = resolve_ui_lang(request, None)
 
         self.assertEqual(resolved, "en")
 
@@ -466,6 +478,24 @@ class DocsEditorPermissionTests(TestCase):
         )
 
         self.assertNotEqual(response.status_code, 403)
+
+
+class UserPreferenceApiTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="pref_user", password="pw123456")
+        self.client.login(username="pref_user", password="pw123456")
+
+    def test_user_preference_patch_updates_ui_lang_and_root_engine(self):
+        response = self.client.patch(
+            "/ko/api/user-preferences/",
+            data=json.dumps({"ui_lang": "en", "root_search_engine": "gpt"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        profile = UserProfile.objects.get(user=self.user)
+        self.assertEqual(profile.preferred_ui_lang, "en")
+        self.assertEqual(profile.preferred_root_search_engine, "gpt")
 
 
 class DocsAuthFlowTests(TestCase):

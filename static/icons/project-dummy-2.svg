@@ -1,0 +1,12 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'>
+  <defs>
+    <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0' stop-color='#111827'/>
+      <stop offset='1' stop-color='#2563eb'/>
+    </linearGradient>
+  </defs>
+  <rect width='1024' height='1024' rx='80' fill='url(#g)'/>
+  <circle cx='820' cy='220' r='140' fill='rgba(255,255,255,0.14)'/>
+  <circle cx='250' cy='830' r='170' fill='rgba(255,255,255,0.08)'/>
+  <text x='90' y='560' fill='#ffffff' font-size='86' font-family='Inter, Arial, sans-serif' font-weight='700'>Dummy Project 2</text>
+</svg>

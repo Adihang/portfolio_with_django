@@ -1,14 +1,8 @@
 <section class="projects">
     <div class="head">
         <div class="title">
-            <h3><b>{% if ui_lang == 'en' %}Projects{% else %}프로젝트{% endif %}</b></h3>
-            <div>
-                {% if ui_lang == 'en' %}
-                A selection of projects I built with genuine curiosity.
-                {% else %}
-                흥미를 가지고 진행했던 프로젝트들을 소개합니다
-                {% endif %}
-            </div>
+            <h3><b>{% include 'partials/ui_i18n.html' with key='project_title' %}</b></h3>
+            <div>{% include 'partials/ui_i18n.html' with key='project_desc' %}</div>
         </div>
     </div>
     <cards class="project_cards">

@@ -60,7 +60,7 @@
 
 .chat-header h3 {
     margin: 0;
-    font-size: 1.1em;
+    font-size: 18px;
 }
 
 .chat-toggle {
@@ -69,7 +69,7 @@
     color: var(--chat-header-color);
     width: 36px;
     height: 36px;
-    font-size: 1.8em;
+    font-size: 29px;
     line-height: 1;
     border-radius: 50%;
     cursor: pointer;
