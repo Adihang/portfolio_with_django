@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+{% block body_class %}portfolio-write-page ui-page{% endblock %}
+{% block content %}
+{% include 'docs/_assets_head.html' %}
+
+<style>
+.portfolio-write-content {
+    padding-bottom: 40px;
+}
+
+.portfolio-write-section {
+    margin-top: 12px;
+}
+
+.portfolio-write-list-empty {
+    margin: 0;
+    padding: 10px 12px;
+    color: var(--ide-text-muted);
+    border-bottom: 1px solid var(--ide-border-soft);
+}
+
+.portfolio-write-list-item {
+    display: block;
+    padding: 10px 12px;
+    color: var(--ide-text);
+    text-decoration: none;
+    border-bottom: 1px solid var(--ide-border-soft);
+    transition: var(--ide-transition-fast);
+}
+
+.portfolio-write-list-item:hover,
+.portfolio-write-list-item:focus-visible {
+    background: var(--ide-hover-soft);
+    color: var(--ide-text-stronger);
+}
+
+.portfolio-write-list-item.is-active {
+    background: var(--ide-selected-bg);
+    color: var(--ide-text-stronger);
+    font-weight: 700;
+}
+
+.portfolio-write-list-item.is-add {
+    border-style: dashed;
+    border-width: 1px;
+    border-color: var(--ide-border);
+    margin: 8px;
+    border-radius: var(--ide-radius-sm);
+}
+
+.portfolio-write-form {
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.portfolio-write-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.portfolio-write-form-grid .full {
+    grid-column: 1 / -1;
+}
+
+.portfolio-write-field {
+    display: grid;
+    gap: 6px;
+    color: var(--ide-text-muted);
+    font-size: 13px;
+}
+
+.portfolio-write-field input,
+.portfolio-write-field textarea,
+.portfolio-write-field select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--ide-border);
+    border-radius: var(--ide-radius-sm);
+    background: var(--ide-bg);
+    color: var(--ide-text);
+    padding: 8px 10px;
+    font-size: 14px;
+}
+
+.portfolio-write-field textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.portfolio-write-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.portfolio-write-status {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--ide-border);
+    border-radius: var(--ide-radius-sm);
+    background: var(--ide-hover-soft);
+    color: var(--ide-text-strong);
+}
+
+@media (max-width: 840px) {
+    .portfolio-write-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="ide-toolbar-wrap ui-toolbar-wrap">
+    <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
+        <div class="ide-toolbar-left ui-toolbar-left">
+            <div class="ide-title-row ui-title-row">
+                <h1 class="ide-title ui-title">{% if ui_lang == 'en' %}Portfolio Write{% else %}포트폴리오 작성{% endif %}</h1>
+            </div>
+            <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
+                <span class="ide-path-current ui-path-current">/portfolio/write</span>
+            </div>
+        </div>
+        <div class="ide-toolbar-right ui-toolbar-right">
+            <div class="ide-toolbar-actions ui-toolbar-actions">
+                <a class="ide-btn" href="{% url 'main:portfolio_user_lang' ui_lang=ui_lang user_id=request.user.username %}">Portfolio</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="ide-shell ui-shell ide-content ui-content portfolio-write-content">
+    {% if write_status_message %}
+    <div class="portfolio-write-status">{{ write_status_message }}</div>
+    {% endif %}
+
+    <section class="portfolio-write-section ide-list-layout is-landscape has-editor">
+        <aside class="ide-list-pane">
+            <div class="ide-list-preview-head">
+                <h3 class="ide-list-preview-title">프로필</h3>
+            </div>
+            <div>
+                <span class="portfolio-write-list-item is-active">기본 정보</span>
+            </div>
+        </aside>
+        <div class="ide-list-editor">
+            <div class="ide-list-editor-head">
+                <strong>프로필 편집</strong>
+            </div>
+            <form method="post" enctype="multipart/form-data" class="portfolio-write-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_profile" />
+                <div class="portfolio-write-form-grid">
+                    <label class="portfolio-write-field full">profile_img (증명사진)<input type="file" name="profile_img" /></label>
+                    <label class="portfolio-write-field">main_title<input type="text" name="main_title" value="{{ profile.main_title }}" maxlength="255" /></label>
+                    <label class="portfolio-write-field">main_title_en<input type="text" name="main_title_en" value="{{ profile.main_title_en }}" maxlength="255" /></label>
+                    <label class="portfolio-write-field">phone<input type="text" name="phone" value="{{ profile.phone }}" maxlength="50" /></label>
+                    <label class="portfolio-write-field">email<input type="email" name="email" value="{{ profile.email }}" /></label>
+                    <label class="portfolio-write-field full">main_subtitle<textarea name="main_subtitle" rows="4">{{ profile.main_subtitle }}</textarea></label>
+                    <label class="portfolio-write-field full">main_subtitle_en<textarea name="main_subtitle_en" rows="4">{{ profile.main_subtitle_en }}</textarea></label>
+                </div>
+                <div class="portfolio-write-actions">
+                    <button class="ide-btn ide-btn-primary" type="submit">프로필 저장</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="portfolio-write-section ide-list-layout is-landscape has-editor">
+        <aside class="ide-list-pane">
+            <div class="ide-list-preview-head">
+                <h3 class="ide-list-preview-title">경력사항</h3>
+            </div>
+            <div>
+                {% for career in careers %}
+                <a
+                    class="portfolio-write-list-item {% if selected_career_id == career.id and career_mode != 'add' %}is-active{% endif %}"
+                    href="?career_id={{ career.id }}{% if selected_project_id %}&project_id={{ selected_project_id }}{% elif project_mode == 'add' %}&project_new=1{% endif %}"
+                >{{ career.company }}</a>
+                {% empty %}
+                <p class="portfolio-write-list-empty">등록된 경력사항이 없습니다.</p>
+                {% endfor %}
+                <a
+                    class="portfolio-write-list-item is-add"
+                    href="?career_new=1{% if selected_project_id %}&project_id={{ selected_project_id }}{% elif project_mode == 'add' %}&project_new=1{% endif %}"
+                >+ 경력사항 추가</a>
+            </div>
+        </aside>
+        <div class="ide-list-editor">
+            <div class="ide-list-editor-head">
+                <strong>{% if career_mode == 'add' %}경력사항 추가{% else %}경력사항 수정{% endif %}</strong>
+            </div>
+            <form method="post" class="portfolio-write-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{% if career_mode == 'add' %}add_career{% else %}update_career{% endif %}" />
+                {% if selected_career and career_mode != 'add' %}
+                <input type="hidden" name="career_id" value="{{ selected_career.id }}" />
+                {% endif %}
+                <div class="portfolio-write-form-grid">
+                    <label class="portfolio-write-field">order<input type="number" name="order" value="{% if selected_career %}{{ selected_career.order|default:0 }}{% else %}0{% endif %}" /></label>
+                    <label class="portfolio-write-field">position<input type="text" name="position" value="{% if selected_career %}{{ selected_career.position }}{% endif %}" required /></label>
+                    <label class="portfolio-write-field">company<input type="text" name="company" value="{% if selected_career %}{{ selected_career.company }}{% endif %}" required /></label>
+                    <label class="portfolio-write-field">company_en<input type="text" name="company_en" value="{% if selected_career %}{{ selected_career.company_en }}{% endif %}" /></label>
+                    <label class="portfolio-write-field">join_date<input type="date" name="join_date" value="{% if selected_career %}{{ selected_career.join_date|date:'Y-m-d' }}{% endif %}" required /></label>
+                    <label class="portfolio-write-field">leave_date<input type="date" name="leave_date" value="{% if selected_career %}{{ selected_career.leave_date|date:'Y-m-d' }}{% endif %}" /></label>
+                    <label class="portfolio-write-field full">content<textarea name="content" rows="3" required>{% if selected_career %}{{ selected_career.content }}{% endif %}</textarea></label>
+                    <label class="portfolio-write-field full">content_en<textarea name="content_en" rows="3">{% if selected_career %}{{ selected_career.content_en }}{% endif %}</textarea></label>
+                </div>
+                <div class="portfolio-write-actions">
+                    <button class="ide-btn ide-btn-primary" type="submit">{% if career_mode == 'add' %}경력 추가{% else %}경력 수정{% endif %}</button>
+                </div>
+            </form>
+            {% if selected_career and career_mode != 'add' %}
+            <form method="post" class="portfolio-write-form" style="padding-top: 0;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_career" />
+                <input type="hidden" name="career_id" value="{{ selected_career.id }}" />
+                <div class="portfolio-write-actions">
+                    <button class="ide-btn" type="submit">선택 경력 삭제</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="portfolio-write-section ide-list-layout is-landscape has-editor">
+        <aside class="ide-list-pane">
+            <div class="ide-list-preview-head">
+                <h3 class="ide-list-preview-title">프로젝트</h3>
+            </div>
+            <div>
+                {% for project in projects %}
+                <a
+                    class="portfolio-write-list-item {% if selected_project_id == project.id and project_mode != 'add' %}is-active{% endif %}"
+                    href="?project_id={{ project.id }}{% if selected_career_id %}&career_id={{ selected_career_id }}{% elif career_mode == 'add' %}&career_new=1{% endif %}"
+                >{{ project.title }}</a>
+                {% empty %}
+                <p class="portfolio-write-list-empty">등록된 프로젝트가 없습니다.</p>
+                {% endfor %}
+                <a
+                    class="portfolio-write-list-item is-add"
+                    href="?project_new=1{% if selected_career_id %}&career_id={{ selected_career_id }}{% elif career_mode == 'add' %}&career_new=1{% endif %}"
+                >+ 프로젝트 추가</a>
+            </div>
+        </aside>
+        <div class="ide-list-editor">
+            <div class="ide-list-editor-head">
+                <strong>{% if project_mode == 'add' %}프로젝트 추가{% else %}프로젝트 수정{% endif %}</strong>
+            </div>
+            <form method="post" enctype="multipart/form-data" class="portfolio-write-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{% if project_mode == 'add' %}add_project{% else %}update_project{% endif %}" />
+                {% if selected_project and project_mode != 'add' %}
+                <input type="hidden" name="project_id" value="{{ selected_project.id }}" />
+                {% endif %}
+                <div class="portfolio-write-form-grid">
+                    <label class="portfolio-write-field">order<input type="number" name="order" value="{% if selected_project %}{{ selected_project.order|default:0 }}{% else %}0{% endif %}" /></label>
+                    <label class="portfolio-write-field">create_date<input type="date" name="create_date" value="{% if selected_project %}{{ selected_project.create_date|date:'Y-m-d' }}{% endif %}" required /></label>
+                    <label class="portfolio-write-field">title<input type="text" name="title" value="{% if selected_project %}{{ selected_project.title }}{% endif %}" required /></label>
+                    <label class="portfolio-write-field">title_en<input type="text" name="title_en" value="{% if selected_project %}{{ selected_project.title_en }}{% endif %}" /></label>
+                    <label class="portfolio-write-field full">banner_img<input type="file" name="banner_img" /></label>
+                    <label class="portfolio-write-field full">content<textarea name="content" rows="4" required>{% if selected_project %}{{ selected_project.content }}{% endif %}</textarea></label>
+                    <label class="portfolio-write-field full">content_en<textarea name="content_en" rows="4">{% if selected_project %}{{ selected_project.content_en }}{% endif %}</textarea></label>
+                    <label class="portfolio-write-field full">tags (여러 개는 Ctrl/Cmd+클릭)
+                        <select name="tags" multiple style="min-height: 88px;">
+                            {% for tag in all_tags %}
+                            <option value="{{ tag.id }}" {% if selected_project and tag in selected_project.tags.all %}selected{% endif %}>{{ tag.tag }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <div class="portfolio-write-actions">
+                    <button class="ide-btn ide-btn-primary" type="submit">{% if project_mode == 'add' %}프로젝트 추가{% else %}프로젝트 수정{% endif %}</button>
+                </div>
+            </form>
+            {% if selected_project and project_mode != 'add' %}
+            <form method="post" class="portfolio-write-form" style="padding-top: 0;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_project" />
+                <input type="hidden" name="project_id" value="{{ selected_project.id }}" />
+                <div class="portfolio-write-actions">
+                    <button class="ide-btn" type="submit">선택 프로젝트 삭제</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="portfolio-write-section ide-list-layout is-landscape has-editor">
+        <aside class="ide-list-pane">
+            <div class="ide-list-preview-head">
+                <h3 class="ide-list-preview-title">챗봇 옆 버튼</h3>
+            </div>
+            <div>
+                {% for button in action_buttons %}
+                <span class="portfolio-write-list-item">{{ button.order }}. {{ button.label }}</span>
+                {% empty %}
+                <p class="portfolio-write-list-empty">등록된 버튼이 없습니다.</p>
+                {% endfor %}
+            </div>
+        </aside>
+        <div class="ide-list-editor">
+            <div class="ide-list-editor-head">
+                <strong>버튼 관리 (최대 3개)</strong>
+            </div>
+            <div style="padding: 12px; display: grid; gap: 12px;">
+                {% for button in action_buttons %}
+                <form method="post" class="portfolio-write-form" style="padding: 0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_button" />
+                    <input type="hidden" name="button_id" value="{{ button.id }}" />
+                    <div class="portfolio-write-form-grid">
+                        <label class="portfolio-write-field">order (1~3)<input type="number" min="1" max="3" name="order" value="{{ button.order }}" required /></label>
+                        <label class="portfolio-write-field">label<input type="text" name="label" value="{{ button.label }}" required /></label>
+                        <label class="portfolio-write-field full">url<input type="url" name="url" value="{{ button.url }}" required /></label>
+                        <label class="portfolio-write-field full">icon_url (선택)<input type="url" name="icon_url" value="{{ button.icon_url }}" /></label>
+                    </div>
+                    <div class="portfolio-write-actions">
+                        <button class="ide-btn ide-btn-primary" type="submit">수정</button>
+                    </div>
+                </form>
+                <form method="post" class="portfolio-write-form" style="padding: 0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_button" />
+                    <input type="hidden" name="button_id" value="{{ button.id }}" />
+                    <div class="portfolio-write-actions">
+                        <button class="ide-btn" type="submit">삭제</button>
+                    </div>
+                </form>
+                <hr style="margin: 0; border-color: var(--ide-border-soft);">
+                {% endfor %}
+
+                {% if action_buttons|length < 3 %}
+                <form method="post" class="portfolio-write-form" style="padding: 0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_button" />
+                    <div class="portfolio-write-form-grid">
+                        <label class="portfolio-write-field">order (1~3)<input type="number" min="1" max="3" name="order" required /></label>
+                        <label class="portfolio-write-field">label<input type="text" name="label" required /></label>
+                        <label class="portfolio-write-field full">url<input type="url" name="url" required /></label>
+                        <label class="portfolio-write-field full">icon_url (선택)<input type="url" name="icon_url" /></label>
+                    </div>
+                    <div class="portfolio-write-actions">
+                        <button class="ide-btn ide-btn-primary" type="submit">버튼 추가</button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}

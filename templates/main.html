@@ -18,33 +18,34 @@
     }
 </style>
 <div class="main main-surface-layer">
+    {% if is_own_portfolio and portfolio_write_url %}
+    <a
+        class="own-portfolio-edit-widget ui-nav-link"
+        href="{{ portfolio_write_url }}"
+        aria-label="{% if ui_lang == 'en' %}Edit Portfolio{% else %}포트폴리오 수정{% endif %}"
+        title="{% if ui_lang == 'en' %}Edit Portfolio{% else %}포트폴리오 수정{% endif %}"
+    >
+        {% if ui_lang == 'en' %}Edit{% else %}수정{% endif %}
+    </a>
+    {% endif %}
     <div class = 'main_banner'>
         <div class = "main_text">
-            <h4 class = 'main_title'>
-                {% if ui_lang == 'en' %}
-                Hands-on full-stack developer, <b>Lim Hanbyeol</b>.
-                {% else %}
-                움직이는 풀스텍 개발자, <b>임한별</b> 입니다.
-                {% endif %}
-            </h4>
+            <div class="main_title">{{ profile_main_title_html }}</div>
             <div class = 'contact'>
                 <div class = "phone">
-                    Phone: +82-10-7935-3599
+                    Phone: {{ profile_phone_display }}
+                </div>
+                <div class = "email">
+                    Email: {{ profile_email_display }}
                 </div>
             </div>
         </div>
-        <img class = "profile_img" src="/media/profile_removebg.png"/>
+        <img class="profile_img" src="{{ profile_image_url }}"/>
     </div>
     <div class = "main_contents">
         <hr>
         <div class = 'main_subtitle'>
-            {% if ui_lang == 'en' %}
-            <div>I do not just watch from afar when something looks difficult. I step in and learn by doing.</div>
-            <div>I do not stop at assigned work. I keep creating work I can drive and finish.</div>
-            {% else %}
-            <div>자신이 당장 하지 못하는 일이라고 손가락을 빨며 멀리서 지켜 보는 것이 아니라 일단 발을 담궈 봅니다.</div>
-            <div>수동적으로 시키는 일만 하며 멈춰 있는 것이 아닌, 본인이 할 수 있는 일을 계속해서 만들어냅니다.</div>
-            {% endif %}
+            {{ profile_main_subtitle_html }}
         </div>
         <hr>
         <div class="main_careers">
@@ -53,9 +54,11 @@
         <div class="main_projects">
             {% include "main/Projects.html" %}
         </div>
+        {% if show_hobbys %}
         <div class="main_hobbys">
             {% include "main/Hobbys.html" %}
         </div>
+        {% endif %}
     </div>
     <div class = 'foot'>
         <div>
@@ -75,36 +78,34 @@
                 <line x1="9" y1="18" x2="15" y2="18"/>
             </svg>
         </button>
+        {% for button in portfolio_action_buttons %}
         <a
             class="portfolio-print-btn ui-nav-link portfolio-chat-link-btn"
-            href="https://github.com/Adihang"
+            href="{{ button.url }}"
             target="_blank"
             rel="noopener noreferrer"
             data-chat-widget-anchor
-            data-chat-widget-anchor-order="1"
-            aria-label="GitHub"
-            title="GitHub"
+            data-chat-widget-anchor-order="{{ forloop.counter }}"
+            aria-label="{{ button.label }}"
+            title="{{ button.label }}"
         >
+            {% if button.label|lower == 'github' %}
             <svg class="portfolio-chat-link-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="currentColor">
                 <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.21 2.2.82a7.53 7.53 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
             </svg>
-        </a>
-        <a
-            class="portfolio-print-btn ui-nav-link portfolio-chat-link-btn"
-            href="https://www.thingiverse.com/hanbyel/designs"
-            target="_blank"
-            rel="noopener noreferrer"
-            data-chat-widget-anchor
-            data-chat-widget-anchor-order="2"
-            aria-label="Thingiverse"
-            title="Thingiverse"
-        >
+            {% elif button.label|lower == 'thingiverse' %}
             <svg class="portfolio-chat-link-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2 3 7v10l9 5 9-5V7z"/>
                 <path d="M3 7l9 5 9-5"/>
                 <path d="M12 12v10"/>
             </svg>
+            {% elif button.icon_url %}
+            <img class="portfolio-chat-link-icon" src="{{ button.icon_url }}" alt="{{ button.label }}" style="width: 20px; height: 20px; object-fit: contain;"/>
+            {% else %}
+            <span style="font-size: 12px; font-weight: 600;">{{ button.label }}</span>
+            {% endif %}
         </a>
+        {% endfor %}
     </div>
 </div>
 {% include "popup/portfolio/print_selector_template.html" %}

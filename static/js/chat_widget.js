@@ -66,8 +66,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+    const portfolioOwnerUsername = String(document.body.getAttribute('data-portfolio-owner-username') || '').trim();
     const footer = document.querySelector('.foot');
     const printButton = document.querySelector('[data-portfolio-print]');
+    const ownPortfolioEditWidget = document.querySelector('.own-portfolio-edit-widget');
     const widgetAnchorButtons = [];
     if (printButton) {
         widgetAnchorButtons.push(printButton);
@@ -100,6 +102,11 @@ document.addEventListener('DOMContentLoaded', function() {
         printButtonAnchorRafId = null;
 
         if (!widgetAnchorButtons.length) {
+            if (ownPortfolioEditWidget) {
+                ownPortfolioEditWidget.classList.remove('is-chat-widget-anchor');
+                ownPortfolioEditWidget.style.left = '';
+                ownPortfolioEditWidget.style.top = '';
+            }
             return;
         }
 
@@ -137,6 +144,20 @@ document.addEventListener('DOMContentLoaded', function() {
             button.style.top = `${alignedTop}px`;
             currentLeft += (buttonWidths[index] || 0) + anchorButtonsSpacing;
         });
+
+        if (ownPortfolioEditWidget && printButton) {
+            ownPortfolioEditWidget.classList.add('is-chat-widget-anchor');
+
+            const printRect = printButton.getBoundingClientRect();
+            const editRect = ownPortfolioEditWidget.getBoundingClientRect();
+            const centeredLeft = printRect.left + ((printRect.width - editRect.width) / 2);
+            const maxEditLeft = Math.max(minViewportInset, window.innerWidth - editRect.width - minViewportInset);
+            const editLeft = Math.min(Math.max(minViewportInset, centeredLeft), maxEditLeft);
+            const editTop = Math.max(minViewportInset, printRect.top - editRect.height - anchorButtonsSpacing);
+
+            ownPortfolioEditWidget.style.left = `${Math.round(editLeft)}px`;
+            ownPortfolioEditWidget.style.top = `${Math.round(editTop)}px`;
+        }
     }
 
     // 인쇄 버튼 앵커 업데이트를 스케줄링하는 함수
@@ -458,7 +479,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     message: userMessage,
-                    history: conversationHistory.slice(-CHAT_REQUEST_HISTORY_LIMIT)
+                    history: conversationHistory.slice(-CHAT_REQUEST_HISTORY_LIMIT),
+                    portfolio_owner_username: portfolioOwnerUsername
                 })
             });
             

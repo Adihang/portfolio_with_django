@@ -41,11 +41,31 @@
 
     relocateRootNavigationBlocks();
 
+    const wireRootLogoutAction = function () {
+        const logoutTrigger = document.querySelector('#ide-auth-account-root [data-ide-logout-trigger]');
+        const logoutForm = document.getElementById('ide-auth-logout-form-root');
+        if (!logoutTrigger || !logoutForm) {
+            return;
+        }
+        logoutTrigger.addEventListener('click', function () {
+            const confirmMessage = String(logoutTrigger.getAttribute('data-confirm-message') || '').trim();
+            if (confirmMessage && !window.confirm(confirmMessage)) {
+                return;
+            }
+            logoutForm.submit();
+        });
+    };
+
+    wireRootLogoutAction();
+
     const ENGINE_URLS = {
-        google: 'https://www.google.com/search?q=',
-        duckduckgo: 'https://duckduckgo.com/?q=',
-        bing: 'https://www.bing.com/search?q=',
-        naver: 'https://search.naver.com/search.naver?query='
+        google: function (query) { return 'https://www.google.com/search?q=' + encodeURIComponent(query); },
+        duckduckgo: function (query) { return 'https://duckduckgo.com/?q=' + encodeURIComponent(query); },
+        bing: function (query) { return 'https://www.bing.com/search?q=' + encodeURIComponent(query); },
+        naver: function (query) { return 'https://search.naver.com/search.naver?query=' + encodeURIComponent(query); },
+        gpt: function (query) { return 'https://chatgpt.com/?q=' + encodeURIComponent(query); },
+        claude: function (query) { return 'https://claude.ai/new?q=' + encodeURIComponent(query); },
+        gemini: function (query) { return 'https://gemini.google.com/app?prompt=' + encodeURIComponent(query); }
     };
 
     const hasScheme = function (text) {
@@ -249,7 +269,9 @@
     updateAdaptivePlaceholder();
 
     if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(updateAdaptivePlaceholder).catch(function () {});
+        document.fonts.ready.then(function () {
+            updateAdaptivePlaceholder();
+        }).catch(function () {});
     }
 
     form.addEventListener('submit', function (event) {
@@ -269,7 +291,7 @@
         }
 
         const engine = engineSelect.value in ENGINE_URLS ? engineSelect.value : 'google';
-        window.location.href = ENGINE_URLS[engine] + encodeURIComponent(raw);
+        window.location.href = ENGINE_URLS[engine](raw);
     });
 
     const shortcutsRoot = document.querySelector('[data-root-shortcuts]');
@@ -281,7 +303,10 @@
     const shortcutForm = shortcutsRoot.querySelector('[data-root-shortcut-form]');
     const shortcutNameInput = shortcutsRoot.querySelector('[data-root-shortcut-name]');
     const shortcutUrlInput = shortcutsRoot.querySelector('[data-root-shortcut-url]');
+    const shortcutSubmitButton = shortcutForm ? shortcutForm.querySelector('.root-shortcuts-submit') : null;
     const shortcutsHint = shortcutsRoot.querySelector('[data-root-shortcuts-hint]');
+    const shortcutMenu = document.querySelector('[data-root-shortcut-menu]');
+    const shortcutMenuEdit = shortcutMenu ? shortcutMenu.querySelector('[data-shortcut-menu-edit]') : null;
 
     if (!shortcutsGrid || !shortcutsHint) {
         return;
@@ -291,10 +316,15 @@
     const loginHint = shortcutsRoot.dataset.loginHint || '';
     const emptyMessage = shortcutsRoot.dataset.emptyMessage || '';
     const addLabel = shortcutsRoot.dataset.addLabel || 'Add';
+    const editLabel = shortcutsRoot.dataset.editLabel || 'Edit';
+    const saveLabel = shortcutSubmitButton ? String(shortcutSubmitButton.textContent || '').trim() : 'Save';
     const apiBase = '/api/root-shortcuts/';
     const reorderApiUrl = apiBase + 'reorder/';
     let draggingCard = null;
     let dragChanged = false;
+    let editingShortcutId = null;
+    let contextTargetShortcutId = null;
+    let currentShortcutItems = [];
 
     const getCsrfToken = function () {
         const meta = document.querySelector('meta[name="csrf-token"]');
@@ -318,6 +348,72 @@
             '<button type="button" class="root-shortcuts-item root-shortcuts-item-add" data-shortcut-add-card aria-label="' + escapeHtml(addLabel) + '">' +
                 '<span class="root-shortcuts-plus-icon" aria-hidden="true">+</span>' +
             '</button>';
+    };
+
+    const hideShortcutMenu = function () {
+        if (!shortcutMenu) {
+            return;
+        }
+        shortcutMenu.hidden = true;
+        shortcutMenu.style.left = '';
+        shortcutMenu.style.top = '';
+        contextTargetShortcutId = null;
+    };
+
+    const openShortcutMenu = function (x, y, shortcutId) {
+        if (!shortcutMenu) {
+            return;
+        }
+        contextTargetShortcutId = shortcutId;
+        shortcutMenu.hidden = false;
+
+        const rect = shortcutMenu.getBoundingClientRect();
+        let left = x;
+        let top = y;
+        const maxLeft = window.innerWidth - rect.width - 8;
+        const maxTop = window.innerHeight - rect.height - 8;
+        if (left > maxLeft) {
+            left = maxLeft;
+        }
+        if (top > maxTop) {
+            top = maxTop;
+        }
+        if (left < 8) {
+            left = 8;
+        }
+        if (top < 8) {
+            top = 8;
+        }
+        shortcutMenu.style.left = left + 'px';
+        shortcutMenu.style.top = top + 'px';
+    };
+
+    const enterEditMode = function (shortcutId) {
+        if (!shortcutForm || !shortcutNameInput || !shortcutUrlInput) {
+            return;
+        }
+        const target = currentShortcutItems.find(function (item) {
+            return Number(item.id) === Number(shortcutId);
+        });
+        if (!target) {
+            return;
+        }
+        editingShortcutId = Number(target.id);
+        shortcutForm.hidden = false;
+        shortcutNameInput.value = target.name || '';
+        shortcutUrlInput.value = target.url || '';
+        if (shortcutSubmitButton) {
+            shortcutSubmitButton.textContent = editLabel;
+        }
+        shortcutNameInput.focus();
+        shortcutNameInput.select();
+    };
+
+    const resetEditMode = function () {
+        editingShortcutId = null;
+        if (shortcutSubmitButton) {
+            shortcutSubmitButton.textContent = saveLabel || 'Save';
+        }
     };
 
     const getOrderedIdsFromDom = function () {
@@ -385,6 +481,7 @@
     };
 
     const renderShortcuts = function (items) {
+        currentShortcutItems = Array.isArray(items) ? items.slice() : [];
         const cards = items.map(function (item) {
             const safeName = escapeHtml(item.name);
             const safeUrl = escapeHtml(item.url);
@@ -462,6 +559,22 @@
         }
     };
 
+    const updateShortcut = async function (shortcutId, name, url) {
+        const response = await fetch(apiBase + String(shortcutId) + '/', {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ name: name, url: url })
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update shortcut');
+        }
+    };
+
     const removeShortcut = async function (shortcutId) {
         const response = await fetch(apiBase + String(shortcutId) + '/', {
             method: 'DELETE',
@@ -478,7 +591,7 @@
     };
 
     if (shortcutNameInput) {
-        shortcutNameInput.placeholder = shortcutsRoot.dataset.namePlaceholder || 'Name';
+        shortcutNameInput.placeholder = shortcutsRoot.dataset.namePlaceholder || 'Name (optional)';
     }
     if (shortcutUrlInput) {
         shortcutUrlInput.placeholder = shortcutsRoot.dataset.urlPlaceholder || 'https://example.com';
@@ -489,26 +602,45 @@
             event.preventDefault();
             const name = shortcutNameInput.value.trim();
             const url = shortcutUrlInput.value.trim();
-            if (!name || !url) {
+            if (!url) {
                 return;
             }
 
             try {
-                await createShortcut(name, url);
+                if (editingShortcutId) {
+                    await updateShortcut(editingShortcutId, name, url);
+                } else {
+                    await createShortcut(name, url);
+                }
                 shortcutForm.reset();
                 shortcutForm.hidden = true;
+                resetEditMode();
                 await fetchShortcuts();
             } catch (error) {}
         });
     }
 
     shortcutsGrid.addEventListener('click', async function (event) {
+        hideShortcutMenu();
         const addCardTarget = event.target.closest('[data-shortcut-add-card]');
         if (addCardTarget && shortcutForm) {
             event.preventDefault();
+            if (editingShortcutId) {
+                resetEditMode();
+                shortcutForm.reset();
+                shortcutForm.hidden = false;
+                if (shortcutNameInput) {
+                    shortcutNameInput.focus();
+                }
+                return;
+            }
+
             shortcutForm.hidden = !shortcutForm.hidden;
-            if (!shortcutForm.hidden && shortcutNameInput) {
-                shortcutNameInput.focus();
+            if (!shortcutForm.hidden) {
+                shortcutForm.reset();
+                if (shortcutNameInput) {
+                    shortcutNameInput.focus();
+                }
             }
             return;
         }
@@ -525,8 +657,56 @@
 
         try {
             await removeShortcut(shortcutId);
+            if (editingShortcutId && Number(editingShortcutId) === Number(shortcutId)) {
+                if (shortcutForm) {
+                    shortcutForm.hidden = true;
+                    shortcutForm.reset();
+                }
+                resetEditMode();
+            }
             await fetchShortcuts();
         } catch (error) {}
+    });
+
+    shortcutsGrid.addEventListener('contextmenu', function (event) {
+        if (!isAuthenticated) {
+            return;
+        }
+        const card = event.target.closest('.root-shortcuts-card[data-shortcut-id]');
+        if (!card) {
+            return;
+        }
+        event.preventDefault();
+        const shortcutId = card.getAttribute('data-shortcut-id');
+        if (!shortcutId) {
+            return;
+        }
+        openShortcutMenu(event.clientX, event.clientY, shortcutId);
+    });
+
+    if (shortcutMenuEdit) {
+        shortcutMenuEdit.addEventListener('click', function (event) {
+            event.preventDefault();
+            if (contextTargetShortcutId) {
+                enterEditMode(contextTargetShortcutId);
+            }
+            hideShortcutMenu();
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!shortcutMenu || shortcutMenu.hidden) {
+            return;
+        }
+        if (!shortcutMenu.contains(event.target)) {
+            hideShortcutMenu();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            hideShortcutMenu();
+        }
     });
 
     shortcutsGrid.addEventListener('dragstart', function (event) {
@@ -608,6 +788,9 @@
             droppedCard.classList.remove('is-dragging');
         }
     });
+
+    window.addEventListener('scroll', hideShortcutMenu, { passive: true });
+    window.addEventListener('resize', hideShortcutMenu, { passive: true });
 
     fetchShortcuts();
 })();
