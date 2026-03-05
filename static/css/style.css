@@ -1576,7 +1576,7 @@ body.portfolio-page section {
 .ui-nav {
     position: sticky;
     top: 0;
-    z-index: 1030;
+    z-index: 4100;
     padding: 9.6px 18px;
     border-bottom: none;
     background: linear-gradient(90deg, var(--color-nav-bg-start), var(--color-nav-bg-end));
@@ -2635,7 +2635,7 @@ body.portfolio-page.theme-dark .own-portfolio-edit-widget {
     border-color: rgba(255, 255, 255, 0.24);
     background: rgba(35, 35, 35, 0.88);
     color: #f0f0f0;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+    box-shadow: 0 8px 18px rgba(255, 255, 255, 0.18);
 }
 
 body.portfolio-page.theme-dark .own-portfolio-edit-widget:hover,

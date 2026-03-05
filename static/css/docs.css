@@ -121,6 +121,8 @@ body.ui-page .portfolio-print-btn {
 .ide-toolbar-wrap,
 .ui-toolbar-wrap {
     position: relative;
+    z-index: 3700;
+    overflow: visible;
     flex: 0 0 auto;
     border-bottom: 1px solid var(--ide-border-soft);
     background: var(--ide-surface-toolbar);
@@ -258,6 +260,7 @@ body.ui-page .portfolio-print-btn {
     align-items: center;
     justify-content: flex-end;
     position: relative;
+    z-index: 1;
     margin: 0;
 }
 
@@ -331,7 +334,7 @@ body.theme-dark .ide-auth-account-avatar {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    z-index: 4200;
+    z-index: 2;
 }
 
 body.theme-dark .ide-auth-account-menu {

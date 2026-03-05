@@ -32,8 +32,6 @@ def _seed_default_portfolio_data(apps, schema_editor):
             "자신이 당장 하지 못하는 일이라고 손가락을 빨며 멀리서 지켜 보는 것이 아니라 일단 발을 담궈 봅니다.\n"
             "수동적으로 시키는 일만 하며 멈춰 있는 것이 아닌, 본인이 할 수 있는 일을 계속해서 만들어냅니다."
         )
-    if not profile.profile_img:
-        profile.profile_img = "profile_removebg.png"
     profile.save()
 
     existing_career_count = PortfolioCareer.objects.filter(user=user).count()
