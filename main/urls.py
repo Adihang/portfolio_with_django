@@ -97,6 +97,7 @@ urlpatterns = [
     re_path(r'^(?P<ui_lang>ko|en)/api/root-shortcuts/(?P<shortcut_id>\d+)/$', views.root_shortcuts_detail, name='root_shortcuts_detail_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/theme-preference/$', views.theme_preference, name='theme_preference_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/user-preferences/$', views.user_preferences, name='user_preferences_lang'),
+    re_path(r'^(?P<ui_lang>ko|en)/account/profile-image/?$', views.account_profile_image_upload, name='account_profile_image_upload_lang'),
     re_path(r'^(?P<ui_lang>ko|en)/api/chat/$', views.chat_with_ai, name='chat_with_ai_lang'),
     path('portfolio/', views.main_legacy_redirect, name='main'),
     path('portfolio/write', views.portfolio_write_legacy_redirect, name='portfolio_write_no_slash'),
@@ -127,5 +128,6 @@ urlpatterns = [
     path('api/root-shortcuts/<int:shortcut_id>/', views.root_shortcuts_detail, name='root_shortcuts_detail'),
     path('api/theme-preference/', views.theme_preference, name='theme_preference'),
     path('api/user-preferences/', views.user_preferences, name='user_preferences'),
+    path('account/profile-image/', views.account_profile_image_upload, name='account_profile_image_upload'),
     path('api/chat/', views.chat_with_ai, name='chat_with_ai')
 ]

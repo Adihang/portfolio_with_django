@@ -51,18 +51,28 @@
     relocateRootNavigationBlocks();
 
     const wireRootLogoutAction = function () {
-        const logoutTrigger = document.querySelector('#ide-auth-account-root [data-ide-logout-trigger]');
+        const accountTrigger = document.querySelector('#ide-auth-account-root [data-ide-account-trigger]');
+        const accountMenu = document.querySelector('#ide-auth-account-root [data-ide-auth-account-menu]');
+        const accountLogoutButton = document.querySelector('#ide-auth-account-root [data-ide-account-logout]');
         const logoutForm = document.getElementById('ide-auth-logout-form-root');
         const logoutModal = document.getElementById('root-auth-logout-modal');
         const logoutModalBackdrop = document.getElementById('root-auth-logout-modal-backdrop');
         const logoutCancelButton = document.getElementById('root-auth-logout-cancel-btn');
         const logoutConfirmButton = document.getElementById('root-auth-logout-confirm-btn');
         const logoutMessage = document.getElementById('root-auth-logout-message');
-        if (!logoutTrigger || !logoutForm) {
+        if (!accountTrigger || !logoutForm) {
             return;
         }
 
         let lastFocusedElement = null;
+
+        const setAccountMenuOpen = function (opened) {
+            if (!accountMenu) {
+                return;
+            }
+            accountMenu.hidden = !opened;
+            accountTrigger.setAttribute('aria-expanded', opened ? 'true' : 'false');
+        };
 
         const setLogoutModalOpen = function (opened) {
             if (!logoutModal) {
@@ -81,7 +91,7 @@
         };
 
         const requestLogout = function () {
-            const confirmMessage = String(logoutTrigger.getAttribute('data-confirm-message') || '').trim();
+            const confirmMessage = String((accountLogoutButton && accountLogoutButton.getAttribute('data-confirm-message')) || '').trim();
             if (!logoutModal || !logoutModalBackdrop || !logoutCancelButton || !logoutConfirmButton || !logoutMessage) {
                 if (confirmMessage && !window.confirm(confirmMessage)) {
                     return;
@@ -94,9 +104,33 @@
             setLogoutModalOpen(true);
         };
 
-        logoutTrigger.addEventListener('click', function (event) {
+        accountTrigger.addEventListener('click', function (event) {
             event.preventDefault();
-            requestLogout();
+            if (!accountMenu) {
+                requestLogout();
+                return;
+            }
+            const isOpen = !accountMenu.hidden;
+            setAccountMenuOpen(!isOpen);
+        });
+
+        if (accountLogoutButton) {
+            accountLogoutButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                setAccountMenuOpen(false);
+                requestLogout();
+            });
+        }
+
+        document.addEventListener('click', function (event) {
+            if (!accountMenu || accountMenu.hidden) {
+                return;
+            }
+            const target = event.target;
+            if (accountMenu.contains(target) || accountTrigger.contains(target)) {
+                return;
+            }
+            setAccountMenuOpen(false);
         });
 
         if (logoutModalBackdrop) {
@@ -118,7 +152,15 @@
         }
 
         document.addEventListener('keydown', function (event) {
-            if (event.key !== 'Escape' || !logoutModal || logoutModal.hidden) {
+            if (event.key !== 'Escape') {
+                return;
+            }
+            if (accountMenu && !accountMenu.hidden) {
+                event.preventDefault();
+                setAccountMenuOpen(false);
+                return;
+            }
+            if (!logoutModal || logoutModal.hidden) {
                 return;
             }
             event.preventDefault();
@@ -127,6 +169,29 @@
     };
 
     wireRootLogoutAction();
+
+    const wireRootProfileImageUpload = function () {
+        const uploadForm = document.querySelector('[data-root-account-profile-upload-form]');
+        const imageTrigger = document.querySelector('[data-root-account-profile-image-trigger]');
+        const imageInput = document.querySelector('[data-root-account-profile-image-input]');
+        if (!uploadForm || !imageTrigger || !imageInput) {
+            return;
+        }
+
+        imageTrigger.addEventListener('click', function (event) {
+            event.preventDefault();
+            imageInput.click();
+        });
+
+        imageInput.addEventListener('change', function () {
+            if (!imageInput.files || !imageInput.files.length) {
+                return;
+            }
+            uploadForm.submit();
+        });
+    };
+
+    wireRootProfileImageUpload();
 
     const ENGINE_URLS = {
         google: function (query) { return 'https://www.google.com/search?q=' + encodeURIComponent(query); },

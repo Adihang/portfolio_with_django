@@ -984,6 +984,9 @@
         const accountTrigger = document.querySelector("[data-ide-account-trigger]");
         const accountMenu = document.querySelector("[data-ide-auth-account-menu]");
         const accountLogoutButton = document.querySelector("[data-ide-account-logout]");
+        const profileUploadForm = document.querySelector("[data-root-account-profile-upload-form]");
+        const profileImageTrigger = document.querySelector("[data-root-account-profile-image-trigger]");
+        const profileImageInput = document.querySelector("[data-root-account-profile-image-input]");
         const logoutForm = document.getElementById("ide-auth-logout-form");
         if (!accountTrigger || !logoutForm) {
             return;
@@ -1060,6 +1063,20 @@
                 event.preventDefault();
                 setAccountMenuOpen(false);
                 requestLogout();
+            });
+        }
+
+        if (profileUploadForm && profileImageTrigger && profileImageInput) {
+            profileImageTrigger.addEventListener("click", function (event) {
+                event.preventDefault();
+                profileImageInput.click();
+            });
+
+            profileImageInput.addEventListener("change", function () {
+                if (!profileImageInput.files || !profileImageInput.files.length) {
+                    return;
+                }
+                profileUploadForm.submit();
             });
         }
 
