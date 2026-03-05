@@ -232,12 +232,23 @@
                 { trigger: "italic", insertText: "*text*", label: "*italic*", cursorBack: 5, priority: 92 },
                 { trigger: "link", insertText: "[text](url)", label: "[text](url)", cursorBack: 4, priority: 94 },
                 { trigger: "code", insertText: "```\n\n```", label: "code block", cursorBack: 4, priority: 91 },
+                { trigger: "quote", insertText: "> ", label: "> quote", priority: 90 },
+                { trigger: "ul", insertText: "- ", label: "- list", priority: 89 },
+                { trigger: "ol", insertText: "1. ", label: "1. list", priority: 88 },
+                { trigger: "todo", insertText: "- [ ] ", label: "- [ ] task", priority: 87 },
+                { trigger: "done", insertText: "- [x] ", label: "- [x] done", priority: 86 },
+                { trigger: "table", insertText: "| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |", label: "table", cursorBack: 32, priority: 85 },
+                { trigger: "img", insertText: "![alt](url)", label: "![alt](url)", cursorBack: 5, priority: 84 },
+                { trigger: "hr", insertText: "---", label: "---", priority: 83 },
+                { trigger: "h4", insertText: "#### ", label: "#### Heading 4", priority: 82 },
+                { trigger: "h5", insertText: "##### ", label: "##### Heading 5", priority: 81 },
             ],
             ".py": [
                 { trigger: "def", insertText: "def function_name():\n    pass", label: "def ...", cursorBack: 8, priority: 98 },
                 { trigger: "class", insertText: "class ClassName:\n    def __init__(self):\n        pass", label: "class ...", cursorBack: 39, priority: 97 },
                 { trigger: "ifmain", insertText: "if __name__ == \"__main__\":\n    main()", label: "if __name__...", cursorBack: 6 },
                 { trigger: "import", insertText: "import ", label: "import ", priority: 100 },
+                { trigger: "importfrom", insertText: "from module import name", label: "from ... import ...", cursorBack: 4, priority: 99 },
                 { trigger: "from", insertText: "from ", label: "from ", priority: 99 },
                 { trigger: "return", insertText: "return ", label: "return ", priority: 96 },
                 { trigger: "string", insertText: "str()", label: "str()", cursorBack: 1, priority: 88 },
@@ -260,28 +271,155 @@
                 { trigger: "break", insertText: "break", label: "break" },
                 { trigger: "continue", insertText: "continue", label: "continue" },
                 { trigger: "print", insertText: "print()", label: "print()", cursorBack: 1, priority: 90 },
+                { trigger: "fstr", insertText: "f\"{value}\"", label: "f-string", cursorBack: 7, priority: 89 },
                 { trigger: "len", insertText: "len()", label: "len()", cursorBack: 1, priority: 85 },
                 { trigger: "range", insertText: "range()", label: "range()", cursorBack: 1, priority: 84 },
                 { trigger: "isinstance", insertText: "isinstance()", label: "isinstance()", cursorBack: 1 },
+                { trigger: "enumerate", insertText: "for index, item in enumerate(items):\n    ", label: "enumerate", priority: 83 },
+                { trigger: "zip", insertText: "for left, right in zip(list_a, list_b):\n    ", label: "zip", priority: 82 },
+                { trigger: "listcomp", insertText: "[item for item in items]", label: "list comprehension", priority: 81 },
+                { trigger: "dictcomp", insertText: "{key: value for key, value in items}", label: "dict comprehension", priority: 80 },
+                { trigger: "open", insertText: "with open(\"\", \"r\", encoding=\"utf-8\") as f:\n    ", label: "with open(...)", cursorBack: 31, priority: 79 },
+                { trigger: "readjson", insertText: "import json\nwith open(\"\", \"r\", encoding=\"utf-8\") as f:\n    data = json.load(f)", label: "read json file", cursorBack: 49, priority: 78 },
+                { trigger: "writejson", insertText: "import json\nwith open(\"\", \"w\", encoding=\"utf-8\") as f:\n    json.dump(data, f, ensure_ascii=False, indent=2)", label: "write json file", cursorBack: 69, priority: 77 },
+                { trigger: "assert", insertText: "assert ", label: "assert", priority: 76 },
+                { trigger: "raise", insertText: "raise Exception(\"\")", label: "raise Exception", cursorBack: 2, priority: 75 },
+                { trigger: "except", insertText: "except Exception as e:\n    ", label: "except", priority: 74 },
+                { trigger: "finally", insertText: "finally:\n    ", label: "finally", priority: 73 },
+                { trigger: "dataclass", insertText: "from dataclasses import dataclass\n\n@dataclass\nclass Name:\n    value: str", label: "@dataclass", cursorBack: 9, priority: 72 },
+                { trigger: "property", insertText: "@property\ndef name(self):\n    return self._name", label: "@property", priority: 71 },
             ],
             ".js": [
                 { trigger: "function", insertText: "function functionName(params) {\n    \n}", label: "function ...", cursorBack: 3, priority: 98 },
                 { trigger: "if", insertText: "if (condition) {\n    \n}", label: "if (...) { }", cursorBack: 3, priority: 97 },
+                { trigger: "const", insertText: "const ", label: "const ", priority: 100 },
+                { trigger: "let", insertText: "let ", label: "let ", priority: 99 },
+                { trigger: "for", insertText: "for (let i = 0; i < ; i += 1) {\n    \n}", label: "for (...) { }", cursorBack: 13, priority: 96 },
+                { trigger: "log", insertText: "console.log()", label: "console.log()", cursorBack: 1, priority: 95 },
+                { trigger: "return", insertText: "return ", label: "return ", priority: 94 },
+                { trigger: "ifelse", insertText: "if (condition) {\n    \n} else {\n    \n}", label: "if / else", cursorBack: 11, priority: 93 },
+                { trigger: "forof", insertText: "for (const item of items) {\n    \n}", label: "for...of", cursorBack: 5, priority: 92 },
+                { trigger: "foreach", insertText: "array.forEach((item) => {\n    \n});", label: "forEach", cursorBack: 6, priority: 91 },
+                { trigger: "map", insertText: "array.map((item) => {\n    return item;\n});", label: "map", cursorBack: 17, priority: 90 },
+                { trigger: "filter", insertText: "array.filter((item) => {\n    return true;\n});", label: "filter", cursorBack: 16, priority: 89 },
+                { trigger: "switch", insertText: "switch (value) {\n    case \"\":\n        break;\n    default:\n        break;\n}", label: "switch", cursorBack: 51, priority: 88 },
+                { trigger: "try", insertText: "try {\n    \n} catch (error) {\n    console.error(error);\n}", label: "try/catch", cursorBack: 44, priority: 87 },
+                { trigger: "async", insertText: "async function name() {\n    \n}", label: "async function", cursorBack: 3, priority: 86 },
+                { trigger: "await", insertText: "await ", label: "await", priority: 85 },
+                { trigger: "fetch", insertText: "const response = await fetch(url);\nconst data = await response.json();", label: "fetch + json", priority: 84 },
+                { trigger: "promise", insertText: "return new Promise((resolve, reject) => {\n    \n});", label: "new Promise", cursorBack: 6, priority: 83 },
+                { trigger: "class", insertText: "class ClassName {\n    constructor() {\n    }\n}", label: "class", cursorBack: 26, priority: 82 },
+                { trigger: "export", insertText: "export ", label: "export", priority: 81 },
+                { trigger: "import", insertText: "import  from \"\";", label: "import", cursorBack: 8, priority: 80 },
+                { trigger: "settimeout", insertText: "setTimeout(() => {\n    \n}, 0);", label: "setTimeout", cursorBack: 7, priority: 79 },
+                { trigger: "interval", insertText: "setInterval(() => {\n    \n}, 1000);", label: "setInterval", cursorBack: 10, priority: 78 },
+                { trigger: "query", insertText: "document.querySelector(\"\")", label: "querySelector", cursorBack: 2, priority: 77 },
+                { trigger: "document", insertText: "document", label: "document", priority: 101 },
+                { trigger: "window", insertText: "window", label: "window", priority: 100 },
+                { trigger: "array", insertText: "Array.from()", label: "Array.from()", cursorBack: 1, priority: 99 },
+                { trigger: "from", insertText: "Array.from()", label: "Array.from()", cursorBack: 1, priority: 98 },
+                { trigger: "setattr", insertText: ".setAttribute(\"\", \"\")", label: "setAttribute", cursorBack: 6, priority: 97 },
+                { trigger: "getattr", insertText: ".getAttribute(\"\")", label: "getAttribute", cursorBack: 2, priority: 96 },
+                { trigger: "addevent", insertText: ".addEventListener(\"\", function (event) {\n    \n});", label: "addEventListener", cursorBack: 12, priority: 95 },
+                { trigger: "removeevent", insertText: ".removeEventListener(\"\", handler);", label: "removeEventListener", cursorBack: 11, priority: 94 },
+                { trigger: "queryall", insertText: "document.querySelectorAll(\"\")", label: "querySelectorAll", cursorBack: 2, priority: 93 },
+                { trigger: "create", insertText: "document.createElement(\"\")", label: "createElement", cursorBack: 2, priority: 92 },
+                { trigger: "append", insertText: ".appendChild()", label: "appendChild", cursorBack: 1, priority: 91 },
+                { trigger: "classlist", insertText: ".classList.add(\"\")", label: "classList.add", cursorBack: 2, priority: 90 },
+                { trigger: "contains", insertText: ".classList.contains(\"\")", label: "classList.contains", cursorBack: 2, priority: 89 },
+                { trigger: "dataset", insertText: ".dataset.", label: "dataset", priority: 88 },
+                { trigger: "jsonparse", insertText: "JSON.parse()", label: "JSON.parse()", cursorBack: 1, priority: 87 },
+                { trigger: "jsonstringify", insertText: "JSON.stringify()", label: "JSON.stringify()", cursorBack: 1, priority: 86 },
+                { trigger: "localstorage", insertText: "window.localStorage.getItem(\"\")", label: "localStorage.getItem", cursorBack: 2, priority: 85 },
+                { trigger: "setitem", insertText: "window.localStorage.setItem(\"\", \"\")", label: "localStorage.setItem", cursorBack: 6, priority: 84 },
+                { trigger: "promiseall", insertText: "Promise.all([])", label: "Promise.all", cursorBack: 2, priority: 83 },
+                { trigger: "reduce", insertText: "array.reduce((acc, item) => {\n    return acc;\n}, initialValue)", label: "reduce", cursorBack: 13, priority: 82 },
+                { trigger: "find", insertText: "array.find((item) => {\n    return true;\n})", label: "find", cursorBack: 16, priority: 81 },
+                { trigger: "some", insertText: "array.some((item) => {\n    return true;\n})", label: "some", cursorBack: 16, priority: 80 },
+                { trigger: "every", insertText: "array.every((item) => {\n    return true;\n})", label: "every", cursorBack: 16, priority: 79 },
+                { trigger: "includes", insertText: ".includes()", label: "includes", cursorBack: 1, priority: 78 },
+                { trigger: "mapobj", insertText: "Object.entries(obj).map(([key, value]) => {\n    return [key, value];\n})", label: "Object.entries map", cursorBack: 25, priority: 77 },
             ],
             ".css": [
                 { trigger: "rule", insertText: ".selector {\n    property: value;\n}", label: ".selector { }", cursorBack: 23, priority: 100 },
                 { trigger: "media", insertText: "@media (max-width: 768px) {\n    \n}", label: "@media ...", cursorBack: 3, priority: 89 },
                 { trigger: "var", insertText: ":root {\n    --color-name: #000;\n}", label: ":root vars", cursorBack: 17 },
+                { trigger: "display", insertText: "display: flex;", label: "display: flex;", priority: 98 },
+                { trigger: "color", insertText: "color: ;", label: "color:", cursorBack: 1, priority: 97 },
+                { trigger: "bg", insertText: "background: ;", label: "background", cursorBack: 1, priority: 96 },
+                { trigger: "grid", insertText: "display: grid;", label: "display: grid;", priority: 95 },
+                { trigger: "center", insertText: "display: flex;\nalign-items: center;\njustify-content: center;", label: "flex center", priority: 94 },
+                { trigger: "gap", insertText: "gap: 8px;", label: "gap", priority: 93 },
+                { trigger: "padding", insertText: "padding: 8px;", label: "padding", priority: 92 },
+                { trigger: "margin", insertText: "margin: 8px;", label: "margin", priority: 91 },
+                { trigger: "radius", insertText: "border-radius: 8px;", label: "border-radius", priority: 90 },
+                { trigger: "shadow", insertText: "box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);", label: "box-shadow", priority: 88 },
+                { trigger: "transition", insertText: "transition: all 0.2s ease;", label: "transition", priority: 87 },
+                { trigger: "hover", insertText: "&:hover {\n    \n}", label: ":hover", cursorBack: 3, priority: 86 },
+                { trigger: "absolute", insertText: "position: absolute;", label: "position: absolute", priority: 85 },
+                { trigger: "relative", insertText: "position: relative;", label: "position: relative", priority: 84 },
+                { trigger: "fixed", insertText: "position: fixed;", label: "position: fixed", priority: 83 },
+                { trigger: "zindex", insertText: "z-index: 10;", label: "z-index", priority: 82 },
+                { trigger: "font", insertText: "font-size: 14px;\nfont-weight: 500;", label: "font", priority: 81 },
             ],
             ".json": [
                 { trigger: "pair", insertText: "\"key\": \"value\"", label: "\"key\": \"value\"", cursorBack: 10, priority: 98 },
                 { trigger: "object", insertText: "{\n  \"key\": \"value\"\n}", label: "{ ... }", cursorBack: 5, priority: 100 },
+                { trigger: "array", insertText: "[\n  \n]", label: "[ ... ]", cursorBack: 4, priority: 96 },
+                { trigger: "bool", insertText: "\"enabled\": true", label: "\"enabled\": true", priority: 95 },
+                { trigger: "null", insertText: "\"key\": null", label: "\"key\": null", priority: 94 },
+                { trigger: "num", insertText: "\"count\": 0", label: "\"count\": 0", priority: 93 },
+                { trigger: "list", insertText: "\"items\": []", label: "\"items\": []", priority: 92 },
+                { trigger: "meta", insertText: "\"meta\": {\n  \"created_at\": \"\",\n  \"updated_at\": \"\"\n}", label: "\"meta\": { ... }", cursorBack: 29, priority: 91 },
             ],
             ".html": [
                 { trigger: "doctype", insertText: "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title></title>\n</head>\n<body>\n  \n</body>\n</html>", label: "HTML boilerplate", cursorBack: 92, priority: 95 },
                 { trigger: "div", insertText: "<div class=\"\">\n  \n</div>", label: "<div>", cursorBack: 12, priority: 100 },
+                { trigger: "a", insertText: "<a href=\"\"></a>", label: "<a>", cursorBack: 4, priority: 98 },
+                { trigger: "img", insertText: "<img src=\"\" alt=\"\">", label: "<img>", cursorBack: 8, priority: 97 },
+                { trigger: "script", insertText: "<script>\n\n</script>", label: "<script>", cursorBack: 10, priority: 96 },
+                { trigger: "style", insertText: "<style>\n\n</style>", label: "<style>", cursorBack: 9, priority: 95 },
+                { trigger: "linkcss", insertText: "<link rel=\"stylesheet\" href=\"\">", label: "<link stylesheet>", cursorBack: 2, priority: 94 },
+                { trigger: "meta", insertText: "<meta name=\"\" content=\"\">", label: "<meta>", cursorBack: 12, priority: 93 },
+                { trigger: "button", insertText: "<button type=\"button\"></button>", label: "<button>", cursorBack: 9, priority: 92 },
+                { trigger: "input", insertText: "<input type=\"text\" name=\"\" value=\"\">", label: "<input>", cursorBack: 10, priority: 91 },
+                { trigger: "form", insertText: "<form action=\"\" method=\"post\">\n  \n</form>", label: "<form>", cursorBack: 10, priority: 90 },
+                { trigger: "section", insertText: "<section>\n  \n</section>", label: "<section>", cursorBack: 12, priority: 89 },
+                { trigger: "header", insertText: "<header>\n  \n</header>", label: "<header>", cursorBack: 11, priority: 88 },
+                { trigger: "footer", insertText: "<footer>\n  \n</footer>", label: "<footer>", cursorBack: 11, priority: 87 },
+                { trigger: "main", insertText: "<main>\n  \n</main>", label: "<main>", cursorBack: 9, priority: 86 },
+                { trigger: "nav", insertText: "<nav>\n  \n</nav>", label: "<nav>", cursorBack: 8, priority: 85 },
+                { trigger: "ul", insertText: "<ul>\n  <li></li>\n</ul>", label: "<ul><li>", cursorBack: 11, priority: 84 },
+                { trigger: "table", insertText: "<table>\n  <thead>\n    <tr><th></th></tr>\n  </thead>\n  <tbody>\n    <tr><td></td></tr>\n  </tbody>\n</table>", label: "<table>", cursorBack: 66, priority: 83 },
             ]
         };
+    }
+
+    const docsEditorCompletionExtensionAliasMap = {
+        ".ts": ".js",
+        ".tsx": ".js",
+        ".jsx": ".js",
+        ".mjs": ".js",
+        ".cjs": ".js",
+        ".htm": ".html",
+        ".yml": ".json",
+        ".yaml": ".json",
+    };
+
+    function resolveEditorCompletionItemsByExtension(extension) {
+        const completionMap = window.__docsEditorCompletionMap || {};
+        const normalized = String(extension || "").trim().toLowerCase();
+        if (normalized && Array.isArray(completionMap[normalized])) {
+            return completionMap[normalized];
+        }
+        const alias = docsEditorCompletionExtensionAliasMap[normalized];
+        if (alias && Array.isArray(completionMap[alias])) {
+            return completionMap[alias];
+        }
+        if (!normalized && Array.isArray(completionMap[".md"])) {
+            return completionMap[".md"];
+        }
+        return [];
     }
 
     function extractEditorCompletionToken(sourceText, cursorIndex) {
@@ -1177,8 +1315,7 @@
         }
 
         function findListEditorSuggestions(extension, tokenText) {
-            const completionMap = window.__docsEditorCompletionMap || {};
-            const items = completionMap[extension] || [];
+            const items = resolveEditorCompletionItemsByExtension(extension);
             return findEditorCompletionItems(items, tokenText, 8);
         }
 
@@ -4412,7 +4549,7 @@
         }
 
         function findEditorSuggestions(extension, tokenText) {
-            const items = editorCompletionMap[extension] || [];
+            const items = resolveEditorCompletionItemsByExtension(extension);
             return findEditorCompletionItems(items, tokenText, 8);
         }
 
@@ -5283,26 +5420,8 @@
             });
         });
 
-        if (contentInput && markdownSnippetMenu) {
-            contentInput.addEventListener("contextmenu", function (event) {
-                const visibleCount = syncSnippetMenuItemsByExtension(getCurrentEditorExtension());
-                if (visibleCount <= 0) {
-                    return;
-                }
-                event.preventDefault();
-                openMarkdownSnippetMenu(event.clientX, event.clientY);
-            });
-        }
-
-        document.addEventListener("click", function (event) {
-            if (!markdownSnippetMenu || markdownSnippetMenu.hidden) {
-                return;
-            }
-            if (event.target instanceof Element && markdownSnippetMenu.contains(event.target)) {
-                return;
-            }
-            closeMarkdownSnippetMenu();
-        });
+        // Editor right-click custom snippet menu removed:
+        // autocomplete now covers this role and native browser context menu is kept.
 
         if (markdownHelpBackdrop) {
             markdownHelpBackdrop.addEventListener("click", function () {
