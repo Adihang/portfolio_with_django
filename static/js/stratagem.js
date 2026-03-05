@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
         commandNumber.toString().split('').forEach(function(digit, index) {
             const img = document.createElement('img');
             const id = `${index}`; // ID 생성
-            img.src = `/media/icon/arrow${digit}.png`;
+            img.src = `/static/media/icon/arrow${digit}.png`;
             img.alt = `arrow ${digit}`;
             img.classList.add('commend_arrow');
             img.setAttribute('id', id); // ID 설정
@@ -140,16 +140,16 @@ document.addEventListener('keydown', async function(event) {
                     soundSelect = 1;
                 }
                 if (typecommand == command) {
-                    playSound('/media/mp3/stratagem/stratagem4.mp3')
+                    playSound('/static/media/mp3/stratagem/stratagem4.mp3')
                 }
             });
             // 모든 카드가 숨겨진 상태인지 확인하고, 그렇다면 typecommand를 빈 문자열로 설정합니다.
             if (allCardsHidden) { // 변수 이름 수정
                 const randomOption = Math.floor(Math.random() * 2);
                 if (randomOption === 0) {
-                    playSound('/media/mp3/stratagem/stratagem2.mp3')
+                    playSound('/static/media/mp3/stratagem/stratagem2.mp3')
                 } else {
-                    playSound('/media/mp3/stratagem/stratagem3.mp3')
+                    playSound('/static/media/mp3/stratagem/stratagem3.mp3')
                 }
                 typecommand = "";
                 const imgss = document.querySelectorAll('img');
@@ -172,7 +172,7 @@ document.addEventListener('keydown', async function(event) {
         });
         if (soundSelect == 1)
         {
-            await playSound('/media/mp3/stratagem/stratagem1.mp3')
+            await playSound('/static/media/mp3/stratagem/stratagem1.mp3')
         }
         if (typecommand != ""){
             find_remove_cards.forEach(function(card) {
@@ -212,4 +212,3 @@ document.addEventListener('keydown', async function(event) {
         }, 501);
     }
 });
-

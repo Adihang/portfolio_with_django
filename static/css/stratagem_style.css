@@ -153,22 +153,22 @@ title{
 } 
 .arrow-top {
     order: -1;
-    background-image: url('/media/icon/arrow5.png');
+    background-image: url('/static/media/icon/arrow5.png');
 }  
   
 .arrow-bottom {
     order: 0;
-    background-image: url('/media/icon/arrow2.png');
+    background-image: url('/static/media/icon/arrow2.png');
 }  
   
 .arrow-left {
     order: 0;
-    background-image: url('/media/icon/arrow1.png');
+    background-image: url('/static/media/icon/arrow1.png');
 }  
   
 .arrow-right {
     order: 0;
-    background-image: url('/media/icon/arrow3.png');
+    background-image: url('/static/media/icon/arrow3.png');
 }  
   
 .content {margin-top: 0px;margin-left: 0px;  
