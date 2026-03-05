@@ -1148,6 +1148,13 @@ body.theme-dark .root-search-submit-icon {
     appearance: none;
     width: 100%;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    gap: 0;
+    padding: 0;
+    line-height: 0;
 }
 
 .root-shortcuts-card.is-dragging .root-shortcuts-item {
@@ -1162,11 +1169,14 @@ body.theme-dark .root-search-submit-icon {
 }
 
 .root-shortcuts-plus-icon {
-    font-size: 40px;
+    font-size: 60px;
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-weight: 300;
     color: var(--site-text-subtle);
-    transform: translateY(-1px);
+    transform: translateY(-5px);
 }
 
 .root-shortcuts-icon {
