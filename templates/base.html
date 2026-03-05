@@ -1,12 +1,18 @@
 {% load static static_versioned %}
 
 <!doctype html>
-<html lang="{{ ui_lang|default:'ko' }}">
+<html lang="{{ ui_lang|default:'ko' }}" data-account-theme-mode="{{ account_theme_mode|default:'' }}">
 <head>
     <style data-surface-light="base-preload">
         html.preload-light-bg,
         html.preload-light-bg body {
             background: #ffffff;
+            background-image: none;
+        }
+
+        html.preload-dark-bg,
+        html.preload-dark-bg body {
+            background: #222222;
             background-image: none;
         }
     </style>
@@ -20,7 +26,35 @@
                 path.startsWith('/project/') ||
                 localizedLightBgPattern.test(path);
 
-            if (shouldUseLightBg) {
+            if (!shouldUseLightBg) {
+                return;
+            }
+
+            const accountThemeMode = (document.documentElement.getAttribute('data-account-theme-mode') || '').trim().toLowerCase();
+            let prefersDark = false;
+
+            if (accountThemeMode === 'dark') {
+                prefersDark = true;
+            } else if (accountThemeMode === 'light') {
+                prefersDark = false;
+            } else {
+                try {
+                    const storedThemeMode = window.localStorage.getItem('portfolio_theme_mode');
+                    if (storedThemeMode === 'dark') {
+                        prefersDark = true;
+                    } else if (storedThemeMode === 'light') {
+                        prefersDark = false;
+                    } else {
+                        prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    }
+                } catch (error) {
+                    prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                }
+            }
+
+            if (prefersDark) {
+                document.documentElement.classList.add('preload-dark-bg');
+            } else {
                 document.documentElement.classList.add('preload-light-bg');
             }
         })();
@@ -43,7 +77,8 @@
     <meta property="og:image" content="https://www.hanplanet.com/static/icons/hanplanet-og-1200.png">
     {% include "partials/pwa.html" %}
     {% include "partials/static_script_fallback.html" %}
-    <link rel="icon" href="{% static_v 'favicon.png' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static_v 'icons/hanplanet.svg' %}">
+    <link rel="icon" type="image/png" href="{% static_v 'icons/pwa-192.png' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/style.css' %}">
     <script src="{% static_v 'js/bootstrap.min.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
@@ -54,7 +89,12 @@
     <!-- CSRF Token for AJAX -->
     <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
-<body class="page {% block body_class %}{% endblock %}">
+<body
+    class="page {% block body_class %}{% endblock %}"
+    data-authenticated="{% if request.user.is_authenticated %}1{% else %}0{% endif %}"
+    data-theme-preference-url="{{ theme_preference_url|default:'' }}"
+    data-portfolio-owner-username="{{ portfolio_owner_username|default:'' }}"
+>
     <!-- 네비게이션바 -->
     <nav class="navbar ui-nav">
         <div class="container-fluid">

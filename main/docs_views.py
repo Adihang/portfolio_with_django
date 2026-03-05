@@ -6,7 +6,7 @@ import shutil
 import secrets
 from functools import wraps
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 import httpx
 
 from django import forms
@@ -1591,6 +1591,10 @@ def _verify_docs_login_captcha_answer(request) -> bool:
 
 
 def _resolve_docs_post_login_url(request, ui_lang: str | None, fallback_next_url: str, user) -> str:
+    fallback_path = urlparse(str(fallback_next_url or "")).path
+    if fallback_path and not re.match(r"^/(?:(ko|en)/)?(?:docs|ide)(/|$)", fallback_path):
+        return fallback_next_url
+
     if user and user.is_authenticated and user.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists():
         username = str(user.get_username() or "").strip()
         if username:

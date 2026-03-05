@@ -1,5 +1,21 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Career, Hobby, NavLink, Project, QuickLink, Stratagem, Stratagem_Hero_Score
+from django.contrib.auth import get_user_model
+from .forms import PortfolioActionButtonForm, PortfolioCareerForm, PortfolioProfileForm, PortfolioProjectForm
+from .models import (
+    Career,
+    Hobby,
+    NavLink,
+    PortfolioActionButton,
+    PortfolioCareer,
+    PortfolioProfile,
+    PortfolioProject,
+    Project_Tag,
+    Project,
+    QuickLink,
+    Stratagem,
+    Stratagem_Hero_Score,
+    UserProfile,
+)
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
@@ -20,7 +36,11 @@ import httpx
 from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Max
 from django.db import transaction
-from urllib.parse import urlparse
+from django.templatetags.static import static
+from urllib.parse import quote, urlparse
+from types import SimpleNamespace
+
+PORTFOLIO_DEFAULT_USERNAME = "HanbyelLim"
 
 MARKDOWN_EXTENSIONS = ["nl2br", "sane_lists", "tables", "fenced_code"]
 SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
@@ -40,6 +60,11 @@ IDENTITY_IMPERSONATION_PATTERNS = [
 FENCED_BLOCK_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})")
 FENCED_BLOCK_START_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<fence>`{3,}|~{3,})(?P<info>[^\n]*)$")
 FENCED_BLOCK_END_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*$")
+
+
+class _DummyTagRelation:
+    def all(self):
+        return []
 
 
 def _build_fenced_code_html(info: str, code_lines: list[str], base_indent: str) -> str:
@@ -282,6 +307,17 @@ def apply_ui_context(request, context, ui_lang):
     context["show_chat_widget"] = False
     context["lang_switch_ko_url"] = build_lang_switch_url(request, "ko")
     context["lang_switch_en_url"] = build_lang_switch_url(request, "en")
+    context["account_theme_mode"] = ""
+    context["theme_preference_url"] = build_localized_url(request, "main:theme_preference_lang")
+    portfolio_nav_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
+    if request.user.is_authenticated:
+        account_theme_mode = (
+            UserProfile.objects.filter(user=request.user)
+            .values_list("theme_mode", flat=True)
+            .first()
+        )
+        if account_theme_mode in ("light", "dark"):
+            context["account_theme_mode"] = account_theme_mode
     try:
         nav_links = list(NavLink.objects.all())
         removed_nav_names = {"github", "thingiverse"}
@@ -292,13 +328,38 @@ def apply_ui_context(request, context, ui_lang):
                 link.name = "IDE"
             if url_value.startswith("/docs"):
                 link.url = "/ide" + url_value[len("/docs"):]
-        context["nav_links"] = [
+        resolved_links = [
             link for link in nav_links
             if str(getattr(link, "name", "") or "").strip().lower() not in removed_nav_names
         ]
+        portfolio_candidates = [
+            link for link in resolved_links
+            if str(getattr(link, "name", "") or "").strip().lower() == "portfolio"
+        ]
+        resolved_links = [
+            link for link in resolved_links
+            if str(getattr(link, "name", "") or "").strip().lower() != "portfolio"
+        ]
+        portfolio_link = portfolio_candidates[0] if portfolio_candidates else {"name": "Portfolio", "url": portfolio_nav_url}
+        try:
+            portfolio_link.url = portfolio_nav_url
+        except AttributeError:
+            portfolio_link["url"] = portfolio_nav_url
+
+        ide_index = next(
+            (
+                index for index, link in enumerate(resolved_links)
+                if str(getattr(link, "name", "") if not isinstance(link, dict) else link.get("name", "")).strip().lower() == "ide"
+            ),
+            -1,
+        )
+        insert_index = ide_index + 1 if ide_index >= 0 else len(resolved_links)
+        resolved_links.insert(insert_index, portfolio_link)
+        context["nav_links"] = resolved_links
     except (OperationalError, ProgrammingError):
         context["nav_links"] = [
             {"name": "IDE", "url": "/ide/list"},
+            {"name": "Portfolio", "url": portfolio_nav_url},
             {"name": "Mini Game", "url": "/fun/minigame/"},
         ]
 
@@ -322,12 +383,35 @@ def redirect_to_localized_route(request, route_name, **kwargs):
     return redirect(build_localized_url(request, route_name, **kwargs))
 
 
+def _redirect_to_docs_login_with_next(request):
+    next_path = request.get_full_path() or "/"
+    encoded_next = quote(next_path, safe="/")
+    return redirect(f"/docs/login/?next={encoded_next}")
+
+
 def main_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:main_lang")
+    return portfolio_root_redirect(request)
+
+
+def portfolio_user_legacy_redirect(request, user_id):
+    return redirect_to_localized_route(request, "main:portfolio_user_lang", user_id=user_id)
+
+
+def portfolio_write_legacy_redirect(request):
+    return redirect_to_localized_route(request, "main:portfolio_write_lang")
 
 
 def project_detail_legacy_redirect(request, project_id):
     return redirect_to_localized_route(request, "main:ProjectDetail_lang", project_id=project_id)
+
+
+def project_detail_user_legacy_redirect(request, user_id, project_number):
+    return redirect_to_localized_route(
+        request,
+        "main:ProjectDetail_user_lang",
+        user_id=user_id,
+        project_number=project_number,
+    )
 
 
 def salvations_edge_legacy_redirect(request, ui_lang=None):
@@ -404,6 +488,7 @@ def none(request, ui_lang=None):
     apply_ui_context(request, context, resolved_lang)
     context["docs_login_url"] = reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang})
     context["docs_signup_url"] = reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang})
+    context["docs_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
     return render(request, 'none.html', context)
 
 
@@ -511,40 +596,316 @@ self.addEventListener('fetch', (event) => {
     return response
 
 
-def main(request, ui_lang=None):
-    context = dict()
-    resolved_lang = resolve_ui_lang(request, ui_lang)
-    apply_ui_context(request, context, resolved_lang)
-    context["show_chat_widget"] = True
+def _get_portfolio_owner(username):
+    user_model = get_user_model()
+    normalized_username = str(username or "").strip()
+    if not normalized_username:
+        normalized_username = PORTFOLIO_DEFAULT_USERNAME
+    user, _ = user_model.objects.get_or_create(username=normalized_username)
+    return user
 
-    careers = list(Career.objects.all().order_by('-order', '-id'))
+
+def _build_portfolio_view_context(request, ui_lang, owner):
+    context = {}
+    apply_ui_context(request, context, ui_lang)
+    context["show_chat_widget"] = True
+    context["portfolio_owner_username"] = owner.username
+
+    profile, _ = PortfolioProfile.objects.get_or_create(user=owner)
+    if ui_lang == "en" and bool((profile.main_title_en or "").strip()):
+        profile_main_title_source = profile.main_title_en
+    elif bool((profile.main_title or "").strip()):
+        profile_main_title_source = profile.main_title
+    elif ui_lang == "en":
+        profile_main_title_source = "Problem-solving full-stack developer, **Your Name**."
+    else:
+        profile_main_title_source = "문제를 해결하는 풀스택 개발자, **홍길동** 입니다."
+
+    if ui_lang == "en" and bool((profile.main_subtitle_en or "").strip()):
+        profile_main_subtitle_source = profile.main_subtitle_en
+    elif bool((profile.main_subtitle or "").strip()):
+        profile_main_subtitle_source = profile.main_subtitle
+    elif ui_lang == "en":
+        profile_main_subtitle_source = (
+            "I approach unfamiliar work by learning quickly and shipping practical results.\n\n"
+            "I communicate clearly, prioritize impact, and keep improving systems over time."
+        )
+    else:
+        profile_main_subtitle_source = (
+            "낯선 과제도 빠르게 배우고 실용적인 결과를 만드는 개발자입니다.\n\n"
+            "명확하게 소통하고, 영향도가 큰 문제부터 해결하며, 시스템을 꾸준히 개선합니다."
+        )
+
+    context["portfolio_owner"] = owner
+    context["portfolio_profile"] = profile
+    context["profile_image_url"] = profile.profile_img.url if profile.profile_img else static("icons/hanplanet.svg")
+    context["profile_main_title_html"] = render_markdown_with_raw_html(profile_main_title_source)
+    context["profile_main_subtitle_html"] = render_markdown_with_raw_html(profile_main_subtitle_source)
+    context["profile_phone_display"] = str(profile.phone or "").strip() or "+82-10-0000-0000"
+    context["profile_email_display"] = str(profile.email or "").strip() or "your.email@example.com"
+    context["show_hobbys"] = owner.username == PORTFOLIO_DEFAULT_USERNAME
+    is_own_portfolio = bool(
+        request.user.is_authenticated
+        and str(request.user.username or "") == str(owner.username or "")
+    )
+    context["is_own_portfolio"] = is_own_portfolio
+    context["portfolio_write_url"] = (
+        reverse("main:portfolio_write_lang", kwargs={"ui_lang": ui_lang}) if is_own_portfolio else ""
+    )
+
+    careers = list(PortfolioCareer.objects.filter(user=owner).order_by("-order", "-id"))
     for career in careers:
-        use_english_content = resolved_lang == "en" and bool((career.content_en or "").strip())
-        use_english_company = resolved_lang == "en" and bool((career.company_en or "").strip())
+        use_english_content = ui_lang == "en" and bool((career.content_en or "").strip())
+        use_english_company = ui_lang == "en" and bool((career.company_en or "").strip())
         career.display_company = career.company_en if use_english_company else career.company
         career.display_content = render_markdown_safely(career.content_en if use_english_content else career.content)
         if career.is_currently_employed:
-            career.display_period_text = "Current" if resolved_lang == "en" else "재직중"
+            career.display_period_text = "Current" if ui_lang == "en" else "재직중"
         else:
             career.display_period_text = (
-                career.display_period_en_rounded
-                if resolved_lang == "en"
-                else career.display_period_rounded
+                career.display_period_en_rounded if ui_lang == "en" else career.display_period_rounded
             )
-        if resolved_lang == "en":
+        if ui_lang == "en":
             effective_leave_date = career.effective_leave_date
             career.display_date_range = f"{career.join_date:%Y-%m-%d} ~ {effective_leave_date:%Y-%m-%d}"
         else:
             career.display_date_range = career.formatted_date_range
+    if not careers:
+        careers = [
+            SimpleNamespace(
+                display_company="Sample Company" if ui_lang == "en" else "샘플 회사",
+                display_date_range="2024-01-01 ~ 2025-12-31" if ui_lang == "en" else "2024년 1월 1일 ~ 2025년 12월 31일",
+                display_period_text="2 year" if ui_lang == "en" else "2년",
+                position="Full-stack Developer" if ui_lang == "en" else "풀스택 개발자",
+                display_content=render_markdown_safely(
+                    "Built and improved web services across backend, frontend, and operations."
+                    if ui_lang == "en"
+                    else "백엔드, 프론트엔드, 운영 전반에서 웹 서비스를 개발하고 개선했습니다."
+                ),
+            )
+        ]
     context["careers"] = careers
 
-    projects = list(Project.objects.all().order_by('-create_date'))
+    projects = list(PortfolioProject.objects.filter(user=owner).order_by("-create_date", "-id"))
     for project in projects:
-        use_english_title = resolved_lang == "en" and bool((project.title_en or "").strip())
+        use_english_title = ui_lang == "en" and bool((project.title_en or "").strip())
         project.display_title = project.title_en if use_english_title else project.title
+    if not projects:
+        projects = [
+            SimpleNamespace(
+                is_dummy=True,
+                dummy_href="#",
+                banner_img=None,
+                dummy_banner_url=static("icons/hanplanet-og-1200.png"),
+                display_title="Sample Project" if ui_lang == "en" else "샘플 프로젝트",
+                tags=_DummyTagRelation(),
+            )
+        ]
     context["projects"] = projects
-    context['hobbys'] = Hobby.objects.all()
-    return render(request, 'main.html', context)
+    context["hobbys"] = Hobby.objects.all()
+
+    action_buttons = list(PortfolioActionButton.objects.filter(user=owner).order_by("order", "id")[:3])
+    context["portfolio_action_buttons"] = action_buttons
+    return context
+
+
+def _portfolio_write_redirect_with_status(request, status):
+    redirect_url = build_localized_url(request, "main:portfolio_write_lang")
+    separator = "&" if "?" in redirect_url else "?"
+    return redirect(f"{redirect_url}{separator}status={status}")
+
+
+def _ensure_authenticated_for_write(request):
+    if request.user.is_authenticated:
+        return None
+    return _redirect_to_docs_login_with_next(request)
+
+
+def main(request, ui_lang=None):
+    return portfolio_root_redirect(request, ui_lang=ui_lang)
+
+
+def portfolio_root_redirect(request, ui_lang=None):
+    if not request.user.is_authenticated:
+        return _redirect_to_docs_login_with_next(request)
+
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    target_path = reverse(
+        "main:portfolio_user_lang",
+        kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+    )
+    query_params = request.GET.copy()
+    query_params.pop("lang", None)
+    query_string = query_params.urlencode()
+    if query_string:
+        target_path = f"{target_path}?{query_string}"
+    return redirect(target_path)
+
+
+def portfolio_user(request, user_id, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    owner = get_object_or_404(get_user_model(), username=user_id)
+    context = _build_portfolio_view_context(request, resolved_lang, owner)
+    return render(request, "main.html", context)
+
+
+@require_http_methods(["GET", "POST"])
+def portfolio_write(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    auth_redirect = _ensure_authenticated_for_write(request)
+    if auth_redirect is not None:
+        return auth_redirect
+
+    profile, _ = PortfolioProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        action = str(request.POST.get("action", "")).strip()
+
+        if action == "save_profile":
+            profile_form = PortfolioProfileForm(request.POST, request.FILES, instance=profile)
+            if profile_form.is_valid():
+                profile_form.save()
+                return _portfolio_write_redirect_with_status(request, "profile_saved")
+            return _portfolio_write_redirect_with_status(request, "profile_invalid")
+
+        if action in {"add_career", "update_career"}:
+            career_instance = None
+            if action == "update_career":
+                career_id = request.POST.get("career_id")
+                career_instance = get_object_or_404(PortfolioCareer, id=career_id, user=request.user)
+            career_form = PortfolioCareerForm(request.POST, instance=career_instance)
+            if career_form.is_valid():
+                career = career_form.save(commit=False)
+                career.user = request.user
+                if career.order is None:
+                    max_order = (
+                        PortfolioCareer.objects.filter(user=request.user).aggregate(max_value=Max("order")).get("max_value")
+                        or 0
+                    )
+                    career.order = max_order + 1
+                career.save()
+                return _portfolio_write_redirect_with_status(request, "career_saved")
+            return _portfolio_write_redirect_with_status(request, "career_invalid")
+
+        if action == "delete_career":
+            career_id = request.POST.get("career_id")
+            career = get_object_or_404(PortfolioCareer, id=career_id, user=request.user)
+            career.delete()
+            return _portfolio_write_redirect_with_status(request, "career_deleted")
+
+        if action in {"add_project", "update_project"}:
+            project_instance = None
+            if action == "update_project":
+                project_id = request.POST.get("project_id")
+                project_instance = get_object_or_404(PortfolioProject, id=project_id, user=request.user)
+            project_form = PortfolioProjectForm(request.POST, request.FILES, instance=project_instance)
+            if project_form.is_valid():
+                project = project_form.save(commit=False)
+                project.user = request.user
+                if project.order is None:
+                    max_order = (
+                        PortfolioProject.objects.filter(user=request.user).aggregate(max_value=Max("order")).get("max_value")
+                        or 0
+                    )
+                    project.order = max_order + 1
+                project.save()
+                project_form.save_m2m()
+                return _portfolio_write_redirect_with_status(request, "project_saved")
+            return _portfolio_write_redirect_with_status(request, "project_invalid")
+
+        if action == "delete_project":
+            project_id = request.POST.get("project_id")
+            project = get_object_or_404(PortfolioProject, id=project_id, user=request.user)
+            project.delete()
+            return _portfolio_write_redirect_with_status(request, "project_deleted")
+
+        if action in {"add_button", "update_button"}:
+            button_instance = None
+            if action == "add_button" and PortfolioActionButton.objects.filter(user=request.user).count() >= 3:
+                return _portfolio_write_redirect_with_status(request, "button_limit")
+            if action == "update_button":
+                button_id = request.POST.get("button_id")
+                button_instance = get_object_or_404(PortfolioActionButton, id=button_id, user=request.user)
+            button_form = PortfolioActionButtonForm(request.POST, instance=button_instance)
+            if button_form.is_valid():
+                button = button_form.save(commit=False)
+                button.user = request.user
+                button.save()
+                return _portfolio_write_redirect_with_status(request, "button_saved")
+            return _portfolio_write_redirect_with_status(request, "button_invalid")
+
+        if action == "delete_button":
+            button_id = request.POST.get("button_id")
+            button = get_object_or_404(PortfolioActionButton, id=button_id, user=request.user)
+            button.delete()
+            return _portfolio_write_redirect_with_status(request, "button_deleted")
+
+    status_map = {
+        "profile_saved": "프로필이 저장되었습니다.",
+        "profile_invalid": "프로필 입력값을 확인해주세요.",
+        "career_saved": "경력사항이 저장되었습니다.",
+        "career_invalid": "경력사항 입력값을 확인해주세요.",
+        "career_deleted": "경력사항이 삭제되었습니다.",
+        "project_saved": "프로젝트가 저장되었습니다.",
+        "project_invalid": "프로젝트 입력값을 확인해주세요.",
+        "project_deleted": "프로젝트가 삭제되었습니다.",
+        "button_saved": "버튼이 저장되었습니다.",
+        "button_invalid": "버튼 입력값을 확인해주세요.",
+        "button_deleted": "버튼이 삭제되었습니다.",
+        "button_limit": "버튼은 최대 3개까지 추가할 수 있습니다.",
+    }
+    status = str(request.GET.get("status", "")).strip()
+    careers_qs = PortfolioCareer.objects.filter(user=request.user).order_by("-order", "-id")
+    projects_qs = PortfolioProject.objects.filter(user=request.user).order_by("-create_date", "-id")
+
+    career_mode = "add" if str(request.GET.get("career_new", "")).strip() == "1" else "edit"
+    project_mode = "add" if str(request.GET.get("project_new", "")).strip() == "1" else "edit"
+
+    selected_career = None
+    selected_project = None
+
+    selected_career_id = None
+    selected_project_id = None
+
+    if career_mode != "add":
+        try:
+            selected_career_id = int(request.GET.get("career_id", "") or 0)
+        except (TypeError, ValueError):
+            selected_career_id = None
+        if selected_career_id:
+            selected_career = careers_qs.filter(id=selected_career_id).first()
+        if selected_career is None:
+            selected_career = careers_qs.first()
+            selected_career_id = selected_career.id if selected_career else None
+
+    if project_mode != "add":
+        try:
+            selected_project_id = int(request.GET.get("project_id", "") or 0)
+        except (TypeError, ValueError):
+            selected_project_id = None
+        if selected_project_id:
+            selected_project = projects_qs.filter(id=selected_project_id).first()
+        if selected_project is None:
+            selected_project = projects_qs.first()
+            selected_project_id = selected_project.id if selected_project else None
+
+    context = {
+        "write_status_message": status_map.get(status, ""),
+        "profile": profile,
+        "careers": careers_qs,
+        "projects": projects_qs,
+        "career_mode": career_mode,
+        "project_mode": project_mode,
+        "selected_career": selected_career,
+        "selected_project": selected_project,
+        "selected_career_id": selected_career_id,
+        "selected_project_id": selected_project_id,
+        "action_buttons": PortfolioActionButton.objects.filter(user=request.user).order_by("order", "id"),
+        "all_tags": Project_Tag.objects.all(),
+    }
+    apply_ui_context(request, context, resolved_lang)
+    context["show_chat_widget"] = False
+    return render(request, "main/portfolio_write.html", context)
 
 
 def ProjectDetail(request, project_id, ui_lang=None):
@@ -560,6 +921,24 @@ def ProjectDetail(request, project_id, ui_lang=None):
     project.content = render_markdown_with_raw_html(content_md)
     context["project"] = project
     return render(request, 'main/ProjectDetail.html', context)
+
+
+def ProjectDetailByUser(request, user_id, project_number, ui_lang=None):
+    context = dict()
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    apply_ui_context(request, context, resolved_lang)
+
+    owner = get_object_or_404(get_user_model(), username=user_id)
+    project = get_object_or_404(PortfolioProject, user=owner, number=project_number)
+    use_english_title = resolved_lang == "en" and bool((project.title_en or "").strip())
+    use_english_content = resolved_lang == "en" and bool((project.content_en or "").strip())
+    project.display_title = project.title_en if use_english_title else project.title
+    content_md = project.content_en if use_english_content else project.content
+    project.content = render_markdown_with_raw_html(content_md)
+    context["project"] = project
+    context["portfolio_owner"] = owner
+    context["portfolio_owner_username"] = owner.username
+    return render(request, "main/ProjectDetail.html", context)
 
 def ProjectComment_create(request, project_id, ui_lang=None):
     project = get_object_or_404(Project, pk=project_id)
@@ -620,6 +999,38 @@ def _root_shortcuts_unauthorized_message(ui_lang):
     return "Login required." if ui_lang == "en" else "로그인이 필요합니다."
 
 
+def _normalize_theme_mode(raw_mode):
+    value = str(raw_mode or "").strip().lower()
+    if value in ("light", "dark"):
+        return value
+    return ""
+
+
+@require_http_methods(["GET", "PATCH"])
+@csrf_protect
+def theme_preference(request, ui_lang=None):
+    resolve_ui_lang(request, ui_lang)
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Login required."}, status=401)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "GET":
+        mode = profile.theme_mode if profile.theme_mode in ("light", "dark") else None
+        return JsonResponse({"mode": mode}, status=200)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    mode = _normalize_theme_mode(payload.get("mode"))
+    profile.theme_mode = mode
+    profile.save(update_fields=["theme_mode", "updated_at"])
+    return JsonResponse({"mode": mode or None}, status=200)
+
+
 def _normalize_shortcut_url(raw_url):
     value = str(raw_url or "").strip()
     if not value:
@@ -642,6 +1053,24 @@ def _build_shortcut_icon_url(shortcut_url):
     if not host:
         return ""
     return f"https://www.google.com/s2/favicons?domain={host}&sz=64"
+
+
+def _build_shortcut_display_name(shortcut_url):
+    parsed = urlparse(shortcut_url)
+    host = (parsed.netloc or "").strip().lower()
+    if not host:
+        return "Shortcut"
+    if host.startswith("www."):
+        host = host[4:]
+    # Drop a single top-level domain label for cleaner auto-generated names.
+    # ex) youtube.com -> youtube, example.net -> example
+    if host and host != "localhost" and not re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host):
+        parts = [part for part in host.split(".") if part]
+        if len(parts) >= 2:
+            host = ".".join(parts[:-1])
+    if not host:
+        return "Shortcut"
+    return host[:1].upper() + host[1:]
 
 
 def _serialize_quick_link(quick_link):
@@ -674,14 +1103,14 @@ def root_shortcuts(request, ui_lang=None):
         return JsonResponse({"error": "Invalid request body."}, status=400)
 
     name = str(data.get("name", "")).strip()
-    if not name:
-        return JsonResponse({"error": "Name is required."}, status=400)
     if len(name) > 80:
         return JsonResponse({"error": "Name is too long."}, status=400)
 
     normalized_url = _normalize_shortcut_url(data.get("url", ""))
     if not normalized_url:
         return JsonResponse({"error": "Invalid URL."}, status=400)
+    if not name:
+        name = _build_shortcut_display_name(normalized_url)[:80]
 
     max_order = QuickLink.objects.filter(user=request.user).aggregate(max_value=Max("display_order"))["max_value"] or 0
     new_item = QuickLink.objects.create(
@@ -694,7 +1123,7 @@ def root_shortcuts(request, ui_lang=None):
     return JsonResponse({"item": _serialize_quick_link(new_item)}, status=201)
 
 
-@require_http_methods(["DELETE"])
+@require_http_methods(["DELETE", "PATCH"])
 @csrf_protect
 def root_shortcuts_detail(request, shortcut_id, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
@@ -706,8 +1135,31 @@ def root_shortcuts_detail(request, shortcut_id, ui_lang=None):
         )
 
     item = get_object_or_404(QuickLink, id=shortcut_id, user=request.user)
-    item.delete()
-    return JsonResponse({"deleted": True}, status=200)
+
+    if request.method == "DELETE":
+        item.delete()
+        return JsonResponse({"deleted": True}, status=200)
+
+    try:
+        data = json.loads(request.body or "{}")
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid request body."}, status=400)
+
+    name = str(data.get("name", "")).strip()
+    if len(name) > 80:
+        return JsonResponse({"error": "Name is too long."}, status=400)
+
+    normalized_url = _normalize_shortcut_url(data.get("url", ""))
+    if not normalized_url:
+        return JsonResponse({"error": "Invalid URL."}, status=400)
+    if not name:
+        name = _build_shortcut_display_name(normalized_url)[:80]
+
+    item.name = name
+    item.url = normalized_url
+    item.icon_url = ""
+    item.save(update_fields=["name", "url", "icon_url", "updated_at"])
+    return JsonResponse({"item": _serialize_quick_link(item)}, status=200)
 
 
 @require_http_methods(["POST"])
@@ -893,6 +1345,33 @@ def call_ollama(system_message, messages):
     data = response.json()
     return data.get("message", {}).get("content", "")
 
+
+PORTFOLIO_OWNER_PATH_PATTERN = re.compile(r"^/(?:ko|en)/portfolio/(?P<user_id>[A-Za-z0-9_.-]+)/?$")
+PROJECT_OWNER_PATH_PATTERN = re.compile(r"^/(?:ko|en)/project/(?P<user_id>[A-Za-z0-9_.-]+)/\d+/?$")
+
+
+def _resolve_chat_portfolio_owner(request, payload):
+    requested_username = str(payload.get("portfolio_owner_username", "") or "").strip()
+    if re.fullmatch(r"[A-Za-z0-9_.-]+", requested_username):
+        owner = get_user_model().objects.filter(username=requested_username).first()
+        if owner is not None:
+            return owner
+
+    referer = str(request.META.get("HTTP_REFERER", "") or "").strip()
+    if referer:
+        parsed = urlparse(referer)
+        referer_path = parsed.path or ""
+        for pattern in (PORTFOLIO_OWNER_PATH_PATTERN, PROJECT_OWNER_PATH_PATTERN):
+            matched = pattern.match(referer_path)
+            if matched:
+                referer_username = str(matched.group("user_id") or "").strip()
+                if re.fullmatch(r"[A-Za-z0-9_.-]+", referer_username):
+                    owner = get_user_model().objects.filter(username=referer_username).first()
+                    if owner is not None:
+                        return owner
+
+    return _get_portfolio_owner(PORTFOLIO_DEFAULT_USERNAME)
+
 @require_http_methods(["POST"])
 @csrf_protect
 def chat_with_ai(request, ui_lang=None):
@@ -934,38 +1413,41 @@ def chat_with_ai(request, ui_lang=None):
 
         chat_history = normalize_chat_history(raw_history, user_message)
         
-        # 캐시에서 웹사이트 컨텍스트 가져오기
-        website_context_cache_key = f"website_context_{ui_lang}"
+        portfolio_owner = _resolve_chat_portfolio_owner(request, data)
+        owner_name = str(portfolio_owner.username or "").strip() or PORTFOLIO_DEFAULT_USERNAME
+        owner_subject_ko = f"{owner_name}님"
+        owner_possessive_en = f"{owner_name}'s"
+        self_intro_en = f"I am Hanbot, an AI assistant that guides {owner_possessive_en} portfolio."
+        self_intro_ko = f"저는 {owner_subject_ko} 포트폴리오를 안내하는 AI 도우미 Hanbot입니다."
+
+        website_context_cache_key = f"website_context_{ui_lang}_{owner_name}"
         website_context = cache.get(website_context_cache_key)
-        
-        # 캐시에 없으면 새로 생성
+
         if website_context is None:
-            logger.info("캐시에 웹사이트 컨텍스트가 없어 새로 생성합니다.")
-            # 데이터베이스에서 프로젝트 및 경력 정보 가져오기
+            logger.info("포트폴리오 사용자 컨텍스트를 새로 생성합니다. owner=%s", owner_name)
             try:
-                # 프로젝트 정보
-                projects = Project.objects.all()
+                profile, _ = PortfolioProfile.objects.get_or_create(user=portfolio_owner)
+
+                projects = list(PortfolioProject.objects.filter(user=portfolio_owner).order_by("-create_date", "-id"))
                 project_list_items = []
                 for p in projects:
                     project_title = p.title_en if is_english_mode and (p.title_en or "").strip() else p.title
                     project_content = p.content_en if is_english_mode and (p.content_en or "").strip() else p.content
-                    detail_path = f"/{ui_lang}/project/{p.id}/"
                     preview = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", "", project_content or "")).strip()
-                    project_list_items.append(
-                        (
-                            f"- {project_title} (ID: {p.id}): {preview[:100]}... "
-                            f"(detail: {build_public_project_url(detail_path)})"
-                        ) if is_english_mode else (
-                            f"- {project_title} (ID: {p.id}): {preview[:100]}... "
-                            f"(자세히 보기: {build_public_project_url(detail_path)})"
+                    detail_path = f"/{ui_lang}/project/{owner_name}/{p.number}/"
+                    if is_english_mode:
+                        project_list_items.append(
+                            f"- {project_title} (No. {p.number}): {preview[:100]}... (detail: {build_public_project_url(detail_path)})"
                         )
-                    )
-                project_list = '\n'.join(project_list_items)
-                if not project_list:
-                    project_list = "- No project information available." if is_english_mode else "- 프로젝트 정보가 없습니다."
-                
-                # 경력 정보
-                careers = Career.objects.all()
+                    else:
+                        project_list_items.append(
+                            f"- {project_title} (번호: {p.number}): {preview[:100]}... (자세히 보기: {build_public_project_url(detail_path)})"
+                        )
+                project_list = "\n".join(project_list_items) or (
+                    "- No project information available." if is_english_mode else "- 프로젝트 정보가 없습니다."
+                )
+
+                careers = list(PortfolioCareer.objects.filter(user=portfolio_owner).order_by("-order", "-id"))
                 career_list_items = []
                 for c in careers:
                     company_name = c.company_en if is_english_mode and (c.company_en or "").strip() else c.company
@@ -977,98 +1459,96 @@ def chat_with_ai(request, ui_lang=None):
                         period_text = "재직중" if c.is_currently_employed else c.display_period_rounded
                         date_range = c.formatted_date_range
                     career_list_items.append(f"- {company_name}: {date_range} ({period_text}) {c.position}")
-                career_list = '\n'.join(career_list_items)
-                if not career_list:
-                    career_list = "- No career information available." if is_english_mode else "- 경력 정보가 없습니다."
-            except Exception as e:
-                logger.error(f"Error fetching data: {str(e)}")
+                career_list = "\n".join(career_list_items) or (
+                    "- No career information available." if is_english_mode else "- 경력 정보가 없습니다."
+                )
+
                 if is_english_mode:
+                    title_text = (profile.main_title_en or profile.main_title or "").strip() or "(empty)"
+                    subtitle_text = (profile.main_subtitle_en or profile.main_subtitle or "").strip() or "(empty)"
+                else:
+                    title_text = (profile.main_title or profile.main_title_en or "").strip() or "(비어 있음)"
+                    subtitle_text = (profile.main_subtitle or profile.main_subtitle_en or "").strip() or "(비어 있음)"
+                phone_text = str(profile.phone or "").strip() or ("(empty)" if is_english_mode else "(비어 있음)")
+                email_text = str(profile.email or "").strip() or ("(empty)" if is_english_mode else "(비어 있음)")
+
+                action_buttons = list(PortfolioActionButton.objects.filter(user=portfolio_owner).order_by("order", "id")[:3])
+                action_button_lines = []
+                for button in action_buttons:
+                    label = str(button.label or "").strip()
+                    url = str(button.url or "").strip()
+                    if label or url:
+                        action_button_lines.append(f"- {label}: {url}")
+                action_buttons_text = "\n".join(action_button_lines) or (
+                    "- No external links." if is_english_mode else "- 외부 링크 정보가 없습니다."
+                )
+            except Exception as e:
+                logger.error("Error fetching portfolio owner data: %s", str(e))
+                if is_english_mode:
+                    title_text = subtitle_text = phone_text = email_text = "(unavailable)"
                     project_list = "- Error occurred while loading project information."
                     career_list = "- Error occurred while loading career information."
+                    action_buttons_text = "- Error occurred while loading external links."
                 else:
+                    title_text = subtitle_text = phone_text = email_text = "(불러오기 실패)"
                     project_list = "- 프로젝트 정보를 불러오는 중 오류가 발생했습니다."
                     career_list = "- 경력 정보를 불러오는 중 오류가 발생했습니다."
-            
-            # 웹사이트 정보 컨텍스트 생성
+                    action_buttons_text = "- 외부 링크 정보를 불러오는 중 오류가 발생했습니다."
+
             if is_english_mode:
                 website_context = f"""
-        This website is Hanbyeol's portfolio website.
+        This website is {owner_name}'s portfolio website.
 
-        Main sections:
-        1. Home: Basic introduction
-        2. Portfolio: Project list
-        3. Tech Stack: Core technologies
-        4. Contact: Email and SNS links
-
-        Detailed project information is available in the portfolio section.
+        Profile:
+        - Main title: {title_text}
+        - Introduction: {subtitle_text}
+        - Phone: {phone_text}
+        - Email: {email_text}
 
         Project list:
         {project_list}
 
-        Tech stack:
-        - Backend: Python, Django, Django REST Framework
-        - Frontend: JavaScript, HTML5, CSS3, Bootstrap, Flutter
-        - Database: PostgreSQL, SQLite, MSSQL
-        - DevOps: Docker, AWS, GCP
-        - Tools: Git, GitHub, VS Code
-
-        Contact:
-        - Email: limhan456@naver.com
-        - GitHub: https://github.com/Adihang
-        - Thingiverse: https://www.thingiverse.com/hanbyel/designs
-        - Phone: 010-7935-3599
-
         Career:
         {career_list}
+
+        External links:
+        {action_buttons_text}
         """
             else:
                 website_context = f"""
-        이 웹사이트는 한별님의 포트폴리오 웹사이트입니다.
-        
-        주요 섹션:
-        1. 홈: 기본 소개와 인사말
-        2. 포트폴리오: 진행한 프로젝트 목록
-        3. 기술 스택: 주로 사용하는 프로그래밍 언어 및 기술
-        4. 연락처: 이메일 및 SNS 링크
-        
-        각 프로젝트에 대한 자세한 내용은 포트폴리오 섹션에서 확인하실 수 있습니다.
-        
+        이 웹사이트는 {owner_subject_ko} 포트폴리오 웹사이트입니다.
+
+        프로필:
+        - 메인 타이틀: {title_text}
+        - 자기소개: {subtitle_text}
+        - 전화번호: {phone_text}
+        - 이메일: {email_text}
+
         프로젝트 목록:
         {project_list}
-        
-        기술 스택:
-        - Backend: Python, Django, Django REST Framework
-        - Frontend: JavaScript, HTML5, CSS3, Bootstrap, Flutter
-        - Database: PostgreSQL, SQLite, MSSQL
-        - DevOps: Docker, AWS, GCP
-        - Tools: Git, GitHub, VS Code
-        
-        연락처 정보:
-        - 이메일: limhan456@naver.com
-        - GitHub: https://github.com/Adihang
-        - thingiverse: https://www.thingiverse.com/hanbyel/designs
-        - 전화번호: 010-7935-3599
-        
+
         경력:
         {career_list}
+
+        외부 링크:
+        {action_buttons_text}
         """
-            
-            # 캐시에 저장 (24시간 유지)
-            cache.set(website_context_cache_key, website_context, timeout=60*60*24)
+
+            cache.set(website_context_cache_key, website_context, timeout=60 * 60 * 24)
 
         # Prepare system message with context
         if is_english_mode:
             system_message = f"""
         [Role]
-        You are Hanbot, the dedicated assistant for Hanbyeol's portfolio website.
+        You are Hanbot, the dedicated assistant for {owner_name}'s portfolio website.
 
         [Identity Rules - Critical]
-        - You are NOT Hanbyeol (Lim Hanbyeol).
-        - Never introduce yourself as Hanbyeol.
-        - Never describe Hanbyeol's experience in first person.
-        - Always refer to Hanbyeol in third person.
+        - You are NOT {owner_name}.
+        - Never introduce yourself as {owner_name}.
+        - Never describe {owner_name}'s experience in first person.
+        - Always refer to {owner_name} in third person.
         - If self-introduction is needed, use this exact sentence:
-          "I am Hanbot, an AI assistant that guides Hanbyeol's portfolio."
+          "{self_intro_en}"
 
         [Language Rules - Highest Priority]
         - Answer in English only.
@@ -1102,16 +1582,16 @@ def chat_with_ai(request, ui_lang=None):
         else:
             system_message = f"""
         [역할]
-        당신은 한별님의 포트폴리오 웹사이트 전용 한국어 도우미입니다.
+        당신은 {owner_subject_ko} 포트폴리오 웹사이트 전용 한국어 도우미입니다.
         당신의 이름은 Hanbot입니다.
 
         [정체성 규칙 - 중요]
-        - 당신은 한별(임한별) 본인이 아닙니다.
-        - 자신을 "한별" 또는 "임한별"이라고 소개하지 않습니다.
-        - 1인칭으로 한별의 경력/프로젝트를 수행했다고 말하지 않습니다.
-        - 한별에 대한 설명은 항상 3인칭으로만 작성합니다. (예: "한별님은 ...")
+        - 당신은 {owner_name} 본인이 아닙니다.
+        - 자신을 "{owner_name}"이라고 소개하지 않습니다.
+        - 1인칭으로 {owner_name}의 경력/프로젝트를 수행했다고 말하지 않습니다.
+        - {owner_name}에 대한 설명은 항상 3인칭으로만 작성합니다. (예: "{owner_subject_ko} ...")
         - 자신 소개가 필요하면 아래 문장을 그대로 사용합니다.
-          "저는 한별님의 포트폴리오를 안내하는 AI 도우미 Hanbot입니다."
+          "{self_intro_ko}"
 
         [언어 규칙 - 최우선]
         - 모든 답변은 반드시 한국어로만 작성합니다.
@@ -1182,10 +1662,10 @@ def chat_with_ai(request, ui_lang=None):
                     당신은 포트폴리오 도우미입니다.
                     반드시 한국어(한글)로만 답변하세요.
                     영어/일본어/중국어/태국어 등 외국어는 절대 사용하지 마세요.
-                    당신은 한별(임한별) 본인이 아닙니다.
-                    절대 "저는 한별"이라고 말하지 마세요.
-                    한별 관련 설명은 3인칭("한별님은 ...")으로만 작성하세요.
-                    자신 소개가 필요하면 "저는 한별님의 포트폴리오를 안내하는 AI 도우미 Hanbot입니다."라고 답하세요.
+                    당신은 {owner_name} 본인이 아닙니다.
+                    절대 "저는 {owner_name}"이라고 말하지 마세요.
+                    {owner_name} 관련 설명은 3인칭("{owner_subject_ko} ...")으로만 작성하세요.
+                    자신 소개가 필요하면 "{self_intro_ko}"라고 답하세요.
                     포트폴리오 범위(프로젝트, 기술, 경력, 연락처)만 답변하세요.
                     컨텍스트:
                     {website_context}
@@ -1228,11 +1708,11 @@ def chat_with_ai(request, ui_lang=None):
                     hard_system_message = f"""
                     You are a portfolio assistant.
                     Answer in English only.
-                    You are NOT Hanbyeol.
-                    Never say "I am Hanbyeol."
-                    Refer to Hanbyeol only in third person.
+                    You are NOT {owner_name}.
+                    Never say "I am {owner_name}."
+                    Refer to {owner_name} only in third person.
                     If self-introduction is needed, say:
-                    "I am Hanbot, an AI assistant that guides Hanbyeol's portfolio."
+                    "{self_intro_en}"
                     Answer only portfolio topics (projects, skills, career, contact).
                     Context:
                     {website_context}
@@ -1260,11 +1740,11 @@ def chat_with_ai(request, ui_lang=None):
                 identity_rewrite_system_message = f"""
                 You are a response fixer.
                 Keep the meaning of the answer, but enforce these rules:
-                - Never pretend to be Hanbyeol.
-                - Never say "I am Hanbyeol."
-                - Refer to Hanbyeol only in third person.
+                - Never pretend to be {owner_name}.
+                - Never say "I am {owner_name}."
+                - Refer to {owner_name} only in third person.
                 - If self-introduction is needed, use:
-                  "I am Hanbot, an AI assistant that guides Hanbyeol's portfolio."
+                  "{self_intro_en}"
                 - Output in English only.
                 Portfolio context:
                 {website_context}
@@ -1277,10 +1757,10 @@ def chat_with_ai(request, ui_lang=None):
                 identity_rewrite_system_message = f"""
                 당신은 응답 교정기입니다.
                 입력 답변의 의미를 유지하되 아래 규칙을 반드시 지켜 다시 작성하세요.
-                - 절대 한별(임한별) 본인인 척하지 마세요.
-                - "저는 한별", "제가 한별" 같은 표현을 금지합니다.
-                - 한별 관련 설명은 3인칭("한별님은 ...")으로만 작성하세요.
-                - 자신 소개가 필요하면 "저는 한별님의 포트폴리오를 안내하는 AI 도우미 Hanbot입니다."를 사용하세요.
+                - 절대 {owner_name} 본인인 척하지 마세요.
+                - "저는 {owner_name}", "제가 {owner_name}" 같은 표현을 금지합니다.
+                - {owner_name} 관련 설명은 3인칭("{owner_subject_ko} ...")으로만 작성하세요.
+                - 자신 소개가 필요하면 "{self_intro_ko}"를 사용하세요.
                 - 반드시 한국어로만 출력하세요.
                 포트폴리오 컨텍스트:
                 {website_context}
@@ -1301,24 +1781,24 @@ def chat_with_ai(request, ui_lang=None):
                 else:
                     if is_english_mode:
                         bot_response = (
-                            "I am Hanbot, an AI assistant that guides Hanbyeol's portfolio. "
+                            f"{self_intro_en} "
                             "I can help with portfolio-related questions."
                         )
                     else:
                         bot_response = (
-                            "저는 한별님의 포트폴리오를 안내하는 AI 도우미 Hanbot입니다. "
+                            f"{self_intro_ko} "
                             "포트폴리오 관련 질문에 대해 안내해드릴게요."
                         )
             except Exception as e:
                 logger.error(f"Error during identity rewrite fallback: {str(e)}")
                 if is_english_mode:
                     bot_response = (
-                        "I am Hanbot, an AI assistant that guides Hanbyeol's portfolio. "
+                        f"{self_intro_en} "
                         "I can help with portfolio-related questions."
                     )
                 else:
                     bot_response = (
-                        "저는 한별님의 포트폴리오를 안내하는 AI 도우미 Hanbot입니다. "
+                        f"{self_intro_ko} "
                         "포트폴리오 관련 질문에 대해 안내해드릴게요."
                     )
                 

@@ -26,6 +26,12 @@
         ? Array.from(themeToggle.querySelectorAll('.ui-control-link[data-theme-mode]'))
         : [];
     const THEME_MODE_STORAGE_KEY = 'portfolio_theme_mode';
+    const SYSTEM_DARK_MEDIA_QUERY = '(prefers-color-scheme: dark)';
+    const ACCOUNT_THEME_MODE_KEY = (document.documentElement.dataset.accountThemeMode || '').trim().toLowerCase();
+    const THEME_PREFERENCE_URL = (document.body.dataset.themePreferenceUrl || '').trim();
+    const IS_AUTHENTICATED_USER = document.body.dataset.authenticated === '1';
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const CSRF_TOKEN = csrfMeta ? csrfMeta.getAttribute('content') : '';
     const printSurfaceSnapshot = {
         active: false,
         htmlStyle: null,
@@ -36,6 +42,7 @@
 
     let currentSurfaceMode = null;
     let manualThemeMode = null;
+    let followsSystemTheme = false;
 
     // 메뉴바 스크롤 관련 변수
     const navbar = document.querySelector('.ui-nav');
@@ -185,6 +192,17 @@
         return null;
     };
 
+    // 계정에 저장된 테마 모드를 읽어오는 함수
+    const readAccountThemeMode = function () {
+        if (ACCOUNT_THEME_MODE_KEY === 'dark') {
+            return true;
+        }
+        if (ACCOUNT_THEME_MODE_KEY === 'light') {
+            return false;
+        }
+        return null;
+    };
+
     // 테마 모드를 로컬 스토리지에 저장하는 함수
     const persistThemeMode = function (darkMode) {
         try {
@@ -198,6 +216,32 @@
             }
             window.localStorage.removeItem(THEME_MODE_STORAGE_KEY);
         } catch (error) {}
+    };
+
+    // 시스템 테마 선호도를 읽어오는 함수
+    const readSystemThemeMode = function () {
+        if (!window.matchMedia) {
+            return false;
+        }
+        return window.matchMedia(SYSTEM_DARK_MEDIA_QUERY).matches;
+    };
+
+    // 계정 테마 설정을 서버에 저장하는 함수
+    const persistThemeModeToAccount = function (darkMode) {
+        if (!IS_AUTHENTICATED_USER || !THEME_PREFERENCE_URL || !window.fetch || !CSRF_TOKEN) {
+            return;
+        }
+
+        const modeValue = darkMode ? 'dark' : 'light';
+        window.fetch(THEME_PREFERENCE_URL, {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify({ mode: modeValue })
+        }).catch(function () {});
     };
 
     // 테마 토글 버튼 상태를 동기화하는 함수
@@ -228,7 +272,9 @@
         const surfaceColor = useDarkTheme ? SURFACE_COLOR.dark : SURFACE_COLOR.light;
         if (useDarkTheme) {
             document.documentElement.classList.remove('preload-light-bg');
+            document.documentElement.classList.add('preload-dark-bg');
         } else {
+            document.documentElement.classList.remove('preload-dark-bg');
             document.documentElement.classList.add('preload-light-bg');
         }
         setLightSurfaceStylesEnabled(!useDarkTheme);
@@ -257,14 +303,41 @@
 
     // 수동 테마 모드를 설정하는 함수
     const setManualThemeMode = function (useDarkTheme) {
+        followsSystemTheme = false;
         manualThemeMode = Boolean(useDarkTheme);
         persistThemeMode(manualThemeMode);
+        persistThemeModeToAccount(manualThemeMode);
         applyThemeMode();
     };
 
-    manualThemeMode = readStoredThemeMode();
+    manualThemeMode = readAccountThemeMode();
+    if (manualThemeMode !== null) {
+        persistThemeMode(manualThemeMode);
+    }
     if (manualThemeMode === null) {
-        manualThemeMode = false;
+        manualThemeMode = readStoredThemeMode();
+    }
+    if (manualThemeMode === null) {
+        followsSystemTheme = true;
+        manualThemeMode = readSystemThemeMode();
+    }
+
+    if (window.matchMedia) {
+        const systemThemeMediaQuery = window.matchMedia(SYSTEM_DARK_MEDIA_QUERY);
+        const handleSystemThemeChange = function (event) {
+            if (!followsSystemTheme) {
+                return;
+            }
+
+            manualThemeMode = Boolean(event.matches);
+            applyThemeMode();
+        };
+
+        if (typeof systemThemeMediaQuery.addEventListener === 'function') {
+            systemThemeMediaQuery.addEventListener('change', handleSystemThemeChange);
+        } else if (typeof systemThemeMediaQuery.addListener === 'function') {
+            systemThemeMediaQuery.addListener(handleSystemThemeChange);
+        }
     }
 
     themeToggleButtons.forEach(function (button) {

@@ -12,11 +12,21 @@ from django.utils import timezone
 import json
 from datetime import date
 
-from .models import Career, DocsAccessRule, NavLink, Stratagem_Hero_Score
+from .models import (
+    Career,
+    DocsAccessRule,
+    NavLink,
+    PortfolioActionButton,
+    PortfolioCareer,
+    PortfolioProfile,
+    PortfolioProject,
+    Stratagem_Hero_Score,
+)
 from .docs_views import (
     DOCS_EDIT_PERMISSION_CODE,
     DOCS_EDITOR_GROUP_NAME,
     DOCS_PUBLIC_WRITE_GROUP_NAME,
+    _resolve_docs_post_login_url,
     get_docs_public_write_group,
     is_docs_editor,
 )
@@ -233,19 +243,182 @@ class LanguageUrlRoutingTests(TestCase):
         response = self.client.get("/portfolio/?tab=projects", HTTP_ACCEPT_LANGUAGE="en-US,en;q=0.9")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/en/portfolio/?tab=projects")
+        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/%3Ftab%3Dprojects")
 
     def test_legacy_portfolio_redirects_to_ko_when_accept_language_missing(self):
         response = self.client.get("/portfolio/", HTTP_ACCEPT_LANGUAGE="")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/ko/portfolio/")
+        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
 
     def test_legacy_portfolio_redirects_to_en_for_non_korean_language(self):
         response = self.client.get("/portfolio/", HTTP_ACCEPT_LANGUAGE="ja-JP,ja;q=0.9")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/en/portfolio/")
+        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
+
+
+class PortfolioPerUserRoutingTests(TestCase):
+    def setUp(self):
+        self.user_model = get_user_model()
+        self.owner, _ = self.user_model.objects.get_or_create(username="HanbyelLim")
+        self.owner.set_password("pw12345")
+        self.owner.save(update_fields=["password"])
+        self.other = self.user_model.objects.create_user(username="GuestUser", password="pw12345")
+
+        PortfolioActionButton.objects.filter(user=self.owner).delete()
+        PortfolioCareer.objects.filter(user=self.owner).delete()
+        PortfolioProject.objects.filter(user=self.owner).delete()
+        PortfolioProfile.objects.filter(user=self.owner).delete()
+
+        PortfolioProfile.objects.create(
+            user=self.owner,
+            main_title="Owner **Title**",
+            main_title_en="Owner Title EN",
+            phone="010-1111-2222",
+            email="owner@example.com",
+            main_subtitle="Owner Subtitle",
+            main_subtitle_en="Owner Subtitle EN",
+        )
+        PortfolioProfile.objects.create(
+            user=self.other,
+            main_title="Guest Title",
+            phone="010-9999-8888",
+            email="guest@example.com",
+            main_subtitle="Guest Subtitle",
+        )
+        PortfolioCareer.objects.create(
+            user=self.owner,
+            order=1,
+            company="Owner Company",
+            position="Developer",
+            content="Owner career",
+            join_date=date(2024, 1, 1),
+        )
+        self.project = PortfolioProject.objects.create(
+            user=self.owner,
+            number=1,
+            title="Owner Project",
+            content="Owner project content",
+            create_date=date(2024, 2, 1),
+        )
+        PortfolioActionButton.objects.create(
+            user=self.owner,
+            order=1,
+            label="GitHub",
+            url="https://github.com/",
+        )
+
+    def test_portfolio_user_url_renders_target_user_data(self):
+        response = self.client.get("/ko/portfolio/HanbyelLim/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Owner <strong>Title</strong>", html=False)
+        self.assertContains(response, "Owner Company")
+
+    def test_project_detail_user_url_renders_project(self):
+        response = self.client.get(f"/ko/project/HanbyelLim/{self.project.number}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Owner Project")
+
+    def test_english_portfolio_uses_profile_english_fields(self):
+        response = self.client.get("/en/portfolio/HanbyelLim/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Owner Title EN")
+        self.assertContains(response, "Owner Subtitle EN")
+
+    def test_main_hobbys_visible_only_for_default_owner(self):
+        owner_response = self.client.get("/ko/portfolio/HanbyelLim/")
+        guest_response = self.client.get("/ko/portfolio/GuestUser/")
+
+        self.assertContains(owner_response, "main_hobbys", html=False)
+        self.assertNotContains(guest_response, "main_hobbys", html=False)
+
+    def test_portfolio_write_shows_selectable_list_and_add_mode(self):
+        self.client.login(username="HanbyelLim", password="pw12345")
+
+        response = self.client.get("/ko/portfolio/write/?career_new=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "+ 경력사항 추가")
+        self.assertContains(response, "Owner Company")
+        self.assertContains(response, 'value="add_career"', html=False)
+
+    def test_logged_in_user_redirects_from_localized_portfolio_to_own_page(self):
+        self.client.login(username="GuestUser", password="pw12345")
+
+        response = self.client.get("/ko/portfolio/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/portfolio/GuestUser/")
+
+    def test_logged_in_user_redirects_from_legacy_portfolio_to_own_page(self):
+        self.client.login(username="GuestUser", password="pw12345")
+
+        response = self.client.get("/portfolio/?tab=projects")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/portfolio/GuestUser/?tab=projects")
+
+    def test_unauthenticated_user_redirects_from_localized_portfolio_to_login(self):
+        response = self.client.get("/ko/portfolio/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/docs/login/?next=/ko/portfolio/")
+
+    def test_unauthenticated_user_redirects_from_legacy_portfolio_to_login(self):
+        response = self.client.get("/portfolio/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
+
+    def test_own_portfolio_shows_edit_widget(self):
+        self.client.login(username="GuestUser", password="pw12345")
+
+        response = self.client.get("/ko/portfolio/GuestUser/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="own-portfolio-edit-widget ui-nav-link"', html=False)
+        self.assertContains(response, 'href="/ko/portfolio/write"', html=False)
+
+    def test_other_user_portfolio_hides_edit_widget(self):
+        self.client.login(username="GuestUser", password="pw12345")
+
+        response = self.client.get("/ko/portfolio/HanbyelLim/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="own-portfolio-edit-widget ui-nav-link"', html=False)
+
+    def test_root_page_shows_account_widget_in_nav_links_when_logged_in(self):
+        self.client.login(username="GuestUser", password="pw12345")
+
+        response = self.client.get("/ko/", HTTP_HOST="localhost")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-ide-auth-account", html=False)
+        self.assertContains(response, "data-root-nav-account-host", html=False)
+        self.assertContains(response, "GuestUser", html=False)
+
+    def test_non_root_page_does_not_render_root_account_widget(self):
+        self.client.login(username="GuestUser", password="pw12345")
+
+        response = self.client.get("/ko/portfolio/GuestUser/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "data-ide-auth-account", html=False)
+
+    def test_empty_portfolio_shows_dummy_data(self):
+        empty_user = self.user_model.objects.create_user(username="EmptyUser", password="pw12345")
+
+        response = self.client.get(f"/ko/portfolio/{empty_user.username}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "샘플 회사")
+        self.assertContains(response, "샘플 프로젝트")
+        self.assertContains(response, "+82-10-0000-0000")
+        self.assertContains(response, "your.email@example.com")
+        self.assertContains(response, "/static/icons/hanplanet.svg", html=False)
+        self.assertContains(response, "/static/icons/hanplanet-og-1200.png", html=False)
 
 
 class DocsEditorPermissionTests(TestCase):
@@ -318,6 +491,20 @@ class DocsAuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/ko/docs/list/")
         self.assertTrue("_auth_user_id" in self.client.session)
+
+    def test_resolve_docs_post_login_url_keeps_portfolio_next(self):
+        public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
+        self.user.groups.add(public_group)
+        request = RequestFactory().get("/ko/ide/login/")
+
+        resolved = _resolve_docs_post_login_url(
+            request,
+            "ko",
+            "/ko/portfolio/docs_login_user/",
+            self.user,
+        )
+
+        self.assertEqual(resolved, "/ko/portfolio/docs_login_user/")
 
     def test_docs_logout_clears_session(self):
         self.client.force_login(self.user)

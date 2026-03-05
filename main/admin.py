@@ -18,7 +18,23 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_markdown
-from .models import Career, DocsAccessRule, Hobby, NavLink, Project, Project_Tag, QuickLink, Stratagem, Stratagem_Class, Stratagem_Hero_Score
+from .models import (
+    Career,
+    DocsAccessRule,
+    Hobby,
+    NavLink,
+    PortfolioActionButton,
+    PortfolioCareer,
+    PortfolioProfile,
+    PortfolioProject,
+    Project,
+    Project_Tag,
+    QuickLink,
+    Stratagem,
+    Stratagem_Class,
+    Stratagem_Hero_Score,
+    UserProfile,
+)
 
 
 ADMIN_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "admin_login_captcha_question"
@@ -163,6 +179,45 @@ class QuickLinkAdmin(admin.ModelAdmin):
     list_filter = ["user"]
     search_fields = ["name", "url", "user__username"]
     ordering = ["user__username", "display_order", "id"]
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ["user", "theme_mode", "updated_at"]
+    list_filter = ["theme_mode"]
+    search_fields = ["user__username"]
+    ordering = ["user__username"]
+
+
+@admin.register(PortfolioProfile)
+class PortfolioProfileAdmin(admin.ModelAdmin):
+    list_display = ["user", "phone", "email", "updated_at"]
+    search_fields = ["user__username", "phone", "email", "main_title"]
+    ordering = ["user__username"]
+
+
+@admin.register(PortfolioCareer)
+class PortfolioCareerAdmin(admin.ModelAdmin):
+    list_display = ["user", "company", "position", "join_date", "leave_date", "order"]
+    search_fields = ["user__username", "company", "position"]
+    list_filter = ["user"]
+    ordering = ["user__username", "-order", "-id"]
+
+
+@admin.register(PortfolioProject)
+class PortfolioProjectAdmin(admin.ModelAdmin):
+    list_display = ["user", "number", "title", "create_date", "order"]
+    search_fields = ["user__username", "title", "title_en"]
+    list_filter = ["user"]
+    ordering = ["user__username", "-create_date", "-id"]
+
+
+@admin.register(PortfolioActionButton)
+class PortfolioActionButtonAdmin(admin.ModelAdmin):
+    list_display = ["user", "order", "label", "url", "updated_at"]
+    search_fields = ["user__username", "label", "url"]
+    list_filter = ["user"]
+    ordering = ["user__username", "order", "id"]
 
 
 @admin.register(DocsAccessRule)

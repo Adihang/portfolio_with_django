@@ -2,10 +2,33 @@
 {% load static_versioned %}
 {% block body_class %}root-page{% endblock %}
 {% block content %}
-<div class="root-shell-controls root-shell-controls-fixed" data-root-controls-host></div>
+<div class="root-shell-controls root-shell-controls-fixed" data-root-controls-host>
+    {% if request.user.is_authenticated %}
+    <div data-root-nav-account-host id="ide-auth-account-root">
+        <div class="ide-auth-account-floating" data-ide-auth-account>
+            <button
+                type="button"
+                class="ide-auth-account-trigger"
+                data-ide-logout-trigger
+                data-confirm-message="{% if ui_lang|default:'ko' == 'en' %}Do you want to log out?{% else %}로그아웃 하시겠습니까?{% endif %}"
+            >
+                <span class="ide-auth-account-avatar" aria-hidden="true"></span>
+                <span class="ide-auth-account-name">{{ request.user.get_username }}</span>
+            </button>
+            <form method="post" action="{{ docs_logout_url }}" class="ide-auth-form ide-auth-form-hidden" id="ide-auth-logout-form-root">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'main:none_lang' ui_lang=ui_lang|default:'ko' %}">
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
 <main class="main main-surface-layer root-search-page">
     <section class="root-search-shell" aria-label="{% if ui_lang|default:'ko' == 'en' %}Smart Search{% else %}스마트 검색{% endif %}">
         <h1 class="root-search-title">Hanplanet</h1>
+        <div class="root-shell-links">
+            <div data-root-nav-links-host></div>
+        </div>
         <form class="root-search-form" data-root-search-form>
             <button
                 type="submit"
@@ -43,7 +66,6 @@
                 </button>
             </div>
         </form>
-        <div class="root-shell-links" data-root-nav-links-host></div>
         <section
             class="root-shortcuts"
             data-root-shortcuts
@@ -51,7 +73,8 @@
             data-login-hint="{% if ui_lang|default:'ko' == 'en' %}Sign in to save personal shortcuts.{% else %}로그인하면 개인 바로가기를 저장할 수 있습니다.{% endif %}"
             data-empty-message="{% if ui_lang|default:'ko' == 'en' %}No shortcuts yet.{% else %}아직 등록된 바로가기가 없습니다.{% endif %}"
             data-add-label="{% if ui_lang|default:'ko' == 'en' %}Add{% else %}추가{% endif %}"
-            data-name-placeholder="{% if ui_lang|default:'ko' == 'en' %}Name{% else %}이름{% endif %}"
+            data-edit-label="{% if ui_lang|default:'ko' == 'en' %}Edit{% else %}편집{% endif %}"
+            data-name-placeholder="{% if ui_lang|default:'ko' == 'en' %}Name (optional, auto from URL if empty){% else %}이름 (선택, 비우면 URL로 자동 생성){% endif %}"
             data-url-placeholder="{% if ui_lang|default:'ko' == 'en' %}https://example.com{% else %}https://example.com{% endif %}"
         >
             <p class="root-shortcuts-hint" data-root-shortcuts-hint></p>
@@ -66,7 +89,7 @@
             </div>
             {% endif %}
             <form class="root-shortcuts-form" data-root-shortcut-form hidden>
-                <input type="text" class="root-shortcuts-input" data-root-shortcut-name maxlength="80" required>
+                <input type="text" class="root-shortcuts-input" data-root-shortcut-name maxlength="80">
                 <input type="text" class="root-shortcuts-input" data-root-shortcut-url maxlength="500" required>
                 <button type="submit" class="root-shortcuts-submit">{% if ui_lang|default:'ko' == 'en' %}Save{% else %}저장{% endif %}</button>
             </form>
@@ -74,6 +97,11 @@
         </section>
     </section>
 </main>
+<div class="root-shortcuts-context-menu" data-root-shortcut-menu hidden>
+    <button type="button" class="root-shortcuts-context-item" data-shortcut-menu-edit>
+        {% if ui_lang|default:'ko' == 'en' %}Edit{% else %}편집{% endif %}
+    </button>
+</div>
 <div class="root-search-engine-popup" data-root-engine-popup role="listbox" aria-hidden="true">
     <button type="button" class="root-search-engine-option is-active" data-engine-option data-engine-value="google">
         <span class="root-search-engine-option-icon" data-engine-icon="google" aria-hidden="true"></span>
@@ -90,6 +118,18 @@
     <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="naver">
         <span class="root-search-engine-option-icon" data-engine-icon="naver" aria-hidden="true"></span>
         <span>Naver</span>
+    </button>
+    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="gpt">
+        <span class="root-search-engine-option-icon" data-engine-icon="gpt" aria-hidden="true"></span>
+        <span>GPT</span>
+    </button>
+    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="claude">
+        <span class="root-search-engine-option-icon" data-engine-icon="claude" aria-hidden="true"></span>
+        <span>Claude</span>
+    </button>
+    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="gemini">
+        <span class="root-search-engine-option-icon" data-engine-icon="gemini" aria-hidden="true"></span>
+        <span>Gemini</span>
     </button>
 </div>
 <script src="{% static_v 'js/root_search.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
