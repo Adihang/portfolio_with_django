@@ -31,11 +31,12 @@ from django.views.decorators.http import require_http_methods
 from .views import (
     SUPPORTED_UI_LANGS,
     apply_ui_context,
+    get_account_display_name,
     redirect_to_localized_route,
     render_markdown_safely,
     resolve_ui_lang,
 )
-from .models import DocsAccessRule, DocsLoginAttemptGuard
+from .models import DocsAccessRule, DocsLoginAttemptGuard, PortfolioProfile
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -1395,12 +1396,27 @@ def docs_common_context(request, ui_lang):
         docs_logout_url = reverse("main:docs_logout")
     docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
     if request.user.is_authenticated:
+        profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
         docs_my_portfolio_url = reverse(
             "main:portfolio_user_lang",
             kwargs={"ui_lang": ui_lang, "user_id": request.user.username},
         )
+        account_profile_image_url = profile.profile_img.url if profile and profile.profile_img else ""
+        account_display_name = get_account_display_name(request.user)
+        account_email = str(request.user.email or "").strip()
+        if ui_lang in SUPPORTED_UI_LANGS:
+            account_profile_upload_url = reverse(
+                "main:account_profile_image_upload_lang",
+                kwargs={"ui_lang": ui_lang},
+            )
+        else:
+            account_profile_upload_url = reverse("main:account_profile_image_upload")
     else:
         docs_my_portfolio_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
+        account_profile_image_url = ""
+        account_display_name = ""
+        account_email = ""
+        account_profile_upload_url = ""
 
     context.update(
         {
@@ -1419,6 +1435,10 @@ def docs_common_context(request, ui_lang):
             "docs_logout_next": docs_base_url,
             "docs_help_url": docs_help_url,
             "docs_my_portfolio_url": docs_my_portfolio_url,
+            "account_profile_image_url": account_profile_image_url,
+            "account_display_name": account_display_name,
+            "account_email": account_email,
+            "account_profile_upload_url": account_profile_upload_url,
             "docs_api_list_url": reverse("main:docs_api_list"),
             "docs_api_save_url": reverse("main:docs_api_save"),
             "docs_api_preview_url": reverse("main:docs_api_preview"),

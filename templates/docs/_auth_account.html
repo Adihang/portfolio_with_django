@@ -7,21 +7,61 @@
         aria-haspopup="menu"
         aria-expanded="false"
     >
+        {% if account_profile_image_url %}
+        <img class="ide-auth-account-avatar" src="{{ account_profile_image_url }}" alt="{{ account_display_name|default:user.get_username }}">
+        {% else %}
         <span class="ide-auth-account-avatar" aria-hidden="true"></span>
+        {% endif %}
         <span class="ide-auth-account-name">{{ user.get_username }}</span>
     </button>
     <div class="ide-auth-account-menu" data-ide-auth-account-menu hidden>
-        <a class="ide-auth-account-menu-item" href="{{ docs_my_portfolio_url }}">
-            {{ docs_text.auth_my_portfolio_button }}
-        </a>
-        <button
-            type="button"
-            class="ide-auth-account-menu-item"
-            data-ide-account-logout
-            data-confirm-message="{{ docs_text.auth_logout_confirm }}"
-        >
-            {{ docs_text.auth_logout_button }}
-        </button>
+        <div class="ide-auth-account-profile">
+            <form
+                method="post"
+                action="{{ account_profile_upload_url }}"
+                enctype="multipart/form-data"
+                class="ide-auth-account-profile-upload-form"
+                data-root-account-profile-upload-form
+            >
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <input
+                    type="file"
+                    name="profile_img"
+                    accept="image/*"
+                    class="ide-auth-account-profile-upload-input"
+                    data-root-account-profile-image-input
+                >
+                <button
+                    type="button"
+                    class="ide-auth-account-profile-image-button"
+                    data-root-account-profile-image-trigger
+                    aria-label="{% if ui_lang|default:'ko' == 'en' %}Change profile image{% else %}프로필 사진 변경{% endif %}"
+                    title="{% if ui_lang|default:'ko' == 'en' %}Change profile image{% else %}프로필 사진 변경{% endif %}"
+                >
+                    {% if account_profile_image_url %}
+                    <img class="ide-auth-account-profile-image" src="{{ account_profile_image_url }}" alt="{{ account_display_name|default:user.get_username }}">
+                    {% else %}
+                    <span class="ide-auth-account-profile-image" aria-hidden="true"></span>
+                    {% endif %}
+                </button>
+            </form>
+            <strong class="ide-auth-account-profile-name">{{ account_display_name|default:user.get_username }}</strong>
+            <span class="ide-auth-account-profile-email">{{ account_email|default:"-" }}</span>
+        </div>
+        <div class="ide-auth-account-menu-actions">
+            <a class="ide-auth-account-menu-item" href="{{ docs_my_portfolio_url }}">
+                {{ docs_text.auth_my_portfolio_button }}
+            </a>
+            <button
+                type="button"
+                class="ide-auth-account-menu-item"
+                data-ide-account-logout
+                data-confirm-message="{{ docs_text.auth_logout_confirm }}"
+            >
+                {{ docs_text.auth_logout_button }}
+            </button>
+        </div>
     </div>
     <form method="post" action="{{ docs_logout_url }}" class="ide-auth-form ide-auth-form-hidden" id="ide-auth-logout-form">
         {% csrf_token %}

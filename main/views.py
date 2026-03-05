@@ -545,6 +545,15 @@ def build_localized_url(request, route_name, **kwargs):
     return localized_path
 
 
+def get_account_display_name(user):
+    if user is None:
+        return ""
+    full_name = str(user.get_full_name() or "").strip()
+    if full_name:
+        return full_name
+    return str(getattr(user, "username", "") or "").strip()
+
+
 def redirect_to_localized_route(request, route_name, **kwargs):
     return redirect(build_localized_url(request, route_name, **kwargs))
 
@@ -702,6 +711,21 @@ def none(request, ui_lang=None):
     context["docs_login_url"] = reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang})
     context["docs_signup_url"] = reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang})
     context["docs_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
+    if request.user.is_authenticated:
+        portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
+        context["docs_my_portfolio_url"] = reverse(
+            "main:portfolio_user_lang",
+            kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+        )
+        context["account_display_name"] = get_account_display_name(request.user)
+        context["account_profile_image_url"] = (
+            portfolio_profile.profile_img.url if portfolio_profile and portfolio_profile.profile_img else ""
+        )
+        context["account_email"] = str(request.user.email or "").strip()
+        context["account_profile_upload_url"] = reverse(
+            "main:account_profile_image_upload_lang",
+            kwargs={"ui_lang": resolved_lang},
+        )
     return render(request, 'none.html', context)
 
 
@@ -1032,6 +1056,26 @@ def _ensure_authenticated_for_write(request):
     if request.user.is_authenticated:
         return None
     return _redirect_to_docs_login_with_next(request)
+
+
+@require_http_methods(["POST"])
+@csrf_protect
+def account_profile_image_upload(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    auth_redirect = _ensure_authenticated_for_write(request)
+    if auth_redirect is not None:
+        return auth_redirect
+
+    profile, _ = PortfolioProfile.objects.get_or_create(user=request.user)
+    uploaded_image = request.FILES.get("profile_img")
+    if uploaded_image:
+        profile.profile_img = uploaded_image
+        profile.save(update_fields=["profile_img"])
+
+    next_url = str(request.POST.get("next") or "").strip()
+    if not next_url.startswith("/"):
+        next_url = reverse("main:none_lang", kwargs={"ui_lang": resolved_lang})
+    return redirect(next_url)
 
 
 def main(request, ui_lang=None):
