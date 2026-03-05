@@ -1,10 +1,12 @@
 from django.urls import path, re_path
+from django.views.generic import RedirectView
 
 from . import docs_views, views
 
 app_name = 'main'
 
 urlpatterns = [
+    path("favicon.ico", RedirectView.as_view(url="/static/favicon.ico", permanent=True)),
     # PWA endpoints (manifest + service worker)
     path("manifest.webmanifest", views.pwa_manifest, name="pwa_manifest"),
     path("service-worker.js", views.service_worker, name="service_worker"),
