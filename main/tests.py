@@ -407,7 +407,7 @@ class PortfolioPerUserRoutingTests(TestCase):
         response = self.client.get("/ko/", HTTP_HOST="localhost")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "data-ide-auth-account", html=False)
+        self.assertContains(response, "data-auth-account", html=False)
         self.assertContains(response, "data-root-nav-account-host", html=False)
         self.assertContains(response, "GuestUser", html=False)
 
@@ -417,7 +417,7 @@ class PortfolioPerUserRoutingTests(TestCase):
         response = self.client.get("/ko/portfolio/GuestUser/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "data-ide-auth-account", html=False)
+        self.assertNotContains(response, "data-auth-account", html=False)
 
     def test_empty_portfolio_shows_dummy_data(self):
         empty_user = self.user_model.objects.create_user(username="EmptyUser", password="pw12345")

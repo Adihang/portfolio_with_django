@@ -1,0 +1,23 @@
+{% if user.is_authenticated %}
+<div class="ui-auth-account-floating" data-auth-account>
+    <button
+        type="button"
+        class="ui-auth-account-trigger"
+        data-auth-account-trigger
+        aria-haspopup="menu"
+        aria-expanded="false"
+    >
+        {% if account_profile_image_url %}
+        <img class="ui-auth-account-avatar" src="{{ account_profile_image_url }}" alt="{{ account_display_name|default:user.get_username }}">
+        {% else %}
+        <span class="ui-auth-account-avatar" aria-hidden="true"></span>
+        {% endif %}
+        <span class="ui-auth-account-name">{{ user.get_username }}</span>
+    </button>
+    {% include "partials/account_widget_menu.html" %}
+    <form method="post" action="{{ account_logout_url }}" class="ui-auth-form ui-auth-form-hidden" id="{{ account_logout_form_id }}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ account_logout_next|default:request.get_full_path }}">
+    </form>
+</div>
+{% endif %}

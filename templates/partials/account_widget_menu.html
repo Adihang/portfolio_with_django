@@ -1,0 +1,49 @@
+<div class="ui-auth-account-menu" data-auth-account-menu hidden>
+    <div class="ui-auth-account-profile">
+        <form
+            method="post"
+            action="{{ account_profile_upload_url }}"
+            enctype="multipart/form-data"
+            class="ui-auth-account-profile-upload-form"
+            data-root-account-profile-upload-form
+        >
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input
+                type="file"
+                name="profile_img"
+                accept="image/*"
+                class="ui-auth-account-profile-upload-input"
+                data-root-account-profile-image-input
+            >
+            <button
+                type="button"
+                class="ui-auth-account-profile-image-button"
+                data-root-account-profile-image-trigger
+                aria-label="{% include 'partials/ui_i18n.html' with key='change_profile_image' %}"
+                title="{% include 'partials/ui_i18n.html' with key='change_profile_image' %}"
+            >
+                {% if account_profile_image_url %}
+                <img class="ui-auth-account-profile-image" src="{{ account_profile_image_url }}" alt="{{ account_display_name|default:user.get_username }}">
+                {% else %}
+                <span class="ui-auth-account-profile-image" aria-hidden="true"></span>
+                {% endif %}
+            </button>
+        </form>
+        <strong class="ui-auth-account-profile-name">{{ account_display_name|default:user.get_username }}</strong>
+        <span class="ui-auth-account-profile-email">{{ account_email|default:"-" }}</span>
+    </div>
+    <div class="ui-auth-account-menu-actions">
+        <a class="ui-auth-account-menu-item" href="{{ account_my_portfolio_url }}">
+            {% include 'partials/ui_i18n.html' with key='my_portfolio' %}
+        </a>
+        <button
+            type="button"
+            class="ui-auth-account-menu-item"
+            data-auth-account-logout
+            data-confirm-message="{% include 'partials/ui_i18n.html' with key='logout_confirm' %}"
+        >
+            {% include 'partials/ui_i18n.html' with key='logout' %}
+        </button>
+    </div>
+</div>

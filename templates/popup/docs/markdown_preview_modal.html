@@ -1,8 +1,1 @@
-<div id="ide-markdown-preview-modal" class="ide-help-modal" hidden>
-    <div class="ide-help-modal-backdrop" id="ide-markdown-preview-backdrop"></div>
-    <div class="ide-help-modal-dialog" role="dialog" aria-modal="true" aria-label="{{ docs_text.markdown_preview_aria }}">
-        <div class="ide-help-modal-body">
-            <article class="ide-markdown ide-help-markdown" id="ide-markdown-preview-content"></article>
-        </div>
-    </div>
-</div>
+{% include "popup/docs/_help_modal.html" with modal_id="ide-markdown-preview-modal" backdrop_id="ide-markdown-preview-backdrop" aria_label=docs_text.markdown_preview_aria article_id="ide-markdown-preview-content" %}

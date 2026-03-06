@@ -1,8 +1,1 @@
-<div id="ide-page-help-modal" class="ide-help-modal" hidden>
-    <div class="ide-help-modal-backdrop" id="ide-page-help-backdrop"></div>
-    <div class="ide-help-modal-dialog" role="dialog" aria-modal="true" aria-label="{{ docs_text.help_button }}">
-        <div class="ide-help-modal-body">
-            <article class="ide-markdown ide-help-markdown">{{ page_help_html }}</article>
-        </div>
-    </div>
-</div>
+{% include "popup/docs/_help_modal.html" with modal_id="ide-page-help-modal" backdrop_id="ide-page-help-backdrop" aria_label=docs_text.help_button article_html=page_help_html %}
