@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="${PROJECT_DIR:-/Users/imhanbyeol/Development/portfolio_with_django}"
+PROJECT_DIR="${PROJECT_DIR:-/Users/imhanbyeol/Development/Hanplanet}"
 PYTHON_BIN="${PYTHON_BIN:-$PROJECT_DIR/.venv/bin/python}"
 MANAGE_PY="${MANAGE_PY:-$PROJECT_DIR/manage.py}"
 TOP_N="${TOP_N:-10}"

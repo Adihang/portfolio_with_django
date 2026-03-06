@@ -6,7 +6,7 @@
 ## Local Development
 
 ```bash
-cd /Users/imhanbyeol/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/Hanplanet
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -119,7 +119,7 @@ docker compose logs -f django nginx cloudflared
 ## Project Structure
 
 ```text
-portfolio_with_django/
+Hanplanet/
 ├─ config/                 # Django 프로젝트 설정 (settings, urls, wsgi/asgi)
 ├─ main/                   # 메인 앱 (models, views, urls, admin, migrations)
 ├─ templates/              # HTML 템플릿
