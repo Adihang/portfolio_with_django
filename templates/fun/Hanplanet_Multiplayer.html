@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static_versioned %}
+{% block body_class %}ui-page hanplanet-multiplayer-page{% endblock %}
+{% block content %}
+{% include 'docs/_assets_head.html' %}
+
+<div class="ui-toolbar-wrap">
+    <div class="ui-shell ui-toolbar">
+        <div class="ui-toolbar-left">
+            <div class="ui-title-row">
+                <h1 class="ui-title">{{ multiplayer_title }}</h1>
+            </div>
+            <div class="ui-subtitle ui-path-breadcrumbs">
+                <a class="ui-path-link" href="{% url 'main:minigame_lang' ui_lang=ui_lang %}">{{ multiplayer_back_text }}</a>
+                <span class="ui-path-sep">/</span>
+                <span class="ui-path-current">{{ multiplayer_title }}</span>
+            </div>
+        </div>
+        <div class="ui-toolbar-right minigame-auth-host">
+            {% include "partials/account_widget.html" %}
+        </div>
+    </div>
+</div>
+
+<main class="ui-shell ui-content multiplayer-shell">
+    <section class="multiplayer-stage" aria-label="{{ multiplayer_title }}">
+        <div
+            class="multiplayer-app"
+            data-game-client
+            data-ws-url="{{ game_ws_url }}"
+            data-token-url="{{ game_token_url }}"
+            data-player-name="{{ game_player_name }}"
+            data-connecting-label="{% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}"
+            data-connected-label="{% include 'partials/ui_i18n.html' with key='multiplayer_connected' %}"
+            data-disconnected-label="{% include 'partials/ui_i18n.html' with key='multiplayer_disconnected' %}"
+        >
+            <header class="multiplayer-panel multiplayer-hero">
+                <div>
+                    <p class="multiplayer-kicker">Hanplanet Multiplayer</p>
+                    <h2 class="multiplayer-heading">{{ multiplayer_title }}</h2>
+                    <p class="multiplayer-description">{{ multiplayer_description }}</p>
+                </div>
+                <button class="ide-btn ide-btn-primary multiplayer-reconnect-btn" type="button" data-game-reconnect>
+                    {% include 'partials/ui_i18n.html' with key='multiplayer_retry' %}
+                </button>
+            </header>
+
+            <section class="multiplayer-grid" aria-label="{{ multiplayer_title }}">
+                <div class="multiplayer-sidebar">
+                    <div class="multiplayer-panel multiplayer-stat">
+                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_connection' %}</span>
+                        <strong class="multiplayer-status" data-game-connection-status>
+                            {% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}
+                        </strong>
+                    </div>
+                    <div class="multiplayer-panel multiplayer-stat">
+                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_signed_in_as' %}</span>
+                        <strong class="multiplayer-stat-value">{{ game_player_name }}</strong>
+                    </div>
+                    <div class="multiplayer-panel multiplayer-stat">
+                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_you' %}</span>
+                        <strong class="multiplayer-stat-value" data-game-self-id>-</strong>
+                    </div>
+                    <div class="multiplayer-panel multiplayer-stat">
+                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_position' %}</span>
+                        <strong class="multiplayer-stat-value" data-game-self-position>-</strong>
+                    </div>
+                    <div class="multiplayer-panel multiplayer-stat">
+                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_nearby_players' %}</span>
+                        <strong class="multiplayer-stat-value" data-game-player-count>0</strong>
+                    </div>
+                    <div class="multiplayer-panel multiplayer-help">
+                        <h3>{% include 'partials/ui_i18n.html' with key='multiplayer_controls' %}</h3>
+                        <p>{% include 'partials/ui_i18n.html' with key='multiplayer_controls_help' %}</p>
+                    </div>
+                </div>
+                <div class="multiplayer-canvas-wrap">
+                    <canvas class="multiplayer-canvas" width="960" height="640" data-game-canvas></canvas>
+                </div>
+            </section>
+        </div>
+    </section>
+</main>
+
+<link rel="stylesheet" type="text/css" href="{% static_v 'css/hanplanet_multiplayer.css' %}">
+<script src="{% static_v 'js/hanplanet_multiplayer.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+{% include "popup/root/auth_logout_modal.html" %}
+<script src="{% static_v 'js/minigame_account_widget.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+{% endblock %}
