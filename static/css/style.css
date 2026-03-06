@@ -662,7 +662,7 @@ body.theme-dark .root-shell-controls-fixed .ui-auth-account-avatar {
     background-color: rgba(238, 238, 238, 0.94);
     background-image: none;
     opacity: 1;
-    padding: 10px 0 0 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -681,6 +681,7 @@ body.theme-dark .root-shell-controls-fixed .ui-auth-account-menu {
 }
 
 .root-shell-controls-fixed .ui-auth-account-profile {
+    margin: 20px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -691,6 +692,7 @@ body.theme-dark .root-shell-controls-fixed .ui-auth-account-menu {
 
 .root-shell-controls-fixed .ui-auth-account-profile-upload-form {
     margin: 0;
+    margin-bottom: 15px;
     display: block;
 }
 
@@ -1795,7 +1797,7 @@ body.theme-dark .ui-nav::after {
 }
 
 .ui-brand-text {
-    font-size: 26px;
+    font-size: 28px;
     display: inline-block;
     transition: transform 0.2s ease;
 }
@@ -1894,6 +1896,7 @@ body.theme-dark .ui-nav::after {
     border: 1px solid transparent;
     background-color: transparent;
     color: var(--theme-subtle);
+    font-size: 20px;
     font-weight: 600;
     transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
     white-space: nowrap;

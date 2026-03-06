@@ -221,7 +221,7 @@ body.ui-page .portfolio-print-btn {
     align-self: flex-end;
     align-items: flex-end;
     justify-content: flex-end;
-    gap: 0;
+    gap: 3px;
     min-width: 0;
 }
 
@@ -330,7 +330,7 @@ body.theme-dark .ui-auth-account-avatar {
     background-color: rgba(238, 238, 238, 0.94);
     background-image: none;
     opacity: 1;
-    padding: 10px 0 0 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -399,6 +399,7 @@ body.theme-dark .ui-auth-account-menu-actions .ui-auth-account-menu-item:focus-v
 }
 
 .ui-auth-account-profile {
+    margin: 20px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -409,6 +410,7 @@ body.theme-dark .ui-auth-account-menu-actions .ui-auth-account-menu-item:focus-v
 
 .ui-auth-account-profile-upload-form {
     margin: 0;
+    margin-bottom: 15px;
     display: block;
 }
 

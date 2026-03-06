@@ -655,8 +655,30 @@ def minigame_page(request, ui_lang=None):
         "page_title": "Mini Game" if is_english else "미니게임",
         "minigame_links": links,
         "minigame_home_label": "Home" if is_english else "홈",
+        "docs_login_url": reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang}),
     }
     apply_ui_context(request, context, resolved_lang)
+    if request.user.is_authenticated:
+        portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
+        context["docs_my_portfolio_url"] = reverse(
+            "main:portfolio_user_lang",
+            kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+        )
+        context["account_display_name"] = get_account_display_name(request.user)
+        context["account_profile_image_url"] = (
+            portfolio_profile.profile_img.url if portfolio_profile and portfolio_profile.profile_img else ""
+        )
+        context["account_email"] = str(request.user.email or "").strip()
+        context["account_profile_upload_url"] = reverse(
+            "main:account_profile_image_upload_lang",
+            kwargs={"ui_lang": resolved_lang},
+        )
+        context["account_my_portfolio_url"] = context["docs_my_portfolio_url"]
+        context["account_logout_form_id"] = "auth-logout-form-minigame"
+        context["account_logout_next"] = request.get_full_path() or reverse(
+            "main:minigame_lang", kwargs={"ui_lang": resolved_lang}
+        )
+        context["account_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
     response = render(request, "fun/minigame.html", context)
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"

@@ -349,6 +349,11 @@
     });
 
     applyThemeMode();
+    window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () {
+            document.body.classList.remove('theme-preinit');
+        });
+    });
 
     // 중첩 스크롤 우선순위를 활성화하는 함수
     const enableNestedScrollPriority = function () {
