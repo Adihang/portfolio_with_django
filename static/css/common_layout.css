@@ -1,0 +1,13 @@
+:root {
+    --site-common-header-min-height: 58px;
+    --site-nav-padding-y: 8px;
+    --site-toolbar-padding-top: 12px;
+    --site-toolbar-padding-bottom: 10px;
+    --site-z-nav: 3200;
+    --site-z-toolbar: 3100;
+    --site-z-popup: 3400;
+    --site-z-modal: 3600;
+    --site-z-modal-top: 3900;
+    --site-popup-radius-common: 12px;
+    --site-popup-shadow-common: 0 8px 18px rgba(0, 0, 0, 0.2);
+}

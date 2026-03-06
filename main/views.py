@@ -726,6 +726,10 @@ def none(request, ui_lang=None):
             "main:account_profile_image_upload_lang",
             kwargs={"ui_lang": resolved_lang},
         )
+        context["account_my_portfolio_url"] = context["docs_my_portfolio_url"]
+        context["account_logout_form_id"] = "auth-logout-form-root"
+        context["account_logout_next"] = reverse("main:none_lang", kwargs={"ui_lang": resolved_lang})
+        context["account_logout_url"] = context["docs_logout_url"]
     return render(request, 'none.html', context)
 
 

@@ -1,0 +1,14 @@
+.ui-auth-account-menu,
+.ide-context-menu,
+.ide-rename-modal-dialog,
+.ide-save-modal-dialog,
+.ide-folder-modal-dialog,
+.ide-help-modal-dialog,
+.ide-permission-modal-dialog,
+.root-auth-modal-dialog,
+.root-search-engine-popup,
+.root-shortcuts-context-menu,
+.portfolio-print-selector-panel {
+    border-radius: var(--site-popup-radius-common) !important;
+    box-shadow: var(--site-popup-shadow-common) !important;
+}

@@ -1,0 +1,15 @@
+<div class="root-auth-modal" id="root-auth-logout-modal" hidden>
+    <div class="root-auth-modal-backdrop" id="root-auth-logout-modal-backdrop"></div>
+    <div class="root-auth-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="root-auth-logout-title">
+        <h3 id="root-auth-logout-title">{% include 'partials/ui_i18n.html' with key='logout' %}</h3>
+        <p id="root-auth-logout-message" class="root-auth-modal-message">{% include 'partials/ui_i18n.html' with key='logout_confirm' %}</p>
+        <div class="root-auth-modal-actions">
+            <button type="button" class="root-auth-modal-btn" id="root-auth-logout-cancel-btn">
+                {% include 'partials/ui_i18n.html' with key='cancel' %}
+            </button>
+            <button type="button" class="root-auth-modal-btn root-auth-modal-btn-primary" id="root-auth-logout-confirm-btn">
+                {% include 'partials/ui_i18n.html' with key='logout' %}
+            </button>
+        </div>
+    </div>
+</div>

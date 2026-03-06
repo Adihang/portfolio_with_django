@@ -1,0 +1,198 @@
+(function () {
+    if (window.__initSiteNavResponsiveManager) {
+        return;
+    }
+
+    window.__initSiteNavResponsiveManager = function (options) {
+        const nav = document.querySelector('.ui-nav');
+        if (!nav) {
+            return;
+        }
+
+        const navContainer = nav.querySelector('.container-fluid');
+        const navBrandGroup = nav.querySelector('.ui-brand-group');
+        const navLinks = nav.querySelector('.ui-nav-links');
+        const navCollapse = nav.querySelector('.ui-nav-collapse');
+        const navControls = navCollapse ? navCollapse.querySelector('.ui-controls-stack') : null;
+        const navToggler = nav.querySelector('.ui-nav-toggler');
+
+        if (!navContainer || !navBrandGroup || !navLinks || !navCollapse || !navToggler) {
+            return;
+        }
+
+        const throttledHandleNavbarScroll = options && typeof options.throttledHandleNavbarScroll === 'function'
+            ? options.throttledHandleNavbarScroll
+            : null;
+
+        const forceClearNavContainerDecorations = function () {
+            const resetTargets = [
+                navContainer,
+                navCollapse,
+                navLinks,
+                navCollapse.querySelector('.ui-nav-links')
+            ];
+            const navItems = nav.querySelectorAll('.nav-item');
+
+            navItems.forEach(function (item) {
+                resetTargets.push(item);
+            });
+
+            resetTargets.forEach(function (target) {
+                if (!target || !target.style || !target.style.setProperty) {
+                    return;
+                }
+
+                if (target === navLinks) {
+                    target.style.removeProperty('border');
+                    target.style.removeProperty('border-color');
+                } else {
+                    target.style.border = 'none';
+                    target.style.borderColor = 'transparent';
+                }
+                target.style.outline = 'none';
+                target.style.outlineColor = 'transparent';
+                target.style.outlineStyle = 'none';
+                target.style.outlineWidth = '0';
+                target.style.removeProperty('box-shadow');
+                target.style.listStyle = 'none';
+            });
+        };
+
+        let rafId = null;
+
+        const measureInlineWidth = function (sourceNode, styleOverrides) {
+            if (!sourceNode) {
+                return 0;
+            }
+
+            const measureNode = sourceNode.cloneNode(true);
+            Object.assign(measureNode.style, {
+                position: 'fixed',
+                left: '-99999px',
+                top: '-99999px',
+                visibility: 'hidden',
+                pointerEvents: 'none',
+                width: 'auto',
+                maxWidth: 'none',
+                margin: '0',
+                padding: '0',
+                ...styleOverrides
+            });
+
+            const liveInstallBtn = sourceNode.querySelector('[data-pwa-install]');
+            const cloneInstallBtn = measureNode.querySelector('[data-pwa-install]');
+            if (liveInstallBtn && cloneInstallBtn) {
+                const installDisplay = window.getComputedStyle(liveInstallBtn).display;
+                cloneInstallBtn.style.display = installDisplay === 'none' ? 'none' : 'inline-flex';
+            }
+
+            document.body.appendChild(measureNode);
+            const width = Math.ceil(measureNode.getBoundingClientRect().width);
+            measureNode.remove();
+            return width;
+        };
+
+        const getMeasuredNavItemsWidth = function () {
+            const linksWidth = measureInlineWidth(navLinks, {
+                display: 'inline-flex',
+                flexDirection: 'row',
+                flexWrap: 'nowrap',
+                alignItems: 'center',
+                listStyle: 'none',
+                gap: '0'
+            });
+            const controlsWidth = navControls ? measureInlineWidth(navControls, {
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '0'
+            }) : 0;
+
+            return linksWidth + controlsWidth;
+        };
+
+        const forceCloseNavMenu = function () {
+            if (window.bootstrap && window.bootstrap.Collapse) {
+                const collapseInstance = window.bootstrap.Collapse.getInstance(navCollapse);
+
+                if (collapseInstance) {
+                    collapseInstance.hide();
+                }
+            }
+
+            navCollapse.classList.remove('show', 'collapsing');
+            navCollapse.style.height = '';
+            navToggler.classList.add('collapsed');
+            navToggler.setAttribute('aria-expanded', 'false');
+            forceClearNavContainerDecorations();
+        };
+
+        const updateNavMode = function () {
+            rafId = null;
+
+            nav.classList.remove('nav-auto-collapsed');
+            forceCloseNavMenu();
+
+            const availableWidth = navContainer.getBoundingClientRect().width;
+            const brandWidth = navBrandGroup.getBoundingClientRect().width;
+            const navItemsBlockWidth = getMeasuredNavItemsWidth();
+            const requiredWidth = brandWidth + navItemsBlockWidth + 22;
+            const shouldCollapseByOverlap = requiredWidth > availableWidth;
+
+            if (shouldCollapseByOverlap) {
+                nav.classList.add('nav-auto-collapsed');
+                forceCloseNavMenu();
+            }
+
+            forceClearNavContainerDecorations();
+        };
+
+        const scheduleNavModeUpdate = function () {
+            if (rafId !== null) {
+                return;
+            }
+
+            rafId = window.requestAnimationFrame(updateNavMode);
+        };
+
+        window.addEventListener('resize', scheduleNavModeUpdate, { passive: true });
+        window.addEventListener('orientationchange', scheduleNavModeUpdate, { passive: true });
+        window.addEventListener('beforeinstallprompt', scheduleNavModeUpdate);
+        window.addEventListener('appinstalled', scheduleNavModeUpdate);
+        navToggler.addEventListener('click', function () {
+            window.requestAnimationFrame(forceClearNavContainerDecorations);
+        });
+        navCollapse.addEventListener('transitionend', forceClearNavContainerDecorations);
+
+        let scrollCleanupTimerId = null;
+        window.addEventListener('scroll', function () {
+            if (scrollCleanupTimerId !== null) {
+                window.clearTimeout(scrollCleanupTimerId);
+            }
+
+            scrollCleanupTimerId = window.setTimeout(function () {
+                window.requestAnimationFrame(forceClearNavContainerDecorations);
+                scrollCleanupTimerId = null;
+            }, 180);
+        }, { passive: true });
+        forceClearNavContainerDecorations();
+        scheduleNavModeUpdate();
+
+        if (throttledHandleNavbarScroll) {
+            window.addEventListener('scroll', throttledHandleNavbarScroll, { passive: true });
+        }
+
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(scheduleNavModeUpdate).catch(function () {});
+        }
+
+        const installButton = nav.querySelector('[data-pwa-install]');
+        if (installButton && window.MutationObserver) {
+            const installButtonObserver = new MutationObserver(scheduleNavModeUpdate);
+            installButtonObserver.observe(installButton, {
+                attributes: true,
+                attributeFilter: ['style', 'class', 'hidden', 'aria-disabled']
+            });
+        }
+    };
+})();

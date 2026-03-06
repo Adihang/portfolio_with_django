@@ -51,10 +51,10 @@
     relocateRootNavigationBlocks();
 
     const wireRootLogoutAction = function () {
-        const accountTrigger = document.querySelector('#ide-auth-account-root [data-ide-account-trigger]');
-        const accountMenu = document.querySelector('#ide-auth-account-root [data-ide-auth-account-menu]');
-        const accountLogoutButton = document.querySelector('#ide-auth-account-root [data-ide-account-logout]');
-        const logoutForm = document.getElementById('ide-auth-logout-form-root');
+        const accountTrigger = document.querySelector('#ui-auth-account-root [data-auth-account-trigger]');
+        const accountMenu = document.querySelector('#ui-auth-account-root [data-auth-account-menu]');
+        const accountLogoutButton = document.querySelector('#ui-auth-account-root [data-auth-account-logout]');
+        const logoutForm = document.getElementById('auth-logout-form-root');
         const logoutModal = document.getElementById('root-auth-logout-modal');
         const logoutModalBackdrop = document.getElementById('root-auth-logout-modal-backdrop');
         const logoutCancelButton = document.getElementById('root-auth-logout-cancel-btn');

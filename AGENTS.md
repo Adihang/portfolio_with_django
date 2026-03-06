@@ -32,6 +32,11 @@
 - Do not break responsive mode-switch timing or breakpoint behavior when viewport size changes.
 - Keep existing transition/animation behavior intact (including resize-triggered interactions) unless explicitly requested.
 - For text/i18n refactors, avoid structural/CSS/JS behavior changes that can affect layout or animation.
+- Korean/English UI strings must be centralized in `templates/partials/ui_i18n.html` and referenced from templates via include keys; do not introduce new per-view duplicated i18n literals unless absolutely necessary.
+- Account popup UI (`ide-auth-account-menu`) must be maintained as a separate shared partial template and included from wrappers; do not duplicate popup markup across page templates.
+- Popup/modal/context-menu markup must be managed as template partials (`templates/popup/**` or shared `templates/partials/**`), not inline in page templates.
+- Popups with similar structure should be merged into a shared base partial and parameterized includes, instead of duplicated HTML blocks.
+- Static assets should be split by responsibility (for example: common layout tokens, popup styles, feature-specific scripts) rather than growing monolithic `style.css` / `docs_page.js` files.
 
 ## Testing Guidelines
 - Tests live in `main/tests.py` using Django’s test framework.

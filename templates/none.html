@@ -4,76 +4,8 @@
 {% block content %}
 <div class="root-shell-controls root-shell-controls-fixed" data-root-controls-host>
     {% if request.user.is_authenticated %}
-    <div data-root-nav-account-host id="ide-auth-account-root">
-        <div class="ide-auth-account-floating" data-ide-auth-account>
-                <button
-                    type="button"
-                    class="ide-auth-account-trigger"
-                    data-ide-account-trigger
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                >
-                    {% if account_profile_image_url %}
-                    <img class="ide-auth-account-avatar" src="{{ account_profile_image_url }}" alt="{{ account_display_name|default:request.user.get_username }}">
-                    {% else %}
-                    <span class="ide-auth-account-avatar" aria-hidden="true"></span>
-                    {% endif %}
-                    <span class="ide-auth-account-name">{{ request.user.get_username }}</span>
-                </button>
-            <div class="ide-auth-account-menu" data-ide-auth-account-menu hidden>
-                <div class="ide-auth-account-profile">
-                    <form
-                        method="post"
-                        action="{{ account_profile_upload_url }}"
-                        enctype="multipart/form-data"
-                        class="ide-auth-account-profile-upload-form"
-                        data-root-account-profile-upload-form
-                    >
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{% url 'main:none_lang' ui_lang=ui_lang|default:'ko' %}">
-                        <input
-                            type="file"
-                            name="profile_img"
-                            accept="image/*"
-                            class="ide-auth-account-profile-upload-input"
-                            data-root-account-profile-image-input
-                        >
-                        <button
-                            type="button"
-                            class="ide-auth-account-profile-image-button"
-                            data-root-account-profile-image-trigger
-                            aria-label="{% if ui_lang|default:'ko' == 'en' %}Change profile image{% else %}프로필 사진 변경{% endif %}"
-                            title="{% if ui_lang|default:'ko' == 'en' %}Change profile image{% else %}프로필 사진 변경{% endif %}"
-                        >
-                            {% if account_profile_image_url %}
-                            <img class="ide-auth-account-profile-image" src="{{ account_profile_image_url }}" alt="{{ account_display_name|default:request.user.get_username }}">
-                            {% else %}
-                            <span class="ide-auth-account-profile-image" aria-hidden="true"></span>
-                            {% endif %}
-                        </button>
-                    </form>
-                    <strong class="ide-auth-account-profile-name">{{ account_display_name|default:request.user.get_username }}</strong>
-                    <span class="ide-auth-account-profile-email">{{ account_email|default:"-" }}</span>
-                </div>
-                <div class="ide-auth-account-menu-actions">
-                    <a class="ide-auth-account-menu-item" href="{{ docs_my_portfolio_url }}">
-                        {% if ui_lang|default:'ko' == 'en' %}My Portfolio{% else %}내 포트폴리오{% endif %}
-                    </a>
-                    <button
-                        type="button"
-                        class="ide-auth-account-menu-item"
-                        data-ide-account-logout
-                        data-confirm-message="{% include 'partials/ui_i18n.html' with key='logout_confirm' %}"
-                    >
-                        {% include 'partials/ui_i18n.html' with key='logout' %}
-                    </button>
-                </div>
-            </div>
-            <form method="post" action="{{ docs_logout_url }}" class="ide-auth-form ide-auth-form-hidden" id="ide-auth-logout-form-root">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{% url 'main:none_lang' ui_lang=ui_lang|default:'ko' %}">
-            </form>
-        </div>
+    <div data-root-nav-account-host id="ui-auth-account-root">
+        {% include "partials/account_widget.html" %}
     </div>
     {% endif %}
 </div>
@@ -151,55 +83,8 @@
         </section>
     </section>
 </main>
-<div class="root-shortcuts-context-menu" data-root-shortcut-menu hidden>
-    <button type="button" class="root-shortcuts-context-item" data-shortcut-menu-edit>
-        {% include 'partials/ui_i18n.html' with key='edit' %}
-    </button>
-</div>
-<div class="root-auth-modal" id="root-auth-logout-modal" hidden>
-    <div class="root-auth-modal-backdrop" id="root-auth-logout-modal-backdrop"></div>
-    <div class="root-auth-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="root-auth-logout-title">
-        <h3 id="root-auth-logout-title">{% include 'partials/ui_i18n.html' with key='logout' %}</h3>
-        <p id="root-auth-logout-message" class="root-auth-modal-message">{% include 'partials/ui_i18n.html' with key='logout_confirm' %}</p>
-        <div class="root-auth-modal-actions">
-            <button type="button" class="root-auth-modal-btn" id="root-auth-logout-cancel-btn">
-                {% include 'partials/ui_i18n.html' with key='cancel' %}
-            </button>
-            <button type="button" class="root-auth-modal-btn root-auth-modal-btn-primary" id="root-auth-logout-confirm-btn">
-                {% include 'partials/ui_i18n.html' with key='logout' %}
-            </button>
-        </div>
-    </div>
-</div>
-<div class="root-search-engine-popup" data-root-engine-popup role="listbox" aria-hidden="true">
-    <button type="button" class="root-search-engine-option is-active" data-engine-option data-engine-value="google">
-        <span class="root-search-engine-option-icon" data-engine-icon="google" aria-hidden="true"></span>
-        <span>Google</span>
-    </button>
-    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="duckduckgo">
-        <span class="root-search-engine-option-icon" data-engine-icon="duckduckgo" aria-hidden="true"></span>
-        <span>DuckDuckGo</span>
-    </button>
-    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="bing">
-        <span class="root-search-engine-option-icon" data-engine-icon="bing" aria-hidden="true"></span>
-        <span>Bing</span>
-    </button>
-    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="naver">
-        <span class="root-search-engine-option-icon" data-engine-icon="naver" aria-hidden="true"></span>
-        <span>Naver</span>
-    </button>
-    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="gpt">
-        <span class="root-search-engine-option-icon" data-engine-icon="gpt" aria-hidden="true"></span>
-        <span>GPT</span>
-    </button>
-    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="claude">
-        <span class="root-search-engine-option-icon" data-engine-icon="claude" aria-hidden="true"></span>
-        <span>Claude</span>
-    </button>
-    <button type="button" class="root-search-engine-option" data-engine-option data-engine-value="gemini">
-        <span class="root-search-engine-option-icon" data-engine-icon="gemini" aria-hidden="true"></span>
-        <span>Gemini</span>
-    </button>
-</div>
+{% include "popup/root/shortcuts_context_menu.html" %}
+{% include "popup/root/auth_logout_modal.html" %}
+{% include "popup/root/search_engine_popup.html" %}
 <script src="{% static_v 'js/root_search.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
 {% endblock %}
