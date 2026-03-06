@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static_versioned %}
 {% block body_class %}ui-page minigame-page{% endblock %}
 {% block content %}
 {% include 'docs/_assets_head.html' %}
@@ -14,6 +15,15 @@
                 <span class="ui-path-sep">/</span>
                 <span class="ui-path-current">{{ page_title }}</span>
             </div>
+        </div>
+        <div class="ui-toolbar-right minigame-auth-host">
+            {% if request.user.is_authenticated %}
+                {% include "partials/account_widget.html" %}
+            {% else %}
+                <a class="ide-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
+                    {% include 'partials/ui_i18n.html' with key='login' %}
+                </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -266,4 +276,8 @@
         });
     })();
 </script>
+{% if request.user.is_authenticated %}
+{% include "popup/root/auth_logout_modal.html" %}
+<script src="{% static_v 'js/minigame_account_widget.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+{% endif %}
 {% endblock %}
