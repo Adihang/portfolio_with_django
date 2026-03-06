@@ -14,7 +14,7 @@
 ## 1. 필수 준비
 
 ```bash
-cd /Users/imhanbyeol/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/Hanplanet
 
 # 가상환경 (이미 있으면 생략)
 python3 -m venv .venv
@@ -85,8 +85,8 @@ After=network.target
 [Service]
 User=ubuntu
 Group=www-data
-WorkingDirectory=/Users/imhanbyeol/Development/portfolio_with_django
-ExecStart=/Users/imhanbyeol/Development/portfolio_with_django/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir /Users/imhanbyeol/Development/portfolio_with_django
+WorkingDirectory=/Users/imhanbyeol/Development/Hanplanet
+ExecStart=/Users/imhanbyeol/Development/Hanplanet/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir /Users/imhanbyeol/Development/Hanplanet
 Restart=always
 RestartSec=3
 
@@ -297,7 +297,7 @@ curl -I https://hanplanet.com
 ### 10-1. 준비
 
 ```bash
-cd /Users/imhanbyeol/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/Hanplanet
 
 cp .env.docker.example .env.docker
 cp docker/cloudflared/config.yml.example docker/cloudflared/config.yml
@@ -363,14 +363,14 @@ docker compose up -d
 ### 11-1. Nginx 재적용
 
 ```bash
-/opt/homebrew/opt/nginx/bin/nginx -t -c /Users/imhanbyeol/Development/portfolio_with_django/nginx/nginx.autorun.conf
+/opt/homebrew/opt/nginx/bin/nginx -t -c /Users/imhanbyeol/Development/Hanplanet/nginx/nginx.autorun.conf
 launchctl kickstart -k gui/$(id -u)/homebrew.mxcl.nginx
 ```
 
 ### 11-2. 수동 회전 테스트
 
 ```bash
-cd /Users/imhanbyeol/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/Hanplanet
 ./scripts/rotate-nginx-access-json.sh
 ls -lh /opt/homebrew/var/log/nginx/access_json*
 ```
@@ -378,7 +378,7 @@ ls -lh /opt/homebrew/var/log/nginx/access_json*
 ### 11-3. 매일 자동 실행(00:05) 등록
 
 ```bash
-cp /Users/imhanbyeol/Development/portfolio_with_django/deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist \
+cp /Users/imhanbyeol/Development/Hanplanet/deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist \
   ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
 
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
@@ -412,7 +412,7 @@ rm -f ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
 ### 11-6. 일일 요약 생성(수동)
 
 ```bash
-cd /Users/imhanbyeol/Development/portfolio_with_django
+cd /Users/imhanbyeol/Development/Hanplanet
 .venv/bin/python manage.py summarize_access_logs --date "$(date -v-1d '+%Y-%m-%d')"
 ls -lh /opt/homebrew/var/log/nginx/summaries/access_summary_*
 ```
@@ -423,7 +423,7 @@ ls -lh /opt/homebrew/var/log/nginx/summaries/access_summary_*
 아래 launchd 등록은 서버 프로세스 외부에서 별도로 돌리고 싶을 때만 사용하세요.
 
 ```bash
-cp /Users/imhanbyeol/Development/portfolio_with_django/deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist \
+cp /Users/imhanbyeol/Development/Hanplanet/deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist \
   ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
 
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
