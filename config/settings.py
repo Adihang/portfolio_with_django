@@ -149,6 +149,12 @@ ALLOWED_HOSTS = env_list(
 
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://hanplanet.com").rstrip("/")
 DJANGO_SERVE_FILES = env_bool("DJANGO_SERVE_FILES", default=True)
+GAME_WS_PUBLIC_URL = os.environ.get("GAME_WS_PUBLIC_URL", "wss://game.hanplanet.com").rstrip("/")
+GAME_WS_LOCAL_URL = os.environ.get("GAME_WS_LOCAL_URL", "ws://127.0.0.1:8081").rstrip("/")
+GAME_JWT_SECRET = load_optional_secret("GAME_JWT_SECRET", SECRET_KEY)
+GAME_JWT_ISSUER = load_optional_secret("GAME_JWT_ISSUER", PUBLIC_BASE_URL).rstrip("/")
+GAME_JWT_AUDIENCE = load_optional_secret("GAME_JWT_AUDIENCE", "hanplanet-game")
+GAME_JWT_EXP_SECONDS = max(30, load_optional_int_secret("GAME_JWT_EXP_SECONDS", 300))
 # Application definition
 
 INSTALLED_APPS = [

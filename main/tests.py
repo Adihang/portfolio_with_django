@@ -32,6 +32,7 @@ from .docs_views import (
     is_docs_editor,
 )
 from .views import (
+    build_game_auth_token,
     build_lang_switch_url,
     has_excessive_korean_text,
     render_markdown_safely,
@@ -559,6 +560,60 @@ class DocsAuthFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], reverse("main:docs_root_lang", kwargs={"ui_lang": "ko"}))
+
+
+class HanplanetMultiplayerPageTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="multiplayer_user",
+            password="pw123456",
+            email="multi@example.com",
+        )
+
+    def test_multiplayer_page_redirects_to_login_when_unauthenticated(self):
+        response = self.client.get("/ko/fun/hanplanet-multiplayer/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/docs/login/?next=/ko/fun/hanplanet-multiplayer/")
+
+    def test_multiplayer_page_renders_for_authenticated_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/hanplanet-multiplayer/", HTTP_HOST="127.0.0.1:8000")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-game-client", html=False)
+        self.assertContains(response, "ws://127.0.0.1:8081", html=False)
+        self.assertContains(response, "/ko/api/game-auth-token/", html=False)
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
+    def test_game_auth_token_api_returns_signed_token(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/api/game-auth-token/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("token", payload)
+        token = payload["token"]
+        self.assertEqual(token.count("."), 2)
+        self.assertEqual(payload["expires_in"], 300)
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
+    def test_build_game_auth_token_uses_expected_subject(self):
+        token = build_game_auth_token(self.user)
+
+        self.assertTrue(token.startswith("ey"))
 
 
 class DocsAccessRuleTests(TestCase):

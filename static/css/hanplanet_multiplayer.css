@@ -1,0 +1,143 @@
+.multiplayer-shell {
+    padding-top: 18px;
+    padding-bottom: 30px;
+}
+
+.multiplayer-stage {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+}
+
+.multiplayer-app {
+    display: grid;
+    gap: 16px;
+}
+
+.multiplayer-panel {
+    border: 1px solid var(--ide-border-soft);
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 55%),
+        var(--ide-surface-muted);
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+.multiplayer-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-end;
+    padding: 20px;
+}
+
+.multiplayer-kicker {
+    margin: 0 0 8px;
+    color: var(--ide-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.multiplayer-heading {
+    margin: 0;
+    font-size: clamp(28px, 3vw, 42px);
+    line-height: 1;
+}
+
+.multiplayer-description {
+    margin: 10px 0 0;
+    color: var(--ide-text-muted);
+    max-width: 620px;
+    font-size: 16px;
+}
+
+.multiplayer-grid {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 16px;
+}
+
+.multiplayer-sidebar {
+    display: grid;
+    gap: 12px;
+}
+
+.multiplayer-stat,
+.multiplayer-help {
+    padding: 16px;
+}
+
+.multiplayer-stat-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--ide-text-muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.multiplayer-stat-value,
+.multiplayer-status {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ide-text-stronger);
+}
+
+.multiplayer-status {
+    color: #0f766e;
+}
+
+.multiplayer-help h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.multiplayer-help p {
+    margin: 0;
+    color: var(--ide-text-muted);
+    line-height: 1.5;
+}
+
+.multiplayer-canvas-wrap {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--ide-border-soft);
+    background:
+        radial-gradient(circle at top, rgba(14, 165, 233, 0.18), transparent 40%),
+        linear-gradient(180deg, #0f172a, #111827 56%, #172554);
+    min-height: 640px;
+}
+
+.multiplayer-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: transparent;
+}
+
+.multiplayer-reconnect-btn {
+    align-self: center;
+}
+
+@media (max-width: 980px) {
+    .multiplayer-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .multiplayer-canvas-wrap {
+        min-height: 480px;
+    }
+}
+
+@media (max-width: 640px) {
+    .multiplayer-hero {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .multiplayer-canvas-wrap {
+        min-height: 360px;
+    }
+}

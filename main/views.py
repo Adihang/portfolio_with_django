@@ -25,6 +25,10 @@ import json
 import re
 import logging
 import math
+import base64
+import hashlib
+import hmac
+import time
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 import markdown
@@ -564,6 +568,32 @@ def _redirect_to_docs_login_with_next(request):
     return redirect(f"/docs/login/?next={encoded_next}")
 
 
+def _base64url_encode(raw_bytes):
+    return base64.urlsafe_b64encode(raw_bytes).rstrip(b"=").decode("ascii")
+
+
+def build_game_auth_token(user):
+    now = int(time.time())
+    header = {"alg": "HS256", "typ": "JWT"}
+    payload = {
+        "sub": str(user.username),
+        "username": str(user.username),
+        "display_name": get_account_display_name(user),
+        "iat": now,
+        "nbf": now,
+        "exp": now + int(getattr(settings, "GAME_JWT_EXP_SECONDS", 300) or 300),
+        "iss": str(getattr(settings, "GAME_JWT_ISSUER", "") or ""),
+        "aud": str(getattr(settings, "GAME_JWT_AUDIENCE", "") or ""),
+    }
+    encoded_header = _base64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+    encoded_payload = _base64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    signing_input = f"{encoded_header}.{encoded_payload}".encode("ascii")
+    secret = str(getattr(settings, "GAME_JWT_SECRET", "") or "").encode("utf-8")
+    signature = hmac.new(secret, signing_input, hashlib.sha256).digest()
+    encoded_signature = _base64url_encode(signature)
+    return f"{encoded_header}.{encoded_payload}.{encoded_signature}"
+
+
 def favicon_ico(request):
     static_root = Path(getattr(settings, "STATIC_ROOT", "") or "")
     base_dir = Path(getattr(settings, "BASE_DIR", Path.cwd()))
@@ -649,6 +679,10 @@ def minigame_page(request, ui_lang=None):
             "title": "Bubble",
             "url": reverse("main:bubble_lang", kwargs={"ui_lang": resolved_lang}),
         },
+        {
+            "title": "Hanplanet Multiplayer",
+            "url": reverse("main:hanplanet_multiplayer_lang", kwargs={"ui_lang": resolved_lang}),
+        },
     ]
 
     context = {
@@ -700,6 +734,86 @@ def bubble_page(request, ui_lang=None):
         "back_to_minigame_text": "Back to Mini Game" if is_english else "미니게임으로 돌아가기",
     }
     return render(request, "fun/bubble.html", context)
+
+
+def hanplanet_multiplayer_page(request, ui_lang=None):
+    if not request.user.is_authenticated:
+        return _redirect_to_docs_login_with_next(request)
+
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    is_english = resolved_lang == "en"
+    host = (request.get_host() or "").split(":")[0].strip().lower()
+
+    if host in {"localhost", "127.0.0.1"}:
+        ws_url = str(getattr(settings, "GAME_WS_LOCAL_URL", "ws://127.0.0.1:8081") or "ws://127.0.0.1:8081")
+    else:
+        ws_url = str(getattr(settings, "GAME_WS_PUBLIC_URL", "wss://game.hanplanet.com") or "wss://game.hanplanet.com")
+
+    portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
+    context = {
+        "ui_lang": resolved_lang,
+        "page_title": "Hanplanet Multiplayer" if is_english else "한플래닛 멀티플레이어",
+        "multiplayer_title": "Hanplanet Multiplayer" if is_english else "한플래닛 멀티플레이어",
+        "multiplayer_description": (
+            "Sign in and move around the shared grid in your browser."
+            if is_english
+            else "로그인 후 브라우저에서 같은 그리드를 함께 돌아다녀 보세요."
+        ),
+        "multiplayer_back_text": "Back to Mini Game" if is_english else "미니게임으로 돌아가기",
+        "game_ws_url": ws_url,
+        "game_token_url": reverse("main:game_auth_token_lang", kwargs={"ui_lang": resolved_lang}),
+        "game_player_name": get_account_display_name(request.user) or request.user.username,
+        "docs_my_portfolio_url": reverse(
+            "main:portfolio_user_lang",
+            kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+        ),
+        "account_display_name": get_account_display_name(request.user),
+        "account_profile_image_url": (
+            portfolio_profile.profile_img.url if portfolio_profile and portfolio_profile.profile_img else ""
+        ),
+        "account_email": str(request.user.email or "").strip(),
+        "account_profile_upload_url": reverse(
+            "main:account_profile_image_upload_lang",
+            kwargs={"ui_lang": resolved_lang},
+        ),
+        "account_my_portfolio_url": reverse(
+            "main:portfolio_user_lang",
+            kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+        ),
+        "account_logout_form_id": "auth-logout-form-multiplayer",
+        "account_logout_next": request.get_full_path() or reverse(
+            "main:hanplanet_multiplayer_lang", kwargs={"ui_lang": resolved_lang}
+        ),
+        "account_logout_url": reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang}),
+    }
+    apply_ui_context(request, context, resolved_lang)
+    response = render(request, "fun/Hanplanet_Multiplayer.html", context)
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
+
+
+@require_http_methods(["GET"])
+def game_auth_token(request, ui_lang=None):
+    resolve_ui_lang(request, ui_lang)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "authentication_required"}, status=401)
+
+    secret = str(getattr(settings, "GAME_JWT_SECRET", "") or "").strip()
+    if not secret:
+        return JsonResponse({"error": "game_jwt_secret_not_configured"}, status=503)
+
+    token = build_game_auth_token(request.user)
+    response = JsonResponse(
+        {
+            "token": token,
+            "expires_in": int(getattr(settings, "GAME_JWT_EXP_SECONDS", 300) or 300),
+            "ws_url": str(getattr(settings, "GAME_WS_PUBLIC_URL", "") or ""),
+        }
+    )
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
 
 
 def none(request, ui_lang=None):
