@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import time
+import tarfile
 from datetime import timedelta
 from pathlib import Path
 
@@ -14,6 +15,7 @@ else:
     import fcntl
 
 from django.utils import timezone
+from django.conf import settings
 
 from .access_log_summary import build_daily_summary, resolve_summary_dir, write_summary_files
 
@@ -23,6 +25,7 @@ _scheduler_started = False
 _scheduler_lock_fd = None
 _scheduler_thread = None
 _last_generated_date = None
+_last_backup_date = None
 
 
 def _env_bool(name, default):
@@ -101,6 +104,77 @@ def _summary_json_path(target_date):
     return Path(resolve_summary_dir()) / f"access_summary_{target_date.isoformat()}.json"
 
 
+def _resolve_backup_root():
+    from_env = os.environ.get("DJANGO_DATA_BACKUP_ROOT", "").strip()
+    if from_env:
+        return Path(from_env)
+    configured = str(getattr(settings, "DATA_BACKUP_ROOT", "") or "").strip()
+    if configured:
+        return Path(configured)
+    return None
+
+
+def _resolve_backup_retention_days():
+    raw_env = os.environ.get("DJANGO_DATA_BACKUP_RETENTION_DAYS", "").strip()
+    if raw_env:
+        try:
+            return max(1, int(raw_env))
+        except ValueError:
+            return 3
+    try:
+        return max(1, int(getattr(settings, "DATA_BACKUP_RETENTION_DAYS", 3)))
+    except (TypeError, ValueError):
+        return 3
+
+
+def _build_backup_target_paths():
+    base_dir = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parent.parent))
+    targets = [
+        base_dir / "db.sqlite3",
+        base_dir / "media",
+        base_dir / "config" / "secrets.json",
+    ]
+    return [target for target in targets if target.exists()]
+
+
+def _backup_archive_path(backup_root, target_date):
+    return backup_root / f"hanplanet_data_{target_date.isoformat()}.tar.gz"
+
+
+def _cleanup_old_backup_archives(backup_root, retention_days):
+    archives = sorted(backup_root.glob("hanplanet_data_*.tar.gz"), key=lambda p: p.name)
+    if len(archives) <= retention_days:
+        return
+    remove_count = len(archives) - retention_days
+    for archive in archives[:remove_count]:
+        try:
+            archive.unlink()
+            logger.info("Removed old backup archive: %s", archive)
+        except OSError as exc:
+            logger.warning("Failed to remove old backup archive %s: %s", archive, exc)
+
+
+def _create_data_backup_archive(backup_root, target_date):
+    backup_root.mkdir(parents=True, exist_ok=True)
+    archive_path = _backup_archive_path(backup_root, target_date)
+    source_paths = _build_backup_target_paths()
+
+    if not source_paths:
+        logger.info("No data targets found for backup.")
+        return None
+
+    base_dir = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parent.parent))
+    with tarfile.open(archive_path, "w:gz") as tar:
+        for source_path in source_paths:
+            try:
+                arcname = source_path.relative_to(base_dir)
+            except ValueError:
+                arcname = source_path.name
+            tar.add(source_path, arcname=str(arcname))
+
+    return archive_path
+
+
 def _maybe_generate_previous_day_summary():
     global _last_generated_date
 
@@ -132,11 +206,42 @@ def _maybe_generate_previous_day_summary():
     )
 
 
+def _maybe_backup_data_files():
+    global _last_backup_date
+
+    now = timezone.localtime()
+    trigger_at = now.replace(hour=0, minute=5, second=0, microsecond=0)
+    if now < trigger_at:
+        return
+
+    backup_date = now.date()
+    if _last_backup_date == backup_date:
+        return
+
+    backup_root = _resolve_backup_root()
+    if backup_root is None:
+        logger.info("DATA_BACKUP_ROOT is empty. Skipping daily data backup.")
+        return
+
+    archive_path = _backup_archive_path(backup_root, backup_date)
+    if archive_path.exists():
+        _last_backup_date = backup_date
+        _cleanup_old_backup_archives(backup_root, _resolve_backup_retention_days())
+        return
+
+    created_archive = _create_data_backup_archive(backup_root, backup_date)
+    if created_archive is not None:
+        _last_backup_date = backup_date
+        logger.info("Created daily data backup: %s", created_archive)
+        _cleanup_old_backup_archives(backup_root, _resolve_backup_retention_days())
+
+
 def _scheduler_loop():
     interval_sec = 30
     while True:
         try:
             _maybe_generate_previous_day_summary()
+            _maybe_backup_data_files()
         except Exception as exc:  # pragma: no cover - defensive loop guard
             logger.exception("Access summary scheduler error: %s", exc)
         time.sleep(interval_sec)

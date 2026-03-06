@@ -100,6 +100,32 @@ def load_optional_secret(name, default=""):
             return value.strip()
     return default
 
+
+def load_optional_int_secret(name, default):
+    from_env = os.environ.get(name)
+    if from_env is not None and str(from_env).strip():
+        try:
+            return int(str(from_env).strip())
+        except ValueError:
+            return default
+
+    if DEBUG:
+        return default
+
+    secrets_path = BASE_DIR / "config" / "secrets.json"
+    if secrets_path.exists():
+        try:
+            with secrets_path.open("r", encoding="utf-8") as file:
+                secrets = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            return default
+        value = secrets.get(name)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+    return default
+
 # Ollama (local LLM) settings
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:latest")
@@ -110,7 +136,11 @@ if DEBUG:
     TURNSTILE_SECRET_KEY = ""
 else:
     TURNSTILE_SITE_KEY = load_optional_secret("TURNSTILE_SITE_KEY", "")
-    TURNSTILE_SECRET_KEY = load_optional_secret("TURNSTILE_SECRET_KEY", "")
+TURNSTILE_SECRET_KEY = load_optional_secret("TURNSTILE_SECRET_KEY", "")
+
+# Daily local backup settings (loaded from config/secrets.json or env)
+DATA_BACKUP_ROOT = load_optional_secret("DATA_BACKUP_ROOT", "")
+DATA_BACKUP_RETENTION_DAYS = max(1, load_optional_int_secret("DATA_BACKUP_RETENTION_DAYS", 3))
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
