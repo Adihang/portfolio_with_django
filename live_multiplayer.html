@@ -1,0 +1,613 @@
+
+
+<!doctype html>
+<html lang="ko" data-account-theme-mode="">
+<head>
+    <style data-surface-light="base-preload">
+        html.preload-light-bg,
+        html.preload-light-bg body {
+            background: #ffffff;
+            background-image: none;
+        }
+
+        html.preload-dark-bg,
+        html.preload-dark-bg body {
+            background: #222222;
+            background-image: none;
+        }
+
+        body.theme-preinit,
+        body.theme-preinit * {
+            transition: none !important;
+            animation: none !important;
+        }
+    </style>
+    <script>
+        (function () {
+            const path = window.location.pathname;
+            const explicitLightPaths = new Set(['/portfolio/', '/portfolio', '/docs/', '/docs']);
+            const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|docs(?:\/.*)?)$/;
+            const shouldUseLightBg = explicitLightPaths.has(path) ||
+                path.startsWith('/docs/') ||
+                path.startsWith('/project/') ||
+                localizedLightBgPattern.test(path);
+
+            if (!shouldUseLightBg) {
+                return;
+            }
+
+            const accountThemeMode = (document.documentElement.getAttribute('data-account-theme-mode') || '').trim().toLowerCase();
+            let prefersDark = false;
+
+            if (accountThemeMode === 'dark') {
+                prefersDark = true;
+            } else if (accountThemeMode === 'light') {
+                prefersDark = false;
+            } else {
+                try {
+                    const storedThemeMode = window.localStorage.getItem('portfolio_theme_mode');
+                    if (storedThemeMode === 'dark') {
+                        prefersDark = true;
+                    } else if (storedThemeMode === 'light') {
+                        prefersDark = false;
+                    } else {
+                        prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    }
+                } catch (error) {
+                    prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                }
+            }
+
+            if (prefersDark) {
+                document.documentElement.classList.add('preload-dark-bg');
+            } else {
+                document.documentElement.classList.add('preload-light-bg');
+            }
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Web IDE Page">
+    <meta name="author" content="Hanplanet">
+    <meta name="generator" content="Django">
+    <meta name="robots" content="index,follow">
+    <meta property="og:title" content="Hanplanet IDE">
+    <meta property="og:site_name" content="Hanplanet IDE">
+    <meta property="og:description" content="Web IDE Page">
+    <meta property="og:url" content="https://hanplanet.com/ko/ide/login">
+    <meta property="og:image" content="https://www.hanplanet.com/static/icons/hanplanet-og-1200.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Hanplanet IDE">
+    <meta name="twitter:description" content="Web IDE Page">
+    <meta name="twitter:image" content="https://www.hanplanet.com/static/icons/hanplanet-og-1200.png">
+    <link rel="canonical" href="https://hanplanet.com/ko/ide/login">
+    
+    
+<!-- PWA metadata for installable app behavior -->
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0d6efd">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171717">
+<link rel="manifest" href="/manifest.webmanifest?v=20260305-5">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/icons/pwa-180.png?v=1772698331">
+<script>
+    (function () {
+        var deferredInstallPrompt = null;
+        var installButtonSelector = '[data-pwa-install]';
+        var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true;
+
+        var setInstallButtonsState = function (state) {
+            var buttons = document.querySelectorAll(installButtonSelector);
+            buttons.forEach(function (button) {
+                if (state === 'ready') {
+                    button.style.display = 'inline-flex';
+                    button.classList.remove('is-disabled');
+                    button.removeAttribute('aria-disabled');
+                    return;
+                }
+
+                if (state === 'installed' || state === 'hidden') {
+                    button.style.display = 'none';
+                    return;
+                }
+
+                button.style.display = 'none';
+            });
+        };
+
+        var showInstallFallbackGuide = function () {
+            var message = '브라우저 메뉴에서 "홈 화면에 추가" 또는 "앱 설치"를 선택해 주세요.';
+            var ua = (window.navigator.userAgent || '').toLowerCase();
+            var isIOS = /iphone|ipad|ipod/.test(ua);
+            if (isIOS) {
+                message = 'Safari에서 공유 버튼을 누른 뒤 "홈 화면에 추가"를 선택해 주세요.';
+            }
+            window.alert(message);
+        };
+
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest(installButtonSelector);
+            if (!button) {
+                return;
+            }
+
+            event.preventDefault();
+            if (!deferredInstallPrompt) {
+                showInstallFallbackGuide();
+                return;
+            }
+
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.finally(function () {
+                deferredInstallPrompt = null;
+                setInstallButtonsState('hidden');
+            });
+        });
+
+        window.addEventListener('beforeinstallprompt', function (event) {
+            deferredInstallPrompt = event;
+            setInstallButtonsState('ready');
+        });
+
+        window.addEventListener('appinstalled', function () {
+            deferredInstallPrompt = null;
+            setInstallButtonsState('installed');
+        });
+
+        if (isStandalone) {
+            setInstallButtonsState('installed');
+        } else {
+            setInstallButtonsState('hidden');
+        }
+
+        if (!('serviceWorker' in navigator)) {
+            return;
+        }
+
+        window.addEventListener('load', function () {
+            // Register once on load; failures are non-blocking for normal page use.
+            navigator.serviceWorker.register('/service-worker.js?v=20260305-5')
+                .catch(function (error) {
+                    console.warn('[pwa] service worker registration failed:', error);
+                });
+        });
+    })();
+</script>
+
+    <script>
+    (function () {
+        if (window.__reloadStaticScript) {
+            return;
+        }
+
+        window.__reloadStaticScript = function (scriptEl) {
+            if (!scriptEl) {
+                return;
+            }
+
+            if (scriptEl.dataset && scriptEl.dataset.retryOnce === '1') {
+                return;
+            }
+
+            var src = scriptEl.getAttribute('src');
+            if (!src) {
+                return;
+            }
+
+            if (scriptEl.dataset) {
+                scriptEl.dataset.retryOnce = '1';
+            }
+
+            var retryScript = document.createElement('script');
+            var cacheBuster = 'v=' + Date.now();
+            retryScript.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + cacheBuster;
+            retryScript.type = scriptEl.type || 'text/javascript';
+            retryScript.defer = scriptEl.defer;
+            retryScript.async = scriptEl.async;
+            retryScript.onerror = function () {
+                console.error('[static-js] retry failed:', retryScript.src);
+            };
+
+            scriptEl.parentNode.insertBefore(retryScript, scriptEl.nextSibling);
+            console.warn('[static-js] initial load failed, retrying:', src);
+        };
+    })();
+</script>
+
+    
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/static/icons/pwa-192.png?v=1772698331">
+    <link rel="stylesheet" type="text/css" href="/static/css/bootstrap.min.css?v=1772595460">
+    <link rel="stylesheet" type="text/css" href="/static/css/common_layout.css?v=1772761070">
+    <link rel="stylesheet" type="text/css" href="/static/css/account_widget.css?v=1772773446">
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css?v=1772773446">
+    <link rel="stylesheet" type="text/css" href="/static/css/popup_common.css?v=1772762658">
+    
+    <script src="/static/js/bootstrap.min.js?v=1772595460" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    <script src="/static/js/portfolio_print_content_helpers.js?v=1772762422" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    <script src="/static/js/portfolio_print_selector_dialog.js?v=1772761696" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    <script src="/static/js/portfolio_print_runtime.js?v=1772762018" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    <script src="/static/js/site_nav_responsive_manager.js?v=1772762422" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    <script src="/static/js/script.js?v=1772773446" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
+    
+    
+    <title>Hanplanet IDE</title>
+    <!-- CSRF Token for AJAX -->
+    <meta name="csrf-token" content="gRFbRnR4If4Zt5i3btVW8QjBEvSOqgSkpTr72AAt3AsacPckdRgnkGVOWwnGlM0V">
+</head>
+<body
+    class="page ide-page"
+    data-authenticated="0"
+    data-theme-preference-url="/ko/api/theme-preference/?next=%2Fko%2Ffun%2Fhanplanet-multiplayer%2F"
+    data-user-preference-url="/ko/api/user-preferences/?next=%2Fko%2Ffun%2Fhanplanet-multiplayer%2F"
+    data-portfolio-owner-username=""
+>
+    <script>
+        (function () {
+            const body = document.body;
+            if (!body) {
+                return;
+            }
+
+            body.classList.add('theme-preinit');
+
+            const accountThemeMode = (document.documentElement.getAttribute('data-account-theme-mode') || '').trim().toLowerCase();
+            let prefersDark = false;
+
+            if (accountThemeMode === 'dark') {
+                prefersDark = true;
+            } else if (accountThemeMode === 'light') {
+                prefersDark = false;
+            } else {
+                try {
+                    const storedThemeMode = window.localStorage.getItem('portfolio_theme_mode');
+                    if (storedThemeMode === 'dark') {
+                        prefersDark = true;
+                    } else if (storedThemeMode === 'light') {
+                        prefersDark = false;
+                    } else {
+                        prefersDark = Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                    }
+                } catch (error) {
+                    prefersDark = Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                }
+            }
+
+            body.classList.toggle('theme-dark', prefersDark);
+        })();
+    </script>
+    <!-- 네비게이션바 -->
+<nav class="navbar ui-nav">
+    <div class="container-fluid">
+        <div class="ui-brand-group">
+            <a class="navbar-brand ui-brand" href="/">
+                <span class="ui-brand-text">Hanplanet</span>
+            </a>
+        </div>
+        
+        <button class="navbar-toggler ui-nav-toggler" type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        
+        <div class="collapse ui-nav-collapse" id="navbarSupportedContent">
+            
+            <ul class="ui-nav-links">
+                
+                    <li class="nav-item">
+                        <a class="nav-link ui-nav-link" href="/ide/list">IDE</a>
+                    </li>
+                
+                    <li class="nav-item">
+                        <a class="nav-link ui-nav-link" href="/minigame">Mini Game</a>
+                    </li>
+                
+            </ul>
+            <button
+                type="button"
+                class="ui-pwa-install-btn"
+                data-pwa-install
+                aria-label="앱 설치
+
+"
+                title="앱 설치
+
+"
+            >
+                <span class="ui-pwa-install-icon" aria-hidden="true"></span>
+            </button>
+            <div class="ui-controls-stack">
+                <div class="ui-lang-toggle ui-control-toggle ui-lang-toggle-inline" aria-label="Language Toggle">
+                    <a class="ui-lang-link ui-control-link is-active" href="/ko/ide/login?next=%2Fko%2Ffun%2Fhanplanet-multiplayer%2F">KO</a>
+                    <span class="ui-lang-divider">|</span>
+                    <a class="ui-lang-link ui-control-link" href="/en/ide/login?next=%2Fko%2Ffun%2Fhanplanet-multiplayer%2F">EN</a>
+                </div>
+                <div class="ui-lang-toggle ui-control-toggle ui-theme-toggle" aria-label="Theme Toggle">
+                    <a href="#" role="button" class="ui-lang-link ui-control-link is-active" data-theme-mode="light">LT</a>
+                    <span class="ui-lang-divider">|</span>
+                    <a href="#" role="button" class="ui-lang-link ui-control-link" data-theme-mode="dark">DK</a>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</nav>
+
+    
+
+<link rel="stylesheet" href="/static/css/docs.css?v=1772773446" type="text/css">
+
+
+<div class="ide-toolbar-wrap ui-toolbar-wrap">
+    <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
+        <div class="ide-toolbar-left ui-toolbar-left">
+            <h1 class="ide-title ui-title">IDE 로그인</h1>
+            <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
+                <a class="ide-path-link ui-path-link" href="/ko/ide">ide</a>
+                <span class="ide-path-sep ui-path-sep">/</span>
+                <span class="ide-path-current ui-path-current">로그인</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="ide-shell ui-shell ide-content ui-content">
+    <form method="post" class="ide-login-form" id="ide-login-form">
+        <input type="hidden" name="csrfmiddlewaretoken" value="gRFbRnR4If4Zt5i3btVW8QjBEvSOqgSkpTr72AAt3AsacPckdRgnkGVOWwnGlM0V">
+        <input type="hidden" name="next" value="/ko/fun/hanplanet-multiplayer/">
+
+        
+
+        <label class="ide-field ide-field-full">
+            <span>아이디</span>
+            <input
+                type="text"
+                name="username"
+                value=""
+                autocomplete="username"
+                required
+                autofocus
+            >
+        </label>
+
+        <label class="ide-field ide-field-full">
+            <span>비밀번호</span>
+            <input
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                required
+            >
+        </label>
+
+        <label class="ide-field ide-field-full" id="ide-login-captcha-block" hidden>
+                <span>캡챠 인증</span>
+                <span class="ide-subtitle">아래 보안 인증을 완료해주세요.</span>
+                <span id="ide-login-captcha-question"></span>
+                <input
+                    type="text"
+                    name="ide-captcha-answer"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="정답 입력"
+                    
+                >
+                
+                    <div id="ide-turnstile-widget"></div>
+                
+        </label>
+
+        <div class="ide-login-actions">
+            <a class="ide-btn" href="/ko/ide">취소</a>
+            <button class="ide-btn ide-btn-primary" type="submit" id="ide-login-submit-btn">로그인</button>
+        </div>
+    </form>
+</main>
+
+<script>
+    (function () {
+        const loginForm = document.getElementById("ide-login-form");
+        const submitButton = document.getElementById("ide-login-submit-btn");
+        if (!loginForm || !submitButton) {
+            return;
+        }
+
+        const handleEnterSubmit = function (event) {
+            if (event.key !== "Enter" || event.isComposing) {
+                return;
+            }
+            event.preventDefault();
+            if (typeof loginForm.requestSubmit === "function") {
+                loginForm.requestSubmit(submitButton);
+                return;
+            }
+            submitButton.click();
+        };
+
+        loginForm.querySelectorAll('input[name="username"], input[name="password"]').forEach(function (input) {
+            input.addEventListener("keydown", handleEnterSubmit);
+        });
+
+        const usernameInput = loginForm.querySelector('input[name="username"]');
+        const captchaBlock = document.getElementById("ide-login-captcha-block");
+        const captchaQuestionNode = document.getElementById("ide-login-captcha-question");
+        const captchaAnswerInput = loginForm.querySelector('input[name="ide-captcha-answer"]');
+        const turnstileContainer = document.getElementById("ide-turnstile-widget");
+        const captchaStatusUrl = "/ide/api/login\u002Dcaptcha\u002Dstatus";
+        const turnstileSiteKey = "0x4AAAAAACktHZCxqjisAyeX";
+
+        const getTurnstileTheme = function () {
+            return document.body.classList.contains("theme-dark") ? "dark" : "light";
+        };
+
+        let lastTheme = "";
+        let turnstileWidgetId = null;
+        let mutationObserver = null;
+        let usernameCheckTimer = null;
+        let lastCheckedUsername = "";
+
+        const removeTurnstile = function () {
+            if (!window.turnstile || turnstileWidgetId === null) {
+                if (turnstileContainer) {
+                    turnstileContainer.innerHTML = "";
+                }
+                return;
+            }
+            try {
+                window.turnstile.remove(turnstileWidgetId);
+            } catch (error) {
+                turnstileContainer.innerHTML = "";
+            }
+            turnstileWidgetId = null;
+        };
+
+        const renderTurnstile = function () {
+            if (!window.turnstile || !turnstileContainer || !turnstileSiteKey) {
+                return;
+            }
+            const nextTheme = getTurnstileTheme();
+            if (
+                lastTheme === nextTheme &&
+                turnstileWidgetId !== null &&
+                turnstileContainer.childElementCount > 0
+            ) {
+                return;
+            }
+            removeTurnstile();
+            turnstileWidgetId = window.turnstile.render("#ide-turnstile-widget", {
+                sitekey: turnstileSiteKey,
+                theme: nextTheme
+            });
+            lastTheme = nextTheme;
+        };
+
+        const setCaptchaVisible = function (visible, questionText) {
+            if (!captchaBlock) {
+                return;
+            }
+            if (visible) {
+                captchaBlock.removeAttribute("hidden");
+            } else {
+                captchaBlock.setAttribute("hidden", "");
+            }
+            if (captchaQuestionNode) {
+                captchaQuestionNode.textContent = visible ? (questionText || "") : "";
+            }
+            if (captchaAnswerInput) {
+                captchaAnswerInput.required = Boolean(visible);
+                if (!visible) {
+                    captchaAnswerInput.value = "";
+                }
+            }
+            if (visible) {
+                renderTurnstile();
+                return;
+            }
+            removeTurnstile();
+            lastTheme = "";
+        };
+
+        const fetchCaptchaStatus = function (force) {
+            if (!usernameInput || !captchaStatusUrl) {
+                return;
+            }
+            const usernameValue = usernameInput.value.trim();
+            if (!usernameValue) {
+                lastCheckedUsername = "";
+                setCaptchaVisible(false, "");
+                return;
+            }
+            if (!force && usernameValue === lastCheckedUsername) {
+                return;
+            }
+            lastCheckedUsername = usernameValue;
+
+            fetch(captchaStatusUrl + "?username=" + encodeURIComponent(usernameValue), {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("captcha status request failed");
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data || data.ok !== true) {
+                        return;
+                    }
+                    if (data.required) {
+                        setCaptchaVisible(true, data.question || "");
+                        return;
+                    }
+                    setCaptchaVisible(false, "");
+                })
+                .catch(function () {
+                    return;
+                });
+        };
+
+        window.ideTurnstileOnload = function () {
+            if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
+                renderTurnstile();
+            }
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+            }
+            mutationObserver = new MutationObserver(function (mutations) {
+                for (const mutation of mutations) {
+                    if (mutation.attributeName === "class") {
+                        if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
+                            renderTurnstile();
+                        }
+                        break;
+                    }
+                }
+            });
+            mutationObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ["class"]
+            });
+        };
+
+        if (window.turnstile && typeof window.turnstile.render === "function") {
+            window.ideTurnstileOnload();
+        }
+
+        if (usernameInput) {
+            usernameInput.addEventListener("blur", function () {
+                fetchCaptchaStatus(true);
+            });
+            usernameInput.addEventListener("input", function () {
+                if (usernameCheckTimer) {
+                    window.clearTimeout(usernameCheckTimer);
+                }
+                usernameCheckTimer = window.setTimeout(function () {
+                    fetchCaptchaStatus(false);
+                }, 300);
+            });
+            fetchCaptchaStatus(true);
+        }
+    })();
+</script>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=ideTurnstileOnload&render=explicit" async defer></script>
+
+
+    <!-- 채팅 위젯 -->
+    
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d7ef2c0f99a2eb5',t:'MTc3Mjc3NDgxNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

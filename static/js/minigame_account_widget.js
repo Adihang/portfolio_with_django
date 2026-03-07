@@ -12,7 +12,7 @@
     const profileUploadForm = host.querySelector('[data-root-account-profile-upload-form]');
     const profileImageTrigger = host.querySelector('[data-root-account-profile-image-trigger]');
     const profileImageInput = host.querySelector('[data-root-account-profile-image-input]');
-    const logoutForm = document.getElementById('auth-logout-form-minigame');
+    const logoutForm = host.querySelector('form.ui-auth-form') || document.getElementById('auth-logout-form-minigame');
 
     if (!accountTrigger || !logoutForm) {
         return;

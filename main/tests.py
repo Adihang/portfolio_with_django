@@ -570,21 +570,23 @@ class HanplanetMultiplayerPageTests(TestCase):
             email="multi@example.com",
         )
 
-    def test_multiplayer_page_redirects_to_login_when_unauthenticated(self):
-        response = self.client.get("/ko/fun/hanplanet-multiplayer/")
+    def test_multiplayer_page_renders_for_unauthenticated_user(self):
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/docs/login/?next=/ko/fun/hanplanet-multiplayer/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-game-client", html=False)
+        self.assertContains(response, "범퍼카 스핔이", html=False)
 
     def test_multiplayer_page_renders_for_authenticated_user(self):
         self.client.force_login(self.user)
 
-        response = self.client.get("/ko/fun/hanplanet-multiplayer/", HTTP_HOST="127.0.0.1:8000")
+        response = self.client.get("/ko/fun/bumpercar-spiky/", HTTP_HOST="127.0.0.1:8000")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "data-game-client", html=False)
         self.assertContains(response, "ws://127.0.0.1:8081", html=False)
         self.assertContains(response, "/ko/api/game-auth-token/", html=False)
+        self.assertContains(response, "범퍼카 스핔이", html=False)
 
     @override_settings(
         GAME_JWT_SECRET="test-game-secret",
@@ -594,7 +596,6 @@ class HanplanetMultiplayerPageTests(TestCase):
     )
     def test_game_auth_token_api_returns_signed_token(self):
         self.client.force_login(self.user)
-
         response = self.client.get("/ko/api/game-auth-token/")
 
         self.assertEqual(response.status_code, 200)
@@ -603,6 +604,20 @@ class HanplanetMultiplayerPageTests(TestCase):
         token = payload["token"]
         self.assertEqual(token.count("."), 2)
         self.assertEqual(payload["expires_in"], 300)
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
+    def test_game_auth_token_api_returns_signed_guest_token_for_unauthenticated_user(self):
+        response = self.client.get("/ko/api/game-auth-token/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("token", payload)
+        self.assertEqual(payload["token"].count("."), 2)
 
     @override_settings(
         GAME_JWT_SECRET="test-game-secret",

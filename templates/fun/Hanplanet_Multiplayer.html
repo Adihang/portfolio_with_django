@@ -4,24 +4,6 @@
 {% block content %}
 {% include 'docs/_assets_head.html' %}
 
-<div class="ui-toolbar-wrap">
-    <div class="ui-shell ui-toolbar">
-        <div class="ui-toolbar-left">
-            <div class="ui-title-row">
-                <h1 class="ui-title">{{ multiplayer_title }}</h1>
-            </div>
-            <div class="ui-subtitle ui-path-breadcrumbs">
-                <a class="ui-path-link" href="{% url 'main:minigame_lang' ui_lang=ui_lang %}">{{ multiplayer_back_text }}</a>
-                <span class="ui-path-sep">/</span>
-                <span class="ui-path-current">{{ multiplayer_title }}</span>
-            </div>
-        </div>
-        <div class="ui-toolbar-right minigame-auth-host">
-            {% include "partials/account_widget.html" %}
-        </div>
-    </div>
-</div>
-
 <main class="ui-shell ui-content multiplayer-shell">
     <section class="multiplayer-stage" aria-label="{{ multiplayer_title }}">
         <div
@@ -30,58 +12,100 @@
             data-ws-url="{{ game_ws_url }}"
             data-token-url="{{ game_token_url }}"
             data-player-name="{{ game_player_name }}"
+            data-player-icon-url="{% static_v 'Spikip/icon/default.png' %}"
+            data-player-npc-icon-url="{% static_v 'Spikip/icon/Ner.png' %}"
+            data-player-npc-boost-icon-url="{% static_v 'Spikip/icon/Ner_acceleration.png' %}"
+            data-player-npc-defeat-icon-url="{% static_v 'Spikip/icon/Ner_evl.png' %}"
+            data-player-boost-icon-url="{% static_v 'Spikip/icon/acceleration.png' %}"
+            data-player-collision-icon-url="{% static_v 'Spikip/icon/win.png' %}"
+            data-player-defeat-icon-url="{% static_v 'Spikip/icon/defeat.png' %}"
+            data-player-boost-sound-urls='{{ game_boost_sound_urls_json }}'
+            data-player-crash-sound-urls='{{ game_crash_sound_urls_json }}'
+            data-player-defeat-sound-urls='{{ game_defeat_sound_urls_json }}'
+            data-player-ner-tracking-sound-urls='{{ game_ner_tracking_sound_urls_json }}'
+            data-player-ner-acceleration-sound-urls='{{ game_ner_acceleration_sound_urls_json }}'
             data-connecting-label="{% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}"
             data-connected-label="{% include 'partials/ui_i18n.html' with key='multiplayer_connected' %}"
             data-disconnected-label="{% include 'partials/ui_i18n.html' with key='multiplayer_disconnected' %}"
         >
-            <header class="multiplayer-panel multiplayer-hero">
+            <header class="multiplayer-hero">
                 <div>
-                    <p class="multiplayer-kicker">Hanplanet Multiplayer</p>
+                    <p class="multiplayer-kicker">Bumper Car Spiky</p>
                     <h2 class="multiplayer-heading">{{ multiplayer_title }}</h2>
                     <p class="multiplayer-description">{{ multiplayer_description }}</p>
                 </div>
-                <button class="ide-btn ide-btn-primary multiplayer-reconnect-btn" type="button" data-game-reconnect>
-                    {% include 'partials/ui_i18n.html' with key='multiplayer_retry' %}
-                </button>
+                <div class="multiplayer-hero-right">
+                    <div class="ui-toolbar-right minigame-auth-host multiplayer-auth-host">
+                        {% if request.user.is_authenticated %}
+                            {% include "partials/account_widget.html" %}
+                        {% else %}
+                            <div class="ui-toolbar-actions">
+                                <a class="ide-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
+                                    {% include 'partials/ui_i18n.html' with key='login' %}
+                                </a>
+                                <a class="ide-btn ide-btn-primary" href="{{ docs_signup_url }}?next={{ request.get_full_path|urlencode }}">
+                                    {% include 'partials/ui_i18n.html' with key='signup' %}
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="ui-toolbar-actions multiplayer-hero-actions">
+                        <button class="ide-btn" type="button" data-game-fullscreen-toggle>
+                            {% include 'partials/ui_i18n.html' with key='multiplayer_fullscreen' %}
+                        </button>
+                        <button class="ide-btn" type="button" data-game-mobile-controls-toggle>
+                            {% include 'partials/ui_i18n.html' with key='multiplayer_spawn_joystick' %}
+                        </button>
+                        <button class="ide-btn ide-btn-primary multiplayer-reconnect-btn" type="button" data-game-reconnect>
+                            {% include 'partials/ui_i18n.html' with key='multiplayer_retry' %}
+                        </button>
+                    </div>
+                </div>
             </header>
 
             <section class="multiplayer-grid" aria-label="{{ multiplayer_title }}">
-                <div class="multiplayer-sidebar">
-                    <div class="multiplayer-panel multiplayer-stat">
-                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_connection' %}</span>
+                <div class="multiplayer-canvas-wrap">
+                    <div class="multiplayer-hud">
+                        <div class="multiplayer-ping" data-game-ping>Ping -- ms</div>
                         <strong class="multiplayer-status" data-game-connection-status>
                             {% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}
                         </strong>
                     </div>
-                    <div class="multiplayer-panel multiplayer-stat">
-                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_signed_in_as' %}</span>
-                        <strong class="multiplayer-stat-value">{{ game_player_name }}</strong>
+                    <label class="multiplayer-volume-control" aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}">
+                        <span class="multiplayer-volume-label">
+                            {% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}
+                        </span>
+                        <input class="multiplayer-volume-slider" type="range" min="0" max="100" step="1" value="35" data-game-master-volume>
+                    </label>
+                    <button
+                        class="multiplayer-fullscreen-exit"
+                        type="button"
+                        data-game-fullscreen-exit
+                        hidden
+                        aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_exit_fullscreen' %}"
+                    >
+                        <span aria-hidden="true">&#8592;</span>
+                    </button>
+                    <canvas class="multiplayer-canvas" data-game-canvas></canvas>
+                    <canvas class="multiplayer-minimap-canvas" width="160" height="160" data-game-minimap aria-label="Player minimap"></canvas>
+                    {% include "popup/fun/multiplayer_death_modal.html" %}
+                    <div class="multiplayer-mobile-controls" data-game-mobile-controls hidden>
+                        <div class="multiplayer-joystick" data-game-joystick>
+                            <div class="multiplayer-joystick-base"></div>
+                            <div class="multiplayer-joystick-knob" data-game-joystick-knob></div>
+                        </div>
+                        <button class="multiplayer-boost-button" type="button" data-game-mobile-boost>
+                            {% include 'partials/ui_i18n.html' with key='multiplayer_boost_button' %}
+                        </button>
                     </div>
-                    <div class="multiplayer-panel multiplayer-stat">
-                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_you' %}</span>
-                        <strong class="multiplayer-stat-value" data-game-self-id>-</strong>
-                    </div>
-                    <div class="multiplayer-panel multiplayer-stat">
-                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_position' %}</span>
-                        <strong class="multiplayer-stat-value" data-game-self-position>-</strong>
-                    </div>
-                    <div class="multiplayer-panel multiplayer-stat">
-                        <span class="multiplayer-stat-label">{% include 'partials/ui_i18n.html' with key='multiplayer_nearby_players' %}</span>
-                        <strong class="multiplayer-stat-value" data-game-player-count>0</strong>
-                    </div>
-                    <div class="multiplayer-panel multiplayer-help">
-                        <h3>{% include 'partials/ui_i18n.html' with key='multiplayer_controls' %}</h3>
-                        <p>{% include 'partials/ui_i18n.html' with key='multiplayer_controls_help' %}</p>
-                    </div>
-                </div>
-                <div class="multiplayer-canvas-wrap">
-                    <canvas class="multiplayer-canvas" width="960" height="640" data-game-canvas></canvas>
+                    <span data-game-player-count hidden>0</span>
                 </div>
             </section>
         </div>
     </section>
 </main>
 
+{% include "popup/fun/multiplayer_idle_timeout_modal.html" %}
 <link rel="stylesheet" type="text/css" href="{% static_v 'css/hanplanet_multiplayer.css' %}">
 <script src="{% static_v 'js/hanplanet_multiplayer.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
 {% include "popup/root/auth_logout_modal.html" %}
