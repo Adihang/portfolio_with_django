@@ -34,6 +34,7 @@ from django.utils.safestring import mark_safe
 import markdown
 import random
 import html
+import secrets
 from django.conf import settings
 from django.core.cache import cache
 import httpx
@@ -492,10 +493,13 @@ def apply_ui_context(request, context, ui_lang):
     context["lang_switch_ko_url"] = build_lang_switch_url(request, "ko")
     context["lang_switch_en_url"] = build_lang_switch_url(request, "en")
     canonical_url = build_public_absolute_url(request.path)
+    default_meta_image = "https://www.hanplanet.com/static/icons/hanplanet-og-1200.png"
     context["meta_robots"] = context.get("meta_robots", "index,follow")
     context["meta_site_name"] = context.get("meta_site_name", "Hanplanet")
     context["meta_canonical_url"] = context.get("meta_canonical_url", canonical_url)
     context["meta_og_url"] = context.get("meta_og_url", canonical_url)
+    context["meta_og_image"] = context.get("meta_og_image", default_meta_image)
+    context["meta_twitter_image"] = context.get("meta_twitter_image", context["meta_og_image"])
     context["account_theme_mode"] = ""
     context["account_root_search_engine"] = "google"
     context["theme_preference_url"] = build_localized_url(request, "main:theme_preference_lang")
@@ -572,13 +576,24 @@ def _base64url_encode(raw_bytes):
     return base64.urlsafe_b64encode(raw_bytes).rstrip(b"=").decode("ascii")
 
 
-def build_game_auth_token(user):
+def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False):
     now = int(time.time())
     header = {"alg": "HS256", "typ": "JWT"}
+    resolved_subject = str(
+        subject
+        or (getattr(user, "username", "") if user is not None else "")
+        or f"guest-{secrets.token_hex(6)}"
+    )
+    resolved_display_name = str(
+        display_name
+        or (get_account_display_name(user) if user is not None else "")
+        or resolved_subject
+    )
     payload = {
-        "sub": str(user.username),
-        "username": str(user.username),
-        "display_name": get_account_display_name(user),
+        "sub": resolved_subject,
+        "username": resolved_subject,
+        "display_name": resolved_display_name,
+        "is_guest": bool(is_guest),
         "iat": now,
         "nbf": now,
         "exp": now + int(getattr(settings, "GAME_JWT_EXP_SECONDS", 300) or 300),
@@ -662,6 +677,10 @@ def bubble_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:bubble_lang")
 
 
+def hanplanet_multiplayer_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:bumpercar_spiky_lang")
+
+
 def minigame_page(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
@@ -680,8 +699,8 @@ def minigame_page(request, ui_lang=None):
             "url": reverse("main:bubble_lang", kwargs={"ui_lang": resolved_lang}),
         },
         {
-            "title": "Hanplanet Multiplayer",
-            "url": reverse("main:hanplanet_multiplayer_lang", kwargs={"ui_lang": resolved_lang}),
+            "title": "Bumper Car Spiky" if is_english else "범퍼카 스핔이",
+            "url": reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}),
         },
     ]
 
@@ -690,7 +709,16 @@ def minigame_page(request, ui_lang=None):
         "minigame_links": links,
         "minigame_home_label": "Home" if is_english else "홈",
         "docs_login_url": reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang}),
+        "docs_signup_url": reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang}),
+        "meta_title": "Hanplanet Mini Games" if is_english else "Hanplanet 미니게임",
+        "meta_og_title": "Hanplanet Mini Games" if is_english else "Hanplanet 미니게임",
+        "meta_description": (
+            "Play browser mini games on Hanplanet, including Bubble, Stratagem Hero, and Bumper Car Spiky."
+            if is_english
+            else "Hanplanet에서 Bubble, Stratagem Hero, 범퍼카 스핔이 같은 브라우저 미니게임을 즐겨보세요."
+        ),
     }
+    context["meta_og_description"] = context["meta_description"]
     apply_ui_context(request, context, resolved_lang)
     if request.user.is_authenticated:
         portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
@@ -737,9 +765,6 @@ def bubble_page(request, ui_lang=None):
 
 
 def hanplanet_multiplayer_page(request, ui_lang=None):
-    if not request.user.is_authenticated:
-        return _redirect_to_docs_login_with_next(request)
-
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
     host = (request.get_host() or "").split(":")[0].strip().lower()
@@ -749,43 +774,107 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     else:
         ws_url = str(getattr(settings, "GAME_WS_PUBLIC_URL", "wss://game.hanplanet.com") or "wss://game.hanplanet.com")
 
-    portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
+    boost_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "acceleration"
+    boost_sound_urls = []
+    if boost_sound_dir.exists():
+        boost_sound_urls = [
+            static(f"Spikip/acceleration/{sound_file.name}")
+            for sound_file in sorted(boost_sound_dir.glob("*.mp3"))
+        ]
+    crash_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "crash"
+    crash_sound_urls = []
+    if crash_sound_dir.exists():
+        crash_sound_urls = [
+            static(f"Spikip/crash/{sound_file.name}")
+            for sound_file in sorted(crash_sound_dir.glob("*.mp3"))
+        ]
+    defeat_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "defeat"
+    defeat_sound_urls = []
+    if defeat_sound_dir.exists():
+        defeat_sound_urls = [
+            static(f"Spikip/defeat/{sound_file.name}")
+            for sound_file in sorted(defeat_sound_dir.glob("*.mp3"))
+        ]
+    ner_tracking_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner_tracking"
+    ner_tracking_sound_urls = []
+    if ner_tracking_sound_dir.exists():
+        ner_tracking_sound_urls = [
+            static(f"Spikip/ner_tracking/{sound_file.name}")
+            for sound_file in sorted(ner_tracking_sound_dir.glob("*.mp3"))
+        ]
+    ner_acceleration_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner_acceleration"
+    ner_acceleration_sound_urls = []
+    if ner_acceleration_sound_dir.exists():
+        ner_acceleration_sound_urls = [
+            static(f"Spikip/ner_acceleration/{sound_file.name}")
+            for sound_file in sorted(ner_acceleration_sound_dir.glob("*.mp3"))
+        ]
+
+    is_authenticated = bool(getattr(request.user, "is_authenticated", False))
+    portfolio_profile = (
+        PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
+        if is_authenticated
+        else None
+    )
+    page_title = "Bumper Car Spiky" if is_english else "범퍼카 스핔이"
+    page_description = "Don't Spiky Ner!" if is_english else "스피키 네르지 마세요!"
     context = {
         "ui_lang": resolved_lang,
-        "page_title": "Hanplanet Multiplayer" if is_english else "한플래닛 멀티플레이어",
-        "multiplayer_title": "Hanplanet Multiplayer" if is_english else "한플래닛 멀티플레이어",
-        "multiplayer_description": (
-            "Sign in and move around the shared grid in your browser."
-            if is_english
-            else "로그인 후 브라우저에서 같은 그리드를 함께 돌아다녀 보세요."
-        ),
-        "multiplayer_back_text": "Back to Mini Game" if is_english else "미니게임으로 돌아가기",
+        "page_title": page_title,
+        "multiplayer_title": page_title,
+        "multiplayer_description": page_description,
+        "multiplayer_back_text": "Mini Game" if is_english else "미니게임",
+        "docs_login_url": reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang}),
+        "docs_signup_url": reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang}),
         "game_ws_url": ws_url,
         "game_token_url": reverse("main:game_auth_token_lang", kwargs={"ui_lang": resolved_lang}),
-        "game_player_name": get_account_display_name(request.user) or request.user.username,
-        "docs_my_portfolio_url": reverse(
-            "main:portfolio_user_lang",
-            kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+        "game_player_name": (
+            get_account_display_name(request.user) or request.user.username
+            if request.user.is_authenticated
+            else ("Spiky" if is_english else "스핔이")
         ),
-        "account_display_name": get_account_display_name(request.user),
-        "account_profile_image_url": (
-            portfolio_profile.profile_img.url if portfolio_profile and portfolio_profile.profile_img else ""
+        "game_boost_sound_urls_json": mark_safe(json.dumps(boost_sound_urls)),
+        "game_crash_sound_urls_json": mark_safe(json.dumps(crash_sound_urls)),
+        "game_defeat_sound_urls_json": mark_safe(json.dumps(defeat_sound_urls)),
+        "game_ner_tracking_sound_urls_json": mark_safe(json.dumps(ner_tracking_sound_urls)),
+        "game_ner_acceleration_sound_urls_json": mark_safe(json.dumps(ner_acceleration_sound_urls)),
+        "meta_title": page_title,
+        "meta_og_title": page_title,
+        "meta_site_name": page_title,
+        "meta_description": (
+            "Bumper Car Spiky is a real-time browser bumper car game on Hanplanet."
+            if is_english
+            else "범퍼카 스핔이는 Hanplanet에서 즐기는 실시간 브라우저 범퍼카 게임입니다."
         ),
-        "account_email": str(request.user.email or "").strip(),
-        "account_profile_upload_url": reverse(
-            "main:account_profile_image_upload_lang",
-            kwargs={"ui_lang": resolved_lang},
-        ),
-        "account_my_portfolio_url": reverse(
-            "main:portfolio_user_lang",
-            kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
-        ),
-        "account_logout_form_id": "auth-logout-form-multiplayer",
-        "account_logout_next": request.get_full_path() or reverse(
-            "main:hanplanet_multiplayer_lang", kwargs={"ui_lang": resolved_lang}
-        ),
-        "account_logout_url": reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang}),
+        "meta_og_image": build_public_absolute_url(static("Spikip/icon/win.png")),
+        "meta_twitter_image": build_public_absolute_url(static("Spikip/icon/win.png")),
     }
+    context["meta_og_description"] = context["meta_description"]
+    if request.user.is_authenticated:
+        context.update({
+            "docs_my_portfolio_url": reverse(
+                "main:portfolio_user_lang",
+                kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+            ),
+            "account_display_name": get_account_display_name(request.user),
+            "account_profile_image_url": (
+                portfolio_profile.profile_img.url if portfolio_profile and portfolio_profile.profile_img else ""
+            ),
+            "account_email": str(request.user.email or "").strip(),
+            "account_profile_upload_url": reverse(
+                "main:account_profile_image_upload_lang",
+                kwargs={"ui_lang": resolved_lang},
+            ),
+            "account_my_portfolio_url": reverse(
+                "main:portfolio_user_lang",
+                kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
+            ),
+            "account_logout_form_id": "auth-logout-form-multiplayer",
+            "account_logout_next": request.get_full_path() or reverse(
+                "main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}
+            ),
+            "account_logout_url": reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang}),
+        })
     apply_ui_context(request, context, resolved_lang)
     response = render(request, "fun/Hanplanet_Multiplayer.html", context)
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -796,14 +885,22 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
 @require_http_methods(["GET"])
 def game_auth_token(request, ui_lang=None):
     resolve_ui_lang(request, ui_lang)
-    if not request.user.is_authenticated:
-        return JsonResponse({"error": "authentication_required"}, status=401)
-
     secret = str(getattr(settings, "GAME_JWT_SECRET", "") or "").strip()
     if not secret:
         return JsonResponse({"error": "game_jwt_secret_not_configured"}, status=503)
 
-    token = build_game_auth_token(request.user)
+    if request.user.is_authenticated:
+        token = build_game_auth_token(request.user)
+    else:
+        guest_subject = request.session.get("guest_game_subject")
+        if not guest_subject:
+            guest_subject = f"guest-{secrets.token_hex(6)}"
+            request.session["guest_game_subject"] = guest_subject
+        token = build_game_auth_token(
+            subject=guest_subject,
+            display_name="스핔이",
+            is_guest=True,
+        )
     response = JsonResponse(
         {
             "token": token,

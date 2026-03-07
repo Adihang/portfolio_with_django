@@ -20,9 +20,14 @@
             {% if request.user.is_authenticated %}
                 {% include "partials/account_widget.html" %}
             {% else %}
-                <a class="ide-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
-                    {% include 'partials/ui_i18n.html' with key='login' %}
-                </a>
+                <div class="ui-toolbar-actions">
+                    <a class="ide-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
+                        {% include 'partials/ui_i18n.html' with key='login' %}
+                    </a>
+                    <a class="ide-btn ide-btn-primary" href="{{ docs_signup_url }}?next={{ request.get_full_path|urlencode }}">
+                        {% include 'partials/ui_i18n.html' with key='signup' %}
+                    </a>
+                </div>
             {% endif %}
         </div>
     </div>
@@ -82,7 +87,7 @@
         color: var(--ide-text-stronger);
         border: 1px solid var(--ide-border-soft);
         border-radius: 12px;
-        background: var(--ide-bg);
+        background: var(--shared-card-bg);
         padding: 12px;
         transition: var(--ide-transition-fast);
         align-items: center;
