@@ -18,7 +18,7 @@ from .models import (
 )
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.cache import cache_control
 from django.urls import reverse
 import json
@@ -44,6 +44,7 @@ from django.db.models import Max
 from django.db import transaction
 from django.templatetags.static import static
 from urllib.parse import quote, urlparse
+from urllib.request import Request, urlopen
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -70,13 +71,17 @@ FENCED_BLOCK_START_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<fence>`{3,}|~{3
 FENCED_BLOCK_END_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*$")
 BUMPERCAR_SPIKY_SETTINGS_DEFAULTS = {
     "user_base_speed": 225.0,
-    "user_max_boost_speed": 420.0,
-    "user_boost_acceleration": 360.0,
-    "user_boost_cooldown": 280.0,
+    "user_boost_distance": 399.3,
+    "user_boost_duration_ms": 1238,
+    "user_post_boost_cooldown_ms": 3000,
     "user_lives": 3,
-    "npc_base_speed": 225.0,
+    "npc_base_speed": 202.5,
     "npc_max_health": 20,
-    "npc_charge_trigger_distance": 240.0,
+    "npc_phase_two_health_ratio": 0.6,
+    "npc_phase_three_health_ratio": 0.2,
+    "npc_charge_trigger_distance": 150.0,
+    "npc_charge_distance_multiplier": 2.2,
+    "npc_extra_charge_distance_multiplier": 1.5,
     "npc_charge_windup_ms": 500,
     "npc_rest_ms": 1800,
     "npc_max_boost_speed": 1687.5,
@@ -85,9 +90,9 @@ BUMPERCAR_SPIKY_SETTINGS_DEFAULTS = {
     "npc_respawn_delay_ms": 60000,
     "npc_damage_min": 1,
     "npc_damage_max": 5,
-    "npc_damage_speed_divisor": 8.0,
 }
 BUMPERCAR_SPIKY_SETTINGS_INT_KEYS = {
+    "user_boost_duration_ms",
     "user_lives",
     "npc_max_health",
     "npc_charge_windup_ms",
@@ -96,6 +101,68 @@ BUMPERCAR_SPIKY_SETTINGS_INT_KEYS = {
     "npc_damage_min",
     "npc_damage_max",
 }
+BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS = {
+    "dummy_kills": 0,
+    "deaths": 0,
+    "ner_kills": 0,
+    "ner_phase1_attack_dodges": 0,
+    "ner_phase2_attack_dodges": 0,
+    "ner_phase3_attack_dodges": 0,
+    "ner_hits": 0,
+}
+BUMPERCAR_SPIKY_ACCOUNT_STATS_KEYS = tuple(BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS.keys())
+
+
+def _derive_boost_profile(base_speed, distance, duration_ms):
+    safe_duration_ms = max(1, int(duration_ms))
+    duration_seconds = safe_duration_ms / 1000.0
+    minimum_distance = base_speed * duration_seconds + 1.0
+    safe_distance = max(float(distance), minimum_distance)
+    delta_speed = max(0.0, (2.0 * (safe_distance - (base_speed * duration_seconds))) / duration_seconds)
+    max_speed = base_speed + delta_speed
+    acceleration = (3.0 * delta_speed) / (2.0 * duration_seconds) if delta_speed > 0 else 1.0
+    cooldown = acceleration * 2.0 if delta_speed > 0 else 2.0
+    return {
+        "distance": safe_distance,
+        "duration_ms": safe_duration_ms,
+        "max_speed": max_speed,
+        "acceleration": acceleration,
+        "cooldown": cooldown,
+    }
+
+
+def _static_with_mtime_version(relative_path):
+    normalized_path = str(relative_path).lstrip("/")
+    base_url = static(normalized_path)
+    candidate_paths = []
+
+    static_root = getattr(settings, "STATIC_ROOT", "")
+    if static_root:
+        candidate_paths.append(Path(static_root) / normalized_path)
+
+    for static_dir in getattr(settings, "STATICFILES_DIRS", []):
+        candidate_paths.append(Path(static_dir) / normalized_path)
+
+    for candidate_path in candidate_paths:
+        if candidate_path.exists() and candidate_path.is_file():
+            separator = "&" if "?" in base_url else "?"
+            return f"{base_url}{separator}v={int(candidate_path.stat().st_mtime)}"
+
+    return base_url
+
+
+def normalize_bumpercar_spiky_account_stats(raw_stats=None):
+    raw_stats = raw_stats or {}
+    normalized = dict(BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS)
+    if not isinstance(raw_stats, dict):
+        return normalized
+
+    for key in BUMPERCAR_SPIKY_ACCOUNT_STATS_KEYS:
+        try:
+            normalized[key] = max(0, int(raw_stats.get(key, normalized[key]) or 0))
+        except (TypeError, ValueError):
+            normalized[key] = BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS[key]
+    return normalized
 
 
 class _DummyTagRelation:
@@ -517,6 +584,8 @@ def build_lang_switch_url(request, target_lang):
 
 
 def apply_ui_context(request, context, ui_lang):
+    request_path = str(getattr(request, "path", "") or "")
+    default_show_account_my_portfolio = "/fun/" not in request_path
     context["ui_lang"] = ui_lang
     context["show_chat_widget"] = False
     context["lang_switch_ko_url"] = build_lang_switch_url(request, "ko")
@@ -531,12 +600,15 @@ def apply_ui_context(request, context, ui_lang):
     context["meta_twitter_image"] = context.get("meta_twitter_image", context["meta_og_image"])
     context["account_theme_mode"] = ""
     context["account_root_search_engine"] = "google"
+    context["account_bumpercar_spiky_stats"] = None
+    context["show_account_bumpercar_spiky_stats"] = bool(context.get("show_account_bumpercar_spiky_stats", False))
+    context["show_account_my_portfolio"] = bool(context.get("show_account_my_portfolio", default_show_account_my_portfolio))
     context["theme_preference_url"] = build_localized_url(request, "main:theme_preference_lang")
     context["user_preference_url"] = build_localized_url(request, "main:user_preferences_lang")
     if request.user.is_authenticated:
         profile_preferences = (
             UserProfile.objects.filter(user=request.user)
-            .values("theme_mode", "preferred_root_search_engine")
+            .values("theme_mode", "preferred_root_search_engine", "bumpercar_spiky_stats")
             .first()
         )
         account_theme_mode = (profile_preferences or {}).get("theme_mode")
@@ -545,6 +617,9 @@ def apply_ui_context(request, context, ui_lang):
         account_root_search_engine = (profile_preferences or {}).get("preferred_root_search_engine")
         if account_root_search_engine in SUPPORTED_ROOT_SEARCH_ENGINES:
             context["account_root_search_engine"] = account_root_search_engine
+        context["account_bumpercar_spiky_stats"] = normalize_bumpercar_spiky_account_stats(
+            (profile_preferences or {}).get("bumpercar_spiky_stats")
+        )
     try:
         nav_links = list(NavLink.objects.all())
         removed_nav_names = {"github", "thingiverse", "portfolio"}
@@ -615,7 +690,7 @@ def get_bumpercar_spiky_settings_path():
 def _normalize_bumpercar_spiky_settings(raw_settings=None):
     normalized = dict(BUMPERCAR_SPIKY_SETTINGS_DEFAULTS)
     if not isinstance(raw_settings, dict):
-        return normalized
+        raw_settings = {}
 
     for key, default_value in BUMPERCAR_SPIKY_SETTINGS_DEFAULTS.items():
         if key not in raw_settings:
@@ -630,13 +705,15 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
             normalized[key] = default_value
 
     normalized["user_base_speed"] = max(1.0, normalized["user_base_speed"])
-    normalized["user_max_boost_speed"] = max(normalized["user_base_speed"], normalized["user_max_boost_speed"])
-    normalized["user_boost_acceleration"] = max(1.0, normalized["user_boost_acceleration"])
-    normalized["user_boost_cooldown"] = max(1.0, normalized["user_boost_cooldown"])
+    normalized["user_post_boost_cooldown_ms"] = max(0, int(normalized["user_post_boost_cooldown_ms"]))
     normalized["user_lives"] = max(1, normalized["user_lives"])
     normalized["npc_base_speed"] = max(1.0, normalized["npc_base_speed"])
     normalized["npc_max_health"] = max(1, normalized["npc_max_health"])
+    normalized["npc_phase_two_health_ratio"] = max(0.0, min(1.0, normalized["npc_phase_two_health_ratio"]))
+    normalized["npc_phase_three_health_ratio"] = max(0.0, min(normalized["npc_phase_two_health_ratio"], normalized["npc_phase_three_health_ratio"]))
     normalized["npc_charge_trigger_distance"] = max(1.0, normalized["npc_charge_trigger_distance"])
+    normalized["npc_charge_distance_multiplier"] = max(0.1, normalized["npc_charge_distance_multiplier"])
+    normalized["npc_extra_charge_distance_multiplier"] = max(0.1, normalized["npc_extra_charge_distance_multiplier"])
     normalized["npc_charge_windup_ms"] = max(0, normalized["npc_charge_windup_ms"])
     normalized["npc_rest_ms"] = max(0, normalized["npc_rest_ms"])
     normalized["npc_max_boost_speed"] = max(normalized["npc_base_speed"], normalized["npc_max_boost_speed"])
@@ -645,7 +722,40 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
     normalized["npc_respawn_delay_ms"] = max(1000, normalized["npc_respawn_delay_ms"])
     normalized["npc_damage_min"] = max(1, normalized["npc_damage_min"])
     normalized["npc_damage_max"] = max(normalized["npc_damage_min"], normalized["npc_damage_max"])
-    normalized["npc_damage_speed_divisor"] = max(0.1, normalized["npc_damage_speed_divisor"])
+
+    if "user_boost_distance" not in raw_settings or "user_boost_duration_ms" not in raw_settings:
+        legacy_user_max_speed = float(raw_settings.get("user_max_boost_speed") or 420.0)
+        legacy_user_acceleration = max(1.0, float(raw_settings.get("user_boost_acceleration") or 360.0))
+        legacy_user_cooldown = max(1.0, float(raw_settings.get("user_boost_cooldown") or 280.0))
+        legacy_user_delta = max(0.0, legacy_user_max_speed - normalized["user_base_speed"])
+        legacy_user_duration_seconds = (legacy_user_delta / legacy_user_acceleration) + (legacy_user_delta / legacy_user_cooldown)
+        legacy_user_distance = normalized["user_base_speed"] * legacy_user_duration_seconds + (0.5 * legacy_user_delta * legacy_user_duration_seconds)
+        normalized["user_boost_distance"] = legacy_user_distance
+        normalized["user_boost_duration_ms"] = int(round(legacy_user_duration_seconds * 1000))
+
+    if "npc_max_boost_speed" not in raw_settings or "npc_boost_acceleration" not in raw_settings or "npc_boost_cooldown" not in raw_settings:
+        legacy_npc_profile = _derive_boost_profile(
+            normalized["npc_base_speed"],
+            float(raw_settings.get("npc_boost_distance") or 2431.7),
+            int(raw_settings.get("npc_boost_duration_ms") or 2573),
+        )
+        normalized["npc_max_boost_speed"] = legacy_npc_profile["max_speed"]
+        normalized["npc_boost_acceleration"] = legacy_npc_profile["acceleration"]
+        normalized["npc_boost_cooldown"] = legacy_npc_profile["cooldown"]
+
+    normalized["user_boost_distance"] = max(1.0, float(normalized["user_boost_distance"]))
+    normalized["user_boost_duration_ms"] = max(1, int(normalized["user_boost_duration_ms"]))
+
+    user_boost_profile = _derive_boost_profile(
+        normalized["user_base_speed"],
+        normalized["user_boost_distance"],
+        normalized["user_boost_duration_ms"],
+    )
+    normalized["user_boost_distance"] = user_boost_profile["distance"]
+    normalized["user_boost_duration_ms"] = user_boost_profile["duration_ms"]
+    normalized["user_max_boost_speed"] = user_boost_profile["max_speed"]
+    normalized["user_boost_acceleration"] = user_boost_profile["acceleration"]
+    normalized["user_boost_cooldown"] = user_boost_profile["cooldown"]
     return normalized
 
 
@@ -670,12 +780,40 @@ def save_bumpercar_spiky_settings(next_settings):
 
 
 def restart_bumpercar_spiky_runtime():
-    commands = [
-        ["/bin/zsh", "-lc", f"launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn"],
-        ["/bin/zsh", "-lc", f"launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server"],
-    ]
-    for command in commands:
-        subprocess.run(command, check=True, timeout=20)
+    subprocess.Popen(
+        [
+            "/bin/zsh",
+            "-lc",
+            "sleep 1; launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn",
+        ],
+        cwd=str(settings.BASE_DIR),
+        start_new_session=True,
+    )
+    subprocess.run(
+        ["/bin/zsh", "-lc", "launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server"],
+        check=True,
+        timeout=20,
+    )
+
+
+def restart_bumpercar_spiky_server():
+    subprocess.run(
+        ["/bin/zsh", "-lc", "launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server"],
+        check=True,
+        timeout=20,
+    )
+
+
+def set_bumpercar_spiky_npc_health(npc_health):
+    payload = json.dumps({"npcHealth": int(npc_health)}).encode("utf-8")
+    request = Request(
+        "http://127.0.0.1:8082/admin/npc-health",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False):
@@ -793,18 +931,22 @@ def minigame_page(request, ui_lang=None):
 
     links = [
         {
+            "slug": "salvations-edge-4",
             "title": "Salvation's Edge 4",
             "url": reverse("main:Salvations_Edge_4_lang", kwargs={"ui_lang": resolved_lang}),
         },
         {
+            "slug": "stratagem-hero",
             "title": "Stratagem Hero",
             "url": reverse("main:Stratagem_Hero_lang", kwargs={"ui_lang": resolved_lang}),
         },
         {
+            "slug": "bubble",
             "title": "Bubble",
             "url": reverse("main:bubble_lang", kwargs={"ui_lang": resolved_lang}),
         },
         {
+            "slug": "bumpercar-spiky",
             "title": "Bumper Car Spiky" if is_english else "범퍼카 스핔이",
             "url": reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}),
         },
@@ -881,40 +1023,61 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     else:
         ws_url = str(getattr(settings, "GAME_WS_PUBLIC_URL", "wss://game.hanplanet.com") or "wss://game.hanplanet.com")
 
-    boost_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "acceleration"
+    boost_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "acceleration"
     boost_sound_urls = []
     if boost_sound_dir.exists():
         boost_sound_urls = [
-            static(f"Spikip/acceleration/{sound_file.name}")
+            _static_with_mtime_version(f"Spikip/speaki_default/acceleration/{sound_file.name}")
             for sound_file in sorted(boost_sound_dir.glob("*.mp3"))
         ]
-    crash_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "crash"
+    crash_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "crash"
     crash_sound_urls = []
     if crash_sound_dir.exists():
         crash_sound_urls = [
-            static(f"Spikip/crash/{sound_file.name}")
+            _static_with_mtime_version(f"Spikip/speaki_default/crash/{sound_file.name}")
             for sound_file in sorted(crash_sound_dir.glob("*.mp3"))
         ]
-    defeat_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "defeat"
+    defeat_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "defeat"
     defeat_sound_urls = []
     if defeat_sound_dir.exists():
         defeat_sound_urls = [
-            static(f"Spikip/defeat/{sound_file.name}")
+            _static_with_mtime_version(f"Spikip/speaki_default/defeat/{sound_file.name}")
             for sound_file in sorted(defeat_sound_dir.glob("*.mp3"))
         ]
-    ner_tracking_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner_tracking"
+    die_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "die"
+    die_sound_urls = []
+    if die_sound_dir.exists():
+        die_sound_urls = [
+            _static_with_mtime_version(f"Spikip/speaki_default/die/{sound_file.name}")
+            for sound_file in sorted(die_sound_dir.glob("*.mp3"))
+        ]
+    respawn_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "respawn"
+    respawn_sound_urls = []
+    if respawn_sound_dir.exists():
+        respawn_sound_urls = [
+            _static_with_mtime_version(f"Spikip/speaki_default/respawn/{sound_file.name}")
+            for sound_file in sorted(respawn_sound_dir.glob("*.mp3"))
+        ]
+    ner_tracking_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner" / "tracking"
     ner_tracking_sound_urls = []
     if ner_tracking_sound_dir.exists():
         ner_tracking_sound_urls = [
-            static(f"Spikip/ner_tracking/{sound_file.name}")
+            _static_with_mtime_version(f"Spikip/ner/tracking/{sound_file.name}")
             for sound_file in sorted(ner_tracking_sound_dir.glob("*.mp3"))
         ]
-    ner_acceleration_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner_acceleration"
+    ner_acceleration_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner" / "acceleration"
     ner_acceleration_sound_urls = []
     if ner_acceleration_sound_dir.exists():
         ner_acceleration_sound_urls = [
-            static(f"Spikip/ner_acceleration/{sound_file.name}")
+            _static_with_mtime_version(f"Spikip/ner/acceleration/{sound_file.name}")
             for sound_file in sorted(ner_acceleration_sound_dir.glob("*.mp3"))
+        ]
+    ner_win_icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner" / "icon" / "win"
+    ner_win_icon_urls = []
+    if ner_win_icon_dir.exists():
+        ner_win_icon_urls = [
+            _static_with_mtime_version(f"Spikip/ner/icon/win/{icon_file.name}")
+            for icon_file in sorted(ner_win_icon_dir.glob("*.gif"))
         ]
 
     is_authenticated = bool(getattr(request.user, "is_authenticated", False))
@@ -924,7 +1087,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
         else None
     )
     page_title = "Bumper Car Spiky" if is_english else "범퍼카 스핔이"
-    page_description = "Don't Spiky Ner!" if is_english else "스피키 네르지 마세요!"
+    page_description = "A multiplayer Spiky bumper car game." if is_english else "멀티플레이 가능한 스핔이 범퍼카 게임."
     context = {
         "ui_lang": resolved_lang,
         "page_title": page_title,
@@ -933,6 +1096,18 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
         "multiplayer_back_text": "Mini Game" if is_english else "미니게임",
         "docs_login_url": reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang}),
         "docs_signup_url": reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang}),
+        "bumpercar_restart_server_url": reverse(
+            "main:bumpercar_spiky_restart_server_lang",
+            kwargs={"ui_lang": resolved_lang},
+        ),
+        "bumpercar_set_npc_health_url": reverse(
+            "main:bumpercar_spiky_set_npc_health_lang",
+            kwargs={"ui_lang": resolved_lang},
+        ),
+        "bumpercar_admin_url": reverse(
+            "main:bumpercar_spiky_admin_lang",
+            kwargs={"ui_lang": resolved_lang},
+        ),
         "game_ws_url": ws_url,
         "game_token_url": reverse("main:game_auth_token_lang", kwargs={"ui_lang": resolved_lang}),
         "game_player_name": (
@@ -940,22 +1115,23 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
             if request.user.is_authenticated
             else ("Spiky" if is_english else "스핔이")
         ),
+        "gameplay_settings": gameplay_settings,
         "gameplay_settings_json": mark_safe(json.dumps(gameplay_settings)),
         "game_boost_sound_urls_json": mark_safe(json.dumps(boost_sound_urls)),
         "game_crash_sound_urls_json": mark_safe(json.dumps(crash_sound_urls)),
         "game_defeat_sound_urls_json": mark_safe(json.dumps(defeat_sound_urls)),
+        "game_die_sound_urls_json": mark_safe(json.dumps(die_sound_urls)),
+        "game_respawn_sound_urls_json": mark_safe(json.dumps(respawn_sound_urls)),
         "game_ner_tracking_sound_urls_json": mark_safe(json.dumps(ner_tracking_sound_urls)),
         "game_ner_acceleration_sound_urls_json": mark_safe(json.dumps(ner_acceleration_sound_urls)),
+        "game_ner_win_icon_urls_json": mark_safe(json.dumps(ner_win_icon_urls)),
         "meta_title": page_title,
         "meta_og_title": page_title,
         "meta_site_name": page_title,
-        "meta_description": (
-            "Bumper Car Spiky is a real-time browser bumper car game on Hanplanet."
-            if is_english
-            else "범퍼카 스핔이는 Hanplanet에서 즐기는 실시간 브라우저 범퍼카 게임입니다."
-        ),
-        "meta_og_image": build_public_absolute_url(static("Spikip/icon/win.png")),
-        "meta_twitter_image": build_public_absolute_url(static("Spikip/icon/win.png")),
+        "meta_description": page_description,
+        "meta_og_image": build_public_absolute_url(static("Spikip/speaki_default/icon/win.png")),
+        "meta_twitter_image": build_public_absolute_url(static("Spikip/speaki_default/icon/win.png")),
+        "show_account_bumpercar_spiky_stats": True,
     }
     context["meta_og_description"] = context["meta_description"]
     if request.user.is_authenticated:
@@ -991,6 +1167,48 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
 
 
 @csrf_protect
+@require_http_methods(["POST"])
+def bumpercar_spiky_restart_server(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    if not getattr(request.user, "is_authenticated", False):
+        return redirect(
+            f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
+        )
+    if not getattr(request.user, "is_superuser", False):
+        raise Http404()
+
+    next_url = str(request.POST.get("next") or "").strip()
+    if not next_url:
+        next_url = reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang})
+
+    restart_bumpercar_spiky_server()
+    return redirect(next_url)
+
+
+@csrf_protect
+@require_http_methods(["POST"])
+def bumpercar_spiky_set_npc_health(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    if not getattr(request.user, "is_authenticated", False):
+        return redirect(
+            f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
+        )
+    if not getattr(request.user, "is_superuser", False):
+        raise Http404()
+
+    next_url = str(request.POST.get("next") or "").strip()
+    if not next_url:
+        next_url = reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang})
+
+    npc_health_value = str(request.POST.get("npc_health") or "").strip()
+    try:
+        set_bumpercar_spiky_npc_health(max(0, int(npc_health_value)))
+    except Exception:
+        pass
+    return redirect(next_url)
+
+
+@csrf_protect
 @require_http_methods(["GET", "POST"])
 def bumpercar_spiky_admin_page(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
@@ -1020,13 +1238,17 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
 
     field_specs = [
         ("user_base_speed", "bumpercar_admin_user_base_speed", "0.1"),
-        ("user_max_boost_speed", "bumpercar_admin_user_max_boost_speed", "0.1"),
-        ("user_boost_acceleration", "bumpercar_admin_user_boost_acceleration", "0.1"),
-        ("user_boost_cooldown", "bumpercar_admin_user_boost_cooldown", "0.1"),
+        ("user_boost_distance", "bumpercar_admin_user_boost_distance", "0.1"),
+        ("user_boost_duration_ms", "bumpercar_admin_user_boost_duration_ms", "1"),
+        ("user_post_boost_cooldown_ms", "bumpercar_admin_user_post_boost_cooldown_ms", "1"),
         ("user_lives", "bumpercar_admin_user_lives", "1"),
         ("npc_base_speed", "bumpercar_admin_npc_base_speed", "0.1"),
         ("npc_max_health", "bumpercar_admin_npc_max_health", "1"),
+        ("npc_phase_two_health_ratio", "bumpercar_admin_npc_phase_two_health_ratio", "0.01"),
+        ("npc_phase_three_health_ratio", "bumpercar_admin_npc_phase_three_health_ratio", "0.01"),
         ("npc_charge_trigger_distance", "bumpercar_admin_npc_charge_trigger_distance", "0.1"),
+        ("npc_charge_distance_multiplier", "bumpercar_admin_npc_charge_distance_multiplier", "0.1"),
+        ("npc_extra_charge_distance_multiplier", "bumpercar_admin_npc_extra_charge_distance_multiplier", "0.1"),
         ("npc_charge_windup_ms", "bumpercar_admin_npc_charge_windup_ms", "1"),
         ("npc_rest_ms", "bumpercar_admin_npc_rest_ms", "1"),
         ("npc_max_boost_speed", "bumpercar_admin_npc_max_boost_speed", "0.1"),
@@ -1035,7 +1257,16 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         ("npc_respawn_delay_ms", "bumpercar_admin_npc_respawn_delay_ms", "1"),
         ("npc_damage_min", "bumpercar_admin_npc_damage_min", "1"),
         ("npc_damage_max", "bumpercar_admin_npc_damage_max", "1"),
-        ("npc_damage_speed_divisor", "bumpercar_admin_npc_damage_speed_divisor", "0.1"),
+    ]
+
+    admin_fields = [
+        {
+            "name": key,
+            "i18n_key": i18n_key,
+            "step": step,
+            "value": current_settings[key],
+        }
+        for key, i18n_key, step in field_specs
     ]
 
     context = {
@@ -1046,14 +1277,13 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         "meta_description": "Admin controls for Bumper Car Spiky gameplay settings." if resolved_lang == "en" else "범퍼카 스핔이 게임 수치를 조절하는 관리자 페이지입니다.",
         "meta_og_description": "Admin controls for Bumper Car Spiky gameplay settings." if resolved_lang == "en" else "범퍼카 스핔이 게임 수치를 조절하는 관리자 페이지입니다.",
         "meta_site_name": "Bumper Car Spiky Admin" if resolved_lang == "en" else "범퍼카 스핔이 관리자",
-        "bumpercar_admin_settings": [
-            {
-                "name": key,
-                "i18n_key": i18n_key,
-                "step": step,
-                "value": current_settings[key],
-            }
-            for key, i18n_key, step in field_specs
+        "bumpercar_admin_user_settings": [
+            field for field in admin_fields
+            if field["name"].startswith("user_") or field["name"] in {"npc_damage_min", "npc_damage_max"}
+        ],
+        "bumpercar_admin_npc_settings": [
+            field for field in admin_fields
+            if field["name"].startswith("npc_") and field["name"] not in {"npc_damage_min", "npc_damage_max"}
         ],
         "bumpercar_admin_save_success": save_success,
         "bumpercar_admin_save_error": save_error,
@@ -1092,6 +1322,49 @@ def game_auth_token(request, ui_lang=None):
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
     return response
+
+
+def _is_local_internal_request(request):
+    remote_addr = str(request.META.get("REMOTE_ADDR") or "").strip()
+    return remote_addr in {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def bumpercar_spiky_stats_record(request):
+    if not _is_local_internal_request(request):
+        raise Http404()
+
+    try:
+        payload = json.loads((request.body or b"{}").decode("utf-8"))
+    except (TypeError, ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+
+    username = str(payload.get("username") or "").strip()
+    increments = payload.get("increments") or {}
+    if not username or not isinstance(increments, dict):
+        return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+
+    user = get_user_model().objects.filter(username=username).first()
+    if not user:
+        return JsonResponse({"ok": True, "skipped": True})
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    next_stats = normalize_bumpercar_spiky_account_stats(profile.bumpercar_spiky_stats)
+
+    for key in BUMPERCAR_SPIKY_ACCOUNT_STATS_KEYS:
+        raw_increment = increments.get(key, 0)
+        try:
+            increment = int(raw_increment or 0)
+        except (TypeError, ValueError):
+            continue
+        if increment <= 0:
+            continue
+        next_stats[key] += increment
+
+    profile.bumpercar_spiky_stats = next_stats
+    profile.save(update_fields=["bumpercar_spiky_stats", "updated_at"])
+    return JsonResponse({"ok": True, "stats": next_stats})
 
 
 def none(request, ui_lang=None):

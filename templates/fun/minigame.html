@@ -38,20 +38,33 @@
         <ul class="minigame-list">
             {% for item in minigame_links %}
                 <li>
-                    <a class="minigame-link" href="{{ item.url }}">
-                        <span class="minigame-link-image-wrap">
-                            <img class="minigame-link-image" src="" alt="{{ item.title }}" loading="lazy" hidden>
-                        </span>
-                        <span class="minigame-link-content" data-minigame-card data-meta-url="{{ item.url }}">
-                            <span class="minigame-link-title">{{ item.title }}</span>
-                            <span class="minigame-link-description"></span>
-                        </span>
-                    </a>
+                    <div class="minigame-link-shell">
+                        {% if request.user.is_authenticated and item.slug == "bumpercar-spiky" %}
+                            <button class="ide-btn minigame-link-stats-button" type="button" data-bumpercar-stats-open>
+                                {% include 'partials/ui_i18n.html' with key='account_bumpercar_stats_button' %}
+                            </button>
+                        {% endif %}
+                        <a class="minigame-link" href="{{ item.url }}">
+                            <span class="minigame-link-image-wrap">
+                                <img class="minigame-link-image" src="" alt="{{ item.title }}" loading="lazy" hidden>
+                            </span>
+                            <span class="minigame-link-content" data-minigame-card data-meta-url="{{ item.url }}">
+                                <span class="minigame-link-head">
+                                    <span class="minigame-link-title">{{ item.title }}</span>
+                                </span>
+                                <span class="minigame-link-description"></span>
+                            </span>
+                        </a>
+                    </div>
                 </li>
             {% endfor %}
         </ul>
     </section>
 </main>
+
+{% if request.user.is_authenticated %}
+    {% include "popup/fun/bumpercar_spiky_stats_modal.html" %}
+{% endif %}
 
 <style>
     .minigame-ui-content {
@@ -92,6 +105,10 @@
         transition: var(--ide-transition-fast);
         align-items: center;
         min-height: 110px;
+    }
+
+    .minigame-link-shell {
+        position: relative;
     }
 
     .minigame-link:visited {
@@ -150,6 +167,94 @@
 
     .minigame-link-content {
         min-width: 0;
+        padding-right: 72px;
+    }
+
+    .minigame-link-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+    }
+
+    .minigame-link-stats-button {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        min-height: 34px;
+        padding: 6px 13px;
+        font-size: 15px;
+        line-height: 1.1;
+        z-index: 2;
+    }
+
+    .bumpercar-stats-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 3600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.54);
+    }
+
+    .bumpercar-stats-modal {
+        width: min(440px, 100%);
+        border: 1px solid var(--ide-border-soft);
+        border-radius: 16px;
+        background: var(--shared-card-bg);
+        padding: 18px;
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+    }
+
+    .bumpercar-stats-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .bumpercar-stats-modal-title {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.2;
+    }
+
+    .bumpercar-stats-modal-close {
+        border: 0;
+        background: transparent;
+        color: var(--ide-text-stronger);
+        font-size: 28px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .bumpercar-stats-modal-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .bumpercar-stats-modal-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.04);
+        color: var(--ide-text);
+    }
+
+    .bumpercar-stats-modal-row strong {
+        color: var(--ide-text-stronger);
+        font-size: 15px;
+    }
+
+    body.theme-dark .bumpercar-stats-modal-row {
+        background: rgba(255, 255, 255, 0.08);
     }
 
     @media (max-width: 840px) {
@@ -278,6 +383,45 @@
                         descriptionNode.hidden = true;
                     }
                 });
+        });
+
+        const statsOpenButtons = document.querySelectorAll('[data-bumpercar-stats-open]');
+        const statsModal = document.querySelector('[data-bumpercar-stats-modal]');
+        const statsModalCloseButton = statsModal ? statsModal.querySelector('[data-bumpercar-stats-modal-close]') : null;
+
+        const setStatsModalOpen = function (opened) {
+            if (!statsModal) {
+                return;
+            }
+            statsModal.hidden = !opened;
+        };
+
+        statsOpenButtons.forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                setStatsModalOpen(true);
+            });
+        });
+
+        if (statsModal) {
+            statsModal.addEventListener('click', function (event) {
+                if (event.target === statsModal) {
+                    setStatsModalOpen(false);
+                }
+            });
+        }
+
+        if (statsModalCloseButton) {
+            statsModalCloseButton.addEventListener('click', function () {
+                setStatsModalOpen(false);
+            });
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && statsModal && !statsModal.hidden) {
+                setStatsModalOpen(false);
+            }
         });
     })();
 </script>

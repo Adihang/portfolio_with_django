@@ -12,3 +12,7 @@
     border-radius: var(--site-popup-radius-common) !important;
     box-shadow: var(--site-popup-shadow-common) !important;
 }
+
+[data-popup-fit-bottom] {
+    transform: translateY(calc(-1 * var(--popup-fit-bottom-shift, 0px)));
+}

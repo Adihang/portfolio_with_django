@@ -333,6 +333,11 @@ class UserProfile(models.Model):
         blank=True,
         default="",
     )
+    bumpercar_spiky_stats = models.JSONField(
+        "범퍼카 스핔이 전적",
+        default=dict,
+        blank=True,
+    )
     updated_at = models.DateTimeField("수정일", auto_now=True)
 
     class Meta:

@@ -4,13 +4,16 @@ import json
 import re
 import shutil
 import secrets
+import subprocess
+import sys
+from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
 from urllib.parse import quote, urlparse
 import httpx
 
 from django import forms
-from django.contrib.auth import login as auth_login
+from django.contrib.auth import authenticate, login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -93,6 +96,7 @@ DOCS_SIGNUP_SQL_PATTERN = re.compile(
 )
 DOCS_RENDER_MODE_MARKDOWN = "markdown"
 DOCS_RENDER_MODE_PLAIN_TEXT = "plain_text"
+DOCS_ACTIVE_ROOT_DIR: ContextVar[Path | None] = ContextVar("docs_active_root_dir", default=None)
 DOCS_DEFAULT_RENDER_PROFILE = {
     "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
     "css_class": "ide-plain-text",
@@ -269,11 +273,13 @@ DOCS_TEXT = {
         "auth_my_portfolio_button": "내 포트폴리오",
         "auth_logout_button": "로그아웃",
         "admin_button": "Admin",
+        "ops_apply_static_and_restart_button": "Apply Static + Restart Gunicorn",
         "auth_login_title": "IDE 로그인",
         "auth_username_label": "아이디",
         "auth_password_label": "비밀번호",
         "auth_login_submit": "로그인",
         "auth_signup_button": "회원가입",
+        "auth_previous_page": "이전 페이지",
         "auth_signup_title": "IDE 회원가입",
         "auth_signup_submit": "가입하기",
         "auth_name_label": "이름",
@@ -433,11 +439,13 @@ DOCS_TEXT = {
         "auth_my_portfolio_button": "My Portfolio",
         "auth_logout_button": "Logout",
         "admin_button": "Admin",
+        "ops_apply_static_and_restart_button": "Apply Static + Restart Gunicorn",
         "auth_login_title": "IDE Login",
         "auth_username_label": "Username",
         "auth_password_label": "Password",
         "auth_login_submit": "Login",
         "auth_signup_button": "회원가입",
+        "auth_previous_page": "Previous Page",
         "auth_signup_title": "IDE Sign up",
         "auth_signup_submit": "Create account",
         "auth_name_label": "Name",
@@ -463,7 +471,11 @@ def get_docs_text(ui_lang: str | None) -> dict:
     return DOCS_TEXT[lang].copy()
 
 
-def docs_root_dir() -> Path:
+def get_request_docs_root_dir(request=None) -> Path:
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated and user.is_superuser:
+        return Path(settings.BASE_DIR).resolve()
+
     media_root = Path(settings.MEDIA_ROOT)
     root = media_root / "ide"
     legacy_root = media_root / "docs"
@@ -471,7 +483,26 @@ def docs_root_dir() -> Path:
     if not root.exists() and legacy_root.exists():
         legacy_root.rename(root)
     root.mkdir(parents=True, exist_ok=True)
-    return root
+    return root.resolve()
+
+
+def docs_root_dir() -> Path:
+    active_root = DOCS_ACTIVE_ROOT_DIR.get()
+    if active_root is not None:
+        return active_root
+    return get_request_docs_root_dir()
+
+
+def with_request_docs_root(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        token = DOCS_ACTIVE_ROOT_DIR.set(get_request_docs_root_dir(request))
+        try:
+            return view_func(request, *args, **kwargs)
+        finally:
+            DOCS_ACTIVE_ROOT_DIR.reset(token)
+
+    return _wrapped
 
 
 def normalize_relative_path(raw_path: str | None, allow_empty: bool = True) -> str:
@@ -1155,6 +1186,8 @@ def get_scoped_docs_home_dir(request) -> str:
     user = getattr(request, "user", None)
     if not (user and user.is_authenticated):
         return "all"
+    if user.is_superuser:
+        return ""
     if not user.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists():
         return ""
     username = str(user.get_username() or "").strip()
@@ -1193,9 +1226,10 @@ def build_docs_breadcrumbs(
     current_dir: str,
     *,
     scoped_home_dir: str = "",
+    root_label: str = "ide",
 ) -> list[dict]:
     if not scoped_home_dir:
-        breadcrumbs = [{"label": "ide", "url": base_url, "is_current": current_dir == "", "path": ""}]
+        breadcrumbs = [{"label": root_label, "url": base_url, "is_current": current_dir == "", "path": ""}]
         if not current_dir:
             return breadcrumbs
 
@@ -1238,6 +1272,16 @@ def build_docs_breadcrumbs(
     return breadcrumbs
 
 
+def get_docs_root_label(request, scoped_home_dir: str = "") -> str:
+    if scoped_home_dir:
+        home_parts = [part for part in scoped_home_dir.split("/") if part]
+        return home_parts[-1] if home_parts else scoped_home_dir
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated and user.is_superuser:
+        return "Hanplanet"
+    return "ide"
+
+
 def is_docs_editor(request) -> bool:
     user = getattr(request, "user", None)
     if not (user and user.is_authenticated):
@@ -1252,6 +1296,17 @@ def is_docs_acl_admin(request) -> bool:
     if not (user and user.is_authenticated):
         return False
     return bool(user.is_staff or user.is_superuser)
+
+
+def require_docs_superuser(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated and user.is_superuser):
+            raise PermissionDenied("관리자 권한이 필요합니다.")
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
 
 
 def require_docs_editor_json(view_func):
@@ -1282,6 +1337,25 @@ def resolve_next_url(request, fallback_url: str) -> str:
         require_https=request.is_secure(),
     ):
         return candidate
+    return fallback_url
+
+
+def resolve_auth_breadcrumb_url(request, fallback_url: str) -> str:
+    next_url = resolve_next_url(request, fallback_url)
+    if next_url and next_url != fallback_url:
+        return next_url
+
+    referer = str(request.META.get("HTTP_REFERER", "") or "").strip()
+    if referer and url_has_allowed_host_and_scheme(
+        url=referer,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        parsed = urlparse(referer)
+        referer_path = parsed.path or "/"
+        if not DOCS_LOGOUT_PATH_PATTERN.match(referer_path):
+            return referer_path
+
     return fallback_url
 
 
@@ -1388,12 +1462,14 @@ def docs_common_context(request, ui_lang):
         docs_login_url = reverse("main:docs_login_lang", kwargs={"ui_lang": ui_lang})
         docs_signup_url = reverse("main:docs_signup_lang", kwargs={"ui_lang": ui_lang})
         docs_logout_url = reverse("main:docs_logout_lang", kwargs={"ui_lang": ui_lang})
+        docs_ops_apply_static_url = reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": ui_lang})
     else:
         docs_base_url = reverse("main:docs_root")
         docs_write_url = reverse("main:docs_write")
         docs_login_url = reverse("main:docs_login")
         docs_signup_url = reverse("main:docs_signup")
         docs_logout_url = reverse("main:docs_logout")
+        docs_ops_apply_static_url = reverse("main:docs_ops_apply_static")
     docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
     if request.user.is_authenticated:
         profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
@@ -1431,6 +1507,7 @@ def docs_common_context(request, ui_lang):
             "docs_login_url": docs_login_url,
             "docs_signup_url": docs_signup_url,
             "docs_logout_url": docs_logout_url,
+            "docs_ops_apply_static_url": docs_ops_apply_static_url,
             "docs_auth_next": request.get_full_path(),
             "docs_logout_next": docs_base_url,
             "docs_help_url": docs_help_url,
@@ -1473,6 +1550,7 @@ def docs_csrf_failure(request, reason="", template_name="403_csrf.html"):
     return default_csrf_failure(request, reason=reason, template_name=template_name)
 
 
+@with_request_docs_root
 def docs_root(request, ui_lang=None):
     scoped_home_dir = get_scoped_docs_home_dir(request)
     if scoped_home_dir:
@@ -1496,18 +1574,6 @@ def docs_list_root_legacy_redirect(request):
 
 def docs_write_legacy_redirect(request):
     return redirect_to_localized_route(request, "main:docs_write_lang")
-
-
-def docs_signup_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:docs_signup_lang")
-
-
-def docs_login_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:docs_login_lang")
-
-
-def docs_logout_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:docs_logout_lang")
 
 
 def docs_list_legacy_redirect(request, folder_path):
@@ -1690,11 +1756,13 @@ class DocsSignupForm(UserCreationForm):
 
 
 @require_http_methods(["GET", "POST"])
+@with_request_docs_root
 def docs_login(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
     next_url = resolve_next_url(request, context["docs_base_url"])
+    auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
 
     if request.user.is_authenticated:
         return redirect(next_url)
@@ -1769,12 +1837,15 @@ def docs_login(request, ui_lang=None):
             "docs_turnstile_site_key": turnstile_site_key,
             "docs_login_captcha_question": captcha_question,
             "docs_api_login_captcha_status_url": reverse("main:docs_api_login_captcha_status"),
+            "docs_auth_breadcrumb_url": auth_breadcrumb_url,
+            "docs_auth_breadcrumb_label": docs_text.get("auth_previous_page", "Previous Page"),
         }
     )
     return render(request, "docs/login.html", context)
 
 
 @require_http_methods(["GET"])
+@with_request_docs_root
 def docs_api_login_captcha_status(request):
     username_value = request.GET.get("username", "")
     target_user = _resolve_docs_login_target_user(username_value)
@@ -1788,11 +1859,13 @@ def docs_api_login_captcha_status(request):
 
 
 @require_http_methods(["GET", "POST"])
+@with_request_docs_root
 def docs_signup(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
     next_url = resolve_next_url(request, context["docs_base_url"])
+    auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
 
     if request.user.is_authenticated:
         return redirect(next_url)
@@ -1811,7 +1884,14 @@ def docs_signup(request, ui_lang=None):
                 except ValueError:
                     scoped_home_dir = ""
             ensure_scoped_home_dir(scoped_home_dir)
-            auth_login(request, user)
+            authed_user = authenticate(
+                request,
+                username=user.get_username(),
+                password=form.cleaned_data.get("password1", ""),
+            )
+            if authed_user is None:
+                authed_user = user
+            auth_login(request, authed_user)
             return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, user))
         signup_error_message = docs_text.get("auth_signup_error", "회원가입 정보를 확인해주세요.")
 
@@ -1820,6 +1900,8 @@ def docs_signup(request, ui_lang=None):
             "docs_signup_form": form,
             "docs_signup_next": next_url,
             "docs_signup_error_message": signup_error_message,
+            "docs_auth_breadcrumb_url": auth_breadcrumb_url,
+            "docs_auth_breadcrumb_label": docs_text.get("auth_previous_page", "Previous Page"),
         }
     )
     return render(request, "docs/signup.html", context)
@@ -1827,6 +1909,7 @@ def docs_signup(request, ui_lang=None):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_logout(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
@@ -1835,6 +1918,33 @@ def docs_logout(request, ui_lang=None):
     return redirect(next_url)
 
 
+@require_http_methods(["POST"])
+@csrf_protect
+@with_request_docs_root
+@require_docs_superuser
+def docs_ops_apply_static(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    context = docs_common_context(request, resolved_lang)
+    next_url = resolve_next_url(request, context["docs_base_url"])
+
+    subprocess.run(
+        [sys.executable, "manage.py", "collectstatic", "--noinput"],
+        cwd=str(settings.BASE_DIR),
+        check=True,
+    )
+    subprocess.Popen(
+        [
+            "/bin/zsh",
+            "-lc",
+            "sleep 1; launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn",
+        ],
+        cwd=str(settings.BASE_DIR),
+        start_new_session=True,
+    )
+    return redirect(next_url)
+
+
+@with_request_docs_root
 def docs_list(request, folder_path="", ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
@@ -1874,6 +1984,7 @@ def docs_list(request, folder_path="", ui_lang=None):
                 context["docs_base_url"],
                 current_dir,
                 scoped_home_dir=scoped_home_dir,
+                root_label=get_docs_root_label(request, scoped_home_dir),
             ),
             "initial_entries": list_directory_entries(directory, request=request),
             "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
@@ -1882,6 +1993,7 @@ def docs_list(request, folder_path="", ui_lang=None):
     return render(request, "docs/list.html", context)
 
 
+@with_request_docs_root
 def docs_view(request, doc_path, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
@@ -1923,6 +2035,7 @@ def docs_view(request, doc_path, ui_lang=None):
                 context["docs_base_url"],
                 parent_dir,
                 scoped_home_dir=scoped_home_dir,
+                root_label=get_docs_root_label(request, scoped_home_dir),
             ),
             "view_current_file_name": file_path.name,
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
@@ -1931,6 +2044,7 @@ def docs_view(request, doc_path, ui_lang=None):
     return render(request, "docs/view.html", context)
 
 
+@with_request_docs_root
 def docs_write(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
@@ -2018,6 +2132,7 @@ def docs_write(request, ui_lang=None):
                 context["docs_base_url"],
                 initial_dir,
                 scoped_home_dir=scoped_home_dir,
+                root_label=get_docs_root_label(request, scoped_home_dir),
             ),
             "write_current_file_name": write_current_file_name,
             "write_public_direct_save": write_public_direct_save,
@@ -2079,6 +2194,7 @@ def parse_path_values(payload: dict, allow_empty: bool) -> list[str]:
 
 @require_http_methods(["GET"])
 @require_docs_acl_admin_json
+@with_request_docs_root
 def docs_api_acl_options(request):
     public_group = get_docs_public_write_group()
     User = get_user_model()
@@ -2111,6 +2227,7 @@ def docs_api_acl_options(request):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 @require_docs_acl_admin_json
+@with_request_docs_root
 def docs_api_acl(request):
     if request.method == "GET":
         rel_path_raw = request.GET.get("path", "")
@@ -2225,6 +2342,7 @@ def docs_api_acl(request):
 
 
 @require_http_methods(["GET"])
+@with_request_docs_root
 def docs_api_list(request):
     rel_path = request.GET.get("path", "")
 
@@ -2249,6 +2367,7 @@ def docs_api_list(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_api_rename(request):
     try:
         payload = parse_json_body(request)
@@ -2297,6 +2416,7 @@ def docs_api_rename(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_api_delete(request):
     try:
         payload = parse_json_body(request)
@@ -2358,6 +2478,7 @@ def docs_api_delete(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_api_mkdir(request):
     try:
         payload = parse_json_body(request)
@@ -2382,6 +2503,7 @@ def docs_api_mkdir(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_api_move(request):
     try:
         payload = parse_json_body(request)
@@ -2445,6 +2567,7 @@ def docs_api_move(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_api_preview(request):
     try:
         payload = parse_json_body(request)
@@ -2516,6 +2639,7 @@ def docs_api_preview(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@with_request_docs_root
 def docs_api_save(request):
     try:
         payload = parse_json_body(request)
@@ -2602,6 +2726,7 @@ def docs_api_save(request):
 
 
 @require_http_methods(["GET"])
+@with_request_docs_root
 def docs_api_download(request):
     try:
         file_path, rel_path = normalize_docs_relative_path(request.GET.get("path"), must_exist=True)
