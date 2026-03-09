@@ -29,6 +29,7 @@ import base64
 import hashlib
 import hmac
 import time
+import subprocess
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 import markdown
@@ -67,6 +68,34 @@ IDENTITY_IMPERSONATION_PATTERNS = [
 FENCED_BLOCK_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})")
 FENCED_BLOCK_START_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<fence>`{3,}|~{3,})(?P<info>[^\n]*)$")
 FENCED_BLOCK_END_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*$")
+BUMPERCAR_SPIKY_SETTINGS_DEFAULTS = {
+    "user_base_speed": 225.0,
+    "user_max_boost_speed": 420.0,
+    "user_boost_acceleration": 360.0,
+    "user_boost_cooldown": 280.0,
+    "user_lives": 3,
+    "npc_base_speed": 225.0,
+    "npc_max_health": 20,
+    "npc_charge_trigger_distance": 240.0,
+    "npc_charge_windup_ms": 500,
+    "npc_rest_ms": 1800,
+    "npc_max_boost_speed": 1687.5,
+    "npc_boost_acceleration": 1350.0,
+    "npc_boost_cooldown": 1008.0,
+    "npc_respawn_delay_ms": 60000,
+    "npc_damage_min": 1,
+    "npc_damage_max": 5,
+    "npc_damage_speed_divisor": 8.0,
+}
+BUMPERCAR_SPIKY_SETTINGS_INT_KEYS = {
+    "user_lives",
+    "npc_max_health",
+    "npc_charge_windup_ms",
+    "npc_rest_ms",
+    "npc_respawn_delay_ms",
+    "npc_damage_min",
+    "npc_damage_max",
+}
 
 
 class _DummyTagRelation:
@@ -576,6 +605,79 @@ def _base64url_encode(raw_bytes):
     return base64.urlsafe_b64encode(raw_bytes).rstrip(b"=").decode("ascii")
 
 
+def get_bumpercar_spiky_settings_path():
+    custom_path = str(getattr(settings, "BUMPERCAR_SPIKY_SETTINGS_PATH", "") or "").strip()
+    if custom_path:
+        return Path(custom_path)
+    return Path(settings.BASE_DIR) / "config" / "bumpercar_spiky_settings.json"
+
+
+def _normalize_bumpercar_spiky_settings(raw_settings=None):
+    normalized = dict(BUMPERCAR_SPIKY_SETTINGS_DEFAULTS)
+    if not isinstance(raw_settings, dict):
+        return normalized
+
+    for key, default_value in BUMPERCAR_SPIKY_SETTINGS_DEFAULTS.items():
+        if key not in raw_settings:
+            continue
+        candidate = raw_settings.get(key)
+        try:
+            if key in BUMPERCAR_SPIKY_SETTINGS_INT_KEYS:
+                normalized[key] = int(candidate)
+            else:
+                normalized[key] = float(candidate)
+        except (TypeError, ValueError):
+            normalized[key] = default_value
+
+    normalized["user_base_speed"] = max(1.0, normalized["user_base_speed"])
+    normalized["user_max_boost_speed"] = max(normalized["user_base_speed"], normalized["user_max_boost_speed"])
+    normalized["user_boost_acceleration"] = max(1.0, normalized["user_boost_acceleration"])
+    normalized["user_boost_cooldown"] = max(1.0, normalized["user_boost_cooldown"])
+    normalized["user_lives"] = max(1, normalized["user_lives"])
+    normalized["npc_base_speed"] = max(1.0, normalized["npc_base_speed"])
+    normalized["npc_max_health"] = max(1, normalized["npc_max_health"])
+    normalized["npc_charge_trigger_distance"] = max(1.0, normalized["npc_charge_trigger_distance"])
+    normalized["npc_charge_windup_ms"] = max(0, normalized["npc_charge_windup_ms"])
+    normalized["npc_rest_ms"] = max(0, normalized["npc_rest_ms"])
+    normalized["npc_max_boost_speed"] = max(normalized["npc_base_speed"], normalized["npc_max_boost_speed"])
+    normalized["npc_boost_acceleration"] = max(1.0, normalized["npc_boost_acceleration"])
+    normalized["npc_boost_cooldown"] = max(1.0, normalized["npc_boost_cooldown"])
+    normalized["npc_respawn_delay_ms"] = max(1000, normalized["npc_respawn_delay_ms"])
+    normalized["npc_damage_min"] = max(1, normalized["npc_damage_min"])
+    normalized["npc_damage_max"] = max(normalized["npc_damage_min"], normalized["npc_damage_max"])
+    normalized["npc_damage_speed_divisor"] = max(0.1, normalized["npc_damage_speed_divisor"])
+    return normalized
+
+
+def load_bumpercar_spiky_settings():
+    settings_path = get_bumpercar_spiky_settings_path()
+    if not settings_path.exists():
+        return dict(BUMPERCAR_SPIKY_SETTINGS_DEFAULTS)
+
+    try:
+        raw_settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return dict(BUMPERCAR_SPIKY_SETTINGS_DEFAULTS)
+    return _normalize_bumpercar_spiky_settings(raw_settings)
+
+
+def save_bumpercar_spiky_settings(next_settings):
+    settings_path = get_bumpercar_spiky_settings_path()
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    normalized = _normalize_bumpercar_spiky_settings(next_settings)
+    settings_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return normalized
+
+
+def restart_bumpercar_spiky_runtime():
+    commands = [
+        ["/bin/zsh", "-lc", f"launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn"],
+        ["/bin/zsh", "-lc", f"launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server"],
+    ]
+    for command in commands:
+        subprocess.run(command, check=True, timeout=20)
+
+
 def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False):
     now = int(time.time())
     header = {"alg": "HS256", "typ": "JWT"}
@@ -681,6 +783,10 @@ def hanplanet_multiplayer_legacy_redirect(request, ui_lang=None):
     return redirect_to_localized_route(request, "main:bumpercar_spiky_lang")
 
 
+def bumpercar_spiky_admin_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:bumpercar_spiky_admin_lang")
+
+
 def minigame_page(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
@@ -768,6 +874,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
     host = (request.get_host() or "").split(":")[0].strip().lower()
+    gameplay_settings = load_bumpercar_spiky_settings()
 
     if host in {"localhost", "127.0.0.1"}:
         ws_url = str(getattr(settings, "GAME_WS_LOCAL_URL", "ws://127.0.0.1:8081") or "ws://127.0.0.1:8081")
@@ -833,6 +940,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
             if request.user.is_authenticated
             else ("Spiky" if is_english else "스핔이")
         ),
+        "gameplay_settings_json": mark_safe(json.dumps(gameplay_settings)),
         "game_boost_sound_urls_json": mark_safe(json.dumps(boost_sound_urls)),
         "game_crash_sound_urls_json": mark_safe(json.dumps(crash_sound_urls)),
         "game_defeat_sound_urls_json": mark_safe(json.dumps(defeat_sound_urls)),
@@ -880,6 +988,79 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
     return response
+
+
+@csrf_protect
+@require_http_methods(["GET", "POST"])
+def bumpercar_spiky_admin_page(request, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    if not getattr(request.user, "is_authenticated", False):
+        return redirect(
+            f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
+        )
+    if not getattr(request.user, "is_superuser", False):
+        raise Http404()
+
+    current_settings = load_bumpercar_spiky_settings()
+    save_success = False
+    save_error = ""
+
+    if request.method == "POST":
+        submitted_settings = {}
+        for key in BUMPERCAR_SPIKY_SETTINGS_DEFAULTS:
+            submitted_settings[key] = request.POST.get(key, current_settings.get(key))
+
+        try:
+            current_settings = save_bumpercar_spiky_settings(submitted_settings)
+            restart_bumpercar_spiky_runtime()
+            save_success = True
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            logging.exception("Failed to save bumpercar spiky settings")
+            save_error = str(error) or "save_failed"
+
+    field_specs = [
+        ("user_base_speed", "bumpercar_admin_user_base_speed", "0.1"),
+        ("user_max_boost_speed", "bumpercar_admin_user_max_boost_speed", "0.1"),
+        ("user_boost_acceleration", "bumpercar_admin_user_boost_acceleration", "0.1"),
+        ("user_boost_cooldown", "bumpercar_admin_user_boost_cooldown", "0.1"),
+        ("user_lives", "bumpercar_admin_user_lives", "1"),
+        ("npc_base_speed", "bumpercar_admin_npc_base_speed", "0.1"),
+        ("npc_max_health", "bumpercar_admin_npc_max_health", "1"),
+        ("npc_charge_trigger_distance", "bumpercar_admin_npc_charge_trigger_distance", "0.1"),
+        ("npc_charge_windup_ms", "bumpercar_admin_npc_charge_windup_ms", "1"),
+        ("npc_rest_ms", "bumpercar_admin_npc_rest_ms", "1"),
+        ("npc_max_boost_speed", "bumpercar_admin_npc_max_boost_speed", "0.1"),
+        ("npc_boost_acceleration", "bumpercar_admin_npc_boost_acceleration", "0.1"),
+        ("npc_boost_cooldown", "bumpercar_admin_npc_boost_cooldown", "0.1"),
+        ("npc_respawn_delay_ms", "bumpercar_admin_npc_respawn_delay_ms", "1"),
+        ("npc_damage_min", "bumpercar_admin_npc_damage_min", "1"),
+        ("npc_damage_max", "bumpercar_admin_npc_damage_max", "1"),
+        ("npc_damage_speed_divisor", "bumpercar_admin_npc_damage_speed_divisor", "0.1"),
+    ]
+
+    context = {
+        "ui_lang": resolved_lang,
+        "page_title": "Bumper Car Spiky Admin" if resolved_lang == "en" else "범퍼카 스핔이 관리자",
+        "meta_title": "Bumper Car Spiky Admin" if resolved_lang == "en" else "범퍼카 스핔이 관리자",
+        "meta_og_title": "Bumper Car Spiky Admin" if resolved_lang == "en" else "범퍼카 스핔이 관리자",
+        "meta_description": "Admin controls for Bumper Car Spiky gameplay settings." if resolved_lang == "en" else "범퍼카 스핔이 게임 수치를 조절하는 관리자 페이지입니다.",
+        "meta_og_description": "Admin controls for Bumper Car Spiky gameplay settings." if resolved_lang == "en" else "범퍼카 스핔이 게임 수치를 조절하는 관리자 페이지입니다.",
+        "meta_site_name": "Bumper Car Spiky Admin" if resolved_lang == "en" else "범퍼카 스핔이 관리자",
+        "bumpercar_admin_settings": [
+            {
+                "name": key,
+                "i18n_key": i18n_key,
+                "step": step,
+                "value": current_settings[key],
+            }
+            for key, i18n_key, step in field_specs
+        ],
+        "bumpercar_admin_save_success": save_success,
+        "bumpercar_admin_save_error": save_error,
+        "bumpercar_admin_game_url": reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}),
+    }
+    apply_ui_context(request, context, resolved_lang)
+    return render(request, "fun/bumpercar_spiky_admin.html", context)
 
 
 @require_http_methods(["GET"])

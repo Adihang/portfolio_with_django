@@ -569,6 +569,11 @@ class HanplanetMultiplayerPageTests(TestCase):
             password="pw123456",
             email="multi@example.com",
         )
+        self.admin_user = get_user_model().objects.create_superuser(
+            username="multiplayer_admin",
+            password="pw123456",
+            email="admin@example.com",
+        )
 
     def test_multiplayer_page_renders_for_unauthenticated_user(self):
         response = self.client.get("/ko/fun/bumpercar-spiky/")
@@ -629,6 +634,21 @@ class HanplanetMultiplayerPageTests(TestCase):
         token = build_game_auth_token(self.user)
 
         self.assertTrue(token.startswith("ey"))
+
+    def test_bumpercar_spiky_admin_requires_superuser(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/admin/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_bumpercar_spiky_admin_renders_for_superuser(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/admin/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "범퍼카 스핔이 관리자", html=False)
 
 
 class DocsAccessRuleTests(TestCase):

@@ -47,10 +47,37 @@ Spacebar{% else %}WASD or 방향키
 {% elif key == "multiplayer_idle_modal_close" %}{% if ui_lang == 'en' %}Close{% else %}닫기{% endif %}
 {% elif key == "multiplayer_death_modal_title" %}{% if ui_lang == 'en' %}You've been Nered!{% else %}네르 당했습니다!{% endif %}
 {% elif key == "multiplayer_death_modal_respawn" %}{% if ui_lang == 'en' %}Respawn{% else %}리스폰{% endif %}
+{% elif key == "multiplayer_death_modal_respawn_lives" %}{% if ui_lang == 'en' %}Respawn (Lives {count}){% else %}리스폰 (남은 목숨 {count}){% endif %}
+{% elif key == "multiplayer_death_modal_no_lives" %}{% if ui_lang == 'en' %}No Lives Left{% else %}목숨 모두 소진{% endif %}
 {% elif key == "multiplayer_sound_volume" %}{% if ui_lang == 'en' %}Sound{% else %}사운드{% endif %}
 {% elif key == "multiplayer_you" %}{% if ui_lang == 'en' %}You{% else %}내 플레이어{% endif %}
 {% elif key == "multiplayer_position" %}{% if ui_lang == 'en' %}Position{% else %}현재 좌표{% endif %}
 {% elif key == "multiplayer_nearby_players" %}{% if ui_lang == 'en' %}Nearby players{% else %}주변 플레이어 수{% endif %}
 {% elif key == "multiplayer_signed_in_as" %}{% if ui_lang == 'en' %}Signed in as{% else %}로그인 계정{% endif %}
 {% elif key == "multiplayer_open_minigame" %}{% if ui_lang == 'en' %}Open Bumper Car Spiky and crash around the shared arena.{% else %}범퍼카 스핔이를 열고 공유 경기장에서 부딪혀 보세요.{% endif %}
+{% elif key == "bumpercar_admin_kicker" %}{% if ui_lang == 'en' %}Game Admin{% else %}게임 관리자{% endif %}
+{% elif key == "bumpercar_admin_title" %}{% if ui_lang == 'en' %}Bumper Car Spiky Admin{% else %}범퍼카 스핔이 관리자{% endif %}
+{% elif key == "bumpercar_admin_description" %}{% if ui_lang == 'en' %}Tune movement, boost, damage, health, and lives for players and Ner.{% else %}유저와 네르의 이동, 돌진, 데미지, 체력, 목숨 수치를 조절합니다.{% endif %}
+{% elif key == "bumpercar_admin_open_game" %}{% if ui_lang == 'en' %}Open Game{% else %}게임 열기{% endif %}
+{% elif key == "bumpercar_admin_saved" %}{% if ui_lang == 'en' %}Settings saved and runtime restarted.{% else %}설정을 저장했고 런타임을 재시작했습니다.{% endif %}
+{% elif key == "bumpercar_admin_save_failed" %}{% if ui_lang == 'en' %}Failed to save settings.{% else %}설정 저장에 실패했습니다.{% endif %}
+{% elif key == "bumpercar_admin_save" %}{% if ui_lang == 'en' %}Save Settings{% else %}설정 저장{% endif %}
+{% elif key == "bumpercar_admin_user_base_speed" %}{% if ui_lang == 'en' %}User Base Speed{% else %}유저 기본 이동속도{% endif %}
+{% elif key == "bumpercar_admin_user_max_boost_speed" %}{% if ui_lang == 'en' %}User Boost Max Speed{% else %}유저 돌진 최대속도{% endif %}
+{% elif key == "bumpercar_admin_user_boost_acceleration" %}{% if ui_lang == 'en' %}User Boost Acceleration{% else %}유저 돌진 가속도{% endif %}
+{% elif key == "bumpercar_admin_user_boost_cooldown" %}{% if ui_lang == 'en' %}User Boost Cooldown{% else %}유저 돌진 감속도{% endif %}
+{% elif key == "bumpercar_admin_user_lives" %}{% if ui_lang == 'en' %}User Lives{% else %}유저 목숨 수{% endif %}
+{% elif key == "bumpercar_admin_npc_base_speed" %}{% if ui_lang == 'en' %}Ner Base Speed{% else %}네르 기본 이동속도{% endif %}
+{% elif key == "bumpercar_admin_npc_max_health" %}{% if ui_lang == 'en' %}Ner Max Health{% else %}네르 최대 체력{% endif %}
+{% elif key == "bumpercar_admin_npc_charge_trigger_distance" %}{% if ui_lang == 'en' %}Ner Charge Trigger Distance{% else %}네르 돌진 시작 거리{% endif %}
+{% elif key == "bumpercar_admin_npc_charge_windup_ms" %}{% if ui_lang == 'en' %}Ner Charge Windup (ms){% else %}네르 돌진 예고 시간(ms){% endif %}
+{% elif key == "bumpercar_admin_npc_rest_ms" %}{% if ui_lang == 'en' %}Ner Rest Time (ms){% else %}네르 정지 시간(ms){% endif %}
+{% elif key == "bumpercar_admin_npc_max_boost_speed" %}{% if ui_lang == 'en' %}Ner Charge Max Speed{% else %}네르 돌진 최대속도{% endif %}
+{% elif key == "bumpercar_admin_npc_boost_acceleration" %}{% if ui_lang == 'en' %}Ner Charge Acceleration{% else %}네르 돌진 가속도{% endif %}
+{% elif key == "bumpercar_admin_npc_boost_cooldown" %}{% if ui_lang == 'en' %}Ner Charge Cooldown{% else %}네르 돌진 감속도{% endif %}
+{% elif key == "bumpercar_admin_npc_respawn_delay_ms" %}{% if ui_lang == 'en' %}Ner Respawn Delay (ms){% else %}네르 리스폰 대기(ms){% endif %}
+{% elif key == "bumpercar_admin_npc_damage_min" %}{% if ui_lang == 'en' %}Ner Damage Min{% else %}네르 최소 데미지{% endif %}
+{% elif key == "bumpercar_admin_npc_damage_max" %}{% if ui_lang == 'en' %}Ner Damage Max{% else %}네르 최대 데미지{% endif %}
+{% elif key == "bumpercar_admin_npc_damage_speed_divisor" %}{% if ui_lang == 'en' %}Ner Damage Speed Divisor{% else %}네르 데미지 속도 계수{% endif %}
+{% elif key == "bumpercar_shared_lives" %}{% if ui_lang == 'en' %}Shared Lives{% else %}남은 목숨{% endif %}
 {% endif %}

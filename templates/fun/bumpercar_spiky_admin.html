@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static_versioned %}
+{% block body_class %}ui-page bumpercar-spiky-admin-page{% endblock %}
+{% block content %}
+{% include 'docs/_assets_head.html' %}
+
+<main class="ui-shell ui-content">
+    <section class="ui-card docs-card" style="max-width: 1080px; margin: 24px auto; padding: 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+            <div>
+                <p class="ui-kicker">{% include 'partials/ui_i18n.html' with key='bumpercar_admin_kicker' %}</p>
+                <h1 class="ui-title" style="margin:0 0 8px 0;">{% include 'partials/ui_i18n.html' with key='bumpercar_admin_title' %}</h1>
+                <p class="ui-muted" style="margin:0;">{% include 'partials/ui_i18n.html' with key='bumpercar_admin_description' %}</p>
+            </div>
+            <a class="ide-btn" href="{{ bumpercar_admin_game_url }}">
+                {% include 'partials/ui_i18n.html' with key='bumpercar_admin_open_game' %}
+            </a>
+        </div>
+
+        {% if bumpercar_admin_save_success %}
+            <div class="ui-card" style="margin-top:16px; padding:12px 14px; border:1px solid rgba(34,197,94,0.35);">
+                {% include 'partials/ui_i18n.html' with key='bumpercar_admin_saved' %}
+            </div>
+        {% endif %}
+        {% if bumpercar_admin_save_error %}
+            <div class="ui-card" style="margin-top:16px; padding:12px 14px; border:1px solid rgba(239,68,68,0.35);">
+                {% include 'partials/ui_i18n.html' with key='bumpercar_admin_save_failed' %}
+                <div class="ui-muted" style="margin-top:6px;">{{ bumpercar_admin_save_error }}</div>
+            </div>
+        {% endif %}
+
+        <form method="post" style="margin-top:20px;">
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:14px;">
+                {% for field in bumpercar_admin_settings %}
+                    <label class="ui-card" style="padding:14px; display:flex; flex-direction:column; gap:8px;">
+                        <span style="font-weight:700;">
+                            {% include 'partials/ui_i18n.html' with key=field.i18n_key %}
+                        </span>
+                        <input
+                            class="ui-input"
+                            type="number"
+                            name="{{ field.name }}"
+                            step="{{ field.step }}"
+                            value="{{ field.value }}"
+                            style="width:100%;"
+                        >
+                    </label>
+                {% endfor %}
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+                <button class="ide-btn ide-btn-primary" type="submit">
+                    {% include 'partials/ui_i18n.html' with key='bumpercar_admin_save' %}
+                </button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}
