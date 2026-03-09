@@ -125,6 +125,79 @@ launchctl list | rg com.hanplanet.gunicorn
 launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn
 ```
 
+## 3-3. 범퍼카 스핔이 게임 서버 (Node WebSocket)
+
+현재 게임 서버 코드는 Django 프로젝트 내부 경로에 함께 둡니다.
+
+- 위치: `/Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server`
+- 실행 파일: `server.js`
+- 기본 운영 포트: `8081`
+- launchd 라벨: `com.hanplanet.bumpercar-spiky-server`
+
+초기 설치:
+
+```bash
+cd /Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server
+cp .env.example .env
+npm install
+```
+
+로컬 단독 실행:
+
+```bash
+cd /Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server
+PORT=8081 npm start
+```
+
+게임 수치 설정 파일:
+
+- Django/게임 서버 공용 설정: `/Users/imhanbyeol/Development/Hanplanet/config/bumpercar_spiky_settings.json`
+- 게임 서버는 시작 시 이 JSON 을 읽으므로, 값 변경 후에는 게임 서버 재시작이 필요합니다.
+
+JWT 연동 값:
+
+- Django `GAME_JWT_SECRET`, `GAME_JWT_ISSUER`, `GAME_JWT_AUDIENCE`
+- 게임 서버 `.env`의 `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`
+
+위 두 쌍은 반드시 동일해야 합니다.
+
+### macOS launchd 등록
+
+템플릿 파일:
+
+- `/Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server/deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist`
+
+설치:
+
+```bash
+cp /Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server/deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist \
+  ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
+
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+```
+
+상태 확인:
+
+```bash
+launchctl print gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+tail -f /tmp/bumpercar-spiky-server.log
+tail -f /tmp/bumpercar-spiky-server-error.log
+```
+
+재시작:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+```
+
+삭제:
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
+rm -f ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
+```
+
 ## 4. Ollama 서비스
 
 설치:

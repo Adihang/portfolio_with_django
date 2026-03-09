@@ -76,7 +76,7 @@ WS    → game.hanplanet.com
 # 3. 프로젝트 구조
 
 ```
-hanplanet-game-server
+Hanplanet/bumpercar-spiky-server
 │
 ├ server.js
 │
@@ -433,7 +433,7 @@ const wss = createServer(world)
 
 startGameLoop(world, wss)
 
-console.log("Hanplanet game server started")
+console.log("Bumper Car Spiky server started")
 ```
 
 ---

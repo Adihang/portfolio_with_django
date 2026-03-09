@@ -1,0 +1,19 @@
+{
+  "user_base_speed": 225,
+  "user_max_boost_speed": 420,
+  "user_boost_acceleration": 360,
+  "user_boost_cooldown": 280,
+  "user_lives": 3,
+  "npc_base_speed": 225,
+  "npc_max_health": 20,
+  "npc_charge_trigger_distance": 240,
+  "npc_charge_windup_ms": 500,
+  "npc_rest_ms": 1800,
+  "npc_max_boost_speed": 1687.5,
+  "npc_boost_acceleration": 1350,
+  "npc_boost_cooldown": 1008,
+  "npc_respawn_delay_ms": 60000,
+  "npc_damage_min": 1,
+  "npc_damage_max": 5,
+  "npc_damage_speed_divisor": 8
+}

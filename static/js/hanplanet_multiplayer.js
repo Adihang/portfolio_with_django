@@ -25,6 +25,8 @@
     const deathModal = root.querySelector('[data-game-death-modal]');
     const deathModalRespawnButton = root.querySelector('[data-game-death-modal-respawn]');
     const pingNode = root.querySelector('[data-game-ping]');
+    const sharedLivesNode = root.querySelector('[data-game-shared-lives]');
+    const sharedLivesCountNode = root.querySelector('[data-game-shared-lives-count]');
     const masterVolumeSlider = root.querySelector('[data-game-master-volume]');
     const idleModal = document.querySelector('[data-game-idle-modal]');
     const idleModalCloseButton = idleModal ? idleModal.querySelector('[data-game-idle-modal-close]') : null;
@@ -44,6 +46,8 @@
         connected: root.getAttribute('data-connected-label') || 'Connected',
         disconnected: root.getAttribute('data-disconnected-label') || 'Disconnected'
     };
+    const deathRespawnLabel = root.getAttribute('data-death-respawn-label') || 'Respawn';
+    const deathNoLivesLabel = root.getAttribute('data-death-no-lives-label') || 'No Lives Left';
     const playerName = root.getAttribute('data-player-name') || 'Player';
     const playerIconUrl = root.getAttribute('data-player-icon-url') || '';
     const playerNpcIconUrl = root.getAttribute('data-player-npc-icon-url') || '';
@@ -99,12 +103,21 @@
     })();
     const rawWsUrl = root.getAttribute('data-ws-url') || '';
     const tokenUrl = root.getAttribute('data-token-url') || '';
+    const gameplaySettings = (function () {
+        const rawValue = root.getAttribute('data-gameplay-settings') || '{}';
+        try {
+            const parsed = JSON.parse(rawValue);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    })();
     const worldSize = 2000;
-    const basePlayerSpeedPerSecond = 225;
-    const maxBoostedSpeedPerSecond = 360;
-    const boostAccelerationPerSecond = 360;
-    const boostCooldownPerSecond = 140;
-    const npcMaxHealth = 20;
+    const basePlayerSpeedPerSecond = Number(gameplaySettings.user_base_speed || 225);
+    const maxBoostedSpeedPerSecond = Number(gameplaySettings.user_max_boost_speed || 420);
+    const boostAccelerationPerSecond = Number(gameplaySettings.user_boost_acceleration || 360);
+    const boostCooldownPerSecond = Number(gameplaySettings.user_boost_cooldown || 280);
+    const npcMaxHealth = Number(gameplaySettings.npc_max_health || 20);
     const cameraFollow = 0.18;
     const remoteLerpPerFrame = 0.24;
     const selfRenderLerpPerFrame = 0.62;
@@ -161,10 +174,11 @@
     let boostDirectionY = 0;
     let selfDeathActive = false;
     let selfDeathRespawnReady = false;
+    let selfLivesRemaining = Math.max(1, Number(gameplaySettings.user_lives || 3));
     let selfCollisionActive = false;
     let selfCollisionVisualType = 'win';
     let audioContext = null;
-    let masterVolume = 0.35;
+    let masterVolume = 0.2;
     const playerAudioStates = new Map();
     const activePlayerSounds = new Map();
     const playerVisuals = new Map();
@@ -276,16 +290,22 @@
         idleModal.hidden = !opened;
     };
 
-    const setDeathModalState = function (opened, respawnReady) {
+    const setDeathModalState = function (opened, respawnReady, livesRemaining) {
         if (!deathModal) {
             return;
         }
 
+        const safeLivesRemaining = Math.max(0, Number(livesRemaining || 0));
         deathModal.hidden = !opened;
         if (deathModalRespawnButton) {
-            deathModalRespawnButton.disabled = !respawnReady;
+            if (!opened) {
+                deathModalRespawnButton.textContent = deathRespawnLabel;
+            } else {
+                deathModalRespawnButton.textContent = safeLivesRemaining > 0 ? deathRespawnLabel : deathNoLivesLabel;
+            }
+            deathModalRespawnButton.disabled = !respawnReady || safeLivesRemaining <= 0;
         }
-        if (!opened || !respawnReady) {
+        if (!opened || !respawnReady || safeLivesRemaining <= 0) {
             input.respawn = false;
         }
     };
@@ -299,6 +319,15 @@
             mobileControlsToggle.hidden = opened;
         }
     };
+
+    const setSharedLives = function (value) {
+        if (!sharedLivesCountNode) {
+            return;
+        }
+        const safeLives = Math.max(0, Number(value || 0));
+        sharedLivesCountNode.textContent = 'x ' + safeLives;
+    };
+    setSharedLives(selfLivesRemaining);
 
     const setFullscreenMode = function (enabled) {
         isFullscreenMode = Boolean(enabled);
@@ -910,7 +939,11 @@
                     boostLockedActive = Boolean(selfPlayer.boostLockedActive);
                     selfDeathActive = Boolean(selfPlayer.deathActive);
                     selfDeathRespawnReady = Boolean(selfPlayer.deathRespawnReady);
-                    setDeathModalState(selfDeathActive, selfDeathRespawnReady);
+                    selfLivesRemaining = typeof selfPlayer.livesRemaining === 'number'
+                        ? Math.max(0, selfPlayer.livesRemaining)
+                        : 0;
+                    setSharedLives(selfLivesRemaining);
+                    setDeathModalState(selfDeathActive, selfDeathRespawnReady, selfLivesRemaining);
                     if (defeatReceivedCountNode) {
                         defeatReceivedCountNode.textContent = String(selfPlayer.defeatReceivedCount || 0);
                     }
@@ -979,9 +1012,11 @@
             boostLockedActive = false;
             selfDeathActive = false;
             selfDeathRespawnReady = false;
+            selfLivesRemaining = Math.max(1, Number(gameplaySettings.user_lives || 3));
             selfCollisionActive = false;
             selfCollisionVisualType = 'win';
-            setDeathModalState(false, false);
+            setSharedLives(selfLivesRemaining);
+            setDeathModalState(false, false, selfLivesRemaining);
             boostState = 'idle';
             if (defeatReceivedCountNode) {
                 defeatReceivedCountNode.textContent = '0';
@@ -1058,57 +1093,87 @@
         );
     };
 
+    const getPlayerSpriteState = function (player, isSelf) {
+        const isNpc = Boolean(player.isNpc);
+        const playerMoveSpeed = typeof player.currentSpeed === 'number' ? player.currentSpeed : basePlayerSpeedPerSecond;
+        const isBoostVisualActive = isSelf
+            ? currentMoveSpeed > basePlayerSpeedPerSecond
+            : (player.boostState === 'charging' || player.boostState === 'cooldown' || playerMoveSpeed > basePlayerSpeedPerSecond);
+        const isCollisionVisualActive = Boolean(player.collisionActive);
+        const isDefeatVisualActive = isCollisionVisualActive && player.collisionVisualType === 'defeat';
+        const isDeathVisualActive = Boolean(player.deathActive);
+        const npcChargeWindupProgress = typeof player.npcChargeWindupProgress === 'number'
+            ? Math.max(0, Math.min(1, player.npcChargeWindupProgress))
+            : 0;
+        const npcBoostState = typeof player.boostState === 'string' ? player.boostState : 'idle';
+        const npcState = player.npcState || '';
+        const isNpcChargeVisualActive = isNpc && (npcChargeWindupProgress > 0 || npcBoostState === 'charging');
+        const isNpcDefeatIconActive = isNpc && (isDeathVisualActive || isDefeatVisualActive);
+        const spriteScale = isNpc
+            ? (isNpcChargeVisualActive ? 2.0 : 3.75)
+            : 1;
+        let activeIcon = playerIcon;
+        let activeIconReady = playerIconReady;
+
+        if (isNpc && isNpcChargeVisualActive && playerNpcBoostIconReady) {
+            activeIcon = playerNpcBoostIcon;
+            activeIconReady = playerNpcBoostIconReady;
+        } else if (isNpc && (isDeathVisualActive || isDefeatVisualActive) && playerNpcDefeatIconReady) {
+            activeIcon = playerNpcDefeatIcon;
+            activeIconReady = playerNpcDefeatIconReady;
+        } else if (isNpc && playerNpcIconReady) {
+            activeIcon = playerNpcIcon;
+            activeIconReady = playerNpcIconReady;
+        } else if (isDeathVisualActive && playerDefeatIconReady) {
+            activeIcon = playerDefeatIcon;
+            activeIconReady = playerDefeatIconReady;
+        } else if (isDefeatVisualActive && playerDefeatIconReady) {
+            activeIcon = playerDefeatIcon;
+            activeIconReady = playerDefeatIconReady;
+        } else if (isCollisionVisualActive && playerCollisionIconReady) {
+            activeIcon = playerCollisionIcon;
+            activeIconReady = playerCollisionIconReady;
+        } else if (isBoostVisualActive && playerBoostIconReady) {
+            activeIcon = playerBoostIcon;
+            activeIconReady = playerBoostIconReady;
+        }
+
+        return {
+            isNpc,
+            isCollisionVisualActive,
+            isDefeatVisualActive,
+            isDeathVisualActive,
+            npcChargeWindupProgress,
+            npcBoostState,
+            npcState,
+            isNpcChargeVisualActive,
+            isNpcDefeatIconActive,
+            spriteScale,
+            activeIcon,
+            activeIconReady
+        };
+    };
+
     const drawPlayers = function (cameraX, cameraY, deltaSeconds, zoom) {
         renderPlayers.forEach(function (player) {
             const x = (player.x - cameraX) * zoom;
             const y = (player.y - cameraY) * zoom;
             const isSelf = player.id === selfId;
-            const isNpc = Boolean(player.isNpc);
             const visual = getPlayerVisual(player.id);
-            const isBoostVisualActive = isSelf && currentMoveSpeed > basePlayerSpeedPerSecond;
-            const isCollisionVisualActive = Boolean(player.collisionActive);
-            const isDefeatVisualActive = isCollisionVisualActive && player.collisionVisualType === 'defeat';
-            const isDeathVisualActive = Boolean(player.deathActive);
+            const spriteState = getPlayerSpriteState(player, isSelf);
+            const isNpc = spriteState.isNpc;
+            const isCollisionVisualActive = spriteState.isCollisionVisualActive;
+            const isDefeatVisualActive = spriteState.isDefeatVisualActive;
+            const isDeathVisualActive = spriteState.isDeathVisualActive;
             const deathFadeProgress = typeof player.deathFadeProgress === 'number' ? player.deathFadeProgress : 0;
             const isNpcDeathAnimating = Boolean(player.npcDeathAnimating);
             const npcHealth = typeof player.npcHealth === 'number' ? player.npcHealth : npcMaxHealth;
             const collisionImpactX = typeof player.collisionImpactX === 'number' ? player.collisionImpactX : 0;
             const collisionImpactY = typeof player.collisionImpactY === 'number' ? player.collisionImpactY : 0;
-            const npcChargeWindupProgress = typeof player.npcChargeWindupProgress === 'number'
-                ? Math.max(0, Math.min(1, player.npcChargeWindupProgress))
-                : 0;
-            const npcBoostState = typeof player.boostState === 'string' ? player.boostState : 'idle';
-            const npcState = player.npcState || '';
-            const isNpcChargeVisualActive = isNpc && (npcChargeWindupProgress > 0 || npcBoostState === 'charging');
-            const isNpcDefeatIconActive = isNpc && (isDeathVisualActive || isDefeatVisualActive);
-            const spriteScale = isNpc
-                ? (isNpcChargeVisualActive ? 2.0 : (isNpcDefeatIconActive ? 3.35 : 3.75))
-                : 1;
-            let activeIcon = playerIcon;
-            let activeIconReady = playerIconReady;
-
-            if (isNpc && (isDeathVisualActive || isDefeatVisualActive) && playerNpcDefeatIconReady) {
-                activeIcon = playerNpcDefeatIcon;
-                activeIconReady = playerNpcDefeatIconReady;
-            } else if (isNpc && isNpcChargeVisualActive && playerNpcBoostIconReady) {
-                activeIcon = playerNpcBoostIcon;
-                activeIconReady = playerNpcBoostIconReady;
-            } else if (isNpc && playerNpcIconReady) {
-                activeIcon = playerNpcIcon;
-                activeIconReady = playerNpcIconReady;
-            } else if (isDeathVisualActive && playerDefeatIconReady) {
-                activeIcon = playerDefeatIcon;
-                activeIconReady = playerDefeatIconReady;
-            } else if (isDefeatVisualActive && playerDefeatIconReady) {
-                activeIcon = playerDefeatIcon;
-                activeIconReady = playerDefeatIconReady;
-            } else if (isCollisionVisualActive && playerCollisionIconReady) {
-                activeIcon = playerCollisionIcon;
-                activeIconReady = playerCollisionIconReady;
-            } else if (isBoostVisualActive && playerBoostIconReady) {
-                activeIcon = playerBoostIcon;
-                activeIconReady = playerBoostIconReady;
-            }
+            const isNpcChargeVisualActive = spriteState.isNpcChargeVisualActive;
+            const spriteScale = spriteState.spriteScale;
+            const activeIcon = spriteState.activeIcon;
+            const activeIconReady = spriteState.activeIconReady;
 
             updateVisualAnimation(visual, deltaSeconds);
 
@@ -1233,11 +1298,35 @@
 
         renderPlayers.forEach(function (player) {
             const isSelf = player.id === selfId;
-            if (player.isNpc && player.deathActive && !player.npcDeathAnimating) {
+            if (player.deathActive) {
                 return;
             }
             const x = padding + (player.x / worldSize) * drawableWidth;
             const y = padding + (player.y / worldSize) * drawableHeight;
+            const visual = getPlayerVisual(player.id);
+            const spriteState = getPlayerSpriteState(player, isSelf);
+
+            if (spriteState.activeIconReady) {
+                const spriteHeight = (player.isNpc ? 16 : 10) * (player.isNpc ? (spriteState.isNpcChargeVisualActive ? 0.82 : 1) : 1);
+                const naturalWidth = spriteState.activeIcon.naturalWidth || playerSpriteWidth;
+                const naturalHeight = spriteState.activeIcon.naturalHeight || playerSpriteHeight;
+                const aspectRatio = naturalHeight > 0 ? naturalWidth / naturalHeight : 1;
+                const spriteWidth = spriteHeight * aspectRatio;
+
+                minimapCtx.save();
+                minimapCtx.translate(x, y);
+                minimapCtx.rotate(visual.currentRotation);
+                minimapCtx.scale(visual.currentFlipX, 1);
+                minimapCtx.drawImage(
+                    spriteState.activeIcon,
+                    -spriteWidth / 2,
+                    -spriteHeight / 2,
+                    spriteWidth,
+                    spriteHeight
+                );
+                minimapCtx.restore();
+                return;
+            }
 
             minimapCtx.beginPath();
             minimapCtx.fillStyle = isSelf ? '#38bdf8' : 'rgba(245, 158, 11, 0.95)';
@@ -1356,6 +1445,7 @@
                     current.npcDeathAnimating = Boolean(serverPlayer.npcDeathAnimating);
                     current.npcHealth = typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null;
                     current.boostState = serverPlayer.boostState || 'idle';
+                    current.currentSpeed = typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond;
                     current.npcChargeWindupProgress = typeof serverPlayer.npcChargeWindupProgress === 'number'
                         ? serverPlayer.npcChargeWindupProgress
                         : 0;
@@ -1380,6 +1470,7 @@
                         npcDeathAnimating: Boolean(serverPlayer.npcDeathAnimating),
                         npcHealth: typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null,
                         boostState: serverPlayer.boostState || 'idle',
+                        currentSpeed: typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond,
                         npcChargeWindupProgress: typeof serverPlayer.npcChargeWindupProgress === 'number'
                             ? serverPlayer.npcChargeWindupProgress
                             : 0,
@@ -1421,6 +1512,7 @@
                 current.npcDeathAnimating = Boolean(serverPlayer.npcDeathAnimating);
                 current.npcHealth = typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null;
                 current.boostState = serverPlayer.boostState || 'idle';
+                current.currentSpeed = typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond;
                 current.npcChargeWindupProgress = typeof serverPlayer.npcChargeWindupProgress === 'number'
                     ? serverPlayer.npcChargeWindupProgress
                     : 0;
@@ -1447,6 +1539,7 @@
                     npcDeathAnimating: Boolean(serverPlayer.npcDeathAnimating),
                     npcHealth: typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null,
                     boostState: serverPlayer.boostState || 'idle',
+                    currentSpeed: typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond,
                     npcChargeWindupProgress: typeof serverPlayer.npcChargeWindupProgress === 'number'
                         ? serverPlayer.npcChargeWindupProgress
                         : 0,
@@ -1521,7 +1614,7 @@
     document.addEventListener('keydown', handleKey(true));
     document.addEventListener('keyup', handleKey(false));
     if (masterVolumeSlider) {
-        masterVolume = Math.max(0, Math.min(1, Number(masterVolumeSlider.value || 35) / 100));
+        masterVolume = Math.max(0, Math.min(1, Number(masterVolumeSlider.value || 20) / 100));
         masterVolumeSlider.addEventListener('input', function () {
             masterVolume = Math.max(0, Math.min(1, Number(masterVolumeSlider.value || 0) / 100));
         });
@@ -1529,7 +1622,7 @@
     reconnectButton.addEventListener('click', connect);
     if (deathModalRespawnButton) {
         deathModalRespawnButton.addEventListener('click', function () {
-            if (!selfDeathActive || !selfDeathRespawnReady) {
+            if (!selfDeathActive || !selfDeathRespawnReady || selfLivesRemaining <= 0) {
                 return;
             }
 

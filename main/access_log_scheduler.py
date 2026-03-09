@@ -223,17 +223,26 @@ def _maybe_backup_data_files():
         logger.info("DATA_BACKUP_ROOT is empty. Skipping daily data backup.")
         return
 
+    # Always retry retention cleanup after the daily trigger time.
+    # This self-heals transient sync/lock issues without waiting for the next day.
+    _cleanup_old_backup_archives(backup_root, _resolve_backup_retention_days())
+
+    if _last_backup_date == backup_date:
+        return
+
     archive_path = _backup_archive_path(backup_root, backup_date)
+    retention_days = _resolve_backup_retention_days()
+
     if archive_path.exists():
         _last_backup_date = backup_date
-        _cleanup_old_backup_archives(backup_root, _resolve_backup_retention_days())
+        _cleanup_old_backup_archives(backup_root, retention_days)
         return
 
     created_archive = _create_data_backup_archive(backup_root, backup_date)
     if created_archive is not None:
         _last_backup_date = backup_date
         logger.info("Created daily data backup: %s", created_archive)
-        _cleanup_old_backup_archives(backup_root, _resolve_backup_retention_days())
+        _cleanup_old_backup_archives(backup_root, retention_days)
 
 
 def _scheduler_loop():
