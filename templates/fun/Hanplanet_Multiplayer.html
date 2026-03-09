@@ -128,10 +128,6 @@
                                 {% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}
                             </strong>
                         </div>
-                        <div class="multiplayer-lives" data-game-shared-lives aria-label="{% include 'partials/ui_i18n.html' with key='bumpercar_shared_lives' %}">
-                            <img class="multiplayer-lives-icon" src="{% static_v 'Spikip/speaki_default/icon/acceleration.png' %}" alt="">
-                            <span class="multiplayer-lives-count" data-game-shared-lives-count>x 3</span>
-                        </div>
                         <label class="multiplayer-volume-control" aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}">
                             <span class="multiplayer-volume-label">
                                 {% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}
@@ -141,6 +137,10 @@
                         <div class="multiplayer-sprite-overlay" data-game-sprite-overlay aria-hidden="true"></div>
                         <canvas class="multiplayer-canvas" data-game-canvas></canvas>
                         <canvas class="multiplayer-minimap-canvas" width="160" height="160" data-game-minimap aria-label="Player minimap"></canvas>
+                        <div class="multiplayer-lives" data-game-shared-lives aria-label="{% include 'partials/ui_i18n.html' with key='bumpercar_shared_lives' %}">
+                            <img class="multiplayer-lives-icon" src="{% static_v 'Spikip/speaki_default/icon/acceleration.png' %}" alt="">
+                            <span class="multiplayer-lives-count" data-game-shared-lives-count>x 3</span>
+                        </div>
                         {% include "popup/fun/multiplayer_death_modal.html" %}
                         <div class="multiplayer-mobile-controls" data-game-mobile-controls hidden>
                             <div class="multiplayer-joystick" data-game-joystick>
