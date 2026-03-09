@@ -416,18 +416,18 @@
     };
 
     const getEffectiveZoom = function () {
-        const canvasWidth = getViewportDisplayWidth();
-        const canvasHeight = getViewportDisplayHeight();
-        const canvasArea = canvasWidth > 0 && canvasHeight > 0
-            ? canvasWidth * canvasHeight
+        const displayWidth = getCanvasDisplayWidth();
+        const displayHeight = getCanvasDisplayHeight();
+        const canvasArea = displayWidth > 0 && displayHeight > 0
+            ? displayWidth * displayHeight
             : referenceCanvasWidth * referenceCanvasHeight;
         const referenceArea = referenceCanvasWidth * referenceCanvasHeight;
         const canvasScale = Math.sqrt(canvasArea / referenceArea);
         const activeViewZoom = isFullscreenMode ? viewZoom : (viewZoom * 0.82);
         const scaledZoom = (activeViewZoom / renderOverscan) * Math.max(canvasScale, 0.35);
         const minWorldFitZoom = Math.max(
-            canvasWidth / worldSize,
-            canvasHeight / worldSize,
+            displayWidth / worldSize,
+            displayHeight / worldSize,
             0.35
         );
         return Math.max(scaledZoom, minWorldFitZoom);

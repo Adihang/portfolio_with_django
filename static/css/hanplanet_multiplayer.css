@@ -458,7 +458,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 .multiplayer-lives {
     position: absolute;
     right: 29px;
-    top: 203px;
+    top: calc(18px + 180px + 8px);
     z-index: 4;
     display: inline-flex;
     align-items: center;
@@ -844,6 +844,11 @@ body.multiplayer-fullscreen-active {
         right: 14px;
     }
 
+    .multiplayer-lives {
+        top: calc(14px + 154px + 8px);
+        right: 25px;
+    }
+
     .multiplayer-volume-control {
         top: 12px;
         gap: 8px;
@@ -914,6 +919,11 @@ body.multiplayer-fullscreen-active {
         right: 12px;
     }
 
+    .multiplayer-lives {
+        top: calc(12px + 132px + 8px);
+        right: 23px;
+    }
+
     .multiplayer-volume-control {
         top: 10px;
         max-width: calc(100% - 120px);
@@ -944,12 +954,6 @@ body.multiplayer-fullscreen-active {
         width: 94px;
         height: 94px;
         font-size: 16px;
-    }
-
-    .multiplayer-app.is-fullscreen .multiplayer-minimap-canvas {
-        width: 124px;
-        top: 12px;
-        right: 12px;
     }
 
     .multiplayer-death-modal-title {
