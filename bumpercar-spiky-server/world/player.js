@@ -3,6 +3,8 @@ const { getGameplaySettings } = require("../config/gameplaySettings")
 
 const GAMEPLAY_SETTINGS = getGameplaySettings()
 const BASE_PLAYER_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_base_speed
+const DUMMY_BASE_SPEED_PER_SECOND = BASE_PLAYER_SPEED_PER_SECOND * 1.5
+const NPC_BASE_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_base_speed
 const COLLISION_SLOW_SPEED_PER_SECOND = BASE_PLAYER_SPEED_PER_SECOND * 0.35
 const NPC_MAX_HEALTH = GAMEPLAY_SETTINGS.npc_max_health
 const PLAYER_STARTING_LIVES = GAMEPLAY_SETTINGS.user_lives
@@ -49,6 +51,7 @@ class Player {
         this.collisionRecoveryStartedAt = 0
         this.collisionRecoveryUntil = 0
         // boostDisabledUntil 이전까지는 다시 가속할 수 없다.
+        this.boostDisabledStartedAt = 0
         this.boostDisabledUntil = 0
         // deathUntil 이 0 이 아니면 사망 상태로 본다.
         this.deathStartedAt = 0
@@ -61,17 +64,41 @@ class Player {
         // 아래 값들은 네르 NPC 전용 상태다.
         this.npcTargetId = ""
         this.npcState = "idle"
+        this.npcPhase = 1
+        this.npcMaxHealth = NPC_MAX_HEALTH
         this.npcHealth = NPC_MAX_HEALTH
+        this.npcDefeatDamageRatio = 0
+        this.npcWinVisualUntil = 0
         this.npcRespawnAt = 0
         this.npcChargeDirectionX = 0
         this.npcChargeDirectionY = 0
         this.npcChargeDistanceRemaining = 0
+        this.npcChargeDistanceTotal = 0
+        this.npcChargeRedirected = false
+        this.npcChargeTargetId = ""
+        this.npcChargeHitTarget = false
+        this.npcChargeIsPhaseAttack = false
         this.npcChargeWindupStartedAt = 0
         this.npcChargeWindupUntil = 0
         this.npcRestUntil = 0
+        this.npcQueuedExtraCharges = 0
+        this.dummyRetaliationTargetId = ""
+        this.dummyState = "idle"
+        this.dummyPhase = 1
+        this.dummyChargeDistanceRemaining = 0
+        this.dummyChargeDistanceTotal = 0
+        this.dummyChargeWindupStartedAt = 0
+        this.dummyChargeWindupUntil = 0
+        this.dummyRestUntil = 0
+        this.dummyQueuedExtraCharges = 0
         // facingAngle 은 회전된 충돌 판정과 클라이언트 아이콘 회전에 공통 사용한다.
         this.facingAngle = 0
         this.cell = null
+
+        if (this.isNpc) {
+            this.baseSpeed = NPC_BASE_SPEED_PER_SECOND
+            this.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+        }
     }
 }
 

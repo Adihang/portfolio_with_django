@@ -21,7 +21,7 @@
     align-items: center;
     justify-content: flex-start;
     gap: 4px;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: 999px;
     background: transparent;
     color: var(--ide-text-stronger);
@@ -37,7 +37,6 @@
 
 .ui-auth-account-trigger:hover,
 .ui-auth-account-trigger:focus-visible {
-    border-color: var(--color-hover-border);
     background-color: var(--color-hover-bg);
     color: var(--theme-accent-strong);
     transform: translateY(-1px);
@@ -47,7 +46,6 @@
 body.theme-dark .ui-auth-account-trigger:hover,
 body.theme-dark .ui-auth-account-trigger:focus-visible {
     background-color: rgba(255, 255, 255, 0.12);
-    border-color: transparent;
 }
 
 .ui-auth-account-avatar {
@@ -68,6 +66,10 @@ body.theme-dark .ui-auth-account-avatar {
 
 .ui-auth-account-name {
     color: var(--ide-text-stronger);
+}
+
+body.hanplanet-multiplayer-page .ui-auth-account-name {
+    color: #111827;
 }
 
 .ui-auth-account-menu {
@@ -196,6 +198,47 @@ img.ui-auth-account-avatar {
     line-height: 1.3;
     color: var(--ide-text);
     word-break: break-all;
+}
+
+.ui-auth-account-stats {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ui-auth-account-stats-title {
+    font-size: 14px;
+    line-height: 1.2;
+    color: var(--ide-text-stronger);
+}
+
+.ui-auth-account-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ui-auth-account-stats-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ide-text);
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.ui-auth-account-stats-row strong {
+    color: var(--ide-text-stronger);
+    font-size: 14px;
+}
+
+body.theme-dark .ui-auth-account-stats-row {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .ui-auth-account-menu-actions {

@@ -1,5 +1,6 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 from django.conf import settings
 from django.test import Client, RequestFactory, TestCase, override_settings
@@ -271,6 +272,29 @@ class LanguageUrlRoutingTests(TestCase):
         self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
 
 
+class DocsSignupAutoLoginTests(TestCase):
+    def test_signup_logs_user_in_immediately(self):
+        response = self.client.post(
+            reverse("main:docs_signup_lang", kwargs={"ui_lang": "ko"}),
+            data={
+                "username": "autologin_user",
+                "password1": "pw123456!!AA",
+                "password2": "pw123456!!AA",
+                "first_name": "Auto",
+                "email": "auto@example.com",
+                "next": "/ko/fun/bumpercar-spiky/",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/ko/fun/bumpercar-spiky/")
+        self.assertTrue("_auth_user_id" in self.client.session)
+        self.assertEqual(
+            self.client.session["_auth_user_id"],
+            str(get_user_model().objects.get(username="autologin_user").pk),
+        )
+
+
 class PortfolioPerUserRoutingTests(TestCase):
     def setUp(self):
         self.user_model = get_user_model()
@@ -509,13 +533,15 @@ class DocsAuthFlowTests(TestCase):
         )
 
     def test_docs_login_page_is_accessible(self):
-        response = self.client.get("/ko/docs/login/")
+        response = self.client.get("/ko/login/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Docs 로그인")
+        self.assertContains(response, "로그인")
+        self.assertContains(response, "이전 페이지")
+        self.assertNotContains(response, ">ide<", html=False)
 
     def test_docs_login_authenticates_non_staff_user(self):
         response = self.client.post(
-            "/ko/docs/login/",
+            "/ko/login/",
             data={"username": "docs_login_user", "password": "pw123456", "next": "/ko/docs/list/"},
         )
 
@@ -526,7 +552,7 @@ class DocsAuthFlowTests(TestCase):
     def test_resolve_docs_post_login_url_keeps_portfolio_next(self):
         public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
         self.user.groups.add(public_group)
-        request = RequestFactory().get("/ko/ide/login/")
+        request = RequestFactory().get("/ko/login/")
 
         resolved = _resolve_docs_post_login_url(
             request,
@@ -541,7 +567,7 @@ class DocsAuthFlowTests(TestCase):
         self.client.force_login(self.user)
 
         response = self.client.post(
-            "/ko/docs/logout/",
+            "/ko/logout/",
             data={"next": "/ko/docs/list/"},
         )
 
@@ -549,17 +575,16 @@ class DocsAuthFlowTests(TestCase):
         self.assertEqual(response["Location"], "/ko/docs/list/")
         self.assertFalse("_auth_user_id" in self.client.session)
 
-    def test_docs_logout_csrf_failure_redirects_to_docs_root(self):
+    def test_docs_logout_csrf_failure_returns_forbidden(self):
         csrf_client = Client(enforce_csrf_checks=True)
         csrf_client.force_login(self.user)
 
         response = csrf_client.post(
-            "/ko/docs/logout/",
+            "/ko/logout/",
             data={"next": "/ko/docs/list/"},
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], reverse("main:docs_root_lang", kwargs={"ui_lang": "ko"}))
+        self.assertEqual(response.status_code, 403)
 
 
 class HanplanetMultiplayerPageTests(TestCase):
@@ -592,6 +617,16 @@ class HanplanetMultiplayerPageTests(TestCase):
         self.assertContains(response, "ws://127.0.0.1:8081", html=False)
         self.assertContains(response, "/ko/api/game-auth-token/", html=False)
         self.assertContains(response, "범퍼카 스핔이", html=False)
+        self.assertNotContains(response, "게임서버재시작", html=False)
+
+    def test_multiplayer_page_shows_restart_button_for_superuser(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "게임서버재시작", html=False)
+        self.assertContains(response, "네르 체력 적용", html=False)
 
     @override_settings(
         GAME_JWT_SECRET="test-game-secret",
@@ -649,6 +684,149 @@ class HanplanetMultiplayerPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "범퍼카 스핔이 관리자", html=False)
+        self.assertContains(response, "네르 첫 돌진 거리 배율", html=False)
+        self.assertContains(response, "네르 추가 돌진 거리 배율", html=False)
+
+    @mock.patch("main.views.restart_bumpercar_spiky_server")
+    def test_bumpercar_spiky_restart_server_requires_superuser(self, mock_restart):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_restart_server_lang", kwargs={"ui_lang": "ko"}),
+            data={"next": "/ko/fun/bumpercar-spiky/"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_restart.assert_not_called()
+
+    @mock.patch("main.views.restart_bumpercar_spiky_server")
+    def test_bumpercar_spiky_restart_server_runs_for_superuser(self, mock_restart):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_restart_server_lang", kwargs={"ui_lang": "ko"}),
+            data={"next": "/ko/fun/bumpercar-spiky/"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/fun/bumpercar-spiky/")
+        mock_restart.assert_called_once()
+
+    @mock.patch("main.views.set_bumpercar_spiky_npc_health")
+    def test_bumpercar_spiky_set_npc_health_requires_superuser(self, mock_set_npc_health):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_set_npc_health_lang", kwargs={"ui_lang": "ko"}),
+            data={"next": "/ko/fun/bumpercar-spiky/", "npc_health": "12"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_set_npc_health.assert_not_called()
+
+    @mock.patch("main.views.set_bumpercar_spiky_npc_health")
+    def test_bumpercar_spiky_set_npc_health_runs_for_superuser(self, mock_set_npc_health):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_set_npc_health_lang", kwargs={"ui_lang": "ko"}),
+            data={"next": "/ko/fun/bumpercar-spiky/", "npc_health": "12"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/fun/bumpercar-spiky/")
+        mock_set_npc_health.assert_called_once_with(12)
+
+    def test_bumpercar_spiky_stats_record_updates_user_profile(self):
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_stats_record"),
+            data=json.dumps(
+                {
+                    "username": self.user.username,
+                    "increments": {
+                        "dummy_kills": 2,
+                        "deaths": 1,
+                        "ner_kills": 3,
+                        "ner_phase1_attack_dodges": 4,
+                        "ner_phase2_attack_dodges": 5,
+                        "ner_phase3_attack_dodges": 6,
+                        "ner_hits": 5,
+                    },
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="127.0.0.1",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        profile = UserProfile.objects.get(user=self.user)
+        self.assertEqual(
+            profile.bumpercar_spiky_stats,
+            {
+                "dummy_kills": 2,
+                "deaths": 1,
+                "ner_kills": 3,
+                "ner_phase1_attack_dodges": 4,
+                "ner_phase2_attack_dodges": 5,
+                "ner_phase3_attack_dodges": 6,
+                "ner_hits": 5,
+            },
+        )
+
+    def test_bumpercar_spiky_stats_record_rejects_non_local_request(self):
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_stats_record"),
+            data=json.dumps(
+                {"username": self.user.username, "increments": {"dummy_kills": 1}}
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.10",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(UserProfile.objects.filter(user=self.user).exists())
+
+    def test_multiplayer_page_includes_account_stats_for_authenticated_user(self):
+        UserProfile.objects.create(
+            user=self.user,
+            bumpercar_spiky_stats={
+                "dummy_kills": 1,
+                "deaths": 2,
+                "ner_kills": 3,
+                "ner_phase1_attack_dodges": 4,
+                "ner_phase2_attack_dodges": 5,
+                "ner_phase3_attack_dodges": 6,
+                "ner_hits": 5,
+            },
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["account_bumpercar_spiky_stats"],
+            {
+                "dummy_kills": 1,
+                "deaths": 2,
+                "ner_kills": 3,
+                "ner_phase1_attack_dodges": 4,
+                "ner_phase2_attack_dodges": 5,
+                "ner_phase3_attack_dodges": 6,
+                "ner_hits": 5,
+            },
+        )
+        self.assertTrue(response.context["show_account_bumpercar_spiky_stats"])
+
+    def test_minigame_page_shows_stats_button_but_not_account_stats_menu(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"dummy_kills": 1})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/minigame/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "전적", html=False)
+        self.assertFalse(response.context["show_account_bumpercar_spiky_stats"])
 
 
 class DocsAccessRuleTests(TestCase):
@@ -819,6 +997,79 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(anonymous_list.status_code, 200)
         self.assertEqual(anonymous_doc.status_code, 200)
         self.assertEqual(api_list.status_code, 200)
+
+    def test_docs_root_for_superuser_shows_unscoped_root(self):
+        admin_user = self.user_model.objects.create_user(
+            username="docs_superuser_root",
+            password="pw123456",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get("/ko/ide/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-current-dir=""')
+        self.assertContains(response, 'data-ide-base-url="/ko/ide"')
+        self.assertContains(response, ">Hanplanet<")
+        self.assertContains(response, "manage.py")
+        self.assertContains(response, "스태틱파일 적용+구니콘 재시작")
+
+    def test_docs_root_for_staff_user_keeps_scoped_home_dir(self):
+        staff_user = self.create_docs_editor("docs_staff_scoped")
+        staff_user.is_staff = True
+        staff_user.save(update_fields=["is_staff"])
+        public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
+        staff_user.groups.add(public_group)
+
+        self.client.force_login(staff_user)
+        response = self.client.get("/ko/ide/")
+        redirected_response = self.client.get(response["Location"])
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/ko/ide/users/docs_staff_scoped/list", response["Location"])
+        self.assertNotContains(redirected_response, "스태틱파일 적용+구니콘 재시작")
+
+    @mock.patch("main.docs_views.subprocess.Popen")
+    @mock.patch("main.docs_views.subprocess.run")
+    def test_docs_ops_apply_static_runs_collectstatic_and_restart_for_superuser(
+        self,
+        mock_run,
+        mock_popen,
+    ):
+        admin_user = self.user_model.objects.create_user(
+            username="docs_ops_superuser",
+            password="pw123456",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
+            data={"next": "/ko/ide/"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/ide/")
+        mock_run.assert_called_once_with(
+            [mock.ANY, "manage.py", "collectstatic", "--noinput"],
+            cwd=str(settings.BASE_DIR),
+            check=True,
+        )
+        mock_popen.assert_called_once()
+
+    def test_docs_ops_apply_static_requires_superuser(self):
+        editor = self.create_docs_editor("docs_ops_editor")
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
+            data={"next": "/ko/ide/"},
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_docs_api_move_moves_file_into_target_directory(self):
         editor = self.create_docs_editor("move_editor")

@@ -8,7 +8,7 @@
         <div class="ide-toolbar-left ui-toolbar-left">
             <h1 class="ide-title ui-title">{{ docs_text.auth_signup_button }}</h1>
             <div class="ide-subtitle ui-subtitle ide-path-breadcrumbs ui-path-breadcrumbs">
-                <a class="ide-path-link ui-path-link" href="{{ docs_base_url }}">ide</a>
+                <a class="ide-path-link ui-path-link" href="{{ docs_auth_breadcrumb_url|default:docs_base_url }}">{{ docs_auth_breadcrumb_label }}</a>
                 <span class="ide-path-sep ui-path-sep">/</span>
                 <span class="ide-path-current ui-path-current">{{ docs_text.auth_signup_button }}</span>
             </div>

@@ -5781,13 +5781,19 @@
         });
 
         document.addEventListener("submit", function (event) {
-            if (event.defaultPrevented || !hasUnsavedWriteChanges()) {
+            if (event.defaultPrevented) {
                 return;
             }
             if (!(event.target instanceof HTMLFormElement)) {
                 return;
             }
             const form = event.target;
+            if (form.hasAttribute("data-bypass-unsaved-guard")) {
+                return;
+            }
+            if (!hasUnsavedWriteChanges()) {
+                return;
+            }
             event.preventDefault();
             attemptLeaveWithUnsavedGuard(function () {
                 form.submit();

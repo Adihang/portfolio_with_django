@@ -1,4 +1,4 @@
-<div class="ui-auth-account-menu" data-auth-account-menu hidden>
+<div class="ui-auth-account-menu" data-auth-account-menu data-popup-fit-bottom hidden>
     <div class="ui-auth-account-profile">
         <form
             method="post"
@@ -33,10 +33,49 @@
         <strong class="ui-auth-account-profile-name">{{ account_display_name|default:user.get_username }}</strong>
         <span class="ui-auth-account-profile-email">{{ account_email|default:"-" }}</span>
     </div>
+    {% if show_account_bumpercar_spiky_stats and account_bumpercar_spiky_stats %}
+    <div class="ui-auth-account-stats">
+        <strong class="ui-auth-account-stats-title">
+            {% include 'partials/ui_i18n.html' with key='account_bumpercar_stats_title' %}
+        </strong>
+        <div class="ui-auth-account-stats-list">
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_dummy_kills' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.dummy_kills }}</strong>
+            </div>
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_deaths' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.deaths }}</strong>
+            </div>
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_ner_kills' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.ner_kills }}</strong>
+            </div>
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_ner_phase1_attack_dodges' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.ner_phase1_attack_dodges }}</strong>
+            </div>
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_ner_phase2_attack_dodges' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.ner_phase2_attack_dodges }}</strong>
+            </div>
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_ner_phase3_attack_dodges' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.ner_phase3_attack_dodges }}</strong>
+            </div>
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_ner_hits' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.ner_hits }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     <div class="ui-auth-account-menu-actions">
+        {% if show_account_my_portfolio %}
         <a class="ui-auth-account-menu-item" href="{{ account_my_portfolio_url }}">
             {% include 'partials/ui_i18n.html' with key='my_portfolio' %}
         </a>
+        {% endif %}
         <button
             type="button"
             class="ui-auth-account-menu-item"

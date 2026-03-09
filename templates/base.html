@@ -25,6 +25,11 @@
     <script>
         (function () {
             const path = window.location.pathname;
+            const bumpercarPattern = /^\/(?:ko|en)\/fun\/bumpercar-spiky\/?$/;
+            if (bumpercarPattern.test(path) || path === '/fun/bumpercar-spiky/' || path === '/fun/bumpercar-spiky') {
+                document.documentElement.classList.add('preload-light-bg');
+                return;
+            }
             const explicitLightPaths = new Set(['/portfolio/', '/portfolio', '/docs/', '/docs']);
             const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|docs(?:\/.*)?)$/;
             const shouldUseLightBg = explicitLightPaths.has(path) ||
@@ -101,6 +106,7 @@
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/account_widget.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/style.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/popup_common.css' %}">
+    <script src="{% static_v 'js/popup_common.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
     {% if not is_root_entry %}
     <script src="{% static_v 'js/bootstrap.min.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
     <script src="{% static_v 'js/portfolio_print_content_helpers.js' %}" type="text/javascript" defer onerror="window.__reloadStaticScript(this)"></script>
@@ -127,6 +133,12 @@
         (function () {
             const body = document.body;
             if (!body) {
+                return;
+            }
+
+            if (body.classList.contains('hanplanet-multiplayer-page')) {
+                body.classList.remove('theme-dark');
+                body.classList.add('theme-preinit');
                 return;
             }
 

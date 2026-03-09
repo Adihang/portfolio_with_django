@@ -2,12 +2,16 @@ const Player = require("./player")
 const SpatialGrid = require("./spatialGrid")
 const { CELL_SIZE, TICK_RATE, WORLD_SIZE } = require("../config/config")
 const { getGameplaySettings } = require("../config/gameplaySettings")
+const { postStatsUpdate } = require("../services/accountStats")
 
 const GAMEPLAY_SETTINGS = getGameplaySettings()
 const BASE_PLAYER_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_base_speed
+const DUMMY_BASE_SPEED_PER_SECOND = BASE_PLAYER_SPEED_PER_SECOND * 1.5
+const NPC_BASE_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_base_speed
 const MAX_BOOSTED_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_max_boost_speed
 const BOOST_ACCELERATION_PER_SECOND = GAMEPLAY_SETTINGS.user_boost_acceleration
 const BOOST_COOLDOWN_PER_SECOND = GAMEPLAY_SETTINGS.user_boost_cooldown
+const USER_POST_BOOST_COOLDOWN_MS = GAMEPLAY_SETTINGS.user_post_boost_cooldown_ms
 const TICK_DELTA_SECONDS = 1 / TICK_RATE
 // 유저 충돌 판정은 아이콘 비율에 맞춘 둥근 직사각형 기반으로 계산한다.
 const PLAYER_COLLISION_HALF_HEIGHT = 20
@@ -20,6 +24,9 @@ const NPC_COLLISION_HALF_WIDTH = NPC_COLLISION_HALF_HEIGHT * 0.5
 const COLLISION_BOUNCE_DISTANCE = 30
 const COLLISION_SPEED_BOUNCE_MULTIPLIER = 5.4
 const COLLISION_MAX_BOUNCE_DISTANCE = 78
+const WALL_BOUNCE_DISTANCE = 36
+const WALL_BOUNCE_SPEED_BOUNCE_MULTIPLIER = 5.4
+const WALL_MAX_BOUNCE_DISTANCE = 90
 const COLLISION_VISUAL_BASE_DURATION_MS = 1000
 const COLLISION_VISUAL_SPEED_DURATION_MULTIPLIER_MS = 90
 const COLLISION_VISUAL_MAX_DURATION_MS = 3000
@@ -29,23 +36,82 @@ const COLLISION_ATTACK_DIRECTION_THRESHOLD = 0.001
 const PLAYER_DEATH_TRIGGER_COUNT = 3
 const PLAYER_STARTING_LIVES = GAMEPLAY_SETTINGS.user_lives
 const PLAYER_DEATH_DURATION_MS = 3000
+const DUMMY_RESPAWN_DELAY_MS = 3 * 60 * 1000
 const RESPAWN_EDGE_PADDING = 120
 const NPC_ID = "네르"
-const DUMMY_ID = "스핔이"
+const DUMMY_SPECS = [
+    { id: "dummy-1", quadrant: 1, displayName: "저는 네르에요" },
+    { id: "dummy-2", quadrant: 2, displayName: "제가 네르에요" },
+    { id: "dummy-3", quadrant: 3, displayName: "네르는 네르에요" },
+    { id: "dummy-4", quadrant: 4, displayName: "세계수 교단의 제사장, 네르입니다" },
+]
 const NPC_CHARGE_TRIGGER_DISTANCE = GAMEPLAY_SETTINGS.npc_charge_trigger_distance
+const NPC_CHARGE_DISTANCE_MULTIPLIER = GAMEPLAY_SETTINGS.npc_charge_distance_multiplier
+const NPC_EXTRA_CHARGE_DISTANCE_MULTIPLIER = GAMEPLAY_SETTINGS.npc_extra_charge_distance_multiplier
 const NPC_CHARGE_WINDUP_DURATION_MS = GAMEPLAY_SETTINGS.npc_charge_windup_ms
 const NPC_REST_DURATION_MS = GAMEPLAY_SETTINGS.npc_rest_ms
 const NPC_MAX_HEALTH = GAMEPLAY_SETTINGS.npc_max_health
-const NPC_DEATH_ANIMATION_DURATION_MS = 3000
-const NPC_RESPAWN_DELAY_MS = GAMEPLAY_SETTINGS.npc_respawn_delay_ms
+const NPC_DEATH_ANIMATION_DURATION_MS = 5000
+const NPC_RESPAWN_DELAY_MS = 6 * 60 * 1000
 const NPC_MAX_BOOSTED_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_max_boost_speed
 const NPC_BOOST_ACCELERATION_PER_SECOND = GAMEPLAY_SETTINGS.npc_boost_acceleration
 const NPC_BOOST_COOLDOWN_PER_SECOND = GAMEPLAY_SETTINGS.npc_boost_cooldown
 const NPC_DAMAGE_MIN = GAMEPLAY_SETTINGS.npc_damage_min
 const NPC_DAMAGE_MAX = GAMEPLAY_SETTINGS.npc_damage_max
-const NPC_DAMAGE_SPEED_DIVISOR = GAMEPLAY_SETTINGS.npc_damage_speed_divisor
+const NPC_PHASE_TWO_HEALTH_RATIO = GAMEPLAY_SETTINGS.npc_phase_two_health_ratio
+const NPC_PHASE_THREE_HEALTH_RATIO = GAMEPLAY_SETTINGS.npc_phase_three_health_ratio
+const NPC_PHASE_THREE_TRIGGER_DISTANCE_MULTIPLIER = 1.5
+const DUMMY_RETALIATION_DISTANCE_MULTIPLIER = 1.2
 // 전체 인간 유저 입력이 이 시간 동안 없으면 진행 상태를 초기화한다.
 const INPUT_IDLE_RESET_MS = 10 * 60 * 1000
+
+function getBaseSpeedForPlayer(player) {
+    if (player && player.isNpc) {
+        return NPC_BASE_SPEED_PER_SECOND
+    }
+    if (player && player.isDummy) {
+        return DUMMY_BASE_SPEED_PER_SECOND
+    }
+    return BASE_PLAYER_SPEED_PER_SECOND
+}
+
+function getNpcPhase(player) {
+    if (!player || !player.isNpc) {
+        return 1
+    }
+    const npcMaxHealth = Math.max(1, Number(player.npcMaxHealth || NPC_MAX_HEALTH))
+    const healthRatio = npcMaxHealth > 0
+        ? Math.max(0, Math.min(1, (player.npcHealth || 0) / npcMaxHealth))
+        : 1
+
+    if (healthRatio <= NPC_PHASE_THREE_HEALTH_RATIO) {
+        return 3
+    }
+    if (healthRatio <= NPC_PHASE_TWO_HEALTH_RATIO) {
+        return 2
+    }
+    return 1
+}
+
+function getDummyPhase(player) {
+    if (!player || !player.isDummy) {
+        return 1
+    }
+    const defeatsInCurrentLife = Number(player.defeatReceivedCount || 0) % PLAYER_DEATH_TRIGGER_COUNT
+    const remainingHealthSegments = Math.max(0, PLAYER_DEATH_TRIGGER_COUNT - defeatsInCurrentLife)
+
+    if (remainingHealthSegments <= 1) {
+        return 3
+    }
+    if (remainingHealthSegments <= 2) {
+        return 2
+    }
+    return 1
+}
+
+function isPersistentHumanPlayer(player) {
+    return Boolean(player) && !player.isNpc && !player.isDummy
+}
 
 class World {
     constructor() {
@@ -55,26 +121,32 @@ class World {
         this.playerProgress = new Map()
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
         this.lastHumanInputAt = Date.now()
+        this.roundResetAnnouncementUntil = 0
         this.grid = new SpatialGrid(CELL_SIZE)
-        this.addCenterDummyPlayer()
+        this.addDummyPlayers()
         this.addNerNpcPlayer()
     }
 
-    addCenterDummyPlayer() {
-        const dummyId = DUMMY_ID
-        if (this.players.has(dummyId)) {
-            return this.players.get(dummyId)
-        }
+    addDummyPlayers() {
+        DUMMY_SPECS.forEach((dummySpec) => {
+            if (this.players.has(dummySpec.id)) {
+                return
+            }
 
-        const player = new Player(dummyId)
-        player.x = WORLD_SIZE / 2
-        player.y = WORLD_SIZE / 2
-        player.isDummy = true
+            const player = new Player(dummySpec.id)
+            const spawnPosition = this.getRandomQuadrantSpawnPosition(dummySpec.quadrant)
+            player.x = spawnPosition.x
+            player.y = spawnPosition.y
+            player.isDummy = true
+            player.dummyQuadrant = dummySpec.quadrant
+            player.dummyDefaultDisplayName = dummySpec.displayName
+            player.baseSpeed = DUMMY_BASE_SPEED_PER_SECOND
+            player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+            player.collisionSlowSpeed = DUMMY_BASE_SPEED_PER_SECOND * 0.35
 
-        this.players.set(dummyId, player)
-        this.grid.add(player)
-
-        return player
+            this.players.set(dummySpec.id, player)
+            this.grid.add(player)
+        })
     }
 
     addNerNpcPlayer() {
@@ -86,13 +158,56 @@ class World {
         player.x = WORLD_SIZE / 2 + 180
         player.y = WORLD_SIZE / 2
         player.isNpc = true
+        player.baseSpeed = NPC_BASE_SPEED_PER_SECOND
+        player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+        player.collisionSlowSpeed = NPC_BASE_SPEED_PER_SECOND * 0.35
         player.npcState = "idle"
-        player.npcHealth = NPC_MAX_HEALTH
+        player.npcPhase = 1
+        player.npcMaxHealth = this.getScaledNpcMaxHealth()
+        player.npcHealth = player.npcMaxHealth
 
         this.players.set(NPC_ID, player)
         this.grid.add(player)
 
         return player
+    }
+
+    getHumanPlayerCount() {
+        return Array.from(this.players.values()).filter((player) => (
+            !player.isNpc && !player.isDummy
+        )).length
+    }
+
+    getScaledNpcMaxHealth() {
+        const humanPlayerCount = Math.max(1, this.getHumanPlayerCount())
+        return Math.max(1, Math.round(NPC_MAX_HEALTH * (1 + Math.max(0, humanPlayerCount - 1) * 0.2)))
+    }
+
+    rebalanceNpcHealthForHumanCount() {
+        const npc = this.players.get(NPC_ID)
+        if (!npc) {
+            return
+        }
+
+        const previousMaxHealth = Math.max(1, Number(npc.npcMaxHealth || NPC_MAX_HEALTH))
+        const nextMaxHealth = this.getScaledNpcMaxHealth()
+        const currentRatio = Math.max(0, Math.min(1, Number(npc.npcHealth || 0) / previousMaxHealth))
+
+        npc.npcMaxHealth = nextMaxHealth
+        npc.npcHealth = Math.max(0, Math.min(nextMaxHealth, Math.round(nextMaxHealth * currentRatio)))
+        npc.npcPhase = getNpcPhase(npc)
+    }
+
+    setNpcHealth(nextHealth) {
+        const npc = this.players.get(NPC_ID)
+        if (!npc) {
+            return null
+        }
+
+        const safeHealth = Math.max(0, Math.min(Number(npc.npcMaxHealth || NPC_MAX_HEALTH), Number(nextHealth || 0)))
+        npc.npcHealth = safeHealth
+        npc.npcPhase = getNpcPhase(npc)
+        return npc
     }
 
     getStoredPlayerProgress(connectionKey) {
@@ -115,8 +230,24 @@ class World {
         // 연결이 끊겨도 유지돼야 하는 최소 정보만 남긴다.
         this.playerProgress.set(connectionKey, {
             displayId: player.id,
+            x: Number(player.x || 0),
+            y: Number(player.y || 0),
+            facingAngle: typeof player.facingAngle === "number" ? player.facingAngle : 0,
+            currentSpeed: Number(player.currentSpeed || getBaseSpeedForPlayer(player)),
             defeatReceivedCount: Number(player.defeatReceivedCount || 0),
-            defeatDealtCount: Number(player.defeatDealtCount || 0)
+            defeatDealtCount: Number(player.defeatDealtCount || 0),
+            collisionVisualUntil: Number(player.collisionVisualUntil || 0),
+            collisionVisualType: player.collisionVisualType || "win",
+            npcDefeatDamageRatio: Number(player.npcDefeatDamageRatio || 0),
+            collisionImpactX: Number(player.collisionImpactX || 0),
+            collisionImpactY: Number(player.collisionImpactY || 0),
+            collisionRecoveryStartedAt: Number(player.collisionRecoveryStartedAt || 0),
+            collisionRecoveryUntil: Number(player.collisionRecoveryUntil || 0),
+            boostDisabledStartedAt: Number(player.boostDisabledStartedAt || 0),
+            boostDisabledUntil: Number(player.boostDisabledUntil || 0),
+            deathStartedAt: Number(player.deathStartedAt || 0),
+            deathUntil: Number(player.deathUntil || 0),
+            respawnRequested: Boolean(player.respawnRequested)
         })
     }
 
@@ -126,7 +257,7 @@ class World {
             return savedProgress.displayId
         }
 
-        const usedIds = new Set([NPC_ID, DUMMY_ID])
+        const usedIds = new Set([NPC_ID, ...DUMMY_SPECS.map((dummySpec) => dummySpec.id)])
         for (const player of this.players.values()) {
             usedIds.add(player.id)
         }
@@ -174,7 +305,7 @@ class World {
         // 라운드 리셋 시 네르는 기본 위치/기본 상태로 완전히 되돌린다.
         player.x = WORLD_SIZE / 2 + 180
         player.y = WORLD_SIZE / 2
-        player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+        player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
         player.boostState = "idle"
         player.boostDirectionX = 0
         player.boostDirectionY = 0
@@ -190,28 +321,37 @@ class World {
         player.lastMoveY = 0
         player.collisionVisualUntil = 0
         player.collisionVisualType = "win"
+        player.npcDefeatDamageRatio = 0
+        player.npcWinVisualUntil = 0
         player.collisionImpactX = 0
         player.collisionImpactY = 0
         player.collisionRecoveryStartedAt = 0
         player.collisionRecoveryUntil = 0
+        player.boostDisabledStartedAt = now
         player.boostDisabledUntil = now
         player.deathStartedAt = 0
         player.deathUntil = 0
-        player.npcHealth = NPC_MAX_HEALTH
+        player.npcMaxHealth = this.getScaledNpcMaxHealth()
+        player.npcHealth = player.npcMaxHealth
+        player.npcPhase = 1
         player.npcRespawnAt = 0
         player.npcState = "idle"
         player.npcTargetId = ""
         player.npcChargeDirectionX = 0
         player.npcChargeDirectionY = 0
         player.npcChargeDistanceRemaining = 0
+        player.npcChargeDistanceTotal = 0
+        player.npcChargeRedirected = false
         player.npcChargeWindupStartedAt = 0
         player.npcChargeWindupUntil = 0
         player.npcRestUntil = 0
+        player.npcQueuedExtraCharges = 0
         this.grid.move(player)
     }
 
     resetRoundLives(now) {
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
+        this.roundResetAnnouncementUntil = now + PLAYER_DEATH_DURATION_MS
 
         for (const player of this.players.values()) {
             if (player.isNpc) {
@@ -275,14 +415,36 @@ class World {
         // 같은 connectionKey 로 재접속하면 이전 통계를 이어받는다.
         const savedProgress = this.getStoredPlayerProgress(player.connectionKey)
         if (savedProgress) {
+            player.x = this.clampToWorld(Number(savedProgress.x || player.x))
+            player.y = this.clampToWorld(Number(savedProgress.y || player.y))
+            player.facingAngle = typeof savedProgress.facingAngle === "number"
+                ? savedProgress.facingAngle
+                : player.facingAngle
+            player.currentSpeed = Math.max(
+                getBaseSpeedForPlayer(player),
+                Number(savedProgress.currentSpeed || getBaseSpeedForPlayer(player))
+            )
             player.defeatReceivedCount = Number(savedProgress.defeatReceivedCount || 0)
             player.defeatDealtCount = Number(savedProgress.defeatDealtCount || 0)
+            player.collisionVisualUntil = Number(savedProgress.collisionVisualUntil || 0)
+            player.collisionVisualType = savedProgress.collisionVisualType || "win"
+            player.npcDefeatDamageRatio = Number(savedProgress.npcDefeatDamageRatio || 0)
+            player.collisionImpactX = Number(savedProgress.collisionImpactX || 0)
+            player.collisionImpactY = Number(savedProgress.collisionImpactY || 0)
+            player.collisionRecoveryStartedAt = Number(savedProgress.collisionRecoveryStartedAt || 0)
+            player.collisionRecoveryUntil = Number(savedProgress.collisionRecoveryUntil || 0)
+            player.boostDisabledStartedAt = Number(savedProgress.boostDisabledStartedAt || 0)
+            player.boostDisabledUntil = Number(savedProgress.boostDisabledUntil || 0)
+            player.deathStartedAt = Number(savedProgress.deathStartedAt || 0)
+            player.deathUntil = Number(savedProgress.deathUntil || 0)
+            player.respawnRequested = Boolean(savedProgress.respawnRequested)
         }
         player.livesRemaining = this.sharedLivesRemaining
 
         this.players.set(resolvedDisplayId, player)
         this.grid.add(player)
         this.updateStoredPlayerProgress(player)
+        this.rebalanceNpcHealthForHumanCount()
 
         return player
     }
@@ -291,6 +453,7 @@ class World {
         this.updateStoredPlayerProgress(player)
         this.grid.remove(player)
         this.players.delete(player.id)
+        this.rebalanceNpcHealthForHumanCount()
     }
 
     handleInput(player, data) {
@@ -330,6 +493,69 @@ class World {
 
     clampToWorld(value) {
         return Math.max(0, Math.min(WORLD_SIZE, value))
+    }
+
+    getWallBounceDistance(moveDelta) {
+        return Math.min(
+            WALL_MAX_BOUNCE_DISTANCE,
+            WALL_BOUNCE_DISTANCE + Math.abs(moveDelta) * WALL_BOUNCE_SPEED_BOUNCE_MULTIPLIER
+        )
+    }
+
+    applyWallBouncePosition(nextValue, moveDelta) {
+        if (nextValue < 0) {
+            return this.clampToWorld(this.getWallBounceDistance(moveDelta))
+        }
+        if (nextValue > WORLD_SIZE) {
+            return this.clampToWorld(WORLD_SIZE - this.getWallBounceDistance(moveDelta))
+        }
+        return nextValue
+    }
+
+    handleWallBoostCollision(player, now, hitNormalX, hitNormalY) {
+        if (!player) {
+            return
+        }
+
+        const collisionVisualUntil = now + COLLISION_VISUAL_BASE_DURATION_MS
+        player.collisionVisualUntil = collisionVisualUntil
+        player.collisionVisualType = "win"
+        player.npcDefeatDamageRatio = 0
+        player.collisionImpactX = hitNormalX
+        player.collisionImpactY = hitNormalY
+
+        if (player.isNpc) {
+            player.npcState = "rest"
+            player.npcRestUntil = now + NPC_REST_DURATION_MS
+            player.npcTargetId = ""
+            player.npcChargeDistanceRemaining = 0
+            player.npcChargeDistanceTotal = 0
+            player.npcChargeWindupStartedAt = 0
+            player.npcChargeWindupUntil = 0
+            player.npcQueuedExtraCharges = 0
+            player.boostState = "idle"
+            player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+            player.boostDirectionX = 0
+            player.boostDirectionY = 0
+            return
+        }
+
+        if (player.isDummy) {
+            player.boostState = "idle"
+            player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+            player.boostDirectionX = 0
+            player.boostDirectionY = 0
+            player.dummyChargeDistanceRemaining = 0
+            player.dummyChargeDistanceTotal = 0
+            player.dummyState = "chase"
+            player.dummyChargeWindupStartedAt = 0
+            player.dummyChargeWindupUntil = 0
+            player.dummyRestUntil = 0
+            player.dummyQueuedExtraCharges = 0
+            return
+        }
+
+        this.applyCollisionSlow(player, now, collisionVisualUntil)
     }
 
     getCollisionHalfExtents(player) {
@@ -392,7 +618,21 @@ class World {
         return { x: axisValue, y: WORLD_SIZE - padding }
     }
 
-    triggerPlayerDeath(player, now) {
+    getRandomQuadrantSpawnPosition(quadrant) {
+        const padding = RESPAWN_EDGE_PADDING
+        const midpoint = WORLD_SIZE / 2
+        const minX = quadrant === 1 || quadrant === 3 ? padding : midpoint + padding
+        const maxX = quadrant === 1 || quadrant === 3 ? midpoint - padding : WORLD_SIZE - padding
+        const minY = quadrant === 1 || quadrant === 2 ? padding : midpoint + padding
+        const maxY = quadrant === 1 || quadrant === 2 ? midpoint - padding : WORLD_SIZE - padding
+
+        return {
+            x: minX + Math.random() * Math.max(0, maxX - minX),
+            y: minY + Math.random() * Math.max(0, maxY - minY),
+        }
+    }
+
+    triggerPlayerDeath(player, now, defeatedByPlayer = null) {
         if (!player || player.isNpc || player.isDummy || this.isPlayerDead(player)) {
             return
         }
@@ -416,6 +656,7 @@ class World {
         player.boostDirectionY = 0
         player.respawnRequested = false
         player.collisionVisualType = "defeat"
+        player.npcDefeatDamageRatio = 1
         player.collisionVisualUntil = player.deathUntil
         player.collisionImpactX = 0
         player.collisionImpactY = 0
@@ -424,7 +665,11 @@ class World {
         player.boostDisabledUntil = Math.max(player.boostDisabledUntil || 0, player.deathUntil)
         player.lastMoveX = 0
         player.lastMoveY = 0
+        if (defeatedByPlayer && defeatedByPlayer.isNpc) {
+            defeatedByPlayer.npcWinVisualUntil = now + 3000
+        }
         this.updateStoredPlayerProgress(player)
+        postStatsUpdate(player.id, { deaths: 1 })
 
         // 공용 목숨이 모두 소진되고 전원이 쓰러졌다면 다음 라운드로 리셋한다.
         if (this.areAllHumanPlayersOut()) {
@@ -432,7 +677,54 @@ class World {
         }
     }
 
-    triggerNpcDeath(player, now) {
+    triggerDummyDeath(player, now, defeatedByPlayer = null) {
+        if (!player || !player.isDummy || this.isPlayerDead(player)) {
+            return
+        }
+
+        // 더미는 공용 목숨과 무관하게 사망 연출 후 3분 뒤 자동 리스폰한다.
+        player.deathStartedAt = now
+        player.deathUntil = now + PLAYER_DEATH_DURATION_MS
+        player.npcRespawnAt = player.deathUntil + DUMMY_RESPAWN_DELAY_MS
+        player.boostState = "idle"
+        player.input = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            boost: false,
+            respawn: false
+        }
+        player.currentSpeed = 0
+        player.boostDirectionX = 0
+        player.boostDirectionY = 0
+        player.respawnRequested = false
+        player.collisionVisualType = "defeat"
+        player.npcDefeatDamageRatio = 1
+        player.collisionVisualUntil = player.deathUntil
+        player.npcWinVisualUntil = 0
+        player.collisionImpactX = 0
+        player.collisionImpactY = 0
+        player.collisionRecoveryStartedAt = 0
+        player.collisionRecoveryUntil = 0
+        player.boostDisabledUntil = Math.max(player.boostDisabledUntil || 0, player.deathUntil)
+        player.lastMoveX = 0
+        player.lastMoveY = 0
+        player.dummyRetaliationTargetId = ""
+        player.dummyState = "idle"
+        player.dummyPhase = 1
+        player.dummyChargeDistanceRemaining = 0
+        player.dummyChargeDistanceTotal = 0
+        player.dummyChargeWindupStartedAt = 0
+        player.dummyChargeWindupUntil = 0
+        player.dummyRestUntil = 0
+        player.dummyQueuedExtraCharges = 0
+        if (isPersistentHumanPlayer(defeatedByPlayer)) {
+            postStatsUpdate(defeatedByPlayer.id, { dummy_kills: 1 })
+        }
+    }
+
+    triggerNpcDeath(player, now, defeatedByPlayer = null) {
         if (!player || !player.isNpc || this.isPlayerDead(player)) {
             return
         }
@@ -446,19 +738,28 @@ class World {
         player.npcState = "dead"
         player.npcTargetId = ""
         player.npcChargeDistanceRemaining = 0
+        player.npcChargeDistanceTotal = 0
+        player.npcChargeRedirected = false
         player.npcChargeWindupStartedAt = 0
         player.npcChargeWindupUntil = 0
         player.npcRestUntil = 0
+        player.npcQueuedExtraCharges = 0
         player.boostState = "idle"
         player.currentSpeed = 0
         player.boostDirectionX = 0
         player.boostDirectionY = 0
         player.input.boost = false
         player.collisionVisualType = "defeat"
+        player.npcDefeatDamageRatio = 1
         player.collisionVisualUntil = player.deathUntil
+        player.npcWinVisualUntil = 0
+        player.boostDisabledStartedAt = now
         player.boostDisabledUntil = player.npcRespawnAt
         player.lastMoveX = 0
         player.lastMoveY = 0
+        if (isPersistentHumanPlayer(defeatedByPlayer)) {
+            postStatsUpdate(defeatedByPlayer.id, { ner_kills: 1 })
+        }
     }
 
     respawnPlayer(player, now) {
@@ -468,18 +769,20 @@ class World {
 
         // 인간 유저는 공용 목숨이 남아 있을 때만 리스폰 가능하다.
         player.livesRemaining = this.sharedLivesRemaining
-        if (!player.isNpc && Number(this.sharedLivesRemaining || 0) <= 0) {
+        if (!player.isNpc && !player.isDummy && Number(this.sharedLivesRemaining || 0) <= 0) {
             player.respawnRequested = false
             player.input.respawn = false
             this.updateStoredPlayerProgress(player)
             return false
         }
 
-        // 플레이어는 맵 가장자리 쪽 랜덤 위치에서 다시 나온다.
-        const spawnPosition = this.getRandomEdgeSpawnPosition()
+        // 더미는 중앙, 그 외 플레이어는 맵 가장자리에서 리스폰한다.
+        const spawnPosition = player.isDummy
+            ? this.getRandomQuadrantSpawnPosition(player.dummyQuadrant || 1)
+            : this.getRandomEdgeSpawnPosition()
         player.x = spawnPosition.x
         player.y = spawnPosition.y
-        player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+        player.currentSpeed = getBaseSpeedForPlayer(player)
         player.boostState = "idle"
         player.boostDirectionX = 0
         player.boostDirectionY = 0
@@ -495,23 +798,43 @@ class World {
         player.lastMoveY = 0
         player.collisionVisualUntil = 0
         player.collisionVisualType = "win"
+        player.npcDefeatDamageRatio = 0
+        player.npcWinVisualUntil = 0
         player.collisionImpactX = 0
         player.collisionImpactY = 0
         player.collisionRecoveryStartedAt = 0
         player.collisionRecoveryUntil = 0
+        player.boostDisabledStartedAt = now
         player.boostDisabledUntil = now
         player.deathStartedAt = 0
         player.deathUntil = 0
         player.respawnRequested = false
         if (player.isNpc) {
-            player.npcHealth = NPC_MAX_HEALTH
+            player.npcMaxHealth = this.getScaledNpcMaxHealth()
+            player.npcHealth = player.npcMaxHealth
             player.npcRespawnAt = 0
             player.npcState = "idle"
             player.npcTargetId = ""
             player.npcChargeDistanceRemaining = 0
+            player.npcChargeDistanceTotal = 0
+            player.npcChargeRedirected = false
+            player.npcChargeTargetId = ""
+            player.npcChargeHitTarget = false
+            player.npcChargeIsPhaseAttack = false
             player.npcChargeWindupStartedAt = 0
             player.npcChargeWindupUntil = 0
             player.npcRestUntil = 0
+            player.npcQueuedExtraCharges = 0
+        } else if (player.isDummy) {
+            player.dummyRetaliationTargetId = ""
+            player.dummyState = "idle"
+            player.dummyPhase = 1
+            player.dummyChargeDistanceRemaining = 0
+            player.dummyChargeDistanceTotal = 0
+            player.dummyChargeWindupStartedAt = 0
+            player.dummyChargeWindupUntil = 0
+            player.dummyRestUntil = 0
+            player.dummyQueuedExtraCharges = 0
         }
         this.grid.move(player)
         this.updateStoredPlayerProgress(player)
@@ -541,25 +864,52 @@ class World {
             return null
         }
 
-        const nextTarget = candidates[Math.floor(Math.random() * candidates.length)]
+        const nextTarget = candidates.reduce((closestCandidate, candidate) => {
+            if (!closestCandidate) {
+                return candidate
+            }
+            const closestDistance = Math.hypot(closestCandidate.x - player.x, closestCandidate.y - player.y)
+            const candidateDistance = Math.hypot(candidate.x - player.x, candidate.y - player.y)
+            return candidateDistance < closestDistance ? candidate : closestCandidate
+        }, null)
         player.npcTargetId = nextTarget.id
         return nextTarget
     }
 
-    startNpcChargeSkill(player, diffX, diffY, distance) {
+    startNpcChargeSkill(player, diffX, diffY, distance, options = {}) {
         if (!player || !player.isNpc) {
             return { dx: 0, dy: 0 }
         }
 
         // 네르 돌진 스킬은 시작 순간 방향과 총 이동 거리를 고정해 둔다.
+        const npcPhase = player.npcPhase || getNpcPhase(player)
+        const queueExtraCharge = options.queueExtraCharge !== false
+        const instantCharge = options.instant === true
+        const distanceMultiplier = Number(options.distanceMultiplier || NPC_CHARGE_DISTANCE_MULTIPLIER)
+        const targetId = String(options.targetId || player.npcTargetId || "").trim()
+        const isPhaseAttack = Boolean(options.isPhaseAttack)
         const magnitude = distance > 0.001 ? distance : 1
         player.npcChargeDirectionX = diffX / magnitude
         player.npcChargeDirectionY = diffY / magnitude
-        player.npcChargeDistanceRemaining = distance * 2
-        player.npcState = "windup"
-        player.boostState = "idle"
-        player.npcChargeWindupStartedAt = Date.now()
-        player.npcChargeWindupUntil = player.npcChargeWindupStartedAt + NPC_CHARGE_WINDUP_DURATION_MS
+        player.npcChargeDistanceTotal = distance * distanceMultiplier
+        player.npcChargeDistanceRemaining = player.npcChargeDistanceTotal
+        player.npcChargeRedirected = false
+        player.npcChargeTargetId = targetId
+        player.npcChargeHitTarget = false
+        player.npcChargeIsPhaseAttack = isPhaseAttack
+        player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+        player.npcChargeWindupStartedAt = 0
+        player.npcChargeWindupUntil = 0
+        if (instantCharge) {
+            player.npcState = "charging"
+            player.boostState = "charging"
+        } else {
+            player.npcState = "windup"
+            player.boostState = "idle"
+            player.npcChargeWindupStartedAt = Date.now()
+            player.npcChargeWindupUntil = player.npcChargeWindupStartedAt + NPC_CHARGE_WINDUP_DURATION_MS
+        }
+        player.npcQueuedExtraCharges = queueExtraCharge && npcPhase >= 2 ? 1 : 0
 
         return { dx: 0, dy: 0 }
     }
@@ -568,6 +918,9 @@ class World {
         if (!player || !player.isNpc) {
             return { dx: 0, dy: 0 }
         }
+
+        player.npcPhase = getNpcPhase(player)
+        const npcPhase = player.npcPhase
 
         // 네르는 충돌 회복 중이면 rest 로 강제 전환한다.
         if (player.collisionRecoveryUntil > now) {
@@ -580,11 +933,35 @@ class World {
 
         if (player.npcState === "rest") {
             player.boostState = "idle"
-            player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+            player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
             player.npcChargeWindupStartedAt = 0
             player.npcChargeWindupUntil = 0
             if (player.npcRestUntil > now) {
                 return { dx: 0, dy: 0 }
+            }
+            if (player.npcQueuedExtraCharges > 0) {
+                const retainedTarget = this.getNpcTarget(player)
+                if (retainedTarget) {
+                    const retainedDiffX = retainedTarget.x - player.x
+                    const retainedDiffY = retainedTarget.y - player.y
+                    const retainedDistance = Math.hypot(retainedDiffX, retainedDiffY)
+                    const instantExtraCharge = npcPhase >= 3
+                    player.npcQueuedExtraCharges = Math.max(0, player.npcQueuedExtraCharges - 1)
+                    return this.startNpcChargeSkill(
+                        player,
+                        retainedDiffX,
+                        retainedDiffY,
+                        retainedDistance,
+                        {
+                            queueExtraCharge: false,
+                            instant: instantExtraCharge,
+                            distanceMultiplier: NPC_EXTRA_CHARGE_DISTANCE_MULTIPLIER,
+                            targetId: retainedTarget.id,
+                            isPhaseAttack: true,
+                        }
+                    )
+                }
+                player.npcQueuedExtraCharges = 0
             }
             player.npcState = "chase"
             player.npcTargetId = ""
@@ -594,7 +971,7 @@ class World {
         if (!target) {
             player.npcState = "idle"
             player.boostState = "idle"
-            player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+            player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
             player.npcChargeWindupStartedAt = 0
             player.npcChargeWindupUntil = 0
             return { dx: 0, dy: 0 }
@@ -633,8 +1010,14 @@ class World {
         }
 
         // 충분히 가까워지면 돌진 스킬 시작.
-        if (distance <= NPC_CHARGE_TRIGGER_DISTANCE) {
-            return this.startNpcChargeSkill(player, diffX, diffY, distance)
+        const triggerDistance = npcPhase >= 3
+            ? NPC_CHARGE_TRIGGER_DISTANCE * NPC_PHASE_THREE_TRIGGER_DISTANCE_MULTIPLIER
+            : NPC_CHARGE_TRIGGER_DISTANCE
+        if (distance <= triggerDistance) {
+            return this.startNpcChargeSkill(player, diffX, diffY, distance, {
+                targetId: target.id,
+                isPhaseAttack: false,
+            })
         }
 
         player.npcState = "chase"
@@ -660,31 +1043,224 @@ class World {
         player.currentSpeed = player.collisionSlowSpeed
         player.collisionRecoveryStartedAt = now
         player.collisionRecoveryUntil = resolvedRecoveryUntil
+        player.boostDisabledStartedAt = now
         player.boostDisabledUntil = resolvedRecoveryUntil
         player.npcChargeWindupStartedAt = 0
         player.npcChargeWindupUntil = 0
     }
 
-    applyNpcDefeatDamage(player, impactSpeed, now) {
-        if (!player || !player.isNpc || this.isPlayerDead(player)) {
+    getUserDamageAgainstNpc(attacker) {
+        if (!attacker || attacker.isNpc || attacker.isDummy) {
+            return 0
+        }
+
+        const effectiveSpeed = Math.max(BASE_PLAYER_SPEED_PER_SECOND, Number(attacker.currentSpeed || 0))
+        const maxSpeedRange = Math.max(1, MAX_BOOSTED_SPEED_PER_SECOND - BASE_PLAYER_SPEED_PER_SECOND)
+        const speedRatio = Math.max(
+            0,
+            Math.min(1, (effectiveSpeed - BASE_PLAYER_SPEED_PER_SECOND) / maxSpeedRange)
+        )
+
+        return Math.max(
+            NPC_DAMAGE_MIN,
+            Math.min(
+                NPC_DAMAGE_MAX,
+                Math.round(NPC_DAMAGE_MIN + (NPC_DAMAGE_MAX - NPC_DAMAGE_MIN) * speedRatio)
+            )
+        )
+    }
+
+    applyNpcCollisionDamage(targetNpc, attacker, now) {
+        if (!targetNpc || !targetNpc.isNpc || this.isPlayerDead(targetNpc)) {
             return
         }
 
-        // 네르 피해량은 직전 충돌 속도에 비례해서 1~5 사이로 계산한다.
-        const damage = Math.max(
-            NPC_DAMAGE_MIN,
-            Math.min(NPC_DAMAGE_MAX, Math.round(Math.max(0, impactSpeed) / NPC_DAMAGE_SPEED_DIVISOR))
-        )
-        player.npcHealth = Math.max(0, (player.npcHealth || NPC_MAX_HEALTH) - damage)
-
-        if (player.npcHealth <= 0) {
-            this.triggerNpcDeath(player, now)
+        const damage = this.getUserDamageAgainstNpc(attacker)
+        if (damage <= 0) {
+            return
         }
+
+        // 유저는 일반 충돌도 최소 공격력이 들어가고,
+        // 돌진 속도가 높아질수록 최대 공격력까지 선형으로 오른다.
+        targetNpc.npcHealth = Math.max(0, (targetNpc.npcHealth || NPC_MAX_HEALTH) - damage)
+        targetNpc.npcDefeatDamageRatio = Math.max(0, Math.min(1, damage / Math.max(1, NPC_DAMAGE_MAX)))
+        // 패배 상태가 되면 기존 타겟/연속 돌진 예약을 버리고 새 타겟을 다시 잡게 한다.
+        targetNpc.npcTargetId = ""
+        targetNpc.npcQueuedExtraCharges = 0
+
+        if (targetNpc.npcHealth <= 0) {
+            this.triggerNpcDeath(targetNpc, now, attacker)
+        }
+    }
+
+    recordNpcPhaseAttackDodge(player) {
+        if (!player || !player.isNpc || !player.npcChargeIsPhaseAttack) {
+            return
+        }
+        const targetId = String(player.npcChargeTargetId || "").trim()
+        const target = targetId ? this.players.get(targetId) : null
+        if (isPersistentHumanPlayer(target) && !this.isPlayerDead(target) && !player.npcChargeHitTarget) {
+            const npcPhase = Math.max(1, Math.min(3, Number(player.npcPhase || 1)))
+            const dodgeKey = `ner_phase${npcPhase}_attack_dodges`
+            postStatsUpdate(target.id, { [dodgeKey]: 1 })
+        }
+        player.npcChargeTargetId = ""
+        player.npcChargeHitTarget = false
+        player.npcChargeIsPhaseAttack = false
     }
 
     getCollisionRadius(player) {
         const { halfWidth, halfHeight } = this.getCollisionHalfExtents(player)
         return Math.max(halfWidth, halfHeight)
+    }
+
+    getDummyRetaliationTarget(player) {
+        if (!player || !player.isDummy) {
+            return null
+        }
+        const targetId = String(player.dummyRetaliationTargetId || "").trim()
+        if (!targetId) {
+            return null
+        }
+        const target = this.players.get(targetId)
+        if (!target || target.isNpc || target.isDummy || this.isPlayerDead(target)) {
+            player.dummyRetaliationTargetId = ""
+            player.dummyChargeDistanceRemaining = 0
+            player.dummyChargeDistanceTotal = 0
+            return null
+        }
+        return target
+    }
+
+    startDummyRetaliationCharge(player, target) {
+        if (!player || !player.isDummy || !target) {
+            return
+        }
+        const diffX = target.x - player.x
+        const diffY = target.y - player.y
+        const distance = Math.max(1, Math.hypot(diffX, diffY))
+        const dummyPhase = player.dummyPhase || getDummyPhase(player)
+        player.boostDirectionX = diffX / distance
+        player.boostDirectionY = diffY / distance
+        player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+        player.dummyChargeDistanceTotal = distance * DUMMY_RETALIATION_DISTANCE_MULTIPLIER
+        player.dummyChargeDistanceRemaining = player.dummyChargeDistanceTotal
+        player.facingAngle = Math.atan2(player.boostDirectionY, player.boostDirectionX)
+        player.dummyQueuedExtraCharges = dummyPhase >= 2 ? 1 : 0
+        player.dummyChargeWindupStartedAt = 0
+        player.dummyChargeWindupUntil = 0
+        if (dummyPhase >= 3) {
+            player.dummyState = "charging"
+            player.boostState = "charging"
+        } else {
+            player.dummyState = "windup"
+            player.boostState = "idle"
+            player.dummyChargeWindupStartedAt = Date.now()
+            player.dummyChargeWindupUntil = player.dummyChargeWindupStartedAt + NPC_CHARGE_WINDUP_DURATION_MS
+        }
+    }
+
+    updateDummy(player) {
+        if (!player || !player.isDummy) {
+            return { dx: 0, dy: 0 }
+        }
+
+        player.dummyPhase = getDummyPhase(player)
+
+        const target = this.getDummyRetaliationTarget(player)
+        if (!target) {
+            player.dummyState = "idle"
+            player.boostState = "idle"
+            player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+            player.boostDirectionX = 0
+            player.boostDirectionY = 0
+            return { dx: 0, dy: 0 }
+        }
+
+        const diffX = target.x - player.x
+        const diffY = target.y - player.y
+        const distance = Math.hypot(diffX, diffY)
+
+        if (player.dummyState === "rest") {
+            player.boostState = "idle"
+            player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+            if (player.dummyRestUntil > Date.now()) {
+                return { dx: 0, dy: 0 }
+            }
+            if (player.dummyQueuedExtraCharges > 0) {
+                player.dummyQueuedExtraCharges = Math.max(0, player.dummyQueuedExtraCharges - 1)
+                player.boostDirectionX = diffX / Math.max(1, distance)
+                player.boostDirectionY = diffY / Math.max(1, distance)
+                player.dummyChargeDistanceTotal = distance * NPC_EXTRA_CHARGE_DISTANCE_MULTIPLIER
+                player.dummyChargeDistanceRemaining = player.dummyChargeDistanceTotal
+                player.facingAngle = Math.atan2(player.boostDirectionY, player.boostDirectionX)
+                if (player.dummyPhase >= 3) {
+                    player.dummyState = "charging"
+                    player.boostState = "charging"
+                } else {
+                    player.dummyState = "windup"
+                    player.boostState = "idle"
+                    player.dummyChargeWindupStartedAt = Date.now()
+                    player.dummyChargeWindupUntil = player.dummyChargeWindupStartedAt + NPC_CHARGE_WINDUP_DURATION_MS
+                }
+                return { dx: 0, dy: 0 }
+            }
+            player.dummyState = "chase"
+        }
+
+        if (player.dummyState === "windup") {
+            if (player.dummyChargeWindupUntil > Date.now()) {
+                if (distance > 0.001) {
+                    player.boostDirectionX = diffX / distance
+                    player.boostDirectionY = diffY / distance
+                    player.facingAngle = Math.atan2(player.boostDirectionY, player.boostDirectionX)
+                }
+                return { dx: 0, dy: 0 }
+            }
+            player.dummyState = "charging"
+            player.boostState = "charging"
+            player.dummyChargeWindupStartedAt = 0
+            player.dummyChargeWindupUntil = 0
+            return {
+                dx: player.boostDirectionX || 0,
+                dy: player.boostDirectionY || 0,
+            }
+        }
+
+        if (player.dummyState === "charging") {
+            return {
+                dx: player.boostDirectionX || 0,
+                dy: player.boostDirectionY || 0,
+            }
+        }
+
+        const triggerDistance = player.dummyPhase >= 3
+            ? NPC_CHARGE_TRIGGER_DISTANCE * NPC_PHASE_THREE_TRIGGER_DISTANCE_MULTIPLIER
+            : NPC_CHARGE_TRIGGER_DISTANCE
+        if (distance <= triggerDistance) {
+            this.startDummyRetaliationCharge(player, target)
+            return { dx: 0, dy: 0 }
+        }
+
+        if (distance < 0.001) {
+            return { dx: 0, dy: 0 }
+        }
+
+        player.dummyState = "chase"
+        return {
+            dx: diffX / distance,
+            dy: diffY / distance,
+        }
+    }
+
+    getCollisionSeparationProfile(playerA, playerB) {
+        if (playerA.isNpc && !playerB.isNpc) {
+            return { pushA: 1 / 3, pushB: 2 / 3, totalScale: 1.8 }
+        }
+        if (!playerA.isNpc && playerB.isNpc) {
+            return { pushA: 2 / 3, pushB: 1 / 3, totalScale: 1.8 }
+        }
+        return { pushA: 1 / 2, pushB: 1 / 2, totalScale: 1.5 }
     }
 
     resolvePlayerCollisions() {
@@ -743,6 +1319,8 @@ class World {
                     COLLISION_BOUNCE_DISTANCE + relativeImpactSpeed * COLLISION_SPEED_BOUNCE_MULTIPLIER
                 )
                 const separation = overlap / 2 + bounceDistance
+                const separationProfile = this.getCollisionSeparationProfile(playerA, playerB)
+                const scaledSeparation = separation * separationProfile.totalScale
                 const collisionVisualDuration = Math.min(
                     COLLISION_VISUAL_MAX_DURATION_MS,
                     COLLISION_VISUAL_BASE_DURATION_MS +
@@ -767,6 +1345,8 @@ class World {
                 playerB.collisionVisualUntil = collisionVisualUntil
                 playerA.collisionVisualType = "win"
                 playerB.collisionVisualType = "win"
+                playerA.npcDefeatDamageRatio = 0
+                playerB.npcDefeatDamageRatio = 0
                 playerA.collisionImpactX = 0
                 playerA.collisionImpactY = 0
                 playerB.collisionImpactX = 0
@@ -784,22 +1364,49 @@ class World {
                     playerB.defeatReceivedCount += 1
                     playerA.defeatDealtCount += 1
                     playerB.defeatDealtCount += 1
-                    this.applyNpcDefeatDamage(playerA, relativeImpactSpeed, now)
-                    this.applyNpcDefeatDamage(playerB, relativeImpactSpeed, now)
+                    if (playerA.isNpc && isPersistentHumanPlayer(playerB)) {
+                        postStatsUpdate(playerB.id, { ner_hits: 1 })
+                    }
+                    if (playerB.isNpc && isPersistentHumanPlayer(playerA)) {
+                        postStatsUpdate(playerA.id, { ner_hits: 1 })
+                    }
                 } else if (playerAAttacking) {
                     playerB.collisionVisualType = "defeat"
                     playerB.collisionImpactX = -normalX
                     playerB.collisionImpactY = -normalY
                     playerA.defeatDealtCount += 1
                     playerB.defeatReceivedCount += 1
-                    this.applyNpcDefeatDamage(playerB, relativeImpactSpeed, now)
+                    if (playerB.isNpc && isPersistentHumanPlayer(playerA)) {
+                        postStatsUpdate(playerA.id, { ner_hits: 1 })
+                    }
+                    if (playerA.isNpc && playerA.npcChargeTargetId === playerB.id) {
+                        playerA.npcChargeHitTarget = true
+                    }
+                    if (playerB.isDummy && !playerA.isNpc && !playerA.isDummy) {
+                        playerB.dummyRetaliationTargetId = playerA.id
+                    }
                 } else if (playerBAttacking) {
                     playerA.collisionVisualType = "defeat"
                     playerA.collisionImpactX = normalX
                     playerA.collisionImpactY = normalY
                     playerB.defeatDealtCount += 1
                     playerA.defeatReceivedCount += 1
-                    this.applyNpcDefeatDamage(playerA, relativeImpactSpeed, now)
+                    if (playerA.isNpc && isPersistentHumanPlayer(playerB)) {
+                        postStatsUpdate(playerB.id, { ner_hits: 1 })
+                    }
+                    if (playerB.isNpc && playerB.npcChargeTargetId === playerA.id) {
+                        playerB.npcChargeHitTarget = true
+                    }
+                    if (playerA.isDummy && !playerB.isNpc && !playerB.isDummy) {
+                        playerA.dummyRetaliationTargetId = playerB.id
+                    }
+                }
+
+                if (playerA.isNpc && !playerB.isNpc && !playerB.isDummy) {
+                    this.applyNpcCollisionDamage(playerA, playerB, now)
+                }
+                if (playerB.isNpc && !playerA.isNpc && !playerA.isDummy) {
+                    this.applyNpcCollisionDamage(playerB, playerA, now)
                 }
 
                 // 일반 유저만 충돌 직후 느려지고, 네르는 감속 대상에서 제외된다.
@@ -808,22 +1415,29 @@ class World {
 
                 if (playerA.collisionVisualType === "defeat" &&
                     !playerA.isNpc &&
-                    !playerA.isDummy &&
                     playerA.defeatReceivedCount % PLAYER_DEATH_TRIGGER_COUNT === 0) {
-                    this.triggerPlayerDeath(playerA, now)
+                    if (playerA.isDummy) {
+                        this.triggerDummyDeath(playerA, now, playerB)
+                    } else {
+                        this.triggerPlayerDeath(playerA, now, playerB)
+                    }
                 }
                 if (playerB.collisionVisualType === "defeat" &&
                     !playerB.isNpc &&
-                    !playerB.isDummy &&
                     playerB.defeatReceivedCount % PLAYER_DEATH_TRIGGER_COUNT === 0) {
-                    this.triggerPlayerDeath(playerB, now)
+                    if (playerB.isDummy) {
+                        this.triggerDummyDeath(playerB, now, playerA)
+                    } else {
+                        this.triggerPlayerDeath(playerB, now, playerA)
+                    }
                 }
 
-                // 최종적으로 겹침 해소 + 반발만큼 서로 밀어낸다.
-                playerA.x = this.clampToWorld(playerA.x - normalX * separation)
-                playerA.y = this.clampToWorld(playerA.y - normalY * separation)
-                playerB.x = this.clampToWorld(playerB.x + normalX * separation)
-                playerB.y = this.clampToWorld(playerB.y + normalY * separation)
+                // 네르-유저 충돌은 유저가 더 멀리 밀려나게 2:1 비율을 적용한다.
+                // 네르가 charging 중일 때도 상태를 끊지 않고 현재 돌진을 유지한다.
+                playerA.x = this.clampToWorld(playerA.x - normalX * scaledSeparation * separationProfile.pushA)
+                playerA.y = this.clampToWorld(playerA.y - normalY * scaledSeparation * separationProfile.pushA)
+                playerB.x = this.clampToWorld(playerB.x + normalX * scaledSeparation * separationProfile.pushB)
+                playerB.y = this.clampToWorld(playerB.y + normalY * scaledSeparation * separationProfile.pushB)
             }
         }
     }
@@ -857,6 +1471,14 @@ class World {
                     continue
                 }
 
+                if (player.isDummy) {
+                    if (player.npcRespawnAt > now) {
+                        continue
+                    }
+                    this.respawnPlayer(player, now)
+                    continue
+                }
+
                 if (player.respawnRequested && Number(this.sharedLivesRemaining || 0) > 0) {
                     this.respawnPlayer(player, now)
                 }
@@ -871,6 +1493,10 @@ class World {
                 const npcVector = this.updateNpc(player, now)
                 dx = npcVector.dx
                 dy = npcVector.dy
+            } else if (player.isDummy) {
+                const dummyVector = this.updateDummy(player)
+                dx = dummyVector.dx
+                dy = dummyVector.dy
             } else {
                 if (player.input.left) dx -= 1
                 if (player.input.right) dx += 1
@@ -885,10 +1511,6 @@ class World {
                 dy *= Math.SQRT1_2
             }
 
-            if (isMoving) {
-                player.facingAngle = Math.atan2(dy, dx)
-            }
-
             if (player.collisionRecoveryUntil > now) {
                 // 충돌 회복 시간 동안은 지정된 느린 속도에서 기본속도로 선형 복귀한다.
                 const recoveryDuration = player.collisionRecoveryUntil - player.collisionRecoveryStartedAt
@@ -897,13 +1519,14 @@ class World {
                     : 1
 
                 player.boostState = "idle"
+                const baseSpeed = getBaseSpeedForPlayer(player)
                 player.currentSpeed = player.collisionSlowSpeed +
-                    (BASE_PLAYER_SPEED_PER_SECOND - player.collisionSlowSpeed) * Math.max(0, Math.min(1, recoveryProgress))
+                    (baseSpeed - player.collisionSlowSpeed) * Math.max(0, Math.min(1, recoveryProgress))
             } else {
                 if (player.collisionRecoveryUntil !== 0) {
                     player.collisionRecoveryStartedAt = 0
                     player.collisionRecoveryUntil = 0
-                    player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+                    player.currentSpeed = getBaseSpeedForPlayer(player)
                 }
 
                 const boostLocked = player.boostDisabledUntil > now
@@ -915,7 +1538,9 @@ class World {
                     player.boostDirectionY = 0
                 }
 
-                if (player.isNpc && player.npcState === "charging" && player.boostState === "idle") {
+                if (player.isDummy && player.dummyState === "charging" && player.boostState === "idle") {
+                    player.boostState = "charging"
+                } else if (player.isNpc && player.npcState === "charging" && player.boostState === "idle") {
                     player.boostState = "charging"
                 } else if (player.input.boost && !boostLocked && player.boostState === "idle" && isMoving) {
                     // 유저 돌진은 시작 방향 저장 후 charging 으로 진입한다.
@@ -926,9 +1551,12 @@ class World {
 
                 if (player.boostState === "charging") {
                     // charging / cooldown 동안 유저는 시작 방향 고정 직진이다.
-                    if (!player.isNpc) {
-                        dx = player.boostDirectionX || dx
-                        dy = player.boostDirectionY || dy
+                    if (player.isDummy && player.dummyState === "charging") {
+                        dx = player.boostDirectionX
+                        dy = player.boostDirectionY
+                    } else if (!player.isNpc) {
+                        dx = player.boostDirectionX
+                        dy = player.boostDirectionY
                     }
                     const maxBoostedSpeed = player.isNpc ? NPC_MAX_BOOSTED_SPEED_PER_SECOND : MAX_BOOSTED_SPEED_PER_SECOND
                     const boostAcceleration = player.isNpc ? NPC_BOOST_ACCELERATION_PER_SECOND : BOOST_ACCELERATION_PER_SECOND
@@ -940,41 +1568,64 @@ class World {
                         player.boostState = "cooldown"
                     }
                 } else if (player.boostState === "cooldown") {
-                    if (!player.isNpc) {
-                        dx = player.boostDirectionX || dx
-                        dy = player.boostDirectionY || dy
+                    if (player.isDummy && player.dummyState === "charging") {
+                        dx = player.boostDirectionX
+                        dy = player.boostDirectionY
+                    } else if (!player.isNpc) {
+                        dx = player.boostDirectionX
+                        dy = player.boostDirectionY
                     }
                     const boostCooldown = player.isNpc ? NPC_BOOST_COOLDOWN_PER_SECOND : BOOST_COOLDOWN_PER_SECOND
+                    const baseSpeed = getBaseSpeedForPlayer(player)
                     player.currentSpeed = Math.max(
-                        BASE_PLAYER_SPEED_PER_SECOND,
+                        baseSpeed,
                         player.currentSpeed - boostCooldown * TICK_DELTA_SECONDS
                     )
-                    if (player.currentSpeed <= BASE_PLAYER_SPEED_PER_SECOND) {
-                        player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+                    if (player.currentSpeed <= baseSpeed) {
+                        player.currentSpeed = baseSpeed
                         if (player.isNpc) {
                             player.npcState = "rest"
                             player.npcRestUntil = now + NPC_REST_DURATION_MS
-                            player.npcTargetId = ""
+                            if (player.npcQueuedExtraCharges <= 0) {
+                                player.npcTargetId = ""
+                            }
                             player.boostState = "idle"
                             player.boostDirectionX = 0
                             player.boostDirectionY = 0
+                        } else if (player.isDummy) {
+                            player.boostState = "idle"
+                            player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+                            player.dummyChargeDistanceRemaining = 0
+                            player.dummyChargeDistanceTotal = 0
+                            player.dummyState = "rest"
+                            player.dummyRestUntil = now + NPC_REST_DURATION_MS
                         } else if (!player.input.boost) {
                             player.boostState = "idle"
                             player.boostDirectionX = 0
                             player.boostDirectionY = 0
+                            if (player.boostDisabledUntil <= now) {
+                                player.boostDisabledStartedAt = now
+                                player.boostDisabledUntil = now + USER_POST_BOOST_COOLDOWN_MS
+                            }
                         }
                     }
                 } else if (!isMoving) {
                     // 멈춘 상태에서는 남아 있던 속도를 자연스럽게 기본속도로 낮춘다.
+                    const baseSpeed = getBaseSpeedForPlayer(player)
                     player.currentSpeed = Math.max(
-                        BASE_PLAYER_SPEED_PER_SECOND,
+                        baseSpeed,
                         player.currentSpeed - BOOST_COOLDOWN_PER_SECOND * TICK_DELTA_SECONDS
                     )
                 } else {
-                    player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
+                    player.currentSpeed = getBaseSpeedForPlayer(player)
                     player.boostDirectionX = 0
                     player.boostDirectionY = 0
                 }
+            }
+
+            if (dx !== 0 || dy !== 0) {
+                // 돌진 잠금으로 보정된 최종 이동 방향 기준으로만 회전 각도를 갱신한다.
+                player.facingAngle = Math.atan2(dy, dx)
             }
 
             player.lastMoveX = dx * player.currentSpeed * TICK_DELTA_SECONDS
@@ -985,21 +1636,90 @@ class World {
                     0,
                     (player.npcChargeDistanceRemaining || 0) - Math.hypot(player.lastMoveX, player.lastMoveY)
                 )
+            } else if (player.isDummy && player.dummyState === "charging") {
+                player.dummyChargeDistanceRemaining = Math.max(
+                    0,
+                    (player.dummyChargeDistanceRemaining || 0) - Math.hypot(player.lastMoveX, player.lastMoveY)
+                )
+                if (player.dummyChargeDistanceRemaining <= 0) {
+                    if (player.dummyQueuedExtraCharges > 0) {
+                        player.boostState = "idle"
+                        player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+                        player.dummyState = "rest"
+                        player.dummyRestUntil = now
+                    } else {
+                        player.boostState = "idle"
+                        player.currentSpeed = DUMMY_BASE_SPEED_PER_SECOND
+                        player.dummyState = "rest"
+                        player.dummyRestUntil = now + NPC_REST_DURATION_MS
+                    }
+                }
             }
 
-            player.x = this.clampToWorld(player.x + player.lastMoveX)
-            player.y = this.clampToWorld(player.y + player.lastMoveY)
+            const nextX = player.x + player.lastMoveX
+            const nextY = player.y + player.lastMoveY
+            const hitLeftWall = nextX < 0
+            const hitRightWall = nextX > WORLD_SIZE
+            const hitTopWall = nextY < 0
+            const hitBottomWall = nextY > WORLD_SIZE
+
+            player.x = this.applyWallBouncePosition(nextX, player.lastMoveX)
+            player.y = this.applyWallBouncePosition(nextY, player.lastMoveY)
+
+            if (
+                (player.boostState === "charging" || player.boostState === "cooldown") &&
+                (hitLeftWall || hitRightWall || hitTopWall || hitBottomWall)
+            ) {
+                const hitNormalX = hitLeftWall ? 1 : (hitRightWall ? -1 : 0)
+                const hitNormalY = hitTopWall ? 1 : (hitBottomWall ? -1 : 0)
+                if (player.isNpc) {
+                    this.recordNpcPhaseAttackDodge(player)
+                }
+                this.handleWallBoostCollision(player, now, hitNormalX, hitNormalY)
+            }
 
             if (player.isNpc && player.npcState === "charging" && player.npcChargeDistanceRemaining <= 0) {
-                // 돌진 거리를 다 쓰면 네르는 rest 로 들어가고 다음 타겟 선정까지 대기한다.
-                player.npcState = "rest"
-                player.npcRestUntil = now + NPC_REST_DURATION_MS
-                player.npcTargetId = ""
-                player.npcChargeDistanceRemaining = 0
-                player.boostState = "idle"
-                player.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
-                player.lastMoveX = 0
-                player.lastMoveY = 0
+                let chainedExtraCharge = false
+                if (player.npcQueuedExtraCharges > 0) {
+                    const retainedTarget = this.getNpcTarget(player)
+                    if (retainedTarget) {
+                        const retainedDiffX = retainedTarget.x - player.x
+                        const retainedDiffY = retainedTarget.y - player.y
+                        const retainedDistance = Math.hypot(retainedDiffX, retainedDiffY)
+                        const instantExtraCharge = (player.npcPhase || getNpcPhase(player)) >= 3
+                        player.npcQueuedExtraCharges = Math.max(0, player.npcQueuedExtraCharges - 1)
+                        player.lastMoveX = 0
+                        player.lastMoveY = 0
+                        this.startNpcChargeSkill(
+                            player,
+                            retainedDiffX,
+                            retainedDiffY,
+                            retainedDistance,
+                            {
+                                queueExtraCharge: false,
+                                instant: instantExtraCharge,
+                                distanceMultiplier: NPC_EXTRA_CHARGE_DISTANCE_MULTIPLIER,
+                                targetId: retainedTarget.id,
+                                isPhaseAttack: true,
+                            }
+                        )
+                        chainedExtraCharge = true
+                    } else {
+                        player.npcQueuedExtraCharges = 0
+                    }
+                }
+                if (!chainedExtraCharge && player.npcQueuedExtraCharges <= 0) {
+                    this.recordNpcPhaseAttackDodge(player)
+                    // 돌진 거리를 다 쓰면 네르는 rest 로 들어가고 다음 타겟 선정까지 대기한다.
+                    player.npcState = "rest"
+                    player.npcRestUntil = now + NPC_REST_DURATION_MS
+                    player.npcTargetId = ""
+                    player.npcChargeDistanceRemaining = 0
+                    player.boostState = "idle"
+                    player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+                    player.lastMoveX = 0
+                    player.lastMoveY = 0
+                }
             }
         }
 
