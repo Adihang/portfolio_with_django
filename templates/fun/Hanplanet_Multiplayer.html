@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% load static_versioned %}
 {% block body_class %}ui-page hanplanet-multiplayer-page{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" type="text/css" href="{% static_v 'css/hanplanet_multiplayer.css' %}">
+{% endblock %}
 {% block content %}
 {% include 'docs/_assets_head.html' %}
 
@@ -74,7 +77,7 @@
                                     {% include 'partials/ui_i18n.html' with key='multiplayer_start_button' %}
                                 </button>
                                 {% if not request.user.is_authenticated %}
-                                <div class="ui-toolbar-actions multiplayer-start-auth-actions">
+                                <div class="multiplayer-start-auth-actions">
                                     <a class="ide-btn ide-btn-primary multiplayer-primary-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
                                         {% include 'partials/ui_i18n.html' with key='login' %}
                                     </a>
@@ -84,7 +87,7 @@
                                 </div>
                                 {% endif %}
                                 {% if request.user.is_superuser %}
-                                <div class="ui-toolbar-actions multiplayer-start-admin-actions">
+                                <div class="multiplayer-start-admin-actions">
                                     <a class="ide-btn ide-btn-primary multiplayer-primary-btn" href="{{ bumpercar_admin_url }}">
                                         {% include 'partials/ui_i18n.html' with key='bumpercar_admin_title' %}
                                     </a>
@@ -115,11 +118,10 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="multiplayer-loading-overlay" data-game-loading-overlay hidden>
-                            <div class="multiplayer-loading-spinner" aria-hidden="true">
-                                <span class="multiplayer-loading-orbit">
-                                    <img class="multiplayer-loading-orbit-icon" src="{% static_v 'Spikip/speaki_default/icon/acceleration.png' %}" alt="">
-                                </span>
+                        <div class="multiplayer-loading-overlay" data-game-loading-overlay>
+                            <div class="multiplayer-loading-stack">
+                                {% include "popup/fun/multiplayer_loading_spinner.html" %}
+                                <p class="multiplayer-loading-caption" data-game-loading-caption></p>
                             </div>
                         </div>
                         <div class="multiplayer-hud">
@@ -170,7 +172,6 @@
 </main>
 
 {% include "popup/fun/multiplayer_idle_timeout_modal.html" %}
-<link rel="stylesheet" type="text/css" href="{% static_v 'css/hanplanet_multiplayer.css' %}">
 <script src="{% static_v 'js/hanplanet_multiplayer.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
 {% include "popup/root/auth_logout_modal.html" %}
 <script src="{% static_v 'js/minigame_account_widget.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>

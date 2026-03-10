@@ -243,6 +243,38 @@ class DocsAccessRule(models.Model):
         return self.path or "/docs"
 
 
+class DocsSharedLink(models.Model):
+    path = models.CharField(
+        "문서 경로",
+        max_length=1024,
+        unique=True,
+        help_text="/docs 기준 상대 파일 경로",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="docs_shared_links",
+        verbose_name="공유 생성 사용자",
+    )
+    share_slug = models.CharField("공유 슬러그", max_length=255)
+    created_at = models.DateTimeField("생성일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        ordering = ["owner__username", "share_slug"]
+        verbose_name = "문서 공유 링크"
+        verbose_name_plural = "문서 공유 링크"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "share_slug"],
+                name="unique_docs_shared_link_owner_slug",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.owner.username}/{self.share_slug}"
+
+
 class DocsLoginAttemptGuard(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

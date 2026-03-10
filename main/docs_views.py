@@ -39,7 +39,7 @@ from .views import (
     render_markdown_safely,
     resolve_ui_lang,
 )
-from .models import DocsAccessRule, DocsLoginAttemptGuard, PortfolioProfile
+from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, PortfolioProfile
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -64,6 +64,7 @@ PAGE_HELP_FILE_BASENAMES = {
 DOCS_EDITOR_GROUP_NAME = "DocsEditors"
 DOCS_EDIT_PERMISSION_CODE = "main.can_edit_docs"
 DOCS_PUBLIC_WRITE_GROUP_NAME = "__DOCS_PUBLIC_ALL__"
+DOCS_URL_ONLY_GROUP_NAME = "url-only"
 DOCS_META_TITLE = "Hanplanet IDE"
 DOCS_META_DESCRIPTION = "Web IDE Page"
 DOCS_LOGIN_CAPTCHA_THRESHOLD = 1
@@ -235,6 +236,12 @@ DOCS_TEXT = {
         "permission_read_groups": "읽기 그룹",
         "permission_write_users": "쓰기 사용자",
         "permission_write_groups": "쓰기 그룹",
+        "url_share_button": "url공유",
+        "url_unshare_button": "url공유해제",
+        "url_share_title": "URL 공유",
+        "url_share_label": "URL",
+        "url_share_copy_button": "복사",
+        "url_share_copied": "복사됨",
         "permission_help": "읽기/쓰기 권한을 각각 독립적으로 설정합니다. 읽기 권한을 비워두면 누구나 읽을 수 있습니다.",
         "permission_save_button": "저장",
         "permission_loading": "불러오는 중...",
@@ -401,6 +408,12 @@ DOCS_TEXT = {
         "permission_read_groups": "Read Groups",
         "permission_write_users": "Write Users",
         "permission_write_groups": "Write Groups",
+        "url_share_button": "Share URL",
+        "url_unshare_button": "Unshare URL",
+        "url_share_title": "Share URL",
+        "url_share_label": "URL",
+        "url_share_copy_button": "Copy",
+        "url_share_copied": "Copied",
         "permission_help": "Configure read and write independently. If read access is empty, everyone can read.",
         "permission_save_button": "Save",
         "permission_loading": "Loading...",
@@ -444,7 +457,7 @@ DOCS_TEXT = {
         "auth_username_label": "Username",
         "auth_password_label": "Password",
         "auth_login_submit": "Login",
-        "auth_signup_button": "회원가입",
+        "auth_signup_button": "Sign Up",
         "auth_previous_page": "Previous Page",
         "auth_signup_title": "IDE Sign up",
         "auth_signup_submit": "Create account",
@@ -897,6 +910,15 @@ def is_docs_public_write_enabled(request, path_value: str | None) -> bool:
     return rule_has_public_group(rule, "write_groups")
 
 
+def is_docs_url_only_enabled(request, path_value: str | None) -> bool:
+    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    if rule is None:
+        return False
+    return any(group.name == DOCS_URL_ONLY_GROUP_NAME for group in rule.read_groups.all()) or any(
+        group.name == DOCS_URL_ONLY_GROUP_NAME for group in rule.write_groups.all()
+    )
+
+
 def get_write_acl_display_labels(request, path_value: str | None) -> list[str]:
     rule, _ = get_effective_docs_acl_rule(request, path_value)
     if rule is None:
@@ -987,18 +1009,21 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
     read_group_ids = {
         group.id
         for group in rule.read_groups.all()
-        if group.name != DOCS_PUBLIC_WRITE_GROUP_NAME
+        if group.name not in {DOCS_PUBLIC_WRITE_GROUP_NAME, DOCS_URL_ONLY_GROUP_NAME}
     }
+    has_url_only_share = any(group.name == DOCS_URL_ONLY_GROUP_NAME for group in rule.read_groups.all())
 
     if not read_user_ids and not read_group_ids:
+        return not has_url_only_share
+
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated and user.id in read_user_ids:
         return True
 
-    return user_matches_docs_acl_rule(
-        request,
-        rule,
-        user_relation="read_users",
-        group_relation="read_groups",
-    )
+    user_group_ids = get_request_user_group_ids(request)
+    if not user_group_ids:
+        return False
+    return bool(user_group_ids & read_group_ids)
 
 
 def has_docs_write_access(request, path_value: str | None) -> bool:
@@ -1139,23 +1164,39 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
     for child in sorted(directory.iterdir(), key=lambda p: (0 if p.is_dir() else 1, p.name.lower())):
         if child.is_dir():
             entry = build_entry(child)
-            if request is not None and not has_docs_read_access(request, entry["path"]):
-                continue
+            can_edit = False
+            can_read = True
             if request is not None:
-                entry["can_edit"] = has_docs_write_access(request, entry["path"])
+                can_edit = has_docs_write_access(request, entry["path"])
+                can_read = has_docs_read_access(request, entry["path"])
+                if not can_read and not can_edit:
+                    continue
+                if is_docs_url_only_enabled(request, entry["path"]) and not can_edit:
+                    continue
+            if request is not None:
+                entry["can_edit"] = can_edit
                 entry["can_write_children"] = has_docs_directory_write_access(request, entry["path"])
                 entry["is_public_write"] = False
+                entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
             entries.append(entry)
             continue
         if child.is_file():
             entry = build_entry(child)
-            if request is not None and not has_docs_read_access(request, entry["path"]):
-                continue
+            can_edit = False
+            can_read = True
             if request is not None:
-                entry["can_edit"] = has_docs_write_access(request, entry["path"])
+                can_edit = has_docs_write_access(request, entry["path"])
+                can_read = has_docs_read_access(request, entry["path"])
+                if not can_read and not can_edit:
+                    continue
+                if is_docs_url_only_enabled(request, entry["path"]) and not can_edit:
+                    continue
+            if request is not None:
+                entry["can_edit"] = can_edit
                 entry["can_write_children"] = False
                 entry["is_public_write"] = is_docs_public_write_enabled(request, entry["path"])
+                entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
             entries.append(entry)
     return entries
@@ -1359,6 +1400,23 @@ def resolve_auth_breadcrumb_url(request, fallback_url: str) -> str:
     return fallback_url
 
 
+def is_docs_share_auth_entry(request, fallback_url: str) -> bool:
+    next_url = resolve_next_url(request, fallback_url)
+    if "/ide/share/" in next_url:
+        return True
+
+    referer = str(request.META.get("HTTP_REFERER", "") or "").strip()
+    if referer and url_has_allowed_host_and_scheme(
+        url=referer,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        parsed = urlparse(referer)
+        return "/ide/share/" in (parsed.path or "")
+
+    return False
+
+
 def get_markdown_help_candidates(ui_lang: str | None) -> list[Path]:
     docs_root = docs_root_dir()
     help_root = docs_root / MARKDOWN_HELP_DIRECTORY
@@ -1451,6 +1509,67 @@ def build_docs_help_url(ui_lang: str | None, docs_base_url: str) -> str:
     return reverse("main:docs_view", kwargs={"doc_path": help_slug})
 
 
+def build_docs_view_url(ui_lang: str | None, slug_path: str) -> str:
+    if ui_lang in SUPPORTED_UI_LANGS:
+        return reverse("main:docs_view_lang", kwargs={"ui_lang": ui_lang, "doc_path": slug_path})
+    return reverse("main:docs_view", kwargs={"doc_path": slug_path})
+
+
+def build_docs_shared_view_url(ui_lang: str | None, owner_username: str, share_slug: str) -> str:
+    if ui_lang in SUPPORTED_UI_LANGS:
+        return reverse(
+            "main:docs_shared_view_lang",
+            kwargs={"ui_lang": ui_lang, "owner_username": owner_username, "share_slug": share_slug},
+        )
+    return reverse("main:docs_shared_view", kwargs={"owner_username": owner_username, "share_slug": share_slug})
+
+
+def build_docs_share_slug(relative_path: str) -> str:
+    base_name = Path(markdown_slug_from_relative(relative_path)).name.strip()
+    return base_name or "document"
+
+
+def get_unique_docs_share_slug(owner, relative_path: str, *, exclude_path: str | None = None) -> str:
+    base_slug = build_docs_share_slug(relative_path)
+    candidate = base_slug
+    suffix = 2
+    queryset = DocsSharedLink.objects.filter(owner=owner)
+    if exclude_path:
+        queryset = queryset.exclude(path=exclude_path)
+    existing_slugs = set(queryset.values_list("share_slug", flat=True))
+    while candidate in existing_slugs:
+        candidate = f"{base_slug}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def ensure_docs_shared_link(path_value: str, owner) -> DocsSharedLink:
+    shared_link = DocsSharedLink.objects.filter(path=path_value).select_related("owner").first()
+    if shared_link:
+        return shared_link
+    share_slug = get_unique_docs_share_slug(owner, path_value)
+    return DocsSharedLink.objects.create(path=path_value, owner=owner, share_slug=share_slug)
+
+
+def move_docs_shared_links(source_path: str, destination_path: str) -> None:
+    normalized_source = normalize_relative_path(source_path, allow_empty=False)
+    normalized_destination = normalize_relative_path(destination_path, allow_empty=False)
+    links = list(DocsSharedLink.objects.filter(path=normalized_source) | DocsSharedLink.objects.filter(path__startswith=normalized_source + "/"))
+    for link in links:
+        old_path = link.path
+        if old_path == normalized_source:
+            link.path = normalized_destination
+        else:
+            link.path = normalized_destination + old_path[len(normalized_source):]
+        link.save(update_fields=["path", "updated_at"])
+
+
+def delete_docs_shared_links_for_path(path_value: str) -> None:
+    normalized = normalize_relative_path(path_value, allow_empty=False)
+    DocsSharedLink.objects.filter(path=normalized).delete()
+    DocsSharedLink.objects.filter(path__startswith=normalized + "/").delete()
+
+
 def docs_common_context(request, ui_lang):
     context = {}
     apply_ui_context(request, context, ui_lang)
@@ -1530,6 +1649,7 @@ def docs_common_context(request, ui_lang):
             "docs_api_download_url": reverse("main:docs_api_download"),
             "docs_api_acl_url": reverse("main:docs_api_acl"),
             "docs_api_acl_options_url": reverse("main:docs_api_acl_options"),
+            "docs_api_url_share_url": reverse("main:docs_api_url_share"),
             "docs_can_edit": has_docs_directory_write_access(request, ""),
             "docs_can_manage_acl": is_docs_acl_admin(request),
             "docs_file_extension_options": get_docs_save_extension_options(),
@@ -1763,6 +1883,7 @@ def docs_login(request, ui_lang=None):
     docs_text = context["docs_text"]
     next_url = resolve_next_url(request, context["docs_base_url"])
     auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
+    hide_global_nav = is_docs_share_auth_entry(request, context["docs_base_url"])
 
     if request.user.is_authenticated:
         return redirect(next_url)
@@ -1839,6 +1960,7 @@ def docs_login(request, ui_lang=None):
             "docs_api_login_captcha_status_url": reverse("main:docs_api_login_captcha_status"),
             "docs_auth_breadcrumb_url": auth_breadcrumb_url,
             "docs_auth_breadcrumb_label": docs_text.get("auth_previous_page", "Previous Page"),
+            "hide_global_nav": hide_global_nav,
         }
     )
     return render(request, "docs/login.html", context)
@@ -1866,6 +1988,7 @@ def docs_signup(request, ui_lang=None):
     docs_text = context["docs_text"]
     next_url = resolve_next_url(request, context["docs_base_url"])
     auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
+    hide_global_nav = is_docs_share_auth_entry(request, context["docs_base_url"])
 
     if request.user.is_authenticated:
         return redirect(next_url)
@@ -1902,6 +2025,7 @@ def docs_signup(request, ui_lang=None):
             "docs_signup_error_message": signup_error_message,
             "docs_auth_breadcrumb_url": auth_breadcrumb_url,
             "docs_auth_breadcrumb_label": docs_text.get("auth_previous_page", "Previous Page"),
+            "hide_global_nav": hide_global_nav,
         }
     )
     return render(request, "docs/signup.html", context)
@@ -2028,6 +2152,7 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_slug_path": slug_path,
             "doc_parent_dir": parent_dir,
             "doc_can_edit": has_docs_write_access(request, relative_file_path),
+            "doc_is_url_only": is_docs_url_only_enabled(request, relative_file_path),
             "doc_content_html": rendered_content_html,
             "doc_content_mode": render_profile["mode"],
             "doc_content_class": render_profile["css_class"],
@@ -2037,6 +2162,61 @@ def docs_view(request, doc_path, ui_lang=None):
                 scoped_home_dir=scoped_home_dir,
                 root_label=get_docs_root_label(request, scoped_home_dir),
             ),
+            "view_current_file_name": file_path.name,
+            "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
+        }
+    )
+    return render(request, "docs/view.html", context)
+
+
+@with_request_docs_root
+def docs_shared_view(request, owner_username, share_slug, ui_lang=None):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    context = docs_common_context(request, resolved_lang)
+    docs_text = context["docs_text"]
+
+    shared_link = DocsSharedLink.objects.select_related("owner").filter(
+        owner__username=owner_username,
+        share_slug=share_slug,
+    ).first()
+    if shared_link is None:
+        raise Http404("공유 문서를 찾을 수 없습니다.")
+    if not is_docs_url_only_enabled(request, shared_link.path):
+        raise Http404("공유 문서를 찾을 수 없습니다.")
+
+    try:
+        file_path, relative_file_path = normalize_docs_relative_path(shared_link.path, must_exist=True)
+    except (ValueError, FileNotFoundError):
+        shared_link.delete()
+        raise Http404("공유 문서를 찾을 수 없습니다.")
+
+    content = file_path.read_text(encoding="utf-8")
+    rendered_content_html, render_profile = render_docs_content(
+        content,
+        file_path.suffix.lower(),
+        source_path=file_path,
+        request=request,
+    )
+
+    context.update(
+        {
+            "doc_title": file_path.name,
+            "doc_relative_path": "",
+            "doc_slug_path": share_slug,
+            "doc_parent_dir": "",
+            "doc_can_edit": False,
+            "doc_is_url_only": True,
+            "hide_global_nav": True,
+            "is_docs_shared_view": True,
+            "doc_content_html": rendered_content_html,
+            "doc_content_mode": render_profile["mode"],
+            "doc_content_class": render_profile["css_class"],
+            "view_breadcrumbs": [
+                {
+                    "label": owner_username,
+                    "url": build_docs_shared_view_url(resolved_lang, owner_username, share_slug),
+                }
+            ],
             "view_current_file_name": file_path.name,
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
         }
@@ -2197,6 +2377,7 @@ def parse_path_values(payload: dict, allow_empty: bool) -> list[str]:
 @with_request_docs_root
 def docs_api_acl_options(request):
     public_group = get_docs_public_write_group()
+    url_only_group, _ = Group.objects.get_or_create(name=DOCS_URL_ONLY_GROUP_NAME)
     User = get_user_model()
     users = [
         {
@@ -2211,6 +2392,12 @@ def docs_api_acl_options(request):
             "name": public_group.name,
             "label": get_public_group_display_label(request),
             "is_public_all": True,
+        },
+        {
+            "id": url_only_group.id,
+            "name": url_only_group.name,
+            "label": url_only_group.name,
+            "is_public_all": False,
         }
     ] + [
         {
@@ -2219,7 +2406,7 @@ def docs_api_acl_options(request):
             "label": group.name,
             "is_public_all": False,
         }
-        for group in Group.objects.exclude(id=public_group.id).order_by("name")
+        for group in Group.objects.exclude(id__in=[public_group.id, url_only_group.id]).order_by("name")
     ]
     return JsonResponse({"ok": True, "users": users, "groups": groups})
 
@@ -2341,6 +2528,74 @@ def docs_api_acl(request):
     return JsonResponse(response_payload)
 
 
+@require_http_methods(["POST"])
+@csrf_protect
+@with_request_docs_root
+def docs_api_url_share(request):
+    try:
+        payload = parse_json_body(request)
+        rel_path = normalize_relative_path(payload.get("path"), allow_empty=False)
+        enabled = bool(payload.get("enabled"))
+        target_path_obj, rel_path = resolve_path(rel_path, must_exist=True)
+    except (ValueError, FileNotFoundError) as exc:
+        return json_error(str(exc), status=400)
+
+    if not target_path_obj.is_file():
+        return json_error("파일만 url공유를 설정할 수 있습니다.", status=400)
+    if not has_docs_write_access(request, rel_path):
+        return json_error("파일을 수정할 권한이 없습니다.", status=403)
+    if not request.user.is_authenticated:
+        return json_error("로그인한 사용자만 url공유를 설정할 수 있습니다.", status=403)
+
+    url_only_group, _ = Group.objects.get_or_create(name=DOCS_URL_ONLY_GROUP_NAME)
+    rule, _ = DocsAccessRule.objects.get_or_create(path=rel_path)
+    shared_link = None
+
+    if enabled:
+        rule.read_groups.add(url_only_group)
+        shared_link = ensure_docs_shared_link(rel_path, request.user)
+    else:
+        rule.read_groups.remove(url_only_group)
+        DocsSharedLink.objects.filter(path=rel_path).delete()
+        if (
+            not rule.read_users.exists()
+            and not rule.read_groups.exists()
+            and not rule.write_users.exists()
+            and not rule.write_groups.exists()
+        ):
+            rule.delete()
+
+    for attr_name in (
+        "_docs_acl_rule_map",
+        "_docs_acl_effective_cache",
+        "_docs_acl_descendant_rule_cache",
+    ):
+        if hasattr(request, attr_name):
+            delattr(request, attr_name)
+
+    ui_lang = resolve_ui_lang(request, getattr(getattr(request, "resolver_match", None), "kwargs", {}).get("ui_lang"))
+    slug_path = markdown_slug_from_relative(rel_path)
+    share_url = ""
+    owner_username = ""
+    if shared_link is not None:
+        owner_username = shared_link.owner.username
+        share_url = request.build_absolute_uri(
+            build_docs_shared_view_url(ui_lang, owner_username, shared_link.share_slug)
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "path": rel_path,
+            "slug_path": slug_path,
+            "is_url_only": enabled,
+            "share_url": share_url,
+            "owner_username": owner_username,
+            "share_slug": shared_link.share_slug if shared_link is not None else "",
+        }
+    )
+
+
 @require_http_methods(["GET"])
 @with_request_docs_root
 def docs_api_list(request):
@@ -2402,6 +2657,7 @@ def docs_api_rename(request):
     source_path.rename(destination)
     relative_destination = relative_from_root(destination)
     move_docs_acl_rules(source_relative, relative_destination)
+    move_docs_shared_links(source_relative, relative_destination)
 
     response = {
         "ok": True,
@@ -2471,6 +2727,7 @@ def docs_api_delete(request):
         else:
             target_path.unlink()
         delete_docs_acl_rules_for_path(target_relative)
+        delete_docs_shared_links_for_path(target_relative)
         deleted_paths.append(target_relative)
 
     return JsonResponse({"ok": True, "deleted_paths": deleted_paths})
@@ -2554,6 +2811,7 @@ def docs_api_move(request):
     source_path.rename(destination_path)
     destination_relative = relative_from_root(destination_path)
     move_docs_acl_rules(source_relative, destination_relative)
+    move_docs_shared_links(source_relative, destination_relative)
 
     response = {
         "ok": True,
@@ -2572,6 +2830,7 @@ def docs_api_preview(request):
     try:
         payload = parse_json_body(request)
         preview_relative_path = normalize_relative_path(payload.get("path"), allow_empty=True)
+        preview_target_dir = normalize_relative_path(payload.get("target_dir"), allow_empty=True)
         if preview_relative_path:
             file_path, relative_file_path = normalize_docs_relative_path(
                 preview_relative_path, must_exist=True
@@ -2618,7 +2877,7 @@ def docs_api_preview(request):
         if not has_docs_write_access(request, source_relative):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
     else:
-        if not has_docs_directory_write_access(request, ""):
+        if not has_docs_directory_write_access(request, preview_target_dir):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
     rendered_html, render_profile = render_docs_content(
@@ -2699,6 +2958,7 @@ def docs_api_save(request):
 
     if source_path is not None and destination.resolve() != source_path.resolve():
         move_docs_acl_rules(source_relative, relative_from_root(destination))
+        move_docs_shared_links(source_relative, relative_from_root(destination))
         source_path.unlink(missing_ok=True)
 
     destination_relative = relative_from_root(destination)

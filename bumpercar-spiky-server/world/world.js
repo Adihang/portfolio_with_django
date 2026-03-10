@@ -342,6 +342,10 @@ class World {
         player.npcChargeDistanceRemaining = 0
         player.npcChargeDistanceTotal = 0
         player.npcChargeRedirected = false
+        player.npcCounterWindowTargetId = ""
+        player.npcCounterWindowPhase = 0
+        player.npcCounterWindowUntil = 0
+        player.npcCounterWindowConsumed = false
         player.npcChargeWindupStartedAt = 0
         player.npcChargeWindupUntil = 0
         player.npcRestUntil = 0
@@ -740,6 +744,10 @@ class World {
         player.npcChargeDistanceRemaining = 0
         player.npcChargeDistanceTotal = 0
         player.npcChargeRedirected = false
+        player.npcCounterWindowTargetId = ""
+        player.npcCounterWindowPhase = 0
+        player.npcCounterWindowUntil = 0
+        player.npcCounterWindowConsumed = false
         player.npcChargeWindupStartedAt = 0
         player.npcChargeWindupUntil = 0
         player.npcRestUntil = 0
@@ -1016,7 +1024,7 @@ class World {
         if (distance <= triggerDistance) {
             return this.startNpcChargeSkill(player, diffX, diffY, distance, {
                 targetId: target.id,
-                isPhaseAttack: false,
+                isPhaseAttack: true,
             })
         }
 
@@ -1084,6 +1092,20 @@ class World {
         // 돌진 속도가 높아질수록 최대 공격력까지 선형으로 오른다.
         targetNpc.npcHealth = Math.max(0, (targetNpc.npcHealth || NPC_MAX_HEALTH) - damage)
         targetNpc.npcDefeatDamageRatio = Math.max(0, Math.min(1, damage / Math.max(1, NPC_DAMAGE_MAX)))
+        const counterTargetId = String(targetNpc.npcCounterWindowTargetId || "").trim()
+        const isCounterAttack = (
+            counterTargetId &&
+            counterTargetId === String(attacker.id || "").trim() &&
+            targetNpc.npcState === "rest" &&
+            now <= Number(targetNpc.npcCounterWindowUntil || 0) &&
+            !targetNpc.npcCounterWindowConsumed
+        )
+        if (isCounterAttack) {
+            const npcPhase = Math.max(1, Math.min(3, Number(targetNpc.npcCounterWindowPhase || targetNpc.npcPhase || 1)))
+            const retaliationKey = `ner_phase${npcPhase}_attack_dodges`
+            postStatsUpdate(attacker.id, { [retaliationKey]: 1 })
+            targetNpc.npcCounterWindowConsumed = true
+        }
         // 패배 상태가 되면 기존 타겟/연속 돌진 예약을 버리고 새 타겟을 다시 잡게 한다.
         targetNpc.npcTargetId = ""
         targetNpc.npcQueuedExtraCharges = 0
@@ -1100,9 +1122,18 @@ class World {
         const targetId = String(player.npcChargeTargetId || "").trim()
         const target = targetId ? this.players.get(targetId) : null
         if (isPersistentHumanPlayer(target) && !this.isPlayerDead(target) && !player.npcChargeHitTarget) {
-            const npcPhase = Math.max(1, Math.min(3, Number(player.npcPhase || 1)))
-            const dodgeKey = `ner_phase${npcPhase}_attack_dodges`
-            postStatsUpdate(target.id, { [dodgeKey]: 1 })
+            player.npcCounterWindowTargetId = target.id
+            player.npcCounterWindowPhase = Math.max(1, Math.min(3, Number(player.npcPhase || 1)))
+            player.npcCounterWindowUntil = Math.max(
+                Number(player.npcRestUntil || 0),
+                Date.now() + NPC_REST_DURATION_MS
+            )
+            player.npcCounterWindowConsumed = false
+        } else {
+            player.npcCounterWindowTargetId = ""
+            player.npcCounterWindowPhase = 0
+            player.npcCounterWindowUntil = 0
+            player.npcCounterWindowConsumed = false
         }
         player.npcChargeTargetId = ""
         player.npcChargeHitTarget = false

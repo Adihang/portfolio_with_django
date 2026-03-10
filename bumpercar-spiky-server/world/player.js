@@ -78,6 +78,10 @@ class Player {
         this.npcChargeTargetId = ""
         this.npcChargeHitTarget = false
         this.npcChargeIsPhaseAttack = false
+        this.npcCounterWindowTargetId = ""
+        this.npcCounterWindowPhase = 0
+        this.npcCounterWindowUntil = 0
+        this.npcCounterWindowConsumed = false
         this.npcChargeWindupStartedAt = 0
         this.npcChargeWindupUntil = 0
         this.npcRestUntil = 0
