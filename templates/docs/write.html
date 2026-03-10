@@ -47,6 +47,7 @@
     data-original-path="{{ original_relative_path }}"
     data-initial-dir="{{ initial_dir }}"
     data-public-write-direct-save="{% if write_public_direct_save %}1{% else %}0{% endif %}"
+    data-is-superuser="{% if user.is_superuser %}1{% else %}0{% endif %}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
     <div class="ide-form-grid">
