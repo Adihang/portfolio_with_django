@@ -615,12 +615,56 @@
         });
     };
 
-    const loadingMessages = [
-        '스피키 네발로 퇴화하는중......',
-        '호박친구와 숨바꼭질 하는중......',
-        '사제장 호출하는 중......',
-        '셰이디가 엘리아스에 차원문 여는중......'
+    const loadingMessageOptions = [
+        {
+            type: 'single',
+            messages: [
+                '스피키 네발로 퇴화하는중......'
+            ]
+        },
+        {
+            type: 'single',
+            messages: [
+                '호박친구와 숨바꼭질 하는중......'
+            ]
+        },
+        {
+            type: 'single',
+            messages: [
+                '사제장 호출하는 중......'
+            ]
+        },
+        {
+            type: 'single',
+            messages: [
+                '셰이디가 엘리아스에 차원문 여는중......'
+            ]
+        },
+        {
+            type: 'sequence',
+            messages: [
+                '네르가 도끼를 찾는 중…...',
+                '네르가 아직도 도끼를 찾는 중…...',
+                '여왕님! 제 도끼들고 뭐하시는 거에요!',
+                '네르가 에르핀을 쫓는중......'
+            ]
+        }
     ];
+    let loadingMessageMode = 'single';
+    let loadingMessageSequence = [];
+    let lastLoadingMessageOptionIndex = -1;
+
+    const pickNextLoadingMessageSelection = function () {
+        let nextIndex = Math.floor(Math.random() * loadingMessageOptions.length);
+        if (loadingMessageOptions.length > 1 && nextIndex === lastLoadingMessageOptionIndex) {
+            nextIndex = (nextIndex + 1 + Math.floor(Math.random() * (loadingMessageOptions.length - 1))) % loadingMessageOptions.length;
+        }
+        lastLoadingMessageOptionIndex = nextIndex;
+        const selection = loadingMessageOptions[nextIndex] || loadingMessageOptions[0];
+        loadingMessageMode = selection.type || 'single';
+        loadingMessageSequence = Array.isArray(selection.messages) ? selection.messages.slice() : [];
+        loadingCaptionMessageIndex = 0;
+    };
 
     const stopLoadingCaptionAnimation = function () {
         if (loadingCaptionTimer) {
@@ -641,7 +685,7 @@
             return;
         }
         const now = Date.now();
-        const message = loadingMessages[loadingCaptionMessageIndex] || '';
+        const message = loadingMessageSequence[loadingCaptionMessageIndex] || '';
 
         if (loadingCaptionPauseUntil > now) {
             scheduleLoadingCaptionTick(90);
@@ -651,7 +695,14 @@
         if (loadingCaptionStep > message.length) {
             loadingCaptionStep = 0;
             loadingCaptionPauseUntil = now + 260;
-            loadingCaptionMessageIndex = (loadingCaptionMessageIndex + 1) % loadingMessages.length;
+            if (loadingMessageMode === 'sequence') {
+                loadingCaptionMessageIndex += 1;
+                if (loadingCaptionMessageIndex >= loadingMessageSequence.length) {
+                    pickNextLoadingMessageSelection();
+                }
+            } else {
+                pickNextLoadingMessageSelection();
+            }
             loadingCaption.textContent = '';
             scheduleLoadingCaptionTick(120);
             return;
@@ -671,7 +722,7 @@
         if (!loadingCaption || loadingCaptionTimer) {
             return;
         }
-        loadingCaptionMessageIndex = Math.floor(Math.random() * loadingMessages.length);
+        pickNextLoadingMessageSelection();
         loadingCaptionStep = 1;
         loadingCaptionPauseUntil = 0;
         runLoadingCaptionTick();
