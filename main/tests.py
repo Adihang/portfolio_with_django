@@ -28,6 +28,7 @@ from .docs_views import (
     DOCS_EDIT_PERMISSION_CODE,
     DOCS_EDITOR_GROUP_NAME,
     DOCS_PUBLIC_WRITE_GROUP_NAME,
+    DOCS_URL_ONLY_GROUP_NAME,
     _resolve_docs_post_login_url,
     get_docs_public_write_group,
     is_docs_editor,
@@ -617,7 +618,7 @@ class HanplanetMultiplayerPageTests(TestCase):
         self.assertContains(response, "ws://127.0.0.1:8081", html=False)
         self.assertContains(response, "/ko/api/game-auth-token/", html=False)
         self.assertContains(response, "범퍼카 스핔이", html=False)
-        self.assertNotContains(response, "게임서버재시작", html=False)
+        self.assertNotContains(response, "서버 재시작", html=False)
 
     def test_multiplayer_page_shows_restart_button_for_superuser(self):
         self.client.force_login(self.admin_user)
@@ -625,8 +626,8 @@ class HanplanetMultiplayerPageTests(TestCase):
         response = self.client.get("/ko/fun/bumpercar-spiky/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "게임서버재시작", html=False)
-        self.assertContains(response, "네르 체력 적용", html=False)
+        self.assertContains(response, "서버 재시작", html=False)
+        self.assertContains(response, "적용", html=False)
 
     @override_settings(
         GAME_JWT_SECRET="test-game-secret",
@@ -997,6 +998,74 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(anonymous_list.status_code, 200)
         self.assertEqual(anonymous_doc.status_code, 200)
         self.assertEqual(api_list.status_code, 200)
+
+    def test_url_only_group_hides_entry_from_list_and_blocks_direct_path(self):
+        url_only_group = Group.objects.create(name=DOCS_URL_ONLY_GROUP_NAME)
+        rule = DocsAccessRule.objects.create(path="public.md")
+        rule.read_groups.add(url_only_group)
+        user = self.user_model.objects.create_user(username="url_only_reader", password="pw123456")
+        user.groups.add(url_only_group)
+        self.client.force_login(user)
+
+        list_response = self.client.get("/ko/ide/list/")
+        api_list = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
+        direct_view = self.client.get("/ko/ide/public/")
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotContains(list_response, "public.md")
+        self.assertEqual(api_list.status_code, 200)
+        self.assertFalse(any(entry.get("path") == "public.md" for entry in api_list.json().get("entries", [])))
+        self.assertEqual(direct_view.status_code, 403)
+
+    def test_url_only_file_stays_visible_to_editor_and_uses_shared_url_for_anonymous(self):
+        url_only_group = Group.objects.create(name=DOCS_URL_ONLY_GROUP_NAME)
+        editors_group = Group.objects.create(name="url_only_editors")
+        rule = DocsAccessRule.objects.create(path="public.md")
+        rule.read_groups.add(url_only_group)
+        rule.write_groups.add(editors_group)
+
+        editor = self.create_docs_editor("url_only_editor")
+        editor.groups.add(editors_group)
+        self.client.force_login(editor)
+
+        list_response = self.client.get("/ko/ide/list/")
+        api_list = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(api_list.status_code, 200)
+        self.assertTrue(any(entry.get("path") == "public.md" for entry in api_list.json().get("entries", [])))
+
+        share_response = self.client.post(
+            reverse("main:docs_api_url_share"),
+            data=json.dumps({"path": "public.md", "enabled": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(share_response.status_code, 200)
+        share_url = share_response.json()["share_url"]
+
+        self.client.logout()
+        anonymous_direct_view = self.client.get("/ko/ide/public/")
+        anonymous_shared_view = self.client.get(share_url)
+        self.assertEqual(anonymous_direct_view.status_code, 403)
+        self.assertEqual(anonymous_shared_view.status_code, 200)
+
+    def test_url_share_api_returns_shared_view_url(self):
+        editor = self.create_docs_editor("url_share_api_editor")
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("main:docs_api_url_share"),
+            data=json.dumps({"path": "public.md", "enabled": True}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["is_url_only"])
+        self.assertEqual(payload["slug_path"], "public")
+        self.assertEqual(payload["owner_username"], "url_share_api_editor")
+        self.assertEqual(payload["share_slug"], "public")
+        self.assertTrue(payload["share_url"].endswith("/ko/ide/share/url_share_api_editor/public"))
 
     def test_docs_root_for_superuser_shows_unscoped_root(self):
         admin_user = self.user_model.objects.create_user(
@@ -1424,6 +1493,30 @@ class DocsAccessRuleTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+    def test_docs_api_preview_allows_new_file_in_scoped_target_dir(self):
+        user = self.create_docs_editor("preview_scoped_editor")
+        public_group = get_docs_public_write_group()
+        user.groups.add(public_group)
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("main:docs_api_preview"),
+            data=json.dumps(
+                {
+                    "original_path": "",
+                    "target_dir": f"users/{user.username}",
+                    "content": "# scoped preview",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("render_mode"), "markdown")
+        self.assertIn("<h1>", payload.get("html", ""))
 
     def test_docs_api_preview_allows_anonymous_for_public_writable_file(self):
         public_group = get_docs_public_write_group()

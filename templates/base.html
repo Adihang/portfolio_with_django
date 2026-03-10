@@ -118,6 +118,7 @@
     {% if show_chat_widget %}
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/chat_widget.css' %}">
     {% endif %}
+    {% block extra_head %}{% endblock %}
     <title>{{ meta_title|default:'Hanplanet' }}</title>
     <!-- CSRF Token for AJAX -->
     <meta name="csrf-token" content="{{ csrf_token }}">
@@ -169,7 +170,9 @@
             body.classList.toggle('theme-dark', prefersDark);
         })();
     </script>
+    {% if not hide_global_nav %}
     {% include "partials/navbar.html" %}
+    {% endif %}
     {% block content %}
     {% endblock %}
     <!-- 채팅 위젯 -->

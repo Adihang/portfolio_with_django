@@ -58,6 +58,19 @@
     min-height: 0;
 }
 
+.hanplanet-multiplayer-page {
+    --multiplayer-z-sprite: 2;
+    --multiplayer-z-hud: 4;
+    --multiplayer-z-loading: 8;
+    --multiplayer-z-start: 7;
+    --multiplayer-z-default-fullscreen: 19;
+    --multiplayer-z-mobile-fullscreen: 20;
+    --multiplayer-z-fullscreen-exit: 21;
+    --multiplayer-z-idle-modal: 22;
+    --multiplayer-z-root-modal: 30;
+    --multiplayer-z-root-modal-dialog: 31;
+}
+
 .multiplayer-hero {
     display: flex;
     justify-content: space-between;
@@ -138,7 +151,7 @@
 .multiplayer-start-overlay {
     position: absolute;
     inset: 0;
-    z-index: 7;
+    z-index: var(--multiplayer-z-start);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -148,11 +161,11 @@
 }
 
 body.hanplanet-multiplayer-page .root-auth-modal {
-    z-index: 30;
+    z-index: var(--multiplayer-z-root-modal);
 }
 
 body.hanplanet-multiplayer-page .root-auth-modal-dialog {
-    z-index: 31;
+    z-index: var(--multiplayer-z-root-modal-dialog);
 }
 
 .multiplayer-start-overlay[hidden] {
@@ -181,9 +194,13 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    align-self: center;
+    justify-content: center;
     gap: 8px;
     width: min(100%, 220px);
     margin: 12px auto 0;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .multiplayer-start-auth-actions .ide-btn {
@@ -280,15 +297,21 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 }
 
 .multiplayer-start-admin-actions {
+    display: flex;
     margin-top: 16px;
+    width: 100%;
     justify-content: center;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .multiplayer-start-admin-actions .ui-auth-form {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .multiplayer-start-admin-actions .ide-btn {
@@ -297,7 +320,8 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 }
 
 .multiplayer-start-admin-actions .ui-auth-form:first-child {
-    align-items: stretch;
+    align-items: center;
+    justify-content: center;
 }
 
 .multiplayer-start-admin-actions .multiplayer-npc-health-input {
@@ -333,7 +357,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 .multiplayer-loading-overlay {
     position: absolute;
     inset: 0;
-    z-index: 6;
+    z-index: var(--multiplayer-z-loading);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -345,12 +369,21 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     display: none;
 }
 
+.multiplayer-loading-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+}
+
 .multiplayer-loading-spinner {
     position: relative;
     width: 164px;
     height: 164px;
     border-radius: 999px;
     background: transparent;
+    overflow: visible;
 }
 
 .multiplayer-loading-spinner::before,
@@ -372,37 +405,85 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 
 .multiplayer-loading-orbit {
     position: absolute;
-    inset: 0;
-    animation: multiplayer-loading-spin 1.05s linear infinite;
+    top: 0;
+    left: 0;
+    width: 39px;
+    height: 39px;
+    transform: translate(-9999px, -9999px);
+    transform-origin: center;
+    will-change: transform, opacity;
+    pointer-events: none;
+}
+
+.multiplayer-loading-orbit-trail {
+    opacity: 0;
+}
+
+.multiplayer-loading-orbit-trail-1 {
+}
+
+.multiplayer-loading-orbit-trail-2 {
+}
+
+.multiplayer-loading-orbit-trail-3 {
+}
+
+.multiplayer-loading-orbit-trail-4 {
+}
+
+.multiplayer-loading-orbit-trail-5 {
 }
 
 .multiplayer-loading-orbit-icon {
-    position: absolute;
-    top: -2px;
-    left: 50%;
-    width: 39px;
-    height: 39px;
+    display: block;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     filter: drop-shadow(0 6px 12px rgba(37, 99, 235, 0.14));
-    transform: translateX(-50%);
 }
 
-@keyframes multiplayer-loading-spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+.multiplayer-loading-orbit-trail-1 .multiplayer-loading-orbit-icon {
+    filter:
+        drop-shadow(0 5px 12px rgba(37, 99, 235, 0.18));
 }
 
+.multiplayer-loading-orbit-trail-2 .multiplayer-loading-orbit-icon {
+    filter:
+        drop-shadow(0 5px 12px rgba(37, 99, 235, 0.18));
+}
+
+.multiplayer-loading-orbit-trail-3 .multiplayer-loading-orbit-icon {
+    filter:
+        drop-shadow(0 5px 12px rgba(37, 99, 235, 0.18));
+}
+
+.multiplayer-loading-orbit-trail-4 .multiplayer-loading-orbit-icon {
+    filter:
+        drop-shadow(0 5px 12px rgba(37, 99, 235, 0.18));
+}
+
+.multiplayer-loading-orbit-trail-5 .multiplayer-loading-orbit-icon {
+    filter:
+        drop-shadow(0 5px 12px rgba(37, 99, 235, 0.18));
+}
+
+.multiplayer-loading-caption {
+    min-height: 28px;
+    margin: 0;
+    color: #262626;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-align: center;
+    text-shadow: 0 2px 10px rgba(255, 255, 255, 0.55);
+}
 
 .multiplayer-hud {
     position: absolute;
     top: 14px;
     left: 14px;
-    z-index: 4;
+    z-index: var(--multiplayer-z-hud);
     display: inline-flex;
     align-items: center;
     gap: 10px;
@@ -415,7 +496,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     top: 14px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 4;
+    z-index: var(--multiplayer-z-hud);
     display: inline-flex;
     align-items: center;
     gap: 10px;
@@ -459,7 +540,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     position: absolute;
     right: 29px;
     top: calc(18px + 180px + 8px);
-    z-index: 4;
+    z-index: var(--multiplayer-z-hud);
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
@@ -497,7 +578,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     position: absolute;
     top: 18px;
     left: 18px;
-    z-index: 21;
+    z-index: var(--multiplayer-z-fullscreen-exit);
     width: 52px;
     height: 52px;
     border: 1px solid rgba(120, 113, 108, 0.18);
@@ -524,7 +605,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 .multiplayer-sprite-overlay {
     position: absolute;
     inset: 0;
-    z-index: 2;
+    z-index: var(--multiplayer-z-sprite);
     pointer-events: none;
     overflow: hidden;
 }
@@ -586,7 +667,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 4;
+    z-index: var(--multiplayer-z-hud);
 }
 
 .multiplayer-joystick {
@@ -656,7 +737,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     justify-content: center;
     padding: 20px;
     background: rgba(15, 23, 42, 0.24);
-    z-index: 22;
+    z-index: var(--multiplayer-z-idle-modal);
 }
 
 .multiplayer-idle-modal {
@@ -699,7 +780,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
 .multiplayer-death-modal-backdrop {
     position: absolute;
     inset: 0;
-    z-index: 7;
+    z-index: var(--multiplayer-z-start);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -774,7 +855,7 @@ body.multiplayer-fullscreen-active {
     width: 100vw;
     height: 100dvh;
     min-height: 0;
-    z-index: 19;
+    z-index: var(--multiplayer-z-default-fullscreen);
     border: 0;
     border-radius: 0;
 }
@@ -792,7 +873,7 @@ body.multiplayer-fullscreen-active {
     width: var(--multiplayer-mobile-vh, 100dvh);
     height: var(--multiplayer-mobile-vw, 100dvw);
     min-height: 0;
-    z-index: 20;
+    z-index: var(--multiplayer-z-mobile-fullscreen);
     border: 0;
     border-radius: 0;
     background: transparent;

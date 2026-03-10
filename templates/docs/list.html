@@ -29,9 +29,6 @@
                 {% if user.is_staff %}
                 <a class="ide-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
                 {% endif %}
-                {% if not user.is_authenticated %}
-                <a class="ide-btn ide-btn-primary" href="{{ docs_signup_url }}">{{ docs_text.auth_signup_button }}</a>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -55,6 +52,7 @@
     data-preview-api-url="{{ docs_api_preview_url }}"
     data-acl-api-url="{{ docs_api_acl_url }}"
     data-acl-options-api-url="{{ docs_api_acl_options_url }}"
+    data-url-share-api-url="{{ docs_api_url_share_url }}"
     data-write-url="{{ docs_write_url }}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
@@ -66,6 +64,12 @@
             <header class="ide-list-preview-head">
                 <h2 class="ide-list-preview-title" id="ide-list-preview-title">{{ docs_text.list_preview_title }}</h2>
                 <div class="ide-list-preview-actions">
+                    <button
+                        id="ide-list-preview-url-share-btn"
+                        class="ide-btn ide-list-preview-open-btn"
+                        type="button"
+                        hidden
+                    >{{ docs_text.url_share_button }}</button>
                     <a
                         id="ide-list-preview-download-btn"
                         class="ide-btn ide-list-preview-open-btn"
@@ -128,6 +132,7 @@
 {% endif %}
 
 {% include "popup/docs/confirm_modal.html" %}
+{% include "popup/docs/url_share_modal.html" %}
 {% include "popup/docs/auth_logout_modal.html" %}
 {% include "popup/docs/page_help_modal.html" %}
 

@@ -1937,6 +1937,28 @@ body.theme-dark .ui-nav::after {
     align-items: flex-end;
 }
 
+.docs-shared-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+}
+
+.docs-shared-controls {
+    display: flex;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+}
+
+.docs-shared-controls .ui-controls-stack {
+    align-items: flex-start;
+}
+
+.docs-shared-head .ui-title-row {
+    margin: 0;
+    align-self: center;
+}
+
 .ui-pwa-install-btn {
     appearance: none;
     border: 1px solid rgba(0, 0, 0, 0.22);

@@ -11,6 +11,10 @@
     const startOverlay = root.querySelector('[data-game-start-overlay]');
     const startButton = root.querySelector('[data-game-start]');
     const loadingOverlay = root.querySelector('[data-game-loading-overlay]');
+    const loadingCaption = root.querySelector('[data-game-loading-caption]');
+    const loadingSpinner = root.querySelector('[data-game-loading-spinner]');
+    const loadingMainNode = root.querySelector('[data-game-loading-main]');
+    const loadingTrailNodes = Array.from(root.querySelectorAll('[data-game-loading-trail]'));
     const connectionStatus = root.querySelector('[data-game-connection-status]');
     const defeatReceivedCountNode = root.querySelector('[data-game-defeat-received-count]');
     const defeatDealtCountNode = root.querySelector('[data-game-defeat-dealt-count]');
@@ -239,6 +243,12 @@
     let lastSentInputAt = 0;
     let audioContext = null;
     let masterVolume = 0.2;
+    let loadingCaptionTimer = null;
+    let loadingCaptionMessageIndex = 0;
+    let loadingCaptionStep = 0;
+    let loadingCaptionPauseUntil = 0;
+    let loadingTrailPoints = [];
+    let loadingTrailLastAt = 0;
     const playerAudioStates = new Map();
     const activePlayerSounds = new Map();
     const playerVisuals = new Map();
@@ -516,11 +526,155 @@
         startOverlay.hidden = !opened;
     };
 
+    const releaseInitialLoadingOverlay = function () {
+        const hideOverlay = function () {
+            window.setTimeout(function () {
+                setLoadingOverlayOpen(false);
+            }, 260);
+        };
+
+        if (window.document.readyState === 'complete') {
+            hideOverlay();
+            return;
+        }
+
+        window.addEventListener('load', hideOverlay, { once: true });
+    };
+
     const setLoadingOverlayOpen = function (opened) {
         if (!loadingOverlay) {
             return;
         }
         loadingOverlay.hidden = !opened;
+        if (opened) {
+            loadingTrailPoints = [];
+            loadingTrailLastAt = 0;
+            startLoadingCaptionAnimation();
+        } else {
+            loadingTrailPoints = [];
+            loadingTrailLastAt = 0;
+            if (loadingMainNode) {
+                loadingMainNode.style.transform = 'translate(-9999px, -9999px)';
+            }
+            loadingTrailNodes.forEach(function (trailNode) {
+                trailNode.style.opacity = '0';
+                trailNode.style.transform = 'translate(-9999px, -9999px)';
+            });
+            stopLoadingCaptionAnimation();
+        }
+    };
+
+    const updateLoadingSpinner = function (nowMs) {
+        if (!loadingSpinner || !loadingMainNode) {
+            return;
+        }
+
+        const orbitRadius = 62;
+        const iconSize = 39;
+        const centerX = 82;
+        const centerY = 82;
+        const cycleMs = 1050;
+        const angle = (nowMs / cycleMs) * Math.PI * 2;
+        const posX = centerX + Math.cos(angle - Math.PI / 2) * orbitRadius;
+        const posY = centerY + Math.sin(angle - Math.PI / 2) * orbitRadius;
+        const rotation = angle;
+        const translateX = posX - iconSize / 2;
+        const translateY = posY - iconSize / 2;
+        const trailFadeDurationMs = 980;
+
+        loadingMainNode.style.opacity = '1';
+        loadingMainNode.style.transform = `translate(${translateX}px, ${translateY}px) rotate(${rotation}rad)`;
+
+        if (!loadingTrailLastAt || nowMs - loadingTrailLastAt >= 80) {
+            loadingTrailPoints.push({
+                x: translateX,
+                y: translateY,
+                rotation,
+                expiresAt: nowMs + trailFadeDurationMs
+            });
+            loadingTrailLastAt = nowMs;
+        }
+
+        if (loadingTrailPoints.length) {
+            loadingTrailPoints = loadingTrailPoints.filter(function (trailPoint) {
+                return trailPoint.expiresAt > nowMs;
+            });
+        }
+
+        loadingTrailNodes.forEach(function (trailNode, index) {
+            const trailPoint = loadingTrailPoints[loadingTrailPoints.length - 1 - index];
+            if (!trailPoint) {
+                trailNode.style.opacity = '0';
+                trailNode.style.transform = 'translate(-9999px, -9999px)';
+                return;
+            }
+            const fadeRatio = Math.max(0, Math.min(1, (trailPoint.expiresAt - nowMs) / trailFadeDurationMs));
+            const alpha = 0.58 * ((loadingTrailNodes.length - index) / loadingTrailNodes.length) * fadeRatio;
+            trailNode.style.opacity = String(alpha);
+            trailNode.style.transform = `translate(${trailPoint.x}px, ${trailPoint.y}px) rotate(${trailPoint.rotation}rad)`;
+        });
+    };
+
+    const loadingMessages = [
+        '스피키 네발로 퇴화하는중......',
+        '호박친구와 숨바꼭질 하는중......',
+        '사제장 호출하는 중......',
+        '셰이디가 엘리아스에 차원문 여는중......'
+    ];
+
+    const stopLoadingCaptionAnimation = function () {
+        if (loadingCaptionTimer) {
+            window.clearTimeout(loadingCaptionTimer);
+            loadingCaptionTimer = null;
+        }
+        if (loadingCaption) {
+            loadingCaption.textContent = '';
+        }
+    };
+
+    const scheduleLoadingCaptionTick = function (delay) {
+        loadingCaptionTimer = window.setTimeout(runLoadingCaptionTick, delay);
+    };
+
+    const runLoadingCaptionTick = function () {
+        if (!loadingCaption || !loadingOverlay || loadingOverlay.hidden) {
+            return;
+        }
+        const now = Date.now();
+        const message = loadingMessages[loadingCaptionMessageIndex] || '';
+
+        if (loadingCaptionPauseUntil > now) {
+            scheduleLoadingCaptionTick(90);
+            return;
+        }
+
+        if (loadingCaptionStep > message.length) {
+            loadingCaptionStep = 0;
+            loadingCaptionPauseUntil = now + 260;
+            loadingCaptionMessageIndex = (loadingCaptionMessageIndex + 1) % loadingMessages.length;
+            loadingCaption.textContent = '';
+            scheduleLoadingCaptionTick(120);
+            return;
+        }
+
+        loadingCaption.textContent = message.slice(0, loadingCaptionStep);
+        loadingCaptionStep += 1;
+        if (loadingCaptionStep > message.length) {
+            loadingCaptionPauseUntil = now + 520;
+            scheduleLoadingCaptionTick(120);
+            return;
+        }
+        scheduleLoadingCaptionTick(message.charAt(loadingCaptionStep - 1) === '.' ? 120 : 70);
+    };
+
+    const startLoadingCaptionAnimation = function () {
+        if (!loadingCaption || loadingCaptionTimer) {
+            return;
+        }
+        loadingCaptionMessageIndex = Math.floor(Math.random() * loadingMessages.length);
+        loadingCaptionStep = 1;
+        loadingCaptionPauseUntil = 0;
+        runLoadingCaptionTick();
     };
 
     const getSpectatablePlayers = function () {
@@ -2473,6 +2627,7 @@
         drawGrid(cameraX, cameraY, effectiveZoom);
         drawPlayers(cameraX, cameraY, deltaSeconds, effectiveZoom);
         drawMinimap();
+        updateLoadingSpinner(now);
         window.requestAnimationFrame(render);
     };
 
@@ -2638,8 +2793,9 @@
 
     setFullscreenMode(false);
     setStartOverlayOpen(true);
-    setLoadingOverlayOpen(false);
+    setLoadingOverlayOpen(true);
     setStatus(labels.disconnected, '#64748b');
     setPing(null);
     render();
+    releaseInitialLoadingOverlay();
 })();

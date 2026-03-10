@@ -6,6 +6,17 @@
 <div class="ide-toolbar-wrap ui-toolbar-wrap">
     <div class="ide-shell ui-shell ide-toolbar ui-toolbar">
         <div class="ide-toolbar-left ui-toolbar-left">
+            {% if is_docs_shared_view %}
+            <div class="docs-shared-head">
+                <div class="docs-shared-controls">
+                    {% include "partials/ui_controls_stack.html" %}
+                </div>
+                <div class="ide-title-row ui-title-row">
+                    <h1 class="ide-title ui-title">{{ doc_title }}</h1>
+                    <button class="ide-help-icon-link" type="button" id="ide-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="ide-help-icon-symbol" aria-hidden="true"></span></button>
+                </div>
+            </div>
+            {% else %}
             <div class="ide-title-row ui-title-row">
                 <h1 class="ide-title ui-title">{{ doc_title }}</h1>
                 <button class="ide-help-icon-link" type="button" id="ide-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="ide-help-icon-symbol" aria-hidden="true"></span></button>
@@ -18,6 +29,7 @@
                 <span class="ide-path-sep ui-path-sep">/</span>
                 <span class="ide-path-current ui-path-current">{{ view_current_file_name }}</span>
             </div>
+            {% endif %}
         </div>
         <div class="ide-toolbar-right ui-toolbar-right">
             {% include "docs/_auth_account.html" %}
@@ -26,6 +38,11 @@
                 {% include "docs/_superuser_ops_button.html" %}
                 {% if user.is_staff %}
                     <a class="ide-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
+                {% endif %}
+                {% if doc_can_edit %}
+                    <button class="ide-btn" type="button" id="ide-url-share-btn">
+                        {% if doc_is_url_only %}{{ docs_text.url_unshare_button }}{% else %}{{ docs_text.url_share_button }}{% endif %}
+                    </button>
                 {% endif %}
                 <a class="ide-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
                 {% if doc_can_edit %}
@@ -44,7 +61,10 @@
     data-ide-page="view"
     data-ide-base-url="{{ docs_base_url }}"
     data-delete-api-url="{{ docs_api_delete_url }}"
+    data-url-share-api-url="{{ docs_api_url_share_url }}"
     data-doc-path="{{ doc_relative_path }}"
+    data-doc-slug-path="{{ doc_slug_path }}"
+    data-doc-is-url-only="{% if doc_is_url_only %}1{% else %}0{% endif %}"
     data-parent-dir="{{ doc_parent_dir }}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
@@ -52,6 +72,7 @@
 </main>
 
 {% include "popup/docs/confirm_modal.html" %}
+{% include "popup/docs/url_share_modal.html" %}
 {% include "popup/docs/auth_logout_modal.html" %}
 {% include "popup/docs/page_help_modal.html" %}
 

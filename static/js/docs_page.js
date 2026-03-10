@@ -763,6 +763,85 @@
 
     const requestConfirmDialog = createDocsConfirmDialog();
 
+    function createDocsUrlShareModal() {
+        const shareModal = document.getElementById("ide-url-share-modal");
+        const shareBackdrop = document.getElementById("ide-url-share-modal-backdrop");
+        const shareInput = document.getElementById("ide-url-share-input");
+        const shareCloseButton = document.getElementById("ide-url-share-close-btn");
+        const shareCopyButton = document.getElementById("ide-url-share-copy-btn");
+
+        if (!shareModal || !shareBackdrop || !shareInput || !shareCloseButton || !shareCopyButton) {
+            return {
+                open: function () {},
+                close: function () {},
+            };
+        }
+
+        let lastFocusedElement = null;
+
+        function close() {
+            if (shareModal.hidden) {
+                return;
+            }
+            shareModal.hidden = true;
+            shareCopyButton.textContent = t("url_share_copy_button", "복사");
+            if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+                lastFocusedElement.focus();
+            }
+            lastFocusedElement = null;
+            syncDocsModalBodyState();
+        }
+
+        async function copyCurrentUrl() {
+            const value = shareInput.value || "";
+            if (!value) {
+                return;
+            }
+            try {
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+                    await navigator.clipboard.writeText(value);
+                } else {
+                    shareInput.focus();
+                    shareInput.select();
+                    document.execCommand("copy");
+                }
+                shareCopyButton.textContent = t("url_share_copied", "복사됨");
+            } catch (error) {
+                shareInput.focus();
+                shareInput.select();
+            }
+        }
+
+        function open(url) {
+            shareInput.value = url || "";
+            shareCopyButton.textContent = t("url_share_copy_button", "복사");
+            shareModal.hidden = false;
+            lastFocusedElement = document.activeElement;
+            syncDocsModalBodyState();
+            window.requestAnimationFrame(function () {
+                shareInput.focus();
+                shareInput.select();
+            });
+        }
+
+        shareBackdrop.addEventListener("click", close);
+        shareCloseButton.addEventListener("click", close);
+        shareCopyButton.addEventListener("click", function () {
+            copyCurrentUrl().catch(function () {});
+        });
+        document.addEventListener("keydown", function (event) {
+            if (event.key !== "Escape" || shareModal.hidden) {
+                return;
+            }
+            event.preventDefault();
+            close();
+        });
+
+        return { open: open, close: close };
+    }
+
+    const urlShareModal = createDocsUrlShareModal();
+
     // 문서 페이지 도움말 모달을 초기화하는 함수
     function initializeDocsPageHelpModal() {
         const pageHelpButton = document.getElementById("ide-page-help-btn");
@@ -1073,6 +1152,7 @@
         const previewApiUrl = root.dataset.previewApiUrl;
         const aclApiUrl = root.dataset.aclApiUrl;
         const aclOptionsApiUrl = root.dataset.aclOptionsApiUrl;
+        const urlShareApiUrl = root.dataset.urlShareApiUrl;
         const writeUrl = root.dataset.writeUrl || "/ide/write";
         const pathBreadcrumbs = document.querySelector(".ide-path-breadcrumbs");
         const listLayout = document.getElementById("ide-list-layout");
@@ -1084,6 +1164,7 @@
         const previewDownloadButton = document.getElementById("ide-list-preview-download-btn");
         const previewEditButton = document.getElementById("ide-list-preview-edit-btn");
         const previewDeleteButton = document.getElementById("ide-list-preview-delete-btn");
+        const previewUrlShareButton = document.getElementById("ide-list-preview-url-share-btn");
         
         // 편집기 관련 요소들
         const editorPanel = document.getElementById("ide-list-editor");
@@ -1771,6 +1852,7 @@
         function setPreviewActionTargets(entry) {
             const isFileEntry = isPreviewableFileEntry(entry);
             const canEdit = Boolean(entry && entry.can_edit);
+            const isUrlOnly = Boolean(entry && entry.is_url_only);
 
             if (previewDownloadButton) {
                 if (!isFileEntry) {
@@ -1808,6 +1890,13 @@
 
             if (previewDeleteButton) {
                 previewDeleteButton.hidden = !(isFileEntry && canEdit);
+            }
+
+            if (previewUrlShareButton) {
+                previewUrlShareButton.hidden = !(isFileEntry && canEdit && urlShareApiUrl);
+                previewUrlShareButton.textContent = isUrlOnly
+                    ? t("url_unshare_button", "url공유해제")
+                    : t("url_share_button", "url공유");
             }
         }
 
@@ -2601,6 +2690,26 @@
             }
             state.expandedFolders = restoredExpandedFolders;
             renderList();
+        }
+
+        async function toggleUrlShare(entry) {
+            if (!entry || entry.type !== "file" || !entry.can_edit || !urlShareApiUrl) {
+                return null;
+            }
+
+            const data = await requestJson(
+                urlShareApiUrl,
+                buildPostOptions({
+                    path: entry.path,
+                    enabled: !Boolean(entry.is_url_only),
+                })
+            );
+
+            await refreshCurrentDirectory();
+            return {
+                entry: state.entryByPath.get(entry.path) || null,
+                data: data,
+            };
         }
 
         function remapExpandedFoldersForRename(fromPath, toPath) {
@@ -3783,6 +3892,33 @@
             });
         }
 
+        if (previewUrlShareButton) {
+            previewUrlShareButton.addEventListener("click", function () {
+                const selectedEntries = getSelectedEntries();
+                const selectedEntry = selectedEntries.length === 1
+                    ? selectedEntries[0]
+                    : (state.activePreviewPath ? state.entryByPath.get(state.activePreviewPath) || null : null);
+                if (!isPreviewableFileEntry(selectedEntry) || !selectedEntry.can_edit) {
+                    return;
+                }
+                toggleUrlShare(selectedEntry).then(function (result) {
+                    const refreshedEntry = result ? result.entry : null;
+                    const responseData = result ? result.data : null;
+                    if (refreshedEntry) {
+                        const previewPromise = loadPreviewForEntry(refreshedEntry);
+                        if (responseData && responseData.is_url_only && responseData.share_url) {
+                            return previewPromise.then(function () {
+                                urlShareModal.open(responseData.share_url);
+                            });
+                        }
+                        return previewPromise;
+                    }
+                    clearPreviewPane();
+                    return null;
+                }).catch(alertError);
+            });
+        }
+
         if (listContainer) {
             listContainer.addEventListener("contextmenu", function (event) {
                 if (event.defaultPrevented) {
@@ -3911,9 +4047,13 @@
     function initializeViewPage() {
         const ideBaseUrl = root.dataset.ideBaseUrl || "/ide";
         const deleteApiUrl = root.dataset.deleteApiUrl;
+        const urlShareApiUrl = root.dataset.urlShareApiUrl;
         const docPath = root.dataset.docPath || "";
+        const docSlugPath = root.dataset.docSlugPath || docPath;
+        const docIsUrlOnly = root.dataset.docIsUrlOnly === "1";
         const parentDir = root.dataset.parentDir || "";
         const deleteButton = document.getElementById("ide-delete-btn");
+        const urlShareButton = document.getElementById("ide-url-share-btn");
         const contentArticle = document.querySelector(".ide-content > article");
 
         if (contentArticle && contentArticle.classList.contains("ide-js")) {
@@ -3926,6 +4066,31 @@
             applyDocsCodeHighlighting(contentArticle, "ide-py");
         } else if (contentArticle && contentArticle.classList.contains("ide-markdown")) {
             applyDocsCodeHighlighting(contentArticle, "ide-markdown");
+        }
+
+        if (urlShareButton && urlShareApiUrl && docPath) {
+            urlShareButton.textContent = docIsUrlOnly
+                ? t("url_unshare_button", "url공유해제")
+                : t("url_share_button", "url공유");
+            urlShareButton.addEventListener("click", async function () {
+                try {
+                    const data = await requestJson(
+                        urlShareApiUrl,
+                        buildPostOptions({
+                            path: docPath,
+                            enabled: !docIsUrlOnly,
+                        })
+                    );
+                    if (data && data.is_url_only) {
+                        const shareUrl = data.share_url || (window.location.origin + buildViewUrl(ideBaseUrl, docSlugPath));
+                        urlShareModal.open(shareUrl);
+                        return;
+                    }
+                    window.location.reload();
+                } catch (error) {
+                    alertError(error);
+                }
+            });
         }
 
         if (!deleteButton) {
@@ -5181,6 +5346,7 @@
                     previewApiUrl,
                     buildPostOptions({
                         original_path: originalPath,
+                        target_dir: normalizePath(initialDir, true),
                         extension: previewExtension,
                         content: contentInput ? contentInput.value : "",
                     })
