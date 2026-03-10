@@ -1029,9 +1029,9 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
 def has_docs_write_access(request, path_value: str | None) -> bool:
     scoped_home_dir = get_scoped_docs_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
-    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
-        return False
-    if scoped_home_dir and is_public_group_scoped_user(request):
+    is_scoped_public_user = bool(scoped_home_dir and is_public_group_scoped_user(request))
+    in_scoped_home = is_path_in_docs_scope(normalized_path, scoped_home_dir)
+    if is_scoped_public_user and in_scoped_home:
         return True
 
     user = getattr(request, "user", None)
@@ -1041,6 +1041,8 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
     rule, matched_rule_path = get_effective_docs_acl_rule(request, path_value)
     has_descendant_rule = has_descendant_docs_acl_rule(request, normalized_path)
     if rule is None:
+        if scoped_home_dir and not in_scoped_home:
+            return False
         # Root directory keeps editor-default write access even when
         # descendant ACL rules exist. This allows DocsEditors to create
         # new files/folders at unconfigured root scope by default.
@@ -1061,8 +1063,6 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
         if target_path.is_dir():
             return False
         return True
-    if not is_docs_editor(request):
-        return False
 
     return user_matches_docs_acl_rule(
         request,
@@ -1075,9 +1075,9 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
 def has_docs_directory_write_access(request, path_value: str | None) -> bool:
     scoped_home_dir = get_scoped_docs_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
-    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
-        return False
-    if scoped_home_dir and is_public_group_scoped_user(request):
+    is_scoped_public_user = bool(scoped_home_dir and is_public_group_scoped_user(request))
+    in_scoped_home = is_path_in_docs_scope(normalized_path, scoped_home_dir)
+    if is_scoped_public_user and in_scoped_home:
         return True
 
     user = getattr(request, "user", None)
@@ -1086,13 +1086,12 @@ def has_docs_directory_write_access(request, path_value: str | None) -> bool:
 
     rule, _ = get_effective_docs_acl_rule(request, path_value)
     if rule is None:
+        if scoped_home_dir and not in_scoped_home:
+            return False
         return is_docs_editor(request)
 
     if rule_has_public_group(rule, "write_groups"):
         # public-write ACL is only valid on markdown files, never on directories.
-        return False
-
-    if not is_docs_editor(request):
         return False
 
     return user_matches_docs_acl_rule(
@@ -2050,9 +2049,11 @@ def docs_ops_apply_static(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     next_url = resolve_next_url(request, context["docs_base_url"])
+    venv_python = settings.BASE_DIR / ".venv" / "bin" / "python"
+    python_executable = str(venv_python) if venv_python.exists() else sys.executable
 
     subprocess.run(
-        [sys.executable, "manage.py", "collectstatic", "--noinput"],
+        [python_executable, "manage.py", "collectstatic", "--noinput"],
         cwd=str(settings.BASE_DIR),
         check=True,
     )
@@ -2060,10 +2061,12 @@ def docs_ops_apply_static(request, ui_lang=None):
         [
             "/bin/zsh",
             "-lc",
-            "sleep 1; launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn",
+            "sleep 1; launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn >/tmp/hanplanet-gunicorn-restart.log 2>&1",
         ],
         cwd=str(settings.BASE_DIR),
         start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     return redirect(next_url)
 

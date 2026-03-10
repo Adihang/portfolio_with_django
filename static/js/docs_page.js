@@ -1186,6 +1186,7 @@
         // API URL들
         const ideApiPreviewUrl = previewApiUrl;
         const scopedHomeDir = normalizePath(root.dataset.scopedHomeDir || "", true);
+        const isSuperuser = root.dataset.isSuperuser === "1";
         const initialBreadcrumbNode = pathBreadcrumbs
             ? pathBreadcrumbs.querySelector(".ide-path-link, .ide-path-current")
             : null;
@@ -4182,6 +4183,8 @@
                 })
             : [".md"];
         const extensionPresetSet = new Set(extensionPresetValues);
+        const scopedHomeDir = normalizePath(root.dataset.scopedHomeDir || "", true);
+        const isSuperuser = root.dataset.isSuperuser === "1";
 
         const rawDirectories = getJsonScriptData("ide-directory-data", []);
         const directories = [];
@@ -5134,6 +5137,155 @@
             state.selectedDir = normalized;
         }
 
+        function getSaveBrowserRootDir() {
+            return scopedHomeDir || "";
+        }
+
+        function getSaveBrowserRootLabel() {
+            if (!scopedHomeDir) {
+                return "/ide";
+            }
+            const homeParts = scopedHomeDir.split("/").filter(Boolean);
+            const homeLabel = homeParts.length ? homeParts[homeParts.length - 1] : scopedHomeDir;
+            return "/ide/" + homeLabel;
+        }
+
+        function getScopedVisiblePath(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!scopedHomeDir) {
+                return normalized;
+            }
+            if (!normalized || normalized === scopedHomeDir) {
+                return "";
+            }
+            if (normalized.startsWith(scopedHomeDir + "/")) {
+                return normalized.slice(scopedHomeDir.length + 1);
+            }
+            return normalized;
+        }
+
+        function isPathInsideScopedHome(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!scopedHomeDir || !normalized) {
+                return false;
+            }
+            return normalized === scopedHomeDir || normalized.startsWith(scopedHomeDir + "/");
+        }
+
+        function getSaveQuickPaths() {
+            const rootDir = getSaveBrowserRootDir();
+            const quickPathSet = new Set();
+            const quickPaths = [];
+            const activePath = normalizePath(state.selectedDir || state.browserDir || initialDir, true);
+
+            function pushQuickPath(pathValue) {
+                const normalized = normalizePath(pathValue, true);
+                if (!isSuperuser && normalized === "users") {
+                    return;
+                }
+                if (quickPathSet.has(normalized)) {
+                    return;
+                }
+                quickPathSet.add(normalized);
+                quickPaths.push(normalized);
+            }
+
+            if (isSuperuser && hasDirectory("")) {
+                pushQuickPath("");
+            } else if (rootDir && hasDirectory(rootDir)) {
+                pushQuickPath(rootDir);
+            }
+            getWritableAncestorPaths(activePath).forEach(function (ancestorPath) {
+                if (ancestorPath && ancestorPath !== rootDir) {
+                    pushQuickPath(ancestorPath);
+                }
+            });
+            getChildDirectories(rootDir).forEach(function (dirPath) {
+                pushQuickPath(dirPath);
+            });
+            return quickPaths;
+        }
+
+        function getWritableAncestorPaths(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            const visibleAncestors = [];
+
+            function appendVisible(pathCandidate) {
+                const normalizedCandidate = normalizePath(pathCandidate, true);
+                if (!normalizedCandidate) {
+                    if (isSuperuser && hasDirectory("")) {
+                        visibleAncestors.push("");
+                    }
+                    return;
+                }
+                if (!hasDirectory(normalizedCandidate)) {
+                    return;
+                }
+                if (!isSuperuser && normalizedCandidate === "users") {
+                    return;
+                }
+                visibleAncestors.push(normalizedCandidate);
+            }
+
+            if (!normalized) {
+                appendVisible("");
+                return visibleAncestors;
+            }
+
+            const parts = normalized.split("/").filter(Boolean);
+            const accumulated = [];
+            appendVisible("");
+            parts.forEach(function (part) {
+                accumulated.push(part);
+                appendVisible(accumulated.join("/"));
+            });
+            return visibleAncestors;
+        }
+
+        function getWritablePathLabel(pathValue) {
+            return getWritableAncestorPaths(pathValue)
+                .map(function (ancestorPath) {
+                    if (!ancestorPath) {
+                        return t("js_docs_root_label", "IDE 루트");
+                    }
+                    return ancestorPath.split("/").slice(-1)[0];
+                })
+                .join("/");
+        }
+
+        function getNearestWritableDirectory(pathValue) {
+            let normalized = normalizePath(pathValue, true);
+            while (normalized) {
+                if (hasDirectory(normalized)) {
+                    return normalized;
+                }
+                normalized = getParentPath(normalized);
+            }
+            if (scopedHomeDir && hasDirectory(scopedHomeDir)) {
+                return scopedHomeDir;
+            }
+            return isSuperuser && hasDirectory("") ? "" : "";
+        }
+
+        function getSaveUpTarget(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!normalized) {
+                return null;
+            }
+            const rootDir = getSaveBrowserRootDir();
+            if (rootDir && normalized === rootDir) {
+                return null;
+            }
+            const parentPath = getParentPath(normalized);
+            if (!parentPath) {
+                return isSuperuser ? "" : null;
+            }
+            if (rootDir && !isPathInsideScopedHome(parentPath)) {
+                return rootDir;
+            }
+            return parentPath;
+        }
+
         function renderBreadcrumb() {
             if (!saveBreadcrumb) {
                 return;
@@ -5158,20 +5310,36 @@
             }
 
             const currentPath = normalizePath(state.selectedDir || state.browserDir, true);
-            addCrumb("/ide", "", !currentPath);
-
-            if (currentPath) {
-                const parts = currentPath.split("/");
-                const accumulated = [];
-                parts.forEach(function (part) {
-                    const separator = document.createElement("span");
-                    separator.className = "ide-save-crumb-sep";
-                    separator.textContent = "/";
-                    fragment.appendChild(separator);
-
-                    accumulated.push(part);
-                    const dirPath = accumulated.join("/");
-                    addCrumb(part, dirPath, dirPath === currentPath);
+            if (scopedHomeDir && isPathInsideScopedHome(currentPath || scopedHomeDir)) {
+                buildBreadcrumbItems(currentPath || scopedHomeDir).forEach(function (crumb, index) {
+                    if (index > 0) {
+                        const separator = document.createElement("span");
+                        separator.className = "ide-save-crumb-sep";
+                        separator.textContent = "/";
+                        fragment.appendChild(separator);
+                    }
+                    addCrumb(crumb.label, crumb.path, crumb.isCurrent);
+                });
+                saveBreadcrumb.appendChild(fragment);
+                return;
+            }
+            const writableAncestors = getWritableAncestorPaths(currentPath);
+            if (!writableAncestors.length) {
+                if (isSuperuser) {
+                    addCrumb(t("js_docs_root_label", "IDE 루트"), "", true);
+                }
+            } else {
+                writableAncestors.forEach(function (ancestorPath, index) {
+                    if (index > 0) {
+                        const separator = document.createElement("span");
+                        separator.className = "ide-save-crumb-sep";
+                        separator.textContent = "/";
+                        fragment.appendChild(separator);
+                    }
+                    const label = ancestorPath
+                        ? ancestorPath.split("/").slice(-1)[0]
+                        : t("js_docs_root_label", "IDE 루트");
+                    addCrumb(label, ancestorPath, ancestorPath === currentPath);
                 });
             }
 
@@ -5184,7 +5352,7 @@
             }
             saveQuickList.innerHTML = "";
 
-            const quickPaths = [""].concat(getChildDirectories(""));
+            const quickPaths = getSaveQuickPaths();
             quickPaths.forEach(function (pathValue) {
                 const item = document.createElement("li");
                 const button = document.createElement("button");
@@ -5194,7 +5362,9 @@
                     button.classList.add("is-active");
                 }
                 button.textContent = pathValue ? pathValue.split("/").slice(-1)[0] : "IDE 루트";
-                if (!pathValue) {
+                if (pathValue === scopedHomeDir) {
+                    button.textContent = scopedHomeDir ? getSaveBrowserRootLabel().replace("/ide/", "") : t("js_docs_root_label", "IDE 루트");
+                } else if (!pathValue) {
                     button.textContent = t("js_docs_root_label", "IDE 루트");
                 }
                 button.addEventListener("click", function () {
@@ -5267,13 +5437,19 @@
             renderQuickList();
             renderFolderList();
             if (saveUpButton) {
-                saveUpButton.disabled = !state.browserDir;
+                saveUpButton.disabled = !getSaveUpTarget(state.browserDir);
             }
         }
 
         function getDocsPathLabel(pathValue) {
-            const normalized = normalizePath(pathValue, true);
-            return normalized ? "/ide/" + normalized : "/ide";
+            if (scopedHomeDir && isPathInsideScopedHome(pathValue || scopedHomeDir)) {
+                return buildBreadcrumbItems(pathValue || scopedHomeDir)
+                    .map(function (crumb) {
+                        return crumb.label;
+                    })
+                    .join("/");
+            }
+            return getWritablePathLabel(pathValue) || (isSuperuser ? t("js_docs_root_label", "IDE 루트") : "");
         }
 
         function getFolderCreateBasePath() {
@@ -5384,10 +5560,10 @@
                 modalInitialDir = "";
             }
             if (!modalInitialDir) {
-                modalInitialDir = normalizePath(initialDir, true);
+                modalInitialDir = normalizePath(initialDir, true) || (isSuperuser ? "" : scopedHomeDir);
             }
             if (!hasDirectory(modalInitialDir)) {
-                modalInitialDir = "";
+                modalInitialDir = getNearestWritableDirectory(modalInitialDir || initialDir);
             }
             state.browserDir = modalInitialDir;
             updateSelectedDir(modalInitialDir);
@@ -5494,9 +5670,20 @@
         }
 
         rawDirectories.forEach(function (pathValue) {
-            upsertDirectory(pathValue);
+            const normalized = upsertDirectory(pathValue);
+            if (!normalized) {
+                return;
+            }
+            const parts = normalized.split("/").filter(Boolean);
+            const accumulated = [];
+            parts.forEach(function (part) {
+                accumulated.push(part);
+                upsertDirectory(accumulated.join("/"));
+            });
         });
-        upsertDirectory("");
+        if (isSuperuser) {
+            upsertDirectory("");
+        }
         upsertDirectory(initialDir || "");
         renderDirectoryOptions();
         if (saveExtensionSelect) {
@@ -5843,9 +6030,12 @@
 
         if (saveUpButton) {
             saveUpButton.addEventListener("click", function () {
-                const parentPath = getParentPath(state.browserDir);
-                state.browserDir = parentPath;
-                updateSelectedDir(parentPath);
+                const nextPath = getSaveUpTarget(state.browserDir);
+                if (!nextPath && nextPath !== "") {
+                    return;
+                }
+                state.browserDir = nextPath;
+                updateSelectedDir(nextPath);
                 renderBrowser();
             });
         }
