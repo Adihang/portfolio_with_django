@@ -26,7 +26,15 @@
             data-player-ner-tracking-sound-urls='{{ game_ner_tracking_sound_urls_json }}'
             data-player-ner-acceleration-sound-urls='{{ game_ner_acceleration_sound_urls_json }}'
             data-player-ner-win-icon-urls='{{ game_ner_win_icon_urls_json }}'
+            data-ost-urls='{{ game_ost_urls_json }}'
+            data-house1-url="{{ game_house1_url }}"
+            data-house2-url="{{ game_house2_url }}"
+            data-house3-url="{{ game_house3_url }}"
             data-gameplay-settings='{{ gameplay_settings_json }}'
+            data-encounter-stage-one-label="{{ game_encounter_stage_one_label }}"
+            data-encounter-stage-two-label="{{ game_encounter_stage_two_label }}"
+            data-encounter-stage-three-label="{{ game_encounter_stage_three_label }}"
+            data-encounter-finale-label="{{ game_encounter_finale_label }}"
             data-connecting-label="{% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}"
             data-connected-label="{% include 'partials/ui_i18n.html' with key='multiplayer_connected' %}"
             data-disconnected-label="{% include 'partials/ui_i18n.html' with key='multiplayer_disconnected' %}"
@@ -40,6 +48,37 @@
                 <div class="multiplayer-canvas-wrap">
                         <div class="multiplayer-start-overlay" data-game-start-overlay>
                             <div class="multiplayer-start-card">
+                                <div class="multiplayer-start-audio-actions">
+                                    <button
+                                        class="multiplayer-start-audio-button"
+                                        type="button"
+                                        data-game-music-mute-toggle
+                                        aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_music_mute' %}"
+                                        title="{% include 'partials/ui_i18n.html' with key='multiplayer_music_mute' %}"
+                                    >
+                                        {% include 'partials/ui_i18n.html' with key='multiplayer_music_button' %}
+                                    </button>
+                                    <button
+                                        class="multiplayer-start-audio-button"
+                                        type="button"
+                                        data-game-sfx-mute-toggle
+                                        aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_sfx_mute' %}"
+                                        title="{% include 'partials/ui_i18n.html' with key='multiplayer_sfx_mute' %}"
+                                    >
+                                        {% include 'partials/ui_i18n.html' with key='multiplayer_sfx_button' %}
+                                    </button>
+                                    <label class="multiplayer-start-volume-wrap" aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}">
+                                        <input
+                                            class="multiplayer-start-volume-slider"
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value="20"
+                                            data-game-master-volume
+                                        >
+                                    </label>
+                                </div>
                                 {% if request.user.is_authenticated %}
                                 <div class="multiplayer-start-account">
                                     {% include "partials/account_widget.html" %}
@@ -117,6 +156,11 @@
                                 {% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}
                             </strong>
                         </div>
+                        <div class="multiplayer-encounter-overlay" data-game-encounter-overlay hidden>
+                            <div class="multiplayer-encounter-message" data-game-encounter-message></div>
+                            <div class="multiplayer-encounter-countdown" data-game-encounter-countdown></div>
+                        </div>
+                        <div class="multiplayer-confetti-layer" data-game-confetti-layer aria-hidden="true"></div>
                         <div class="multiplayer-sprite-overlay" data-game-sprite-overlay aria-hidden="true"></div>
                         <canvas class="multiplayer-canvas" data-game-canvas></canvas>
                         <div class="multiplayer-minimap-hud">

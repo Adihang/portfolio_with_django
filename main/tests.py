@@ -284,6 +284,7 @@ class DocsSignupAutoLoginTests(TestCase):
                 "password2": "pw123456!!AA",
                 "first_name": "Auto",
                 "email": "auto@example.com",
+                "privacy_consent": "on",
                 "next": "/ko/fun/bumpercar-spiky/",
             },
         )
@@ -295,6 +296,39 @@ class DocsSignupAutoLoginTests(TestCase):
             self.client.session["_auth_user_id"],
             str(get_user_model().objects.get(username="autologin_user").pk),
         )
+
+    def test_signup_saves_privacy_and_terms_consent(self):
+        self.client.post(
+            reverse("main:docs_signup_lang", kwargs={"ui_lang": "ko"}),
+            data={
+                "username": "consent_user",
+                "password1": "pw123456!!AA",
+                "password2": "pw123456!!AA",
+                "first_name": "Consent",
+                "email": "consent@example.com",
+                "privacy_consent": "on",
+            },
+        )
+
+        profile = UserProfile.objects.get(user__username="consent_user")
+        self.assertIsNotNone(profile.privacy_policy_agreed_at)
+        self.assertIsNotNone(profile.terms_of_service_agreed_at)
+
+
+class LegalPageTests(TestCase):
+    def test_privacy_page_renders(self):
+        response = self.client.get(reverse("main:privacy_page_lang", kwargs={"ui_lang": "ko"}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "개인정보 처리방침")
+        self.assertContains(response, "Privacy Policy")
+
+    def test_terms_page_renders(self):
+        response = self.client.get(reverse("main:terms_page_lang", kwargs={"ui_lang": "ko"}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "이용약관")
+        self.assertContains(response, "Terms of Service")
 
 
 class PortfolioPerUserRoutingTests(TestCase):
@@ -658,7 +692,7 @@ class HanplanetMultiplayerPageTests(TestCase):
         GAME_JWT_EXP_SECONDS=300,
     )
     def test_game_auth_token_api_uses_unlocked_selected_skin(self):
-        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"ner_kills": 10})
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"game_clears": 1})
         self.client.force_login(self.user)
 
         response = self.client.get("/ko/api/game-auth-token/?skin=evolution")
@@ -790,6 +824,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                         "deaths": 1,
                         "player_kills": 4,
                         "ner_kills": 3,
+                        "game_clears": 1,
                         "ner_phase1_attack_dodges": 4,
                         "ner_phase2_attack_dodges": 5,
                         "ner_phase3_attack_dodges": 6,
@@ -810,6 +845,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "deaths": 1,
                 "player_kills": 4,
                 "ner_kills": 3,
+                "game_clears": 1,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
                 "ner_phase3_attack_dodges": 6,
@@ -838,6 +874,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "deaths": 2,
                 "player_kills": 7,
                 "ner_kills": 3,
+                "game_clears": 0,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
                 "ner_phase3_attack_dodges": 6,
@@ -856,6 +893,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "deaths": 2,
                 "player_kills": 7,
                 "ner_kills": 3,
+                "game_clears": 0,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
                 "ner_phase3_attack_dodges": 6,
@@ -864,8 +902,8 @@ class HanplanetMultiplayerPageTests(TestCase):
         )
         self.assertTrue(response.context["show_account_bumpercar_spiky_stats"])
 
-    def test_multiplayer_page_marks_evolution_skin_unlocked_when_ner_kills_reach_ten(self):
-        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"ner_kills": 10})
+    def test_multiplayer_page_marks_evolution_skin_unlocked_when_game_is_cleared(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"game_clears": 1})
         self.client.force_login(self.user)
 
         response = self.client.get("/ko/fun/bumpercar-spiky/")
@@ -885,6 +923,34 @@ class HanplanetMultiplayerPageTests(TestCase):
         skin_catalog = json.loads(response.context["game_skin_catalog_json"])
         double_skin = next(skin for skin in skin_catalog if skin["name"] == "double")
         self.assertTrue(double_skin["unlocked"])
+
+    def test_multiplayer_page_marks_many_skin_locked_for_regular_user(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"dummy_kills": 20})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        many_skin = next(skin for skin in skin_catalog if skin["name"] == "many")
+        self.assertFalse(many_skin["unlocked"])
+        self.assertEqual(many_skin["unlock_condition"], "개발 중")
+
+    def test_multiplayer_page_marks_many_skin_unlocked_for_superuser(self):
+        admin_user = get_user_model().objects.create_superuser(
+            username="many-admin",
+            email="many-admin@example.com",
+            password="testpass123",
+        )
+        UserProfile.objects.create(user=admin_user, bumpercar_spiky_stats={"dummy_kills": 0})
+        self.client.force_login(admin_user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        many_skin = next(skin for skin in skin_catalog if skin["name"] == "many")
+        self.assertTrue(many_skin["unlocked"])
 
     def test_minigame_page_shows_stats_button_but_not_account_stats_menu(self):
         UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"dummy_kills": 1})

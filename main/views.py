@@ -38,6 +38,7 @@ import html
 import secrets
 from django.conf import settings
 from django.core.cache import cache
+from django.template.loader import render_to_string
 import httpx
 from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Max
@@ -106,6 +107,7 @@ BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS = {
     "deaths": 0,
     "player_kills": 0,
     "ner_kills": 0,
+    "game_clears": 0,
     "ner_phase1_attack_dodges": 0,
     "ner_phase2_attack_dodges": 0,
     "ner_phase3_attack_dodges": 0,
@@ -245,10 +247,11 @@ def _collect_bumpercar_skin_variant_dirs(skin_name, folder_name):
     )
 
 
-def _build_bumpercar_skin_catalog(ui_lang, account_stats=None):
+def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
     stats = normalize_bumpercar_spiky_account_stats(account_stats)
-    total_ner_kills = int(stats.get("ner_kills", 0))
+    total_game_clears = int(stats.get("game_clears", 0))
     is_english = ui_lang == "en"
+    is_superuser = bool(getattr(user, "is_superuser", False))
     skin_specs = [
         {
             "name": "default",
@@ -278,16 +281,30 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None):
             "unlocked": int(stats.get("deaths", 0)) >= 20,
         },
         {
+            "name": "many",
+            "asset_source_name": "many",
+            "preview_icon_name": "main",
+            "display_name": "Spikies" if is_english else "스핔이들",
+            "unlock_condition": "In development" if is_english else "개발 중",
+            "description": (
+                "A bored Spiky made a lot of friends.\n"
+                "\"I still miss my pumpkin friend.\""
+                if is_english
+                else "심심한 스핔이는 친구를 잔뜩 만들었습니다.\n\"그래도 호박친구가 보고 싶어요\""
+            ),
+            "unlocked": is_superuser,
+        },
+        {
             "name": "evolution",
             "display_name": "Speaki" if is_english else "스피키",
-            "unlock_condition": "Defeat Ner 10 times." if is_english else "네르 10번 처치",
+            "unlock_condition": "Clear the game." if is_english else "게임 클리어",
             "description": (
                 "Only the strongest Spiky survived and evolved into bipedal form.\n"
                 "\"I think I've grown apart from my pumpkin friend.\""
                 if is_english
                 else "스핔이중 가장 강한 스핔이 만이 살아남아 이족보행으로 진화했습니다.\n\"호박친구하고 거리가 멀어진 것 같아요\""
             ),
-            "unlocked": total_ner_kills >= 10,
+            "unlocked": total_game_clears >= 1,
         },
     ]
 
@@ -295,6 +312,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None):
     for skin_spec in skin_specs:
         skin_name = skin_spec["name"]
         asset_source_name = str(skin_spec.get("asset_source_name") or skin_name)
+        fallback_sound_source_name = "default" if skin_name in {"double", "many"} else asset_source_name
         default_variants = []
         for variant_name in _collect_bumpercar_skin_variant_dirs(asset_source_name, "default"):
             variant_frames = _collect_bumpercar_skin_icon_sequence_urls(asset_source_name, "default", variant_name)
@@ -328,9 +346,27 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None):
             skin_type = "evolution"
         elif skin_name == "double":
             skin_type = "double"
+        elif skin_name == "many":
+            skin_type = "many"
         if skin_type == "evolution":
             defeat_frames = _collect_bumpercar_skin_icon_urls(asset_source_name, "defeat")
             boost_frames = _collect_bumpercar_skin_icon_urls(asset_source_name, "acc")
+        boost_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "acceleration")
+        crash_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "crash")
+        defeat_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "defeat")
+        die_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "die")
+        respawn_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "respawn")
+        if fallback_sound_source_name != asset_source_name:
+            if not boost_sound_urls:
+                boost_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "acceleration")
+            if not crash_sound_urls:
+                crash_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "crash")
+            if not defeat_sound_urls:
+                defeat_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "defeat")
+            if not die_sound_urls:
+                die_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "die")
+            if not respawn_sound_urls:
+                respawn_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "respawn")
         catalog.append({
             **skin_spec,
             "skin_type": skin_type,
@@ -349,11 +385,11 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None):
                 "defeat_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "defeat"),
                 "win_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "win"),
                 "stop_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "stop"),
-                "boost_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "acceleration"),
-                "crash_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "crash"),
-                "defeat_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "defeat"),
-                "die_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "die"),
-                "respawn_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "respawn"),
+                "boost_sound_urls": boost_sound_urls,
+                "crash_sound_urls": crash_sound_urls,
+                "defeat_sound_urls": defeat_sound_urls,
+                "die_sound_urls": die_sound_urls,
+                "respawn_sound_urls": respawn_sound_urls,
             },
         })
 
@@ -371,6 +407,7 @@ def resolve_bumpercar_skin_name(user=None, requested_skin_name=""):
     catalog = _build_bumpercar_skin_catalog(
         "ko",
         (profile.bumpercar_spiky_stats if profile else None),
+        user=user,
     )
     unlocked_names = {
         str(skin["name"])
@@ -820,10 +857,20 @@ def apply_ui_context(request, context, ui_lang):
     context["show_account_my_portfolio"] = bool(context.get("show_account_my_portfolio", default_show_account_my_portfolio))
     context["theme_preference_url"] = build_localized_url(request, "main:theme_preference_lang")
     context["user_preference_url"] = build_localized_url(request, "main:user_preferences_lang")
+    context["privacy_url"] = build_localized_url(request, "main:privacy_page_lang")
+    context["terms_url"] = build_localized_url(request, "main:terms_page_lang")
+    context["account_privacy_policy_agreed_at"] = ""
+    context["account_terms_of_service_agreed_at"] = ""
     if request.user.is_authenticated:
         profile_preferences = (
             UserProfile.objects.filter(user=request.user)
-            .values("theme_mode", "preferred_root_search_engine", "bumpercar_spiky_stats")
+            .values(
+                "theme_mode",
+                "preferred_root_search_engine",
+                "bumpercar_spiky_stats",
+                "privacy_policy_agreed_at",
+                "terms_of_service_agreed_at",
+            )
             .first()
         )
         account_theme_mode = (profile_preferences or {}).get("theme_mode")
@@ -835,6 +882,12 @@ def apply_ui_context(request, context, ui_lang):
         context["account_bumpercar_spiky_stats"] = normalize_bumpercar_spiky_account_stats(
             (profile_preferences or {}).get("bumpercar_spiky_stats")
         )
+        privacy_agreed_at = (profile_preferences or {}).get("privacy_policy_agreed_at")
+        terms_agreed_at = (profile_preferences or {}).get("terms_of_service_agreed_at")
+        if privacy_agreed_at:
+            context["account_privacy_policy_agreed_at"] = timezone.localtime(privacy_agreed_at).strftime("%Y-%m-%d %H:%M")
+        if terms_agreed_at:
+            context["account_terms_of_service_agreed_at"] = timezone.localtime(terms_agreed_at).strftime("%Y-%m-%d %H:%M")
     try:
         nav_links = list(NavLink.objects.all())
         removed_nav_names = {"github", "thingiverse", "portfolio"}
@@ -870,6 +923,48 @@ def build_localized_url(request, route_name, **kwargs):
     if query_string:
         return f"{localized_path}?{query_string}"
     return localized_path
+
+
+def _read_legal_markdown(filename: str) -> str:
+    legal_path = settings.BASE_DIR / "static" / filename
+    try:
+        return legal_path.read_text(encoding="utf-8")
+    except OSError:
+        return "# Document Not Found\n\nThe requested document could not be loaded."
+
+
+def _render_legal_page(request, ui_lang, *, title_ko: str, title_en: str, filename: str):
+    resolved_lang = resolve_ui_lang(request, ui_lang)
+    context = {
+        "page_title": title_en if resolved_lang == "en" else title_ko,
+        "page_content_html": render_markdown_safely(_read_legal_markdown(filename)),
+        "meta_title": title_en if resolved_lang == "en" else title_ko,
+        "meta_og_title": title_en if resolved_lang == "en" else title_ko,
+        "meta_description": title_en if resolved_lang == "en" else title_ko,
+        "meta_og_description": title_en if resolved_lang == "en" else title_ko,
+    }
+    apply_ui_context(request, context, resolved_lang)
+    return render(request, "main/legal_page.html", context)
+
+
+def privacy_page(request, ui_lang=None):
+    return _render_legal_page(
+        request,
+        ui_lang,
+        title_ko="개인정보 처리방침",
+        title_en="Privacy Policy",
+        filename="Privacy_Policy.txt",
+    )
+
+
+def terms_page(request, ui_lang=None):
+    return _render_legal_page(
+        request,
+        ui_lang,
+        title_ko="이용약관",
+        title_en="Terms of Service",
+        filename="Terms_of_Service.txt",
+    )
 
 
 def get_account_display_name(user):
@@ -1029,6 +1124,17 @@ def set_bumpercar_spiky_npc_health(npc_health):
     )
     with urlopen(request, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def get_bumpercar_spiky_connected_player_count():
+    request = Request(
+        "http://127.0.0.1:8082/admin/status",
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    with urlopen(request, timeout=5) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    return max(0, int(payload.get("connectedPlayers", 0)))
 
 
 def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False, skin_name="default"):
@@ -1273,6 +1379,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     skin_catalog = _build_bumpercar_skin_catalog(
         resolved_lang,
         profile.bumpercar_spiky_stats if profile else None,
+        user=request.user,
     )
     default_skin = next((skin for skin in skin_catalog if skin["name"] == "default"), skin_catalog[0])
     portfolio_profile = (
@@ -1315,6 +1422,18 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
         "game_ner_tracking_sound_urls_json": mark_safe(json.dumps(ner_tracking_sound_urls)),
         "game_ner_acceleration_sound_urls_json": mark_safe(json.dumps(ner_acceleration_sound_urls)),
         "game_ner_win_icon_urls_json": mark_safe(json.dumps(ner_win_icon_urls)),
+        "game_ost_urls_json": mark_safe(json.dumps({
+            "1pa": _static_with_mtime_version("Spikip/ost/1pa.mp3"),
+            "1hou": _static_with_mtime_version("Spikip/ost/1hou.mp3"),
+            "2pa": _static_with_mtime_version("Spikip/ost/2pa.mp3"),
+            "2hou": _static_with_mtime_version("Spikip/ost/2hou.mp3"),
+            "3pa": _static_with_mtime_version("Spikip/ost/3pa.mp3"),
+            "3hou": _static_with_mtime_version("Spikip/ost/3hou.mp3"),
+            "ed": _static_with_mtime_version("Spikip/ost/ed.mp3"),
+        })),
+        "game_house1_url": _static_with_mtime_version("Spikip/house/house1.webp"),
+        "game_house2_url": _static_with_mtime_version("Spikip/house/house2.webp"),
+        "game_house3_url": _static_with_mtime_version("Spikip/house/house3.webp"),
         "meta_title": page_title,
         "meta_og_title": page_title,
         "meta_site_name": page_title,
@@ -1323,6 +1442,10 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
         "meta_twitter_image": build_public_absolute_url(static("Spikip/speaki_default/icon/main.png")),
         "bumpercar_default_skin": default_skin,
         "show_account_bumpercar_spiky_stats": True,
+        "game_encounter_stage_one_label": render_to_string("partials/ui_i18n.html", {"key": "multiplayer_encounter_stage_one", "ui_lang": resolved_lang}).strip(),
+        "game_encounter_stage_two_label": render_to_string("partials/ui_i18n.html", {"key": "multiplayer_encounter_stage_two", "ui_lang": resolved_lang}).strip(),
+        "game_encounter_stage_three_label": render_to_string("partials/ui_i18n.html", {"key": "multiplayer_encounter_stage_three", "ui_lang": resolved_lang}).strip(),
+        "game_encounter_finale_label": render_to_string("partials/ui_i18n.html", {"key": "multiplayer_encounter_finale", "ui_lang": resolved_lang}).strip(),
     }
     context["meta_og_description"] = context["meta_description"]
     if request.user.is_authenticated:
@@ -1413,6 +1536,7 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
     current_settings = load_bumpercar_spiky_settings()
     save_success = False
     save_error = ""
+    connected_players = 0
 
     if request.method == "POST":
         submitted_settings = {}
@@ -1426,6 +1550,11 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             logging.exception("Failed to save bumpercar spiky settings")
             save_error = str(error) or "save_failed"
+
+    try:
+        connected_players = get_bumpercar_spiky_connected_player_count()
+    except Exception:
+        connected_players = 0
 
     field_specs = [
         ("user_base_speed", "bumpercar_admin_user_base_speed", "0.1"),
@@ -1479,6 +1608,7 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         "bumpercar_admin_save_success": save_success,
         "bumpercar_admin_save_error": save_error,
         "bumpercar_admin_game_url": reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}),
+        "bumpercar_admin_connected_players": connected_players,
     }
     apply_ui_context(request, context, resolved_lang)
     return render(request, "fun/bumpercar_spiky_admin.html", context)

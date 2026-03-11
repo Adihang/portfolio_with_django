@@ -370,6 +370,16 @@ class UserProfile(models.Model):
         default=dict,
         blank=True,
     )
+    privacy_policy_agreed_at = models.DateTimeField(
+        "개인정보 처리방침 동의 시각",
+        null=True,
+        blank=True,
+    )
+    terms_of_service_agreed_at = models.DateTimeField(
+        "이용약관 동의 시각",
+        null=True,
+        blank=True,
+    )
     updated_at = models.DateTimeField("수정일", auto_now=True)
 
     class Meta:

@@ -11,6 +11,9 @@
                 <p class="ui-kicker">{% include 'partials/ui_i18n.html' with key='bumpercar_admin_kicker' %}</p>
                 <h1 class="ui-title bumpercar-admin-title">{% include 'partials/ui_i18n.html' with key='bumpercar_admin_title' %}</h1>
                 <p class="ui-muted bumpercar-admin-description">{% include 'partials/ui_i18n.html' with key='bumpercar_admin_description' %}</p>
+                <p class="ui-muted bumpercar-admin-description">
+                    {% include 'partials/ui_i18n.html' with key='bumpercar_admin_connected_players' %}: {{ bumpercar_admin_connected_players }}
+                </p>
             </div>
             <a class="ide-btn" href="{{ bumpercar_admin_game_url }}">
                 {% include 'partials/ui_i18n.html' with key='bumpercar_admin_open_game' %}
