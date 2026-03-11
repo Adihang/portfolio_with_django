@@ -13,6 +13,15 @@ const wss = createServer(world)
 const adminServer = http.createServer((request, response) => {
     const requestUrl = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`)
 
+    if (request.method === "GET" && requestUrl.pathname === "/admin/status") {
+        response.writeHead(200, { "content-type": "application/json" })
+        response.end(JSON.stringify({
+            ok: true,
+            connectedPlayers: world.getHumanPlayerCount()
+        }))
+        return
+    }
+
     if (request.method === "POST" && requestUrl.pathname === "/admin/npc-health") {
         let body = ""
         request.on("data", (chunk) => {
@@ -30,9 +39,8 @@ const adminServer = http.createServer((request, response) => {
                 response.writeHead(200, { "content-type": "application/json" })
                 response.end(JSON.stringify({
                     ok: true,
-                    npcHealth: npc.npcHealth,
-                    npcMaxHealth: npc.npcMaxHealth,
-                    npcPhase: npc.npcPhase || 1
+                    count: npc.count,
+                    ners: npc.ners,
                 }))
             } catch (error) {
                 response.writeHead(400, { "content-type": "application/json" })

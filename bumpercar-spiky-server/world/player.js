@@ -60,6 +60,11 @@ class Player {
         this.y = Math.random() * WORLD_SIZE
         this.isDummy = false
         this.isNpc = false
+        this.isHouse = false
+        this.houseStage = 0
+        this.houseHealth = 0
+        this.houseMaxHealth = 0
+        this.houseImageKey = ""
         // baseSpeed/currentSpeed 는 기본 이동과 가속/감속 계산의 기준값이다.
         this.baseSpeed = BASE_PLAYER_SPEED_PER_SECOND
         this.currentSpeed = BASE_PLAYER_SPEED_PER_SECOND
@@ -128,6 +133,7 @@ class Player {
         this.npcChargeWindupUntil = 0
         this.npcRestUntil = 0
         this.npcQueuedExtraCharges = 0
+        this.npcEncounterVariant = ""
         this.dummyRetaliationTargetId = ""
         this.dummyState = "idle"
         this.dummyPhase = 1

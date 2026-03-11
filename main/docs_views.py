@@ -24,6 +24,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
@@ -39,7 +40,7 @@ from .views import (
     render_markdown_safely,
     resolve_ui_lang,
 )
-from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, PortfolioProfile
+from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, PortfolioProfile, UserProfile
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -292,6 +293,8 @@ DOCS_TEXT = {
         "auth_name_label": "이름",
         "auth_email_label": "이메일 주소",
         "auth_password_confirm_label": "비밀번호 확인",
+        "auth_privacy_consent_label": "개인정보 처리방침 및 이용약관에 동의합니다.",
+        "auth_privacy_consent_error": "개인정보 처리방침 및 이용약관 동의가 필요합니다.",
         "auth_signup_error": "회원가입 정보를 확인해주세요.",
         "auth_login_error": "아이디 또는 비밀번호를 확인해주세요.",
         "auth_login_captcha_label": "캡챠 인증",
@@ -464,6 +467,8 @@ DOCS_TEXT = {
         "auth_name_label": "Name",
         "auth_email_label": "Email address",
         "auth_password_confirm_label": "Confirm password",
+        "auth_privacy_consent_label": "I agree to the Privacy Policy and Terms of Service.",
+        "auth_privacy_consent_error": "You must agree to the Privacy Policy and Terms of Service.",
         "auth_signup_error": "Please check the sign up information.",
         "auth_login_error": "Please check your username or password.",
         "auth_login_captcha_label": "Captcha Verification",
@@ -1833,12 +1838,17 @@ def _resolve_docs_post_login_url(request, ui_lang: str | None, fallback_next_url
 class DocsSignupForm(UserCreationForm):
     first_name = forms.CharField(max_length=150, required=False)
     email = forms.EmailField(required=False)
+    privacy_consent = forms.BooleanField(required=True)
 
     def __init__(self, *args, ui_lang: str | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         docs_text = get_docs_text(ui_lang)
         self.fields["first_name"].label = docs_text.get("auth_name_label", "이름")
         self.fields["email"].label = docs_text.get("auth_email_label", "이메일 주소")
+        self.fields["privacy_consent"].label = docs_text.get("auth_privacy_consent_label", "개인정보 처리방침 및 이용약관에 동의합니다.")
+        self.fields["privacy_consent"].error_messages = {
+            "required": docs_text.get("auth_privacy_consent_error", "개인정보 처리방침 및 이용약관 동의가 필요합니다."),
+        }
         self.fields["first_name"].widget.attrs.update({"autocomplete": "name"})
         self.fields["email"].widget.attrs.update({"autocomplete": "email"})
         self.fields["username"].widget.attrs.update({"autocomplete": "username"})
@@ -1997,6 +2007,11 @@ def docs_signup(request, ui_lang=None):
     if request.method == "POST":
         if form.is_valid():
             user = form.save()
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            consented_at = timezone.now()
+            profile.privacy_policy_agreed_at = consented_at
+            profile.terms_of_service_agreed_at = consented_at
+            profile.save(update_fields=["privacy_policy_agreed_at", "terms_of_service_agreed_at", "updated_at"])
             public_group = get_docs_public_write_group()
             user.groups.add(public_group)
             scoped_home_dir = get_scoped_docs_home_dir(request)

@@ -33,6 +33,24 @@
         <strong class="ui-auth-account-profile-name">{{ account_display_name|default:user.get_username }}</strong>
         <span class="ui-auth-account-profile-email">{{ account_email|default:"-" }}</span>
     </div>
+    {% if account_privacy_policy_agreed_at or account_terms_of_service_agreed_at %}
+    <div class="ui-auth-account-stats">
+        <div class="ui-auth-account-stats-list">
+            {% if account_privacy_policy_agreed_at %}
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_privacy_policy_agreed_at' %}</span>
+                <strong>{{ account_privacy_policy_agreed_at }}</strong>
+            </div>
+            {% endif %}
+            {% if account_terms_of_service_agreed_at %}
+            <div class="ui-auth-account-stats-row">
+                <span>{% include 'partials/ui_i18n.html' with key='account_terms_of_service_agreed_at' %}</span>
+                <strong>{{ account_terms_of_service_agreed_at }}</strong>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
     {% if show_account_bumpercar_spiky_stats and account_bumpercar_spiky_stats %}
     <button
         type="button"

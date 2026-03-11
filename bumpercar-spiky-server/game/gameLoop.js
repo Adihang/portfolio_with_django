@@ -97,6 +97,11 @@ function startGameLoop(world, wss) {
                     facingAngle: typeof p.facingAngle === "number" ? p.facingAngle : 0,
                     isDummy: Boolean(p.isDummy),
                     isNpc: Boolean(p.isNpc),
+                    isHouse: Boolean(p.isHouse),
+                    houseStage: p.isHouse ? Number(p.houseStage || 0) : 0,
+                    houseHealth: p.isHouse ? Number(p.houseHealth || 0) : null,
+                    houseMaxHealth: p.isHouse ? Number(p.houseMaxHealth || 0) : null,
+                    houseImageKey: p.isHouse ? String(p.houseImageKey || "") : "",
                     npcPhase: p.isNpc ? Number(p.npcPhase || 1) : 1,
                     npcPhaseTwoRatio: p.isNpc ? Number(GAMEPLAY_SETTINGS.npc_phase_two_health_ratio || 0.6) : null,
                     npcPhaseThreeRatio: p.isNpc ? Number(GAMEPLAY_SETTINGS.npc_phase_three_health_ratio || 0.2) : null,
@@ -129,7 +134,12 @@ function startGameLoop(world, wss) {
                     defeatReceivedCount: p.defeatReceivedCount || 0,
                     defeatDealtCount: p.defeatDealtCount || 0,
                     roundResetAnnouncementActive: roundResetAnnouncementActive,
-                    doubleState: doubleState
+                    doubleState: doubleState,
+                    encounterStage: Number(world.encounterStage || 0),
+                    encounterAnnouncementKey: String(world.encounterAnnouncementKey || ""),
+                    encounterCountdownSeconds: world.getEncounterCountdownSecondsRemaining(now),
+                    encounterFinaleActive: now < Number(world.encounterFinaleUntil || 0),
+                    encounterFinaleUntil: Number(world.encounterFinaleUntil || 0)
                 }
             })
 

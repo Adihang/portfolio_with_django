@@ -48,10 +48,16 @@
     const deathModalSpectatePrevButton = root.querySelector('[data-game-death-modal-spectate-prev]');
     const deathModalSpectateNextButton = root.querySelector('[data-game-death-modal-spectate-next]');
     const deathModalSpectateLabel = root.querySelector('[data-game-death-modal-spectate-label]');
+    const encounterOverlayNode = root.querySelector('[data-game-encounter-overlay]');
+    const encounterMessageNode = root.querySelector('[data-game-encounter-message]');
+    const encounterCountdownNode = root.querySelector('[data-game-encounter-countdown]');
+    const confettiLayer = root.querySelector('[data-game-confetti-layer]');
     const pingNode = root.querySelector('[data-game-ping]');
     const sharedLivesNode = root.querySelector('[data-game-shared-lives]');
     const sharedLivesCountNode = root.querySelector('[data-game-shared-lives-count]');
     const masterVolumeSlider = root.querySelector('[data-game-master-volume]');
+    const musicMuteToggleButton = root.querySelector('[data-game-music-mute-toggle]');
+    const sfxMuteToggleButton = root.querySelector('[data-game-sfx-mute-toggle]');
     const spriteOverlayRoot = root.querySelector('[data-game-sprite-overlay]');
     const idleModal = document.querySelector('[data-game-idle-modal]');
     const idleModalCloseButton = idleModal ? idleModal.querySelector('[data-game-idle-modal-close]') : null;
@@ -121,6 +127,15 @@
             return [];
         }
     })();
+    const ostUrls = (function () {
+        const rawValue = root.getAttribute('data-ost-urls') || '{}';
+        try {
+            const parsed = JSON.parse(rawValue);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    })();
     const rawWsUrl = root.getAttribute('data-ws-url') || '';
     const tokenUrl = root.getAttribute('data-token-url') || '';
     const gameplaySettings = (function () {
@@ -132,6 +147,15 @@
             return {};
         }
     })();
+    const house1Url = root.getAttribute('data-house1-url') || '';
+    const house2Url = root.getAttribute('data-house2-url') || '';
+    const house3Url = root.getAttribute('data-house3-url') || '';
+    const encounterLabels = {
+        stage1: root.getAttribute('data-encounter-stage-one-label') || '',
+        stage2: root.getAttribute('data-encounter-stage-two-label') || '',
+        stage3: root.getAttribute('data-encounter-stage-three-label') || '',
+        finale: root.getAttribute('data-encounter-finale-label') || ''
+    };
     const worldSize = 2000;
     const basePlayerSpeedPerSecond = Number(gameplaySettings.user_base_speed || 225);
     const npcBaseSpeedPerSecond = Number(gameplaySettings.npc_base_speed || 281.25);
@@ -157,6 +181,8 @@
     const cameraLeadRatioY = 0.14;
     const cameraLeadSpeedThreshold = 18;
     const remoteRenderDelaySeconds = 0.06;
+    const MUSIC_MUTED_STORAGE_KEY = 'bumpercar_spiky_music_muted';
+    const SFX_MUTED_STORAGE_KEY = 'bumpercar_spiky_sfx_muted';
     const referenceCanvasWidth = 960;
     const referenceCanvasHeight = 640;
     const defaultPlayerAspectRatio = 173 / 170;
@@ -217,10 +243,21 @@
     let selfCollisionActive = false;
     let selfCollisionImpactActive = false;
     let selfCollisionVisualType = 'win';
+    let encounterStage = 0;
+    let encounterAnnouncementKey = '';
+    let encounterCountdownSeconds = 0;
+    let encounterFinaleActive = false;
+    let encounterFinaleUntil = 0;
+    let confettiParticles = [];
+    let lastConfettiSpawnAt = 0;
     let lastSentInputSignature = '';
     let lastSentInputAt = 0;
     let audioContext = null;
     let masterVolume = 0.2;
+    let musicMuted = false;
+    let effectsMuted = false;
+    let backgroundMusicAudio = null;
+    let currentBackgroundMusicKey = '';
     let loadingCaptionTimer = null;
     let loadingCaptionMessageIndex = 0;
     let loadingCaptionStep = 0;
@@ -325,6 +362,12 @@
             return '';
         }
         return String(entry.image.currentSrc || entry.image.src || '');
+    };
+
+    const houseImages = {
+        house1: createManagedImage(house1Url),
+        house2: createManagedImage(house2Url),
+        house3: createManagedImage(house3Url)
     };
 
     const createSkinAssetRuntime = function (skinConfig) {
@@ -507,11 +550,11 @@
     };
 
     const getViewportDisplayWidth = function () {
-        return isFullscreenMode ? getCanvasDisplayHeight() : getCanvasDisplayWidth();
+        return getCanvasDisplayWidth();
     };
 
     const getViewportDisplayHeight = function () {
-        return isFullscreenMode ? getCanvasDisplayWidth() : getCanvasDisplayHeight();
+        return getCanvasDisplayHeight();
     };
 
     const getEffectiveZoom = function () {
@@ -564,6 +607,130 @@
             return;
         }
         pingNode.textContent = typeof value === 'number' ? ('Ping ' + value + ' ms') : 'Ping -- ms';
+    };
+
+    const getEncounterLabel = function (key) {
+        if (key === 'stage1' || key === 'ner_knocks_door') {
+            return encounterLabels.stage1;
+        }
+        if (key === 'stage2' || key === 'ner_breaks_door') {
+            return encounterLabels.stage2;
+        }
+        if (key === 'stage3' || key === 'ner_holds_deed') {
+            return encounterLabels.stage3;
+        }
+        if (key === 'finale' || key === 'ner_true_finale') {
+            return encounterLabels.finale;
+        }
+        return '';
+    };
+
+    const setEncounterOverlayState = function () {
+        if (!encounterOverlayNode || !encounterMessageNode || !encounterCountdownNode) {
+            return;
+        }
+        const label = getEncounterLabel(encounterAnnouncementKey).replace(/\\n/g, '\n');
+        const showCountdown = !encounterFinaleActive && encounterCountdownSeconds > 0;
+        const visible = Boolean(label) || showCountdown;
+        encounterOverlayNode.hidden = !visible;
+        if (!visible) {
+            encounterMessageNode.textContent = '';
+            encounterCountdownNode.textContent = '';
+            return;
+        }
+        encounterMessageNode.textContent = label;
+        encounterCountdownNode.textContent = showCountdown ? String(Math.max(0, encounterCountdownSeconds)) : '';
+    };
+
+    const confettiColors = ['#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7', '#ec4899'];
+
+    const clearConfetti = function () {
+        confettiParticles = [];
+        lastConfettiSpawnAt = 0;
+        if (confettiLayer) {
+            confettiLayer.innerHTML = '';
+        }
+    };
+
+    const spawnConfettiBurst = function (nowMs) {
+        if (!confettiLayer) {
+            return;
+        }
+        const width = confettiLayer.clientWidth || getCanvasDisplayWidth();
+        for (let index = 0; index < 8; index += 1) {
+            const node = document.createElement('span');
+            node.className = 'multiplayer-confetti-piece';
+            node.style.background = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+            confettiLayer.appendChild(node);
+            confettiParticles.push({
+                node: node,
+                x: Math.random() * Math.max(1, width),
+                y: -20 - Math.random() * 40,
+                driftX: -0.8 + Math.random() * 1.6,
+                velocityY: 90 + Math.random() * 140,
+                rotation: Math.random() * Math.PI * 2,
+                spin: -2.4 + Math.random() * 4.8,
+                wobble: Math.random() * Math.PI * 2,
+                scale: 0.8 + Math.random() * 0.6,
+                alpha: 0.92,
+                createdAt: nowMs
+            });
+        }
+    };
+
+    const updateConfetti = function (deltaSeconds, nowMs) {
+        if (!confettiLayer) {
+            return;
+        }
+        if (!encounterFinaleActive) {
+            if (confettiParticles.length || confettiLayer.childElementCount) {
+                clearConfetti();
+            }
+            return;
+        }
+        if (!lastConfettiSpawnAt || nowMs - lastConfettiSpawnAt >= 180) {
+            spawnConfettiBurst(nowMs);
+            lastConfettiSpawnAt = nowMs;
+        }
+        const height = confettiLayer.clientHeight || getCanvasDisplayHeight();
+        confettiParticles = confettiParticles.filter(function (particle) {
+            particle.x += particle.driftX * 60 * deltaSeconds;
+            particle.y += particle.velocityY * deltaSeconds;
+            particle.rotation += particle.spin * deltaSeconds;
+            particle.wobble += 3.2 * deltaSeconds;
+            particle.alpha = Math.max(0, 0.92 - ((particle.y / Math.max(1, height)) * 0.55));
+            if (particle.y > height + 40) {
+                if (particle.node.parentNode === confettiLayer) {
+                    confettiLayer.removeChild(particle.node);
+                }
+                return false;
+            }
+            particle.node.style.opacity = String(particle.alpha);
+            particle.node.style.transform =
+                'translate(' + Math.round(particle.x) + 'px, ' + Math.round(particle.y) + 'px) ' +
+                'rotate(' + particle.rotation + 'rad) ' +
+                'scale(' + (particle.scale + Math.sin(particle.wobble) * 0.16) + ')';
+            return true;
+        });
+        while (confettiParticles.length > 120) {
+            const particle = confettiParticles.shift();
+            if (particle && particle.node.parentNode === confettiLayer) {
+                confettiLayer.removeChild(particle.node);
+            }
+        }
+    };
+
+    const updateEncounterStateFromPlayer = function (player) {
+        if (!player) {
+            return;
+        }
+        encounterStage = typeof player.encounterStage === 'number' ? player.encounterStage : encounterStage;
+        encounterAnnouncementKey = String(player.encounterAnnouncementKey || '');
+        encounterCountdownSeconds = typeof player.encounterCountdownSeconds === 'number' ? Math.max(0, player.encounterCountdownSeconds) : 0;
+        encounterFinaleActive = Boolean(player.encounterFinaleActive);
+        encounterFinaleUntil = typeof player.encounterFinaleUntil === 'number' ? player.encounterFinaleUntil : 0;
+        setEncounterOverlayState();
+        updateBackgroundMusic();
     };
 
     const setIdleModalOpen = function (opened) {
@@ -732,9 +899,16 @@
         manualStartAutoRespawnPending = false;
         selfCollisionActive = false;
         selfCollisionVisualType = 'win';
+        encounterStage = 0;
+        encounterAnnouncementKey = '';
+        encounterCountdownSeconds = 0;
+        encounterFinaleActive = false;
+        encounterFinaleUntil = 0;
+        stopBackgroundMusic();
         spectateTargetId = '';
         setSharedLives(selfLivesRemaining);
         setDeathModalState(false, false, selfLivesRemaining);
+        setEncounterOverlayState();
         boostState = 'idle';
         if (defeatReceivedCountNode) {
             defeatReceivedCountNode.textContent = '0';
@@ -1207,8 +1381,128 @@
         });
     };
 
+    const stopAllPlayerSounds = function () {
+        Array.from(pendingPlayerSoundTimers.keys()).forEach(function (key) {
+            const timerId = pendingPlayerSoundTimers.get(key);
+            if (timerId) {
+                window.clearTimeout(timerId);
+            }
+        });
+        pendingPlayerSoundTimers.clear();
+        Array.from(activePlayerSounds.keys()).forEach(function (key) {
+            stopPlayerSound(key);
+        });
+    };
+
+    const readMutePreference = function (storageKey) {
+        try {
+            return window.localStorage.getItem(storageKey) === '1';
+        } catch (error) {
+            return false;
+        }
+    };
+
+    const writeMutePreference = function (storageKey, nextValue) {
+        try {
+            window.localStorage.setItem(storageKey, nextValue ? '1' : '0');
+        } catch (error) {}
+    };
+
+    const syncMasterVolumeSliderVisual = function () {
+        if (!masterVolumeSlider) {
+            return;
+        }
+        const percent = Math.max(0, Math.min(100, Number(masterVolumeSlider.value || 20)));
+        masterVolumeSlider.style.setProperty('--multiplayer-volume-percent', percent + '%');
+    };
+
+    const applyMusicMuteState = function () {
+        if (backgroundMusicAudio) {
+            backgroundMusicAudio.muted = musicMuted;
+        }
+        const musicNodes = root.querySelectorAll('audio[data-game-music]');
+        musicNodes.forEach(function (node) {
+            node.muted = musicMuted;
+        });
+    };
+
+    const stopBackgroundMusic = function () {
+        if (!backgroundMusicAudio) {
+            currentBackgroundMusicKey = '';
+            return;
+        }
+        try {
+            backgroundMusicAudio.pause();
+            backgroundMusicAudio.currentTime = 0;
+        } catch (error) {}
+        backgroundMusicAudio = null;
+        currentBackgroundMusicKey = '';
+    };
+
+    const getEncounterMusicKey = function () {
+        if (!gameStarted || !activeSocket || activeSocket.readyState !== window.WebSocket.OPEN) {
+            return '';
+        }
+        if (encounterStage === 0) {
+            return '1pa';
+        }
+        if (encounterStage === 1) {
+            return '1hou';
+        }
+        if (encounterStage === 2) {
+            return '2pa';
+        }
+        if (encounterStage === 3) {
+            return '2hou';
+        }
+        if (encounterStage === 4) {
+            return '3pa';
+        }
+        if (encounterStage === 5) {
+            return '3hou';
+        }
+        if (encounterStage === 6) {
+            return 'ed';
+        }
+        return '';
+    };
+
+    const updateBackgroundMusic = function () {
+        const nextMusicKey = getEncounterMusicKey();
+        const nextUrl = nextMusicKey ? String(ostUrls[nextMusicKey] || '').trim() : '';
+        if (!nextUrl) {
+            stopBackgroundMusic();
+            return;
+        }
+        if (currentBackgroundMusicKey === nextMusicKey && backgroundMusicAudio) {
+            applyMusicMuteState();
+            return;
+        }
+        stopBackgroundMusic();
+        backgroundMusicAudio = new window.Audio(nextUrl);
+        backgroundMusicAudio.loop = true;
+        backgroundMusicAudio.volume = 0.34;
+        currentBackgroundMusicKey = nextMusicKey;
+        applyMusicMuteState();
+        backgroundMusicAudio.play().catch(function () {});
+    };
+
+    const updateAudioToggleButtons = function () {
+        if (musicMuteToggleButton) {
+            musicMuteToggleButton.classList.toggle('is-muted', musicMuted);
+            musicMuteToggleButton.setAttribute('aria-pressed', musicMuted ? 'true' : 'false');
+        }
+        if (sfxMuteToggleButton) {
+            sfxMuteToggleButton.classList.toggle('is-muted', effectsMuted);
+            sfxMuteToggleButton.setAttribute('aria-pressed', effectsMuted ? 'true' : 'false');
+        }
+    };
+
     const getEffectiveVolume = function (volume) {
         const normalizedVolume = typeof volume === 'number' ? volume : 1;
+        if (effectsMuted) {
+            return 0;
+        }
         return Math.max(0, Math.min(1, normalizedVolume * masterVolume));
     };
 
@@ -1383,6 +1677,17 @@
                 npcState: ''
             };
 
+            if (player.id !== selfId && player.isHouse) {
+                playerAudioStates.set(player.id, {
+                    boostState: 'idle',
+                    collisionActive: false,
+                    collisionVisualType: 'win',
+                    deathActive: false,
+                    npcState: ''
+                });
+                return;
+            }
+
             if (player.id !== selfId && player.isNpc) {
                 const volume = getSpatialVolume(listenerPlayer, player, 0.95);
 
@@ -1506,7 +1811,9 @@
                 playerWinIconIndex: 0,
                 stopVisualActive: false,
                 stopIconIndex: 0,
-                collisionVisualActive: false
+                collisionVisualActive: false,
+                finaleActive: false,
+                finaleStuntPattern: 0
             });
         }
         return playerVisuals.get(id);
@@ -1970,6 +2277,7 @@
         setPing(null);
         window.clearTimeout(reconnectTimer);
         setLoadingOverlayOpen(true);
+        updateBackgroundMusic();
 
         if (socket) {
             suppressNextCloseReconnect = true;
@@ -1989,6 +2297,7 @@
         } catch (error) {
             setStatus(labels.disconnected, '#ef4444');
             setLoadingOverlayOpen(false);
+            stopBackgroundMusic();
             reconnectAttemptInFlight = false;
             scheduleReconnect();
             return;
@@ -2009,6 +2318,7 @@
             setIdleModalOpen(false);
             reconnectAttemptInFlight = false;
             setStatus(labels.connected, '#22c55e');
+            updateBackgroundMusic();
             startInputLoop();
             startPingLoop();
         });
@@ -2061,12 +2371,20 @@
                         clientReceivedAt: receivedAt
                     });
                 });
-                if (playerCountNode) {
-                    playerCountNode.textContent = String(payload.length);
-                }
                 const selfPlayer = payload.find(function (player) {
                     return player.id === selfId;
                 });
+                updateEncounterStateFromPlayer(
+                    selfPlayer ||
+                    payload.find(function (player) {
+                        return !player.isHouse;
+                    }) ||
+                    payload[0] ||
+                    null
+                );
+                if (playerCountNode) {
+                    playerCountNode.textContent = String(payload.length);
+                }
                 processRemotePlayerSounds(payload, selfPlayer || predictedSelf);
                 if (selfPlayer) {
                     const wasSelfDeathActive = selfDeathActive;
@@ -2192,6 +2510,7 @@
             stopInputLoop();
             stopPingLoop();
             setPing(null);
+            stopBackgroundMusic();
             stopPlayerSound(selfId || '__self__');
             playerAudioStates.clear();
             playerVisuals.clear();
@@ -2217,6 +2536,7 @@
             stopPingLoop();
             setPing(null);
             setLoadingOverlayOpen(false);
+            stopBackgroundMusic();
             setStatus(labels.disconnected, '#ef4444');
         });
     };
@@ -2229,6 +2549,7 @@
         }
         gameStarted = true;
         setStartOverlayOpen(false);
+        updateBackgroundMusic();
         connect();
     };
 
@@ -2305,6 +2626,13 @@
                 baseSpeed: basePlayerSpeedPerSecond,
                 maxHealthSegments: 4,
                 type: 'double'
+            };
+        }
+        if (normalizedName === 'many') {
+            return {
+                baseSpeed: basePlayerSpeedPerSecond,
+                maxHealthSegments: 5,
+                type: 'many'
             };
         }
         return {
@@ -2450,7 +2778,19 @@
                 ? (healthSegments >= 3 ? defaultSet.healthy : defaultSet.damaged)
                 : skinRuntime.legacyIcon;
 
-            if (skinRuntime.skinType === 'evolution') {
+            if (skinRuntime.skinType === 'many') {
+                const manyIconIndex = Math.max(0, Math.min((skinRuntime.defaultStateIcons.length || 1) - 1, healthSegments - 1));
+                if (skinRuntime.defaultStateIcons.length) {
+                    selectedEntry = skinRuntime.defaultStateIcons[manyIconIndex] || selectedEntry;
+                }
+                if ((isDeathVisualActive || isDefeatVisualActive || (collisionRecoveryActive && player.collisionVisualType === 'defeat')) && skinRuntime.defeatStateIcons.length) {
+                    selectedEntry = skinRuntime.defeatStateIcons[Math.max(0, Math.min(skinRuntime.defeatStateIcons.length - 1, healthSegments - 1))] || selectedEntry;
+                } else if ((isCollisionVisualActive || collisionRecoveryActive) && player.collisionVisualType !== 'defeat' && skinRuntime.collisionStateIcons.length) {
+                    selectedEntry = skinRuntime.collisionStateIcons[Math.max(0, Math.min(skinRuntime.collisionStateIcons.length - 1, healthSegments - 1))] || selectedEntry;
+                } else if (isBoostVisualActive && skinRuntime.boostStages.length) {
+                    selectedEntry = skinRuntime.boostStages[Math.max(0, Math.min(skinRuntime.boostStages.length - 1, healthSegments - 1))] || selectedEntry;
+                }
+            } else if (skinRuntime.skinType === 'evolution') {
                 if (skinRuntime.defaultStateIcons.length) {
                     if (healthSegments >= 5) {
                         selectedEntry = skinRuntime.defaultStateIcons[0] || selectedEntry;
@@ -3249,13 +3589,88 @@
         drawCtx.restore();
     };
 
+    const drawHouseEntity = function (player, cameraX, cameraY, zoom) {
+        const imageEntry = houseImages[player.houseImageKey || ''];
+        const image = imageEntry && imageEntry.ready ? imageEntry.image : null;
+        if (!image) {
+            return;
+        }
+        const x = (player.x - cameraX) * zoom;
+        const y = (player.y - cameraY) * zoom;
+        const naturalWidth = image.naturalWidth || 220;
+        const naturalHeight = image.naturalHeight || 220;
+        const targetWidth = Math.max(132, 220 * zoom);
+        const targetHeight = targetWidth * (naturalHeight / Math.max(1, naturalWidth));
+        drawSpriteImage(ctx, image, x, y, targetWidth, targetHeight, 0, 1, 1);
+
+        const maxHealth = Math.max(1, Number(player.houseMaxHealth || 1));
+        const health = Math.max(0, Number(player.houseHealth || 0));
+        const healthRatio = Math.max(0, Math.min(1, health / maxHealth));
+        const barWidth = targetWidth * 0.7;
+        const barHeight = Math.max(8, 10 * zoom);
+        const barX = x - barWidth / 2;
+        const barY = y - targetHeight / 2 - (18 * zoom);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.74)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = 'rgba(31, 41, 55, 0.16)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = healthRatio > 0.5
+            ? 'rgba(34, 197, 94, 0.94)'
+            : (healthRatio > 0.25 ? 'rgba(245, 158, 11, 0.94)' : 'rgba(239, 68, 68, 0.94)');
+        ctx.fillRect(barX, barY, barWidth * healthRatio, barHeight);
+        ctx.restore();
+    };
+
+    const getFinaleJumpOffset = function (player, nowMs, zoom) {
+        if (!encounterFinaleActive || player.isNpc || player.isDummy || player.isHouse || player.deathActive) {
+            return 0;
+        }
+        const cycleMs = 860;
+        const phase = (nowMs % cycleMs) / cycleMs;
+        const jumpHeight = playerSpriteHeight * zoom;
+        if (phase < 0.22) {
+            return -(jumpHeight * (phase / 0.22));
+        }
+        return -(jumpHeight * Math.max(0, 1 - ((phase - 0.22) / 0.78)));
+    };
+
+    const getFinaleSpinRotation = function (player, visual, nowMs) {
+        if (!encounterFinaleActive || player.isNpc || player.isDummy || player.isHouse || player.deathActive) {
+            return 0;
+        }
+        if (!visual || !visual.finaleStuntPattern) {
+            return 0;
+        }
+        const cycleMs = 860;
+        const phase = (nowMs % cycleMs) / cycleMs;
+        const direction = visual.finaleStuntPattern === 2 ? -1 : 1;
+        return direction * (Math.PI * 2) * phase;
+    };
+
     const drawPlayers = function (cameraX, cameraY, deltaSeconds, zoom) {
         const visibleOverlayIds = new Set();
         renderPlayers.forEach(function (player) {
+            if (Boolean(player.isHouse)) {
+                drawHouseEntity(player, cameraX, cameraY, zoom);
+                return;
+            }
             const x = (player.x - cameraX) * zoom;
             const y = (player.y - cameraY) * zoom;
+            const nowMs = window.performance.now();
+            const drawY = y + getFinaleJumpOffset(player, nowMs, zoom);
             const isSelf = player.id === selfId;
             const visual = getPlayerVisual(player.id);
+            if (encounterFinaleActive && !player.isNpc && !player.isDummy && !player.isHouse && !player.deathActive) {
+                if (!visual.finaleActive) {
+                    visual.finaleActive = true;
+                    visual.finaleStuntPattern = Math.floor(Math.random() * 3);
+                }
+            } else {
+                visual.finaleActive = false;
+                visual.finaleStuntPattern = 0;
+            }
             if (Boolean(player.npcWinVisualActive) && !visual.npcWinVisualActive) {
                 visual.npcWinIconIndex = playerNpcWinIcons.length
                     ? Math.floor(Math.random() * playerNpcWinIcons.length)
@@ -3335,7 +3750,6 @@
                     : isBoostVisualActive
             );
             const trailFadeDurationMs = 280;
-            const nowMs = window.performance.now();
             const npcPhase = isNpc
                 ? Math.max(1, Number(player.npcPhase || 1))
                 : 1;
@@ -3406,7 +3820,7 @@
                 if (visual.trailPoints.length) {
                     visual.trailPoints.forEach(function (trailPoint, index) {
                         const trailX = (trailPoint.x - cameraX) * zoom;
-                        const trailY = (trailPoint.y - cameraY) * zoom;
+                        const trailY = (trailPoint.y - cameraY) * zoom + getFinaleJumpOffset(player, nowMs, zoom);
                         const fadeRatio = trailPoint.expiresAt
                             ? Math.max(0, Math.min(1, (trailPoint.expiresAt - nowMs) / trailFadeDurationMs))
                             : 1;
@@ -3426,6 +3840,7 @@
                     });
                 }
                 const playerAlpha = isDeathVisualActive ? Math.max(0, 1 - deathFadeProgress) : 1;
+                const finaleSpinRotation = getFinaleSpinRotation(player, visual, nowMs);
                 const dentAngle = Math.atan2(collisionImpactY, collisionImpactX) - visual.currentRotation;
                 const dentLocalX = collisionImpactX === 0 && collisionImpactY === 0
                     ? 0
@@ -3445,17 +3860,18 @@
                         overlayNode.style.height = spriteHeight + 'px';
                         overlayNode.style.opacity = String(playerAlpha);
                         overlayNode.style.transform =
-                            'translate(' + x + 'px, ' + y + 'px) translate(-50%, -50%) rotate(' +
-                            (visual.currentRotation + (isNpcDeathAnimating ? Math.PI / 2 : 0)) +
+                            'translate(' + x + 'px, ' + drawY + 'px) translate(-50%, -50%) rotate(' +
+                            (visual.currentRotation + finaleSpinRotation + (isNpcDeathAnimating ? Math.PI / 2 : 0)) +
                             'rad) scale(' + visual.currentFlipX + ', 1)';
                         visibleOverlayIds.add(player.id);
                     }
                 } else {
                     hideSpriteOverlayNode(player.id);
                     ctx.save();
-                    ctx.translate(x, y);
+                    ctx.translate(x, drawY);
                     ctx.rotate(
                         visual.currentRotation +
+                        finaleSpinRotation +
                         (isNpcDeathAnimating ? Math.PI / 2 : 0)
                     );
                     ctx.scale(visual.currentFlipX, 1);
@@ -3510,7 +3926,7 @@
                     drawNpcFallbackCore(
                         ctx,
                         x,
-                        y,
+                        drawY,
                         18 * zoom,
                         visual.currentRotation,
                         'rgba(127, 29, 29, 0.92)'
@@ -3519,7 +3935,7 @@
                     drawFallbackArrow(
                         ctx,
                         x,
-                        y,
+                        drawY,
                         12 * zoom,
                         visual.currentRotation,
                         visual.currentFlipX,
@@ -3547,7 +3963,7 @@
                     const segmentHeight = Math.max(4, 5 * zoom);
                     const defaultSegmentStartX = x - healthBarWidth / 2;
                     const verticalOffset = skinProfile.type === 'evolution' ? 9 * zoom : 5 * zoom;
-                    const defaultSegmentY = y + spriteHeight / 2 + verticalOffset;
+                    const defaultSegmentY = drawY + spriteHeight / 2 + verticalOffset;
                     const healthSegmentColor = healthSegmentsFilled >= Math.max(3, totalSegments)
                         ? 'rgba(34, 197, 94, 1)'
                         : (healthSegmentsFilled >= Math.max(2, Math.ceil(totalSegments / 2))
@@ -3592,7 +4008,7 @@
                 ctx.fillText(
                     player.displayName || player.id,
                     x,
-                    y - spriteHeight / 2 - (getPlayerSkinProfile(player.skinName || 'default').type === 'evolution' ? 9 * zoom : 5 * zoom)
+                    drawY - spriteHeight / 2 - (getPlayerSkinProfile(player.skinName || 'default').type === 'evolution' ? 9 * zoom : 5 * zoom)
                 );
             } else if (!isDeathVisualActive || isNpcDeathAnimating) {
                 const healthRatio = Math.max(0, Math.min(1, npcHealth / playerNpcMaxHealth));
@@ -3602,7 +4018,7 @@
                 const barHeight = Math.max(6, 8 * zoom);
                 const barX = x - barWidth / 2;
                 const healthBarGap = isNpcChargeVisualActive ? 18 : 4;
-                const barY = y - (playerSpriteHeight * spriteScale * zoom) / 2 - healthBarGap * zoom;
+                const barY = drawY - (playerSpriteHeight * spriteScale * zoom) / 2 - healthBarGap * zoom;
 
                 ctx.fillStyle = 'rgba(17, 24, 39, 0.22)';
                 ctx.fillRect(barX, barY, barWidth, barHeight);
@@ -3688,7 +4104,7 @@
         });
 
         let inputVector = getInputVector();
-        if (selfDeathActive) {
+        if (encounterFinaleActive || selfDeathActive) {
             input.up = false;
             input.down = false;
             input.left = false;
@@ -3789,6 +4205,11 @@
                     current.velocityY = typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0;
                     current.facingAngle = typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0;
                     current.isDummy = Boolean(serverPlayer.isDummy);
+                    current.isHouse = Boolean(serverPlayer.isHouse);
+                    current.houseStage = typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0;
+                    current.houseHealth = typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null;
+                    current.houseMaxHealth = typeof serverPlayer.houseMaxHealth === 'number' ? serverPlayer.houseMaxHealth : null;
+                    current.houseImageKey = serverPlayer.houseImageKey || '';
                     current.collisionImpactActive = Boolean(serverPlayer.collisionImpactActive);
                     current.collisionActive = Boolean(serverPlayer.collisionActive);
                     current.npcPhase = typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1;
@@ -3834,6 +4255,11 @@
                         velocityY: typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0,
                         facingAngle: typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0,
                         isDummy: Boolean(serverPlayer.isDummy),
+                        isHouse: Boolean(serverPlayer.isHouse),
+                        houseStage: typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0,
+                        houseHealth: typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null,
+                        houseMaxHealth: typeof serverPlayer.houseMaxHealth === 'number' ? serverPlayer.houseMaxHealth : null,
+                        houseImageKey: serverPlayer.houseImageKey || '',
                         collisionImpactActive: Boolean(serverPlayer.collisionImpactActive),
                         isNpc: Boolean(serverPlayer.isNpc),
                         npcPhase: typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1,
@@ -3919,6 +4345,11 @@
                 current.velocityY = remoteVelocityY;
                 current.facingAngle = typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0;
                 current.isDummy = Boolean(serverPlayer.isDummy);
+                current.isHouse = Boolean(serverPlayer.isHouse);
+                current.houseStage = typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0;
+                current.houseHealth = typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null;
+                current.houseMaxHealth = typeof serverPlayer.houseMaxHealth === 'number' ? serverPlayer.houseMaxHealth : null;
+                current.houseImageKey = serverPlayer.houseImageKey || '';
                 current.isNpc = Boolean(serverPlayer.isNpc);
                 current.collisionImpactActive = Boolean(serverPlayer.collisionImpactActive);
                 current.npcPhase = typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1;
@@ -3967,6 +4398,11 @@
                     velocityY: remoteVelocityY,
                     facingAngle: typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0,
                     isDummy: Boolean(serverPlayer.isDummy),
+                    isHouse: Boolean(serverPlayer.isHouse),
+                    houseStage: typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0,
+                    houseHealth: typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null,
+                    houseMaxHealth: typeof serverPlayer.houseMaxHealth === 'number' ? serverPlayer.houseMaxHealth : null,
+                    houseImageKey: serverPlayer.houseImageKey || '',
                     collisionImpactActive: Boolean(serverPlayer.collisionImpactActive),
                     isNpc: Boolean(serverPlayer.isNpc),
                     npcPhase: typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1,
@@ -4089,6 +4525,7 @@
         drawGrid(cameraX, cameraY, effectiveZoom);
         drawPlayers(cameraX, cameraY, deltaSeconds, effectiveZoom);
         drawMinimap();
+        updateConfetti(deltaSeconds, now);
         updateLoadingSpinner(now);
         window.requestAnimationFrame(render);
     };
@@ -4122,10 +4559,34 @@
 
     document.addEventListener('keydown', handleKey(true));
     document.addEventListener('keyup', handleKey(false));
+    musicMuted = readMutePreference(MUSIC_MUTED_STORAGE_KEY);
+    effectsMuted = readMutePreference(SFX_MUTED_STORAGE_KEY);
+    applyMusicMuteState();
+    updateAudioToggleButtons();
+    if (musicMuteToggleButton) {
+        musicMuteToggleButton.addEventListener('click', function () {
+            musicMuted = !musicMuted;
+            writeMutePreference(MUSIC_MUTED_STORAGE_KEY, musicMuted);
+            applyMusicMuteState();
+            updateAudioToggleButtons();
+        });
+    }
+    if (sfxMuteToggleButton) {
+        sfxMuteToggleButton.addEventListener('click', function () {
+            effectsMuted = !effectsMuted;
+            writeMutePreference(SFX_MUTED_STORAGE_KEY, effectsMuted);
+            if (effectsMuted) {
+                stopAllPlayerSounds();
+            }
+            updateAudioToggleButtons();
+        });
+    }
     if (masterVolumeSlider) {
         masterVolume = Math.max(0, Math.min(1, Number(masterVolumeSlider.value || 20) / 100));
+        syncMasterVolumeSliderVisual();
         masterVolumeSlider.addEventListener('input', function () {
-            masterVolume = Math.max(0, Math.min(1, Number(masterVolumeSlider.value || 0) / 100));
+            masterVolume = Math.max(0, Math.min(1, Number(masterVolumeSlider.value || 20) / 100));
+            syncMasterVolumeSliderVisual();
         });
     }
     if (deathModalRespawnButton) {

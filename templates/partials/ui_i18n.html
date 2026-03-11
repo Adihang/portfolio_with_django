@@ -19,14 +19,16 @@
 {% elif key == "my_portfolio" %}{% if ui_lang|default:'ko' == 'en' %}My Portfolio{% else %}내 포트폴리오{% endif %}
 {% elif key == "close" %}{% if ui_lang|default:'ko' == 'en' %}Close{% else %}닫기{% endif %}
 {% elif key == "account_bumpercar_stats_title" %}{% if ui_lang|default:'ko' == 'en' %}Bumper Car Spiky Stats{% else %}범퍼카 스핔이 전적{% endif %}
-{% elif key == "account_bumpercar_player_kills" %}{% if ui_lang|default:'ko' == 'en' %}Player kills{% else %}유저 사망시킨 횟수{% endif %}
+{% elif key == "account_bumpercar_player_kills" %}{% if ui_lang|default:'ko' == 'en' %}Player kills{% else %}유저 처치한 횟수{% endif %}
 {% elif key == "account_bumpercar_deaths" %}{% if ui_lang|default:'ko' == 'en' %}Deaths{% else %}사망한 횟수{% endif %}
-{% elif key == "account_bumpercar_ner_kills" %}{% if ui_lang|default:'ko' == 'en' %}Ner kills{% else %}네르 사망시킨 횟수{% endif %}
+{% elif key == "account_bumpercar_ner_kills" %}{% if ui_lang|default:'ko' == 'en' %}Ner kills{% else %}네르 처치한 횟수{% endif %}
 {% elif key == "account_bumpercar_ner_phase1_attack_dodges" %}{% if ui_lang|default:'ko' == 'en' %}Phase 1 counters{% else %}네르 1페이즈 반격한 횟수{% endif %}
 {% elif key == "account_bumpercar_ner_phase2_attack_dodges" %}{% if ui_lang|default:'ko' == 'en' %}Phase 2 counters{% else %}네르 2페이즈 반격한 횟수{% endif %}
 {% elif key == "account_bumpercar_ner_phase3_attack_dodges" %}{% if ui_lang|default:'ko' == 'en' %}Phase 3 counters{% else %}네르 3페이즈 반격한 횟수{% endif %}
 {% elif key == "account_bumpercar_ner_hits" %}{% if ui_lang|default:'ko' == 'en' %}Hits on Ner{% else %}네르를 공격한 횟수{% endif %}
 {% elif key == "account_bumpercar_stats_button" %}{% if ui_lang|default:'ko' == 'en' %}Stats{% else %}전적{% endif %}
+{% elif key == "account_privacy_policy_agreed_at" %}{% if ui_lang|default:'ko' == 'en' %}Privacy agreed at{% else %}개인정보 처리방침 동의 시각{% endif %}
+{% elif key == "account_terms_of_service_agreed_at" %}{% if ui_lang|default:'ko' == 'en' %}Terms agreed at{% else %}이용약관 동의 시각{% endif %}
 {% elif key == "change_profile_image" %}{% if ui_lang|default:'ko' == 'en' %}Change profile image{% else %}프로필 사진 변경{% endif %}
 {% elif key == "dummy_notice" %}{% if ui_lang == "en" %}Add your information and complete your portfolio!{% else %}자신의 정보를 입력하고 포트폴리오를 완성 시켜보세요!{% endif %}
 {% elif key == "career_title" %}{% if ui_lang == 'en' %}Career{% else %}경력 사항{% endif %}
@@ -44,7 +46,7 @@
 {% elif key == "multiplayer_connected" %}{% if ui_lang == 'en' %}Connected{% else %}연결됨{% endif %}
 {% elif key == "multiplayer_disconnected" %}{% if ui_lang == 'en' %}Disconnected{% else %}연결 끊김{% endif %}
 {% elif key == "multiplayer_start_button" %}Start!
-{% elif key == "multiplayer_skin_title" %}{% if ui_lang == 'en' %}Choose Skin{% else %}스킨 선택{% endif %}
+{% elif key == "multiplayer_skin_title" %}{% if ui_lang == 'en' %}Choose Character{% else %}캐릭터 선택{% endif %}
 {% elif key == "multiplayer_skin_open" %}{% if ui_lang == 'en' %}Open skin selector{% else %}스킨 선택 열기{% endif %}
 {% elif key == "multiplayer_start_skin_hint" %}{% if ui_lang == 'en' %}Click Spiky to choose a skin{% else %}스핔이를 클릭해 스킨선택{% endif %}
 {% elif key == "multiplayer_skin_select" %}{% if ui_lang == 'en' %}Select{% else %}선택{% endif %}
@@ -63,18 +65,26 @@ Spacebar{% else %}WASD or 방향키
 {% elif key == "multiplayer_restart_server" %}{% if ui_lang == 'en' %}Restart Server{% else %}서버 재시작{% endif %}
 {% elif key == "multiplayer_set_npc_health" %}{% if ui_lang == 'en' %}Apply{% else %}적용{% endif %}
 {% elif key == "multiplayer_boost_button" %}»
+{% elif key == "multiplayer_encounter_stage_one" %}{% if ui_lang == 'en' %}Ner knocks on the cult leader's door!{% else %}네르가 교주님의 방 문을 두드립니다!{% endif %}
+{% elif key == "multiplayer_encounter_stage_two" %}{% if ui_lang == 'en' %}Ner tries to break the cult leader's door with an axe!{% else %}네르가 도끼로 교주님의 방 문을 부수려 합니다!{% endif %}
+{% elif key == "multiplayer_encounter_stage_three" %}{% if ui_lang == 'en' %}Ner stands before the cult leader's door with the deed!{% else %}네르가 집문서를 들고 교주의 문 앞에 서 있습니다!{% endif %}
+{% elif key == "multiplayer_encounter_finale" %}{% if ui_lang == 'en' %}Great! Great!\nI defeated Ner and now I truly became Ner!{% else %}쪼아요! 쪼아요!\n네르를 쓰러트리고 이제 제가 진짜 네르가 된거에요!{% endif %}
 {% elif key == "multiplayer_idle_modal_title" %}{% if ui_lang == 'en' %}Connection Ended{% else %}연결 종료{% endif %}
 {% elif key == "multiplayer_idle_modal_description" %}{% if ui_lang == 'en' %}The server connection ends after 3 minutes without movement.{% else %}3분간 움직임이 없어 서버 연결이 종료됩니다.{% endif %}
 {% elif key == "multiplayer_idle_modal_close" %}{% if ui_lang == 'en' %}Close{% else %}닫기{% endif %}
 {% elif key == "multiplayer_death_modal_title" %}{% if ui_lang == 'en' %}You've been Nered!{% else %}네르 당했습니다!{% endif %}
 {% elif key == "multiplayer_death_modal_game_over_title" %}{% if ui_lang == 'en' %}Spiky tried hard......{% else %}스핔이 열심히 했는데......{% endif %}
-{% elif key == "multiplayer_death_modal_respawn" %}{% if ui_lang == 'en' %}Respawn{% else %}리스폰{% endif %}
-{% elif key == "multiplayer_death_modal_respawn_lives" %}{% if ui_lang == 'en' %}Respawn (Lives {count}){% else %}리스폰 (남은 목숨 {count}){% endif %}
+{% elif key == "multiplayer_death_modal_respawn" %}{% if ui_lang == 'en' %}Revive{% else %}부활{% endif %}
+{% elif key == "multiplayer_death_modal_respawn_lives" %}{% if ui_lang == 'en' %}Revive (Lives {count}){% else %}부활 (남은 목숨 {count}){% endif %}
 {% elif key == "multiplayer_death_modal_no_lives" %}{% if ui_lang == 'en' %}No Lives Left{% else %}목숨 모두 소진{% endif %}
 {% elif key == "multiplayer_death_modal_spectate_prev" %}{% if ui_lang == 'en' %}←{% else %}←{% endif %}
 {% elif key == "multiplayer_death_modal_spectate_next" %}{% if ui_lang == 'en' %}→{% else %}→{% endif %}
 {% elif key == "multiplayer_death_modal_spectate_empty" %}{% if ui_lang == 'en' %}No players to spectate{% else %}관전할 유저가 없습니다{% endif %}
 {% elif key == "multiplayer_sound_volume" %}{% if ui_lang == 'en' %}Sound{% else %}사운드{% endif %}
+{% elif key == "multiplayer_music_button" %}{% if ui_lang == 'en' %}Music{% else %}음악{% endif %}
+{% elif key == "multiplayer_sfx_button" %}{% if ui_lang == 'en' %}SFX{% else %}효과음{% endif %}
+{% elif key == "multiplayer_music_mute" %}{% if ui_lang == 'en' %}Mute Music{% else %}음악 음소거{% endif %}
+{% elif key == "multiplayer_sfx_mute" %}{% if ui_lang == 'en' %}Mute Sound Effects{% else %}효과음 음소거{% endif %}
 {% elif key == "multiplayer_you" %}{% if ui_lang == 'en' %}You{% else %}내 플레이어{% endif %}
 {% elif key == "multiplayer_position" %}{% if ui_lang == 'en' %}Position{% else %}현재 좌표{% endif %}
 {% elif key == "multiplayer_nearby_players" %}{% if ui_lang == 'en' %}Nearby players{% else %}주변 플레이어 수{% endif %}
@@ -83,6 +93,7 @@ Spacebar{% else %}WASD or 방향키
 {% elif key == "bumpercar_admin_kicker" %}{% if ui_lang == 'en' %}Game Admin{% else %}게임 관리자{% endif %}
 {% elif key == "bumpercar_admin_title" %}{% if ui_lang == 'en' %}Admin{% else %}관리자{% endif %}
 {% elif key == "bumpercar_admin_description" %}{% if ui_lang == 'en' %}Tune movement, boost, damage, health, and lives for players and Ner.{% else %}유저와 네르의 이동, 돌진, 데미지, 체력, 목숨 수치를 조절합니다.{% endif %}
+{% elif key == "bumpercar_admin_connected_players" %}{% if ui_lang == 'en' %}Connected Players{% else %}현재 접속 유저 수{% endif %}
 {% elif key == "bumpercar_admin_open_game" %}{% if ui_lang == 'en' %}Open Game{% else %}게임 열기{% endif %}
 {% elif key == "bumpercar_admin_saved" %}{% if ui_lang == 'en' %}Settings saved and runtime restarted.{% else %}설정을 저장했고 런타임을 재시작했습니다.{% endif %}
 {% elif key == "bumpercar_admin_save_failed" %}{% if ui_lang == 'en' %}Failed to save settings.{% else %}설정 저장에 실패했습니다.{% endif %}

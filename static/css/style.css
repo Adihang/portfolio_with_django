@@ -519,8 +519,8 @@ body.portfolio-page.theme-dark .portfolio-watermark-layer {
 }
 
 body.root-page .main.main-surface-layer.root-search-page {
-    min-height: 100dvh;
-    height: 100dvh;
+    min-height: calc(100dvh - 56px);
+    height: auto;
 }
 
 body.root-page .ui-nav {
@@ -535,7 +535,7 @@ body.root-page .ui-nav {
     align-items: center;
     justify-content: center;
     gap: 20px;
-    margin-top: 0;
+    margin-top: 28px;
     padding-left: 16px;
     padding-right: 16px;
     border: 0;
@@ -2941,4 +2941,54 @@ body.portfolio-page.theme-dark .project_card_text hr,
 body.portfolio-page.theme-dark .career_cards hr {
     background-color: transparent;
     color: var(--theme-border);
+}
+
+.site-footer-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 16px 22px;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.site-footer-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.site-footer-link:hover,
+.site-footer-link:focus-visible {
+    color: #374151;
+    text-decoration: underline;
+}
+
+.site-footer-sep {
+    color: #9ca3af;
+}
+
+.legal-page-content {
+    padding-top: 18px;
+    padding-bottom: 8px;
+}
+
+.legal-page-article {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+.ide-field-checkbox {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: start;
+}
+
+.ide-field-checkbox-control {
+    padding-top: 3px;
+}
+
+.ide-field-checkbox-text {
+    line-height: 1.5;
 }

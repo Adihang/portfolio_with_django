@@ -53,7 +53,6 @@ const NPC_CHARGE_WINDUP_DURATION_MS = GAMEPLAY_SETTINGS.npc_charge_windup_ms
 const NPC_REST_DURATION_MS = GAMEPLAY_SETTINGS.npc_rest_ms
 const NPC_MAX_HEALTH = GAMEPLAY_SETTINGS.npc_max_health
 const NPC_DEATH_ANIMATION_DURATION_MS = 5000
-const NPC_RESPAWN_DELAY_MS = 6 * 60 * 1000
 const NPC_MAX_BOOSTED_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_max_boost_speed
 const NPC_BOOST_ACCELERATION_PER_SECOND = GAMEPLAY_SETTINGS.npc_boost_acceleration
 const NPC_BOOST_COOLDOWN_PER_SECOND = GAMEPLAY_SETTINGS.npc_boost_cooldown
@@ -63,11 +62,50 @@ const NPC_PHASE_TWO_HEALTH_RATIO = GAMEPLAY_SETTINGS.npc_phase_two_health_ratio
 const NPC_PHASE_THREE_HEALTH_RATIO = GAMEPLAY_SETTINGS.npc_phase_three_health_ratio
 const NPC_PHASE_THREE_TRIGGER_DISTANCE_MULTIPLIER = 1.5
 const DUMMY_RETALIATION_DISTANCE_MULTIPLIER = 1.2
+const HOUSE_STAGE_ONE_ID = "house-1"
+const HOUSE_STAGE_TWO_ID = "house-2"
+const HOUSE_STAGE_THREE_ID = "house-3"
+const HOUSE_STAGE_ONE_HEALTH = 30
+const HOUSE_STAGE_TWO_HEALTH = 30
+const HOUSE_STAGE_THREE_HEALTH = 30
+const HOUSE_COLLISION_SCALE = 0.5
+const HOUSE_COLLISION_HALF_WIDTH = 110 * HOUSE_COLLISION_SCALE
+const HOUSE_COLLISION_HALF_HEIGHT = HOUSE_COLLISION_HALF_WIDTH * (508 / 815)
+const HOUSE_COLLISION_POLYGON = [
+    { x: -0.291, y: -0.42 },
+    { x: 0.265, y: -0.42 },
+    { x: 0.308, y: -0.34 },
+    { x: 0.305, y: -0.22 },
+    { x: 0.369, y: -0.1 },
+    { x: 0.348, y: 0.06 },
+    { x: 0.399, y: 0.22 },
+    { x: 0.47, y: 0.38 },
+    { x: 0.217, y: 0.5 },
+    { x: -0.242, y: 0.5 },
+    { x: -0.473, y: 0.38 },
+    { x: -0.399, y: 0.22 },
+    { x: -0.407, y: 0.06 },
+    { x: -0.399, y: -0.1 },
+    { x: -0.354, y: -0.22 },
+    { x: -0.32, y: -0.34 },
+]
+const ENCOUNTER_STAGE_ONE_COUNTDOWN_MS = 3 * 60 * 1000
+const ENCOUNTER_STAGE_TWO_COUNTDOWN_MS = 2 * 60 * 1000
+const ENCOUNTER_STAGE_THREE_COUNTDOWN_MS = 60 * 1000
+const ENCOUNTER_FINALE_DURATION_MS = 20 * 1000
+const ENCOUNTER_STAGE_ONE_LIVES = 4
+const ENCOUNTER_STAGE_TWO_LIVES = 5
+const ENCOUNTER_ANNOUNCEMENT_STAGE_ONE = "ner_knocks_door"
+const ENCOUNTER_ANNOUNCEMENT_STAGE_TWO = "ner_breaks_door"
+const ENCOUNTER_ANNOUNCEMENT_STAGE_THREE = "ner_holds_deed"
+const ENCOUNTER_ANNOUNCEMENT_FINALE = "ner_true_finale"
 // 전체 인간 유저 입력이 이 시간 동안 없으면 진행 상태를 초기화한다.
 const INPUT_IDLE_RESET_MS = 10 * 60 * 1000
 const EVOLUTION_SKIN_NAME = "evolution"
 const EVOLUTION_SPEED_MULTIPLIER = 0.8
 const EVOLUTION_HEALTH_SEGMENTS = 5
+const MANY_SKIN_NAME = "many"
+const MANY_HEALTH_SEGMENTS = 5
 const DOUBLE_SKIN_NAME = "double"
 const DOUBLE_UNIT_HEALTH = 2
 const DOUBLE_UNIT_COUNT = 2
@@ -86,9 +124,14 @@ const DOUBLE_ALIGNMENT_DEADZONE_DISTANCE = DOUBLE_MERGED_SIDE_OFFSET * 0.35
 const DOUBLE_INACTIVE_FADE_MS = 200
 const NPC_DEFEAT_BOUNCE_MULTIPLIER = 1.5
 
+function getNpcBaseSpeed(player) {
+    const multiplier = Math.max(0.1, Number(player && player.npcSpeedMultiplier || 1))
+    return NPC_BASE_SPEED_PER_SECOND * multiplier
+}
+
 function getBaseSpeedForPlayer(player) {
     if (player && player.isNpc) {
-        return NPC_BASE_SPEED_PER_SECOND
+        return getNpcBaseSpeed(player)
     }
     if (player && player.isDummy) {
         return DUMMY_BASE_SPEED_PER_SECOND
@@ -166,7 +209,13 @@ function getPlayerDeathTriggerCount(player) {
         return PLAYER_DEATH_TRIGGER_COUNT
     }
     const skinName = String(player.skinName || "").trim().toLowerCase()
-    return skinName === EVOLUTION_SKIN_NAME ? EVOLUTION_HEALTH_SEGMENTS : PLAYER_DEATH_TRIGGER_COUNT
+    if (skinName === EVOLUTION_SKIN_NAME) {
+        return EVOLUTION_HEALTH_SEGMENTS
+    }
+    if (skinName === MANY_SKIN_NAME) {
+        return MANY_HEALTH_SEGMENTS
+    }
+    return PLAYER_DEATH_TRIGGER_COUNT
 }
 
 function getNpcPhase(player) {
@@ -217,6 +266,13 @@ class World {
         this.lastHumanInputAt = Date.now()
         this.roundResetAnnouncementUntil = 0
         this.pendingRoundResetAt = 0
+        this.encounterStage = 0
+        this.encounterAnnouncementKey = ""
+        this.encounterAnnouncementUntil = 0
+        this.encounterCountdownUntil = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
         this.grid = new SpatialGrid(CELL_SIZE)
         this.addDummyPlayers()
         this.addNerNpcPlayer()
@@ -245,26 +301,242 @@ class World {
     }
 
     addNerNpcPlayer() {
-        if (this.players.has(NPC_ID)) {
-            return this.players.get(NPC_ID)
+        return this.spawnNerNpcPlayer(NPC_ID, {
+            x: WORLD_SIZE / 2 + 180,
+            y: WORLD_SIZE / 2,
+            speedMultiplier: 1,
+        })
+    }
+
+    spawnNerNpcPlayer(id, options = {}) {
+        if (this.players.has(id)) {
+            return this.players.get(id)
         }
 
-        const player = new Player(NPC_ID)
-        player.x = WORLD_SIZE / 2 + 180
-        player.y = WORLD_SIZE / 2
+        const player = new Player(id)
+        player.x = Number(options.x || WORLD_SIZE / 2)
+        player.y = Number(options.y || WORLD_SIZE / 2)
         player.isNpc = true
-        player.baseSpeed = NPC_BASE_SPEED_PER_SECOND
-        player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+        player.npcSpeedMultiplier = Math.max(0.1, Number(options.speedMultiplier || 1))
+        player.npcEncounterVariant = String(options.encounterVariant || "").trim()
+        player.baseSpeed = NPC_BASE_SPEED_PER_SECOND * player.npcSpeedMultiplier
+        player.currentSpeed = player.baseSpeed
         player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
         player.npcState = "idle"
         player.npcPhase = 1
         player.npcMaxHealth = this.getScaledNpcMaxHealth()
         player.npcHealth = player.npcMaxHealth
-
-        this.players.set(NPC_ID, player)
+        this.players.set(id, player)
         this.grid.add(player)
 
         return player
+    }
+
+    spawnHouse(stage) {
+        const houseId = stage === 1 ? HOUSE_STAGE_ONE_ID : (stage === 2 ? HOUSE_STAGE_TWO_ID : HOUSE_STAGE_THREE_ID)
+        const existing = this.players.get(houseId)
+        if (existing) {
+            return existing
+        }
+        const player = new Player(houseId)
+        player.isHouse = true
+        player.houseStage = stage
+        player.houseImageKey = `house${stage}`
+        player.houseMaxHealth = stage === 1 ? HOUSE_STAGE_ONE_HEALTH : (stage === 2 ? HOUSE_STAGE_TWO_HEALTH : HOUSE_STAGE_THREE_HEALTH)
+        player.houseHealth = player.houseMaxHealth
+        player.x = WORLD_SIZE / 2
+        player.y = WORLD_SIZE / 2
+        this.players.set(houseId, player)
+        this.grid.add(player)
+        return player
+    }
+
+    removeHousePlayers() {
+        for (const player of Array.from(this.players.values())) {
+            if (!player.isHouse) {
+                continue
+            }
+            this.grid.remove(player)
+            this.players.delete(player.id)
+        }
+    }
+
+    removeNerPlayers() {
+        for (const player of Array.from(this.players.values())) {
+            if (!player.isNpc) {
+                continue
+            }
+            this.grid.remove(player)
+            this.players.delete(player.id)
+        }
+    }
+
+    getNerPlayers() {
+        return Array.from(this.players.values()).filter((player) => player.isNpc)
+    }
+
+    getAliveNerPlayers() {
+        return this.getNerPlayers().filter((player) => !this.isPlayerDead(player))
+    }
+
+    getHousePlayers() {
+        return Array.from(this.players.values()).filter((player) => player.isHouse)
+    }
+
+    getEncounterCountdownSecondsRemaining(now = Date.now()) {
+        if (!this.encounterCountdownUntil || now >= this.encounterCountdownUntil) {
+            return 0
+        }
+        return Math.max(0, Math.ceil((this.encounterCountdownUntil - now) / 1000))
+    }
+
+    clearEncounterAnnouncement() {
+        this.encounterAnnouncementKey = ""
+        this.encounterAnnouncementUntil = 0
+        this.encounterCountdownUntil = 0
+    }
+
+    startEncounterAnnouncement(now, key, durationMs) {
+        this.encounterAnnouncementKey = key
+        this.encounterAnnouncementUntil = now + durationMs
+        this.encounterCountdownUntil = now + durationMs
+    }
+
+    killAllHumansForEncounterFailure(now) {
+        this.sharedLivesRemaining = 0
+        this.encounterResetOnAllDead = true
+        for (const player of this.players.values()) {
+            if (!isPersistentHumanPlayer(player) || this.isPlayerDead(player)) {
+                continue
+            }
+            this.triggerPlayerDeath(player, now, null)
+        }
+    }
+
+    beginStageOneHouseEncounter(now) {
+        this.encounterStage = 1
+        this.pendingRoundResetAt = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
+        this.removeNerPlayers()
+        this.removeHousePlayers()
+        this.startEncounterAnnouncement(now, ENCOUNTER_ANNOUNCEMENT_STAGE_ONE, ENCOUNTER_STAGE_ONE_COUNTDOWN_MS)
+        this.spawnHouse(1)
+    }
+
+    beginStageTwoNer(now) {
+        this.encounterStage = 2
+        this.pendingRoundResetAt = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
+        this.removeHousePlayers()
+        this.clearEncounterAnnouncement()
+        this.sharedLivesRemaining = ENCOUNTER_STAGE_ONE_LIVES
+        for (const player of this.players.values()) {
+            if (isPersistentHumanPlayer(player)) {
+                player.livesRemaining = this.sharedLivesRemaining
+            }
+        }
+        this.spawnNerNpcPlayer(NPC_ID, {
+            x: WORLD_SIZE / 2,
+            y: WORLD_SIZE / 2,
+            speedMultiplier: 1,
+            encounterVariant: "doorboss",
+        })
+    }
+
+    beginStageTwoHouseEncounter(now) {
+        this.encounterStage = 3
+        this.pendingRoundResetAt = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
+        this.removeNerPlayers()
+        this.removeHousePlayers()
+        this.startEncounterAnnouncement(now, ENCOUNTER_ANNOUNCEMENT_STAGE_TWO, ENCOUNTER_STAGE_TWO_COUNTDOWN_MS)
+        this.spawnHouse(2)
+    }
+
+    beginStageThreeNer(now) {
+        this.encounterStage = 4
+        this.pendingRoundResetAt = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
+        this.removeHousePlayers()
+        this.clearEncounterAnnouncement()
+        this.sharedLivesRemaining = ENCOUNTER_STAGE_TWO_LIVES
+        for (const player of this.players.values()) {
+            if (isPersistentHumanPlayer(player)) {
+                player.livesRemaining = this.sharedLivesRemaining
+            }
+        }
+        const humanCount = Math.max(1, this.getHumanPlayerCount())
+        const spawnCount = humanCount + 1
+        const spacing = 140
+        const startX = (WORLD_SIZE / 2) - ((spawnCount - 1) * spacing / 2)
+        for (let index = 0; index < spawnCount; index += 1) {
+            this.spawnNerNpcPlayer(`${NPC_ID}-${index + 1}`, {
+                x: startX + (index * spacing),
+                y: WORLD_SIZE / 2,
+                speedMultiplier: 1,
+            })
+        }
+    }
+
+    beginStageThreeHouseEncounter(now) {
+        this.encounterStage = 5
+        this.pendingRoundResetAt = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
+        this.removeNerPlayers()
+        this.removeHousePlayers()
+        this.startEncounterAnnouncement(now, ENCOUNTER_ANNOUNCEMENT_STAGE_THREE, ENCOUNTER_STAGE_THREE_COUNTDOWN_MS)
+        this.spawnHouse(3)
+    }
+
+    beginEncounterFinale(now) {
+        this.encounterStage = 6
+        this.pendingRoundResetAt = 0
+        this.encounterResetOnAllDead = false
+        this.removeNerPlayers()
+        this.removeHousePlayers()
+        this.encounterAnnouncementKey = ENCOUNTER_ANNOUNCEMENT_FINALE
+        this.encounterAnnouncementUntil = now + ENCOUNTER_FINALE_DURATION_MS
+        this.encounterCountdownUntil = 0
+        this.encounterFinaleUntil = now + ENCOUNTER_FINALE_DURATION_MS
+        this.encounterFinaleRewarded = false
+    }
+
+    resetEncounterToInitial(now) {
+        this.encounterStage = 0
+        this.pendingRoundResetAt = 0
+        this.encounterFinaleUntil = 0
+        this.encounterFinaleRewarded = false
+        this.encounterResetOnAllDead = false
+        this.clearEncounterAnnouncement()
+        this.removeHousePlayers()
+        for (const player of Array.from(this.players.values())) {
+            if (player.isNpc) {
+                this.grid.remove(player)
+                this.players.delete(player.id)
+            }
+        }
+        this.sharedLivesRemaining = PLAYER_STARTING_LIVES
+        for (const player of this.players.values()) {
+            if (player.isDummy) {
+                continue
+            }
+            if (isPersistentHumanPlayer(player)) {
+                player.defeatReceivedCount = 0
+                player.livesRemaining = this.sharedLivesRemaining
+                this.respawnPlayer(player, now)
+            }
+        }
+        this.addNerNpcPlayer()
     }
 
     getHumanPlayerCount() {
@@ -274,35 +546,41 @@ class World {
     }
 
     getScaledNpcMaxHealth() {
-        const humanPlayerCount = Math.max(1, this.getHumanPlayerCount())
-        return Math.max(1, Math.round(NPC_MAX_HEALTH * (1 + Math.max(0, humanPlayerCount - 1) * 0.2)))
+        return NPC_MAX_HEALTH
     }
 
     rebalanceNpcHealthForHumanCount() {
-        const npc = this.players.get(NPC_ID)
-        if (!npc) {
-            return
+        for (const npc of this.getNerPlayers()) {
+            const previousMaxHealth = Math.max(1, Number(npc.npcMaxHealth || NPC_MAX_HEALTH))
+            const nextMaxHealth = this.getScaledNpcMaxHealth()
+            const currentRatio = Math.max(0, Math.min(1, Number(npc.npcHealth || 0) / previousMaxHealth))
+            npc.npcMaxHealth = nextMaxHealth
+            npc.npcHealth = Math.max(0, Math.min(nextMaxHealth, Math.round(nextMaxHealth * currentRatio)))
+            npc.npcPhase = getNpcPhase(npc)
         }
-
-        const previousMaxHealth = Math.max(1, Number(npc.npcMaxHealth || NPC_MAX_HEALTH))
-        const nextMaxHealth = this.getScaledNpcMaxHealth()
-        const currentRatio = Math.max(0, Math.min(1, Number(npc.npcHealth || 0) / previousMaxHealth))
-
-        npc.npcMaxHealth = nextMaxHealth
-        npc.npcHealth = Math.max(0, Math.min(nextMaxHealth, Math.round(nextMaxHealth * currentRatio)))
-        npc.npcPhase = getNpcPhase(npc)
     }
 
     setNpcHealth(nextHealth) {
-        const npc = this.players.get(NPC_ID)
-        if (!npc) {
+        const ners = this.getNerPlayers()
+        if (!ners.length) {
             return null
         }
 
-        const safeHealth = Math.max(0, Math.min(Number(npc.npcMaxHealth || NPC_MAX_HEALTH), Number(nextHealth || 0)))
-        npc.npcHealth = safeHealth
-        npc.npcPhase = getNpcPhase(npc)
-        return npc
+        const updatedNers = ners.map((npc) => {
+            const safeHealth = Math.max(0, Math.min(Number(npc.npcMaxHealth || NPC_MAX_HEALTH), Number(nextHealth || 0)))
+            npc.npcHealth = safeHealth
+            npc.npcPhase = getNpcPhase(npc)
+            return {
+                id: npc.id,
+                npcHealth: npc.npcHealth,
+                npcMaxHealth: npc.npcMaxHealth,
+                npcPhase: npc.npcPhase || 1,
+            }
+        })
+        return {
+            count: updatedNers.length,
+            ners: updatedNers,
+        }
     }
 
     getStoredPlayerProgress(connectionKey) {
@@ -429,7 +707,7 @@ class World {
         // 라운드 리셋 시 네르는 기본 위치/기본 상태로 완전히 되돌린다.
         player.x = WORLD_SIZE / 2 + 180
         player.y = WORLD_SIZE / 2
-        player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+        player.currentSpeed = getNpcBaseSpeed(player)
         player.boostState = "idle"
         player.boostDirectionX = 0
         player.boostDirectionY = 0
@@ -482,6 +760,7 @@ class World {
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
         this.roundResetAnnouncementUntil = now + PLAYER_DEATH_DURATION_MS
         this.pendingRoundResetAt = 0
+        this.encounterResetOnAllDead = false
 
         for (const player of this.players.values()) {
             if (player.isNpc) {
@@ -912,8 +1191,39 @@ class World {
             if (Math.abs(desiredDx) > 0.001 || Math.abs(desiredDy) > 0.001) {
                 unit.facingAngle = Math.atan2(desiredDy, desiredDx)
             }
-            unit.x = this.clampToWorld(unit.x + unit.lastMoveX)
-            unit.y = this.clampToWorld(unit.y + unit.lastMoveY)
+            const nextUnitX = unit.x + unit.lastMoveX
+            const nextUnitY = unit.y + unit.lastMoveY
+            const hitLeftWall = nextUnitX < 0
+            const hitRightWall = nextUnitX > WORLD_SIZE
+            const hitTopWall = nextUnitY < 0
+            const hitBottomWall = nextUnitY > WORLD_SIZE
+            unit.x = this.applyWallBouncePosition(nextUnitX, unit.lastMoveX)
+            unit.y = this.applyWallBouncePosition(nextUnitY, unit.lastMoveY)
+
+            if (
+                (unit.boostState === "charging" || unit.boostState === "cooldown") &&
+                (hitLeftWall || hitRightWall || hitTopWall || hitBottomWall)
+            ) {
+                const hitNormalX = hitLeftWall ? 1 : (hitRightWall ? -1 : 0)
+                const hitNormalY = hitTopWall ? 1 : (hitBottomWall ? -1 : 0)
+                const collisionVisualUntil = now + COLLISION_VISUAL_BASE_DURATION_MS
+                unit.collisionVisualUntil = collisionVisualUntil
+                unit.collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+                unit.collisionVisualType = "win"
+                unit.collisionImpactX = hitNormalX
+                unit.collisionImpactY = hitNormalY
+                unit.boostState = "idle"
+                unit.currentSpeed = player.collisionSlowSpeed
+                unit.collisionRecoveryStartedAt = now
+                unit.collisionRecoveryUntil = now + COLLISION_RECOVERY_DURATION_MS
+                unit.boostDisabledStartedAt = now
+                unit.boostDisabledUntil = Math.max(
+                    now + COLLISION_BOOST_LOCK_DURATION_MS,
+                    Number(collisionVisualUntil || 0)
+                )
+                unit.boostDirectionX = 0
+                unit.boostDirectionY = 0
+            }
         })
 
         if (aliveIndices.length > 1) {
@@ -951,6 +1261,35 @@ class World {
 
         const averageMoveX = aliveIndices.reduce((sum, unitIndex) => sum + Number(player.doubleUnits[unitIndex].lastMoveX || 0), 0) / aliveIndices.length
         const averageMoveY = aliveIndices.reduce((sum, unitIndex) => sum + Number(player.doubleUnits[unitIndex].lastMoveY || 0), 0) / aliveIndices.length
+        const strongestUnit = aliveIndices.reduce((bestUnit, unitIndex) => {
+            const unit = player.doubleUnits[unitIndex]
+            if (!bestUnit) {
+                return unit
+            }
+            return Number(unit && unit.currentSpeed || 0) > Number(bestUnit && bestUnit.currentSpeed || 0)
+                ? unit
+                : bestUnit
+        }, null)
+        const mergedBoostState = aliveIndices.some((unitIndex) => {
+            const unit = player.doubleUnits[unitIndex]
+            return unit && (unit.boostState === "charging" || unit.boostState === "cooldown")
+        })
+            ? (aliveIndices.some((unitIndex) => player.doubleUnits[unitIndex] && player.doubleUnits[unitIndex].boostState === "charging")
+                ? "charging"
+                : "cooldown")
+            : "idle"
+        player.currentSpeed = Math.max(
+            getBaseSpeedForPlayer(player),
+            Number(strongestUnit && strongestUnit.currentSpeed || getBaseSpeedForPlayer(player))
+        )
+        player.boostState = mergedBoostState
+        if (mergedBoostState !== "idle" && strongestUnit) {
+            player.boostDirectionX = Number(strongestUnit.boostDirectionX || 0)
+            player.boostDirectionY = Number(strongestUnit.boostDirectionY || 0)
+        } else {
+            player.boostDirectionX = 0
+            player.boostDirectionY = 0
+        }
         return {
             dx: averageMoveX,
             dy: averageMoveY
@@ -1128,7 +1467,7 @@ class World {
             player.npcChargeWindupUntil = 0
             player.npcQueuedExtraCharges = 0
             player.boostState = "idle"
-            player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+            player.currentSpeed = getNpcBaseSpeed(player)
             player.boostDirectionX = 0
             player.boostDirectionY = 0
             return
@@ -1154,6 +1493,12 @@ class World {
 
     getCollisionHalfExtents(player) {
         // 현재는 유저/네르만 다른 충돌 크기를 가진다.
+        if (player && player.isHouse) {
+            return {
+                halfWidth: HOUSE_COLLISION_HALF_WIDTH,
+                halfHeight: HOUSE_COLLISION_HALF_HEIGHT,
+            }
+        }
         if (player && player.isNpc) {
             return {
                 halfWidth: NPC_COLLISION_HALF_WIDTH,
@@ -1168,6 +1513,9 @@ class World {
     }
 
     getSingleCollisionDirectionRadius(player, normalX, normalY, angleOverride = null) {
+        if (player && player.isHouse) {
+            return this.getHouseCollisionDirectionRadius(normalX, normalY)
+        }
         // 회전된 둥근 직사각형을 한 방향에서 바라본 "유효 반지름"으로 바꿔서
         // 방향별 충돌 거리 계산에 사용한다.
         const { halfWidth, halfHeight } = this.getCollisionHalfExtents(player)
@@ -1187,25 +1535,20 @@ class World {
         return (Math.abs(localX) * innerHalfWidth) + (Math.abs(localY) * innerHalfHeight) + cornerRadius
     }
 
-    getCollisionDirectionRadius(player, normalX, normalY) {
-        if (player && player.isDoubleSkin && !player.doubleMerged && Array.isArray(player.doubleUnits)) {
-            const aliveIndices = getDoubleAliveUnitIndices(player)
-            if (aliveIndices.length) {
-                let bestRadius = 0
-                aliveIndices.forEach((unitIndex) => {
-                    const unit = player.doubleUnits[unitIndex]
-                    if (!unit) {
-                        return
-                    }
-                    const offsetX = Number(unit.x || 0) - Number(player.x || 0)
-                    const offsetY = Number(unit.y || 0) - Number(player.y || 0)
-                    const unitRadius = this.getSingleCollisionDirectionRadius(player, normalX, normalY, typeof unit.facingAngle === "number" ? unit.facingAngle : null)
-                    bestRadius = Math.max(bestRadius, (offsetX * normalX) + (offsetY * normalY) + unitRadius)
-                })
-                return Math.max(0, bestRadius)
+    getHouseCollisionDirectionRadius(normalX, normalY) {
+        let bestProjection = 0
+        HOUSE_COLLISION_POLYGON.forEach((vertex) => {
+            const vx = vertex.x * HOUSE_COLLISION_HALF_WIDTH * 2
+            const vy = vertex.y * HOUSE_COLLISION_HALF_HEIGHT * 2
+            const projection = (vx * normalX) + (vy * normalY)
+            if (projection > bestProjection) {
+                bestProjection = projection
             }
-        }
+        })
+        return bestProjection
+    }
 
+    getCollisionDirectionRadius(player, normalX, normalY) {
         return this.getSingleCollisionDirectionRadius(player, normalX, normalY)
     }
 
@@ -1357,10 +1700,10 @@ class World {
         }
 
         // 네르는 체력이 0 이하가 되면 즉시 dead 상태로 들어가고,
-        // 애니메이션 후 일정 시간 뒤 자동 리스폰한다.
+        // 애니메이션이 끝나면 월드에서 제거된다.
         player.deathStartedAt = now
         player.deathUntil = now + NPC_DEATH_ANIMATION_DURATION_MS
-        player.npcRespawnAt = now + NPC_RESPAWN_DELAY_MS
+        player.npcRespawnAt = 0
         player.npcHealth = 0
         player.npcState = "dead"
         player.npcTargetId = ""
@@ -1387,12 +1730,20 @@ class World {
         player.npcWinVisualUntil = 0
         player.playerWinVisualUntil = 0
         player.boostDisabledStartedAt = now
-        player.boostDisabledUntil = player.npcRespawnAt
+        player.boostDisabledUntil = player.deathUntil
         player.lastMoveX = 0
         player.lastMoveY = 0
         if (isPersistentHumanPlayer(defeatedByPlayer)) {
             defeatedByPlayer.playerWinVisualUntil = now + 3000
             postStatsUpdate(defeatedByPlayer.id, { ner_kills: 1 })
+        }
+        const remainingAliveNers = this.getAliveNerPlayers().filter((candidate) => candidate.id !== player.id)
+        if (this.encounterStage === 0) {
+            this.beginStageOneHouseEncounter(now)
+        } else if (this.encounterStage === 2) {
+            this.beginStageTwoHouseEncounter(now)
+        } else if (this.encounterStage === 4 && remainingAliveNers.length === 0) {
+            this.beginStageThreeHouseEncounter(now)
         }
     }
 
@@ -1509,7 +1860,16 @@ class World {
             return null
         }
 
-        const nextTarget = candidates.reduce((closestCandidate, candidate) => {
+        const targetedIds = new Set(
+            this.getAliveNerPlayers()
+                .filter((candidate) => candidate.id !== player.id && candidate.npcTargetId)
+                .map((candidate) => String(candidate.npcTargetId || ""))
+                .filter(Boolean)
+        )
+        const untargetedCandidates = candidates.filter((candidate) => !targetedIds.has(candidate.id))
+        const targetPool = untargetedCandidates.length ? untargetedCandidates : candidates
+
+        const nextTarget = targetPool.reduce((closestCandidate, candidate) => {
             if (!closestCandidate) {
                 return candidate
             }
@@ -1519,6 +1879,32 @@ class World {
         }, null)
         player.npcTargetId = nextTarget.id
         return nextTarget
+    }
+
+    getNpcChargePattern(player, npcPhase) {
+        if (String(player && player.npcEncounterVariant || "") !== "doorboss") {
+            return {
+                queuedExtraCharges: npcPhase >= 2 ? 1 : 0,
+                instantExtraCharge: npcPhase >= 3,
+            }
+        }
+
+        if (npcPhase >= 3) {
+            return {
+                queuedExtraCharges: 2,
+                instantExtraCharge: true,
+            }
+        }
+        if (npcPhase >= 2) {
+            return {
+                queuedExtraCharges: 1,
+                instantExtraCharge: true,
+            }
+        }
+        return {
+            queuedExtraCharges: 1,
+            instantExtraCharge: false,
+        }
     }
 
     startNpcChargeSkill(player, diffX, diffY, distance, options = {}) {
@@ -1542,7 +1928,7 @@ class World {
         player.npcChargeTargetId = targetId
         player.npcChargeHitTarget = false
         player.npcChargeIsPhaseAttack = isPhaseAttack
-        player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+        player.currentSpeed = getNpcBaseSpeed(player)
         player.npcChargeWindupStartedAt = 0
         player.npcChargeWindupUntil = 0
         if (instantCharge) {
@@ -1554,7 +1940,8 @@ class World {
             player.npcChargeWindupStartedAt = Date.now()
             player.npcChargeWindupUntil = player.npcChargeWindupStartedAt + NPC_CHARGE_WINDUP_DURATION_MS
         }
-        player.npcQueuedExtraCharges = queueExtraCharge && npcPhase >= 2 ? 1 : 0
+        const chargePattern = this.getNpcChargePattern(player, npcPhase)
+        player.npcQueuedExtraCharges = queueExtraCharge ? chargePattern.queuedExtraCharges : 0
 
         return { dx: 0, dy: 0 }
     }
@@ -1578,7 +1965,7 @@ class World {
 
         if (player.npcState === "rest") {
             player.boostState = "idle"
-            player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+            player.currentSpeed = getNpcBaseSpeed(player)
             player.npcChargeWindupStartedAt = 0
             player.npcChargeWindupUntil = 0
             if (player.npcRestUntil > now) {
@@ -1590,7 +1977,8 @@ class World {
                     const retainedDiffX = retainedTarget.x - player.x
                     const retainedDiffY = retainedTarget.y - player.y
                     const retainedDistance = Math.hypot(retainedDiffX, retainedDiffY)
-                    const instantExtraCharge = npcPhase >= 3
+                    const chargePattern = this.getNpcChargePattern(player, npcPhase)
+                    const instantExtraCharge = chargePattern.instantExtraCharge
                     player.npcQueuedExtraCharges = Math.max(0, player.npcQueuedExtraCharges - 1)
                     return this.startNpcChargeSkill(
                         player,
@@ -1616,7 +2004,7 @@ class World {
         if (!target) {
             player.npcState = "idle"
             player.boostState = "idle"
-            player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+            player.currentSpeed = getNpcBaseSpeed(player)
             player.npcChargeWindupStartedAt = 0
             player.npcChargeWindupUntil = 0
             return { dx: 0, dy: 0 }
@@ -1954,7 +2342,7 @@ class World {
                 return true
             }
         }
-        if (Number(player.doubleDefeatProtectedUntil || 0) > now) {
+        if (aliveIndices.length > 1 && Number(player.doubleDefeatProtectedUntil || 0) > now) {
             if (defeatedByPlayer && String(player.doubleDefeatProtectedById || "") === String(defeatedByPlayer.id || "")) {
                 return true
             }
@@ -2057,11 +2445,16 @@ class World {
         targetUnit.currentSpeed = player.currentSpeed
         targetUnit.boostDisabledStartedAt = player.boostDisabledStartedAt
         targetUnit.boostDisabledUntil = player.boostDisabledUntil
-        player.doubleDefeatProtectedUntil = Math.max(
-            now + COLLISION_IMPACT_DURATION_MS,
-            Number(player.collisionRecoveryUntil || 0)
-        )
-        player.doubleDefeatProtectedById = defeatedByPlayer ? String(defeatedByPlayer.id || "") : ""
+        if (aliveIndices.length > 1) {
+            player.doubleDefeatProtectedUntil = Math.max(
+                now + COLLISION_IMPACT_DURATION_MS,
+                Number(player.collisionRecoveryUntil || 0)
+            )
+            player.doubleDefeatProtectedById = defeatedByPlayer ? String(defeatedByPlayer.id || "") : ""
+        } else {
+            player.doubleDefeatProtectedUntil = 0
+            player.doubleDefeatProtectedById = ""
+        }
 
         if (targetUnit.health <= 0) {
             targetUnit.inactiveUntil = now + DOUBLE_INACTIVE_FADE_MS
@@ -2134,6 +2527,48 @@ class World {
                 }
 
                 const overlap = collisionDistance - distance
+
+                if (playerA.isHouse || playerB.isHouse) {
+                    const housePlayer = playerA.isHouse ? playerA : playerB
+                    const moverPlayer = playerA.isHouse ? playerB : playerA
+                    const hitNormalFromHouseX = playerA.isHouse ? normalX : -normalX
+                    const hitNormalFromHouseY = playerA.isHouse ? normalY : -normalY
+                    const bounceDistance = Math.min(
+                        COLLISION_MAX_BOUNCE_DISTANCE,
+                        COLLISION_BOUNCE_DISTANCE + Math.hypot(moverPlayer.lastMoveX || 0, moverPlayer.lastMoveY || 0) * COLLISION_SPEED_BOUNCE_MULTIPLIER
+                    )
+                    this.applyCollisionPush(moverPlayer, hitNormalFromHouseX, hitNormalFromHouseY, overlap + bounceDistance)
+                    moverPlayer.collisionVisualUntil = now + COLLISION_VISUAL_BASE_DURATION_MS
+                    moverPlayer.collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+                    moverPlayer.collisionVisualType = "win"
+                    moverPlayer.collisionImpactX = hitNormalFromHouseX
+                    moverPlayer.collisionImpactY = hitNormalFromHouseY
+                    this.applyCollisionSlow(moverPlayer, now, moverPlayer.collisionVisualUntil)
+
+                    if (isPersistentHumanPlayer(moverPlayer) && !moverPlayer.isDummy && !moverPlayer.isNpc) {
+                        const damage = this.getUserDamageAgainstNpc(moverPlayer)
+                        if (damage > 0) {
+                            housePlayer.houseHealth = Math.max(0, Number(housePlayer.houseHealth || 0) - damage)
+                            if (housePlayer.houseHealth <= 0) {
+                                this.grid.remove(housePlayer)
+                                this.players.delete(housePlayer.id)
+                                if (housePlayer.houseStage === 1) {
+                                    this.beginStageTwoNer(now)
+                                } else if (housePlayer.houseStage === 2) {
+                                    this.beginStageThreeNer(now)
+                                } else if (housePlayer.houseStage === 3) {
+                                    this.beginEncounterFinale(now)
+                                }
+                            }
+                        }
+                    }
+                    continue
+                }
+
+                if (playerA.isNpc && playerB.isNpc) {
+                    continue
+                }
+
                 const relativeMoveX = playerB.lastMoveX - playerA.lastMoveX
                 const relativeMoveY = playerB.lastMoveY - playerA.lastMoveY
                 const relativeImpactSpeed = Math.max(
@@ -2315,7 +2750,29 @@ class World {
         const now = Date.now()
         this.maybeResetAfterInputIdle(now)
         if (this.pendingRoundResetAt && now >= this.pendingRoundResetAt && this.areAllHumanPlayersOut()) {
-            this.resetRoundLives(now)
+            if (this.encounterResetOnAllDead) {
+                this.resetEncounterToInitial(now)
+            } else {
+                this.resetRoundLives(now)
+            }
+        }
+        if (this.encounterStage > 0 && this.encounterCountdownUntil && now >= this.encounterCountdownUntil) {
+            if (this.encounterStage === 1 || this.encounterStage === 3 || this.encounterStage === 5) {
+                this.killAllHumansForEncounterFailure(now)
+                this.clearEncounterAnnouncement()
+            }
+        }
+        if (this.encounterFinaleUntil && now >= this.encounterFinaleUntil) {
+            if (!this.encounterFinaleRewarded) {
+                for (const player of this.players.values()) {
+                    if (isPersistentHumanPlayer(player)) {
+                        postStatsUpdate(player.id, { game_clears: 1 })
+                    }
+                }
+                this.encounterFinaleRewarded = true
+            }
+            this.resetEncounterToInitial(now)
+            return
         }
 
         for (const player of this.players.values()) {
@@ -2336,10 +2793,8 @@ class World {
                 }
 
                 if (player.isNpc) {
-                    if (player.npcRespawnAt > now) {
-                        continue
-                    }
-                    this.respawnPlayer(player, now)
+                    this.grid.remove(player)
+                    this.players.delete(player.id)
                     continue
                 }
 
@@ -2570,7 +3025,8 @@ class World {
                         const retainedDiffX = retainedTarget.x - player.x
                         const retainedDiffY = retainedTarget.y - player.y
                         const retainedDistance = Math.hypot(retainedDiffX, retainedDiffY)
-                        const instantExtraCharge = (player.npcPhase || getNpcPhase(player)) >= 3
+                        const chargePattern = this.getNpcChargePattern(player, player.npcPhase || getNpcPhase(player))
+                        const instantExtraCharge = chargePattern.instantExtraCharge
                         player.npcQueuedExtraCharges = Math.max(0, player.npcQueuedExtraCharges - 1)
                         player.lastMoveX = 0
                         player.lastMoveY = 0
@@ -2600,7 +3056,7 @@ class World {
                     player.npcTargetId = ""
                     player.npcChargeDistanceRemaining = 0
                     player.boostState = "idle"
-                    player.currentSpeed = NPC_BASE_SPEED_PER_SECOND
+                        player.currentSpeed = getNpcBaseSpeed(player)
                     player.lastMoveX = 0
                     player.lastMoveY = 0
                 }

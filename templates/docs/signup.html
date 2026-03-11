@@ -65,10 +65,26 @@
             <div class="ide-login-error">{{ docs_signup_form.email.errors|join:", " }}</div>
         {% endif %}
 
+        <label class="ide-field ide-field-full ide-field-checkbox">
+            <span class="ide-field-checkbox-control">
+                {{ docs_signup_form.privacy_consent }}
+            </span>
+            <span class="ide-field-checkbox-text">
+                {{ docs_text.auth_privacy_consent_label }}
+                <a class="ui-path-link" href="{{ privacy_url }}" target="_blank" rel="noopener">Privacy Policy</a>
+                ·
+                <a class="ui-path-link" href="{{ terms_url }}" target="_blank" rel="noopener">Terms of Service</a>
+            </span>
+        </label>
+        {% if docs_signup_form.privacy_consent.errors %}
+            <div class="ide-login-error">{{ docs_signup_form.privacy_consent.errors|join:", " }}</div>
+        {% endif %}
+
         <div class="ide-login-actions">
             <a class="ide-btn" href="{{ docs_login_url }}">{{ docs_text.cancel }}</a>
             <button class="ide-btn ide-btn-primary" type="submit">{{ docs_text.auth_signup_submit }}</button>
         </div>
     </form>
 </main>
+{% include "partials/site_footer_links.html" %}
 {% endblock %}
