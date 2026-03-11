@@ -43,7 +43,8 @@ function getConnectionAuth(request, world) {
         userId: verified.payload?.is_guest
             ? world.getOrAssignGuestDisplayId(verified.userId || verified.payload?.sub || "")
             : verified.userId,
-        isGuest: Boolean(verified.payload?.is_guest)
+        isGuest: Boolean(verified.payload?.is_guest),
+        skinName: String(verified.payload?.selected_skin || "default").trim() || "default"
     }
 }
 
@@ -74,7 +75,7 @@ function createServer(world) {
 
         const id = auth.userId || Math.random().toString(36).slice(2)
         const connectionKey = auth.connectionKey || id
-        const player = world.addPlayer(connectionKey, id)
+        const player = world.addPlayer(connectionKey, id, { skinName: auth.skinName })
 
         // 소켓 객체에 플레이어/유휴 판정 정보를 같이 붙여서 관리한다.
         ws.player = player

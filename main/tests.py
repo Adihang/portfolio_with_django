@@ -1,3 +1,5 @@
+import base64
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
@@ -10,7 +12,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-import json
 from datetime import date
 
 from .models import (
@@ -619,6 +620,7 @@ class HanplanetMultiplayerPageTests(TestCase):
         self.assertContains(response, "/ko/api/game-auth-token/", html=False)
         self.assertContains(response, "범퍼카 스핔이", html=False)
         self.assertNotContains(response, "서버 재시작", html=False)
+        self.assertContains(response, "data-skin-catalog=", html=False)
 
     def test_multiplayer_page_shows_restart_button_for_superuser(self):
         self.client.force_login(self.admin_user)
@@ -645,6 +647,45 @@ class HanplanetMultiplayerPageTests(TestCase):
         token = payload["token"]
         self.assertEqual(token.count("."), 2)
         self.assertEqual(payload["expires_in"], 300)
+        payload_segment = token.split(".")[1]
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload_segment + "==").decode("utf-8"))
+        self.assertEqual(decoded_payload["selected_skin"], "default")
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
+    def test_game_auth_token_api_uses_unlocked_selected_skin(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"ner_kills": 10})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/api/game-auth-token/?skin=evolution")
+
+        self.assertEqual(response.status_code, 200)
+        token = response.json()["token"]
+        payload_segment = token.split(".")[1]
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload_segment + "==").decode("utf-8"))
+        self.assertEqual(decoded_payload["selected_skin"], "evolution")
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
+    def test_game_auth_token_api_uses_unlocked_double_skin(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"deaths": 20})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/api/game-auth-token/?skin=double")
+
+        self.assertEqual(response.status_code, 200)
+        token = response.json()["token"]
+        payload_segment = token.split(".")[1]
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload_segment + "==").decode("utf-8"))
+        self.assertEqual(decoded_payload["selected_skin"], "double")
 
     @override_settings(
         GAME_JWT_SECRET="test-game-secret",
@@ -747,6 +788,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                     "increments": {
                         "dummy_kills": 2,
                         "deaths": 1,
+                        "player_kills": 4,
                         "ner_kills": 3,
                         "ner_phase1_attack_dodges": 4,
                         "ner_phase2_attack_dodges": 5,
@@ -766,6 +808,7 @@ class HanplanetMultiplayerPageTests(TestCase):
             {
                 "dummy_kills": 2,
                 "deaths": 1,
+                "player_kills": 4,
                 "ner_kills": 3,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
@@ -793,6 +836,7 @@ class HanplanetMultiplayerPageTests(TestCase):
             bumpercar_spiky_stats={
                 "dummy_kills": 1,
                 "deaths": 2,
+                "player_kills": 7,
                 "ner_kills": 3,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
@@ -810,6 +854,7 @@ class HanplanetMultiplayerPageTests(TestCase):
             {
                 "dummy_kills": 1,
                 "deaths": 2,
+                "player_kills": 7,
                 "ner_kills": 3,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
@@ -818,6 +863,28 @@ class HanplanetMultiplayerPageTests(TestCase):
             },
         )
         self.assertTrue(response.context["show_account_bumpercar_spiky_stats"])
+
+    def test_multiplayer_page_marks_evolution_skin_unlocked_when_ner_kills_reach_ten(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"ner_kills": 10})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        evolution_skin = next(skin for skin in skin_catalog if skin["name"] == "evolution")
+        self.assertTrue(evolution_skin["unlocked"])
+
+    def test_multiplayer_page_marks_double_skin_unlocked_when_deaths_reach_twenty(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"deaths": 20})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        double_skin = next(skin for skin in skin_catalog if skin["name"] == "double")
+        self.assertTrue(double_skin["unlocked"])
 
     def test_minigame_page_shows_stats_button_but_not_account_stats_menu(self):
         UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"dummy_kills": 1})

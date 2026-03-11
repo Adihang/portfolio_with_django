@@ -15,6 +15,17 @@
     const loadingSpinner = root.querySelector('[data-game-loading-spinner]');
     const loadingMainNode = root.querySelector('[data-game-loading-main]');
     const loadingTrailNodes = Array.from(root.querySelectorAll('[data-game-loading-trail]'));
+    const startCharacterButton = root.querySelector('[data-game-skin-open]');
+    const startCharacterImage = root.querySelector('[data-game-start-character-image]');
+    const skinModal = root.querySelector('[data-game-skin-modal]');
+    const skinModalCloseButton = root.querySelector('[data-game-skin-modal-close]');
+    const skinListNode = root.querySelector('[data-game-skin-list]');
+    const skinDetailNode = root.querySelector('[data-game-skin-detail]');
+    const skinDetailIconNode = root.querySelector('[data-game-skin-detail-icon]');
+    const skinDetailNameNode = root.querySelector('[data-game-skin-detail-name]');
+    const skinDetailUnlockNode = root.querySelector('[data-game-skin-detail-unlock]');
+    const skinDetailDescriptionNode = root.querySelector('[data-game-skin-detail-description]');
+    const skinSelectButton = root.querySelector('[data-game-skin-select]');
     const connectionStatus = root.querySelector('[data-game-connection-status]');
     const defeatReceivedCountNode = root.querySelector('[data-game-defeat-received-count]');
     const defeatDealtCountNode = root.querySelector('[data-game-defeat-dealt-count]');
@@ -22,8 +33,9 @@
     const selfIdNode = root.querySelector('[data-game-self-id]');
     const selfPositionNode = root.querySelector('[data-game-self-position]');
     const reconnectButton = root.querySelector('[data-game-reconnect]');
-    const fullscreenToggle = root.querySelector('[data-game-fullscreen-toggle]');
+    const fullscreenToggles = Array.from(root.querySelectorAll('[data-game-fullscreen-toggle]'));
     const fullscreenExitButton = root.querySelector('[data-game-fullscreen-exit]');
+    const topActions = root.querySelector('[data-game-top-actions]');
     const mobileControlsToggle = root.querySelector('[data-game-mobile-controls-toggle]');
     const mobileControls = root.querySelector('[data-game-mobile-controls]');
     const joystick = root.querySelector('[data-game-joystick]');
@@ -64,8 +76,17 @@
     const deathRespawnLabel = root.getAttribute('data-death-respawn-label') || 'Respawn';
     const deathNoLivesLabel = root.getAttribute('data-death-no-lives-label') || 'No Lives Left';
     const deathSpectateEmptyLabel = root.getAttribute('data-death-spectate-empty-label') || 'No players to spectate';
+    const skinLockedLabel = window.document.documentElement.lang === 'en' ? 'Locked' : '잠김';
     const playerName = root.getAttribute('data-player-name') || 'Player';
-    const playerIconUrl = root.getAttribute('data-player-icon-url') || '';
+    const skinCatalog = (function () {
+        const rawValue = root.getAttribute('data-skin-catalog') || '[]';
+        try {
+            const parsed = JSON.parse(rawValue);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    })();
     const playerNpcIconUrl = root.getAttribute('data-player-npc-icon-url') || '';
     const playerNpcPhase2IconUrl = root.getAttribute('data-player-npc-phase2-icon-url') || '';
     const playerNpcPhase3IconUrl = root.getAttribute('data-player-npc-phase3-icon-url') || '';
@@ -73,54 +94,6 @@
     const playerNpcDefeat1IconUrl = root.getAttribute('data-player-npc-defeat1-icon-url') || '';
     const playerNpcDefeat2IconUrl = root.getAttribute('data-player-npc-defeat2-icon-url') || '';
     const playerNpcDieIconUrl = root.getAttribute('data-player-npc-die-icon-url') || '';
-    const playerBoostIconUrl = root.getAttribute('data-player-boost-icon-url') || '';
-    const playerCollisionIconUrl = root.getAttribute('data-player-collision-icon-url') || '';
-    const playerDefeatIconUrl = root.getAttribute('data-player-defeat-icon-url') || '';
-    const boostSoundUrls = (function () {
-        const rawValue = root.getAttribute('data-player-boost-sound-urls') || '[]';
-        try {
-            const parsed = JSON.parse(rawValue);
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
-    const crashSoundUrls = (function () {
-        const rawValue = root.getAttribute('data-player-crash-sound-urls') || '[]';
-        try {
-            const parsed = JSON.parse(rawValue);
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
-    const defeatSoundUrls = (function () {
-        const rawValue = root.getAttribute('data-player-defeat-sound-urls') || '[]';
-        try {
-            const parsed = JSON.parse(rawValue);
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
-    const dieSoundUrls = (function () {
-        const rawValue = root.getAttribute('data-player-die-sound-urls') || '[]';
-        try {
-            const parsed = JSON.parse(rawValue);
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
-    const respawnSoundUrls = (function () {
-        const rawValue = root.getAttribute('data-player-respawn-sound-urls') || '[]';
-        try {
-            const parsed = JSON.parse(rawValue);
-            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
     const nerTrackingSoundUrls = (function () {
         const rawValue = root.getAttribute('data-player-ner-tracking-sound-urls') || '[]';
         try {
@@ -186,8 +159,10 @@
     const remoteRenderDelaySeconds = 0.06;
     const referenceCanvasWidth = 960;
     const referenceCanvasHeight = 640;
+    const defaultPlayerAspectRatio = 173 / 170;
     const rotationLerpPerSecond = 14;
     const flipDurationSeconds = 0.18;
+    const doubleUnitDeathFadeMs = 3000;
     const soundHearingRadius = 560;
     const inputSendIntervalMs = 66;
     const inputHeartbeatMs = 150;
@@ -216,6 +191,7 @@
     let suppressNextCloseReconnect = false;
     let idleReconnectBlocked = false;
     let isFullscreenMode = false;
+    let isCompactViewport = false;
     let joystickPointerId = null;
     let lastRenderTime = 0;
     let cameraX = worldSize / 2;
@@ -234,10 +210,12 @@
     let selfLivesRemaining = Math.max(1, Number(gameplaySettings.user_lives || 3));
     let roundResetAnnouncementActive = false;
     let roundResetAnnouncementLatched = false;
+    let selfDoubleMerged = false;
     let respawnRequestPending = false;
     let manualStartAutoRespawnPending = false;
     let spectateTargetId = '';
     let selfCollisionActive = false;
+    let selfCollisionImpactActive = false;
     let selfCollisionVisualType = 'win';
     let lastSentInputSignature = '';
     let lastSentInputAt = 0;
@@ -251,13 +229,14 @@
     let loadingTrailLastAt = 0;
     const playerAudioStates = new Map();
     const activePlayerSounds = new Map();
+    const pendingPlayerSoundTimers = new Map();
     const playerVisuals = new Map();
     const spriteOverlayNodes = new Map();
     let canvasScale = 1;
     const animatedAssetDock = window.document.createElement('div');
     const npcTintCanvas = window.document.createElement('canvas');
     const npcTintContext = npcTintCanvas.getContext('2d');
-    const playerIcon = new window.Image();
+    const skinAssetRuntimeByName = new Map();
     const playerNpcIcon = new window.Image();
     const playerNpcPhase2Icon = new window.Image();
     const playerNpcPhase3Icon = new window.Image();
@@ -272,10 +251,6 @@
             url: url
         };
     });
-    const playerBoostIcon = new window.Image();
-    const playerCollisionIcon = new window.Image();
-    const playerDefeatIcon = new window.Image();
-    let playerIconReady = false;
     let playerNpcIconReady = false;
     let playerNpcPhase2IconReady = false;
     let playerNpcPhase3IconReady = false;
@@ -283,9 +258,8 @@
     let playerNpcDefeat1IconReady = false;
     let playerNpcDefeat2IconReady = false;
     let playerNpcDieIconReady = false;
-    let playerBoostIconReady = false;
-    let playerCollisionIconReady = false;
-    let playerDefeatIconReady = false;
+    let selectedSkinName = 'default';
+    let selectedSkinDetailName = '';
 
     animatedAssetDock.setAttribute('aria-hidden', 'true');
     animatedAssetDock.style.position = 'fixed';
@@ -301,11 +275,15 @@
     animatedAssetDock.style.clipPath = 'inset(0 0 0 0 round 999px)';
     window.document.body.appendChild(animatedAssetDock);
 
+    const isAnimatedRasterAsset = function (src) {
+        return /\.(?:gif|webp)(?:\?|$)/i.test(String(src || ''));
+    };
+
     const bindImage = function (image, src, onReadyChange) {
         if (!src) {
             return;
         }
-        if (/\.gif(?:\?|$)/i.test(src) && !image.isConnected) {
+        if (isAnimatedRasterAsset(src) && !image.isConnected) {
             image.setAttribute('aria-hidden', 'true');
             image.style.position = 'static';
             image.style.display = 'block';
@@ -330,9 +308,128 @@
         });
     };
 
+    const createManagedImage = function (src) {
+        const entry = {
+            image: new window.Image(),
+            ready: false,
+            url: src || ''
+        };
+        bindImage(entry.image, src || '', function (ready) {
+            entry.ready = ready;
+        });
+        return entry;
+    };
+
+    const getManagedImageSource = function (entry) {
+        if (!entry || !entry.image) {
+            return '';
+        }
+        return String(entry.image.currentSrc || entry.image.src || '');
+    };
+
+    const createSkinAssetRuntime = function (skinConfig) {
+        const assets = skinConfig && skinConfig.assets ? skinConfig.assets : {};
+        const runtime = {
+            name: skinConfig && skinConfig.name ? skinConfig.name : 'default',
+            displayName: skinConfig && skinConfig.display_name ? skinConfig.display_name : 'Default',
+            unlocked: Boolean(skinConfig && skinConfig.unlocked),
+            unlockCondition: skinConfig && skinConfig.unlock_condition ? skinConfig.unlock_condition : '',
+            description: skinConfig && skinConfig.description ? skinConfig.description : '',
+            sounds: {
+                boost: Array.isArray(assets.boost_sound_urls) ? assets.boost_sound_urls.filter(Boolean) : [],
+                crash: Array.isArray(assets.crash_sound_urls) ? assets.crash_sound_urls.filter(Boolean) : [],
+                defeat: Array.isArray(assets.defeat_sound_urls) ? assets.defeat_sound_urls.filter(Boolean) : [],
+                die: Array.isArray(assets.die_sound_urls) ? assets.die_sound_urls.filter(Boolean) : [],
+                respawn: Array.isArray(assets.respawn_sound_urls) ? assets.respawn_sound_urls.filter(Boolean) : [],
+            },
+            previewIcon: createManagedImage(assets.preview_icon_url || assets.default_icon_url || ''),
+            legacyIcon: createManagedImage(assets.default_icon_url || assets.preview_icon_url || ''),
+            legacyBoostIcon: createManagedImage(assets.boost_icon_url || ''),
+            legacyCollisionIcon: createManagedImage(assets.collision_icon_url || ''),
+            legacyDefeatIcon: createManagedImage(assets.defeat_icon_url || ''),
+            skinType: skinConfig && skinConfig.skin_type ? String(skinConfig.skin_type) : 'classic',
+            defaultIconSets: Array.isArray(assets.default_icon_sets)
+                ? assets.default_icon_sets.map(function (set) {
+                    return {
+                        healthy: createManagedImage(set && set.healthy_icon_url ? set.healthy_icon_url : ''),
+                        damaged: createManagedImage(set && set.damaged_icon_url ? set.damaged_icon_url : '')
+                    };
+                }).filter(function (set) {
+                    return set.healthy.url || set.damaged.url;
+                })
+                : [],
+            boostStages: Array.isArray(assets.boost_icon_stages)
+                ? assets.boost_icon_stages.filter(Boolean).map(createManagedImage)
+                : [],
+            collisionIconSets: Array.isArray(assets.collision_icon_sets)
+                ? assets.collision_icon_sets.map(function (set) {
+                    return {
+                        impact: createManagedImage(set && set.impact_icon_url ? set.impact_icon_url : ''),
+                        slow: createManagedImage(set && set.slow_icon_url ? set.slow_icon_url : '')
+                    };
+                }).filter(function (set) {
+                    return set.impact.url || set.slow.url;
+                })
+                : [],
+            defeatStages: Array.isArray(assets.defeat_icon_stages)
+                ? assets.defeat_icon_stages.filter(Boolean).map(createManagedImage)
+                : [],
+            defaultStateIcons: Array.isArray(assets.default_state_icons)
+                ? assets.default_state_icons.filter(Boolean).map(createManagedImage)
+                : [],
+            collisionStateIcons: Array.isArray(assets.collision_state_icons)
+                ? assets.collision_state_icons.filter(Boolean).map(createManagedImage)
+                : [],
+            defeatStateIcons: Array.isArray(assets.defeat_state_icons)
+                ? assets.defeat_state_icons.filter(Boolean).map(createManagedImage)
+                : [],
+            winStateIcons: Array.isArray(assets.win_state_icons)
+                ? assets.win_state_icons.filter(Boolean).map(createManagedImage)
+                : [],
+            stopStateIcons: Array.isArray(assets.stop_state_icons)
+                ? assets.stop_state_icons.filter(Boolean).map(createManagedImage)
+                : [],
+        };
+        return runtime;
+    };
+
+    const ensureSkinAssetRuntime = function (skinName) {
+        const normalizedName = String(skinName || 'default').trim().toLowerCase() || 'default';
+        if (skinAssetRuntimeByName.has(normalizedName)) {
+            return skinAssetRuntimeByName.get(normalizedName);
+        }
+        const skinConfig = skinCatalog.find(function (entry) {
+            return String(entry && entry.name || '').trim().toLowerCase() === normalizedName;
+        }) || skinCatalog[0] || {
+            name: 'default',
+            display_name: 'Default',
+            unlocked: true,
+            assets: {}
+        };
+        const runtime = createSkinAssetRuntime(skinConfig);
+        skinAssetRuntimeByName.set(normalizedName, runtime);
+        return runtime;
+    };
+
+    const getSkinConfig = function (skinName) {
+        return ensureSkinAssetRuntime(skinName || selectedSkinName || 'default');
+    };
+
+    const resolveSelectedSkinName = function () {
+        const storedValue = window.localStorage ? window.localStorage.getItem('hanplanet-bumpercar-selected-skin') : '';
+        const requestedName = String(storedValue || 'default').trim().toLowerCase() || 'default';
+        const matchingSkin = skinCatalog.find(function (skin) {
+            return String(skin && skin.name || '').trim().toLowerCase() === requestedName;
+        });
+        if (matchingSkin && matchingSkin.unlocked) {
+            return requestedName;
+        }
+        return 'default';
+    };
+
     const isAnimatedGifIcon = function (icon) {
         const src = String((icon && (icon.currentSrc || icon.src)) || '');
-        return /\.gif(?:\?|$)/i.test(src);
+        return isAnimatedRasterAsset(src);
     };
 
     const getSpriteOverlayNode = function (playerId) {
@@ -361,8 +458,8 @@
         node.style.display = 'none';
     };
 
-    bindImage(playerIcon, playerIconUrl, function (ready) {
-        playerIconReady = ready;
+    skinCatalog.forEach(function (skinConfig) {
+        ensureSkinAssetRuntime(skinConfig && skinConfig.name ? skinConfig.name : 'default');
     });
     bindImage(playerNpcIcon, playerNpcIconUrl, function (ready) {
         playerNpcIconReady = ready;
@@ -390,15 +487,7 @@
             entry.ready = ready;
         });
     });
-    bindImage(playerBoostIcon, playerBoostIconUrl, function (ready) {
-        playerBoostIconReady = ready;
-    });
-    bindImage(playerCollisionIcon, playerCollisionIconUrl, function (ready) {
-        playerCollisionIconReady = ready;
-    });
-    bindImage(playerDefeatIcon, playerDefeatIconUrl, function (ready) {
-        playerDefeatIconReady = ready;
-    });
+    selectedSkinName = resolveSelectedSkinName();
 
     const clampToWorld = function (value) {
         return Math.max(0, Math.min(worldSize, value));
@@ -426,14 +515,14 @@
     };
 
     const getEffectiveZoom = function () {
-        const displayWidth = getCanvasDisplayWidth();
-        const displayHeight = getCanvasDisplayHeight();
+        const displayWidth = getViewportDisplayWidth();
+        const displayHeight = getViewportDisplayHeight();
         const canvasArea = displayWidth > 0 && displayHeight > 0
             ? displayWidth * displayHeight
             : referenceCanvasWidth * referenceCanvasHeight;
         const referenceArea = referenceCanvasWidth * referenceCanvasHeight;
         const canvasScale = Math.sqrt(canvasArea / referenceArea);
-        const activeViewZoom = isFullscreenMode ? viewZoom : (viewZoom * 0.82);
+        const activeViewZoom = viewZoom * 0.82;
         const scaledZoom = (activeViewZoom / renderOverscan) * Math.max(canvasScale, 0.35);
         const minWorldFitZoom = Math.max(
             displayWidth / worldSize,
@@ -484,6 +573,144 @@
         idleModal.hidden = !opened;
     };
 
+    const updateStartCharacterPreview = function () {
+        if (!startCharacterImage) {
+            return;
+        }
+        const skinRuntime = getSkinConfig(selectedSkinName);
+        const nextUrl = getManagedImageSource(skinRuntime.previewIcon) || getManagedImageSource(skinRuntime.legacyIcon);
+        startCharacterImage.classList.remove('is-ready');
+        if (nextUrl) {
+            if (startCharacterImage.src !== nextUrl) {
+                startCharacterImage.src = nextUrl;
+            }
+        }
+        startCharacterImage.alt = skinRuntime.displayName;
+        startCharacterImage.classList.toggle('is-evolution', skinRuntime.skinType === 'evolution');
+        if (startCharacterImage.complete && startCharacterImage.naturalWidth > 0) {
+            startCharacterImage.classList.add('is-ready');
+        }
+    };
+
+    if (startCharacterImage) {
+        startCharacterImage.addEventListener('load', function () {
+            startCharacterImage.classList.add('is-ready');
+        });
+        startCharacterImage.addEventListener('error', function () {
+            startCharacterImage.classList.remove('is-ready');
+        });
+    }
+
+    const setSkinModalOpen = function (opened) {
+        if (!skinModal) {
+            return;
+        }
+        skinModal.hidden = !opened;
+        if (!opened && skinDetailNode) {
+            skinDetailNode.hidden = true;
+            selectedSkinDetailName = '';
+        }
+        if (!opened && skinDetailIconNode) {
+            skinDetailIconNode.classList.remove('is-evolution');
+        }
+    };
+
+    const renderSkinList = function () {
+        if (!skinListNode) {
+            return;
+        }
+        skinListNode.innerHTML = '';
+        skinCatalog.forEach(function (skinConfig) {
+            const skinRuntime = getSkinConfig(skinConfig.name);
+            const item = window.document.createElement('div');
+            item.className = 'multiplayer-skin-item';
+            if (!skinConfig.unlocked) {
+                item.classList.add('is-locked');
+            }
+            if (selectedSkinName === skinConfig.name) {
+                item.classList.add('is-selected');
+            }
+
+            const button = window.document.createElement('button');
+            button.className = 'multiplayer-skin-item-button';
+            button.type = 'button';
+            button.dataset.skinName = skinConfig.name;
+
+            const icon = window.document.createElement('img');
+            icon.className = 'multiplayer-skin-item-icon';
+            icon.src = getManagedImageSource(skinRuntime.previewIcon) || getManagedImageSource(skinRuntime.legacyIcon);
+            icon.alt = skinRuntime.displayName;
+            icon.classList.toggle('is-evolution', skinRuntime.skinType === 'evolution');
+
+            const name = window.document.createElement('strong');
+            name.className = 'multiplayer-skin-item-name';
+            name.textContent = skinConfig.unlocked ? skinRuntime.displayName : '???';
+
+            const state = window.document.createElement('span');
+            state.className = 'multiplayer-skin-item-state';
+            state.textContent = selectedSkinName === skinConfig.name
+                ? '✓'
+                : (skinConfig.unlocked ? '' : skinLockedLabel);
+
+            button.appendChild(icon);
+            button.appendChild(name);
+            button.appendChild(state);
+            button.addEventListener('click', function () {
+                selectedSkinDetailName = skinConfig.name;
+                if (skinDetailNode) {
+                    skinDetailNode.hidden = false;
+                }
+                if (skinDetailIconNode) {
+                    skinDetailIconNode.src = icon.src;
+                    skinDetailIconNode.alt = skinRuntime.displayName;
+                    skinDetailIconNode.classList.toggle('is-evolution', skinRuntime.skinType === 'evolution');
+                    skinDetailIconNode.classList.toggle('is-locked', !skinRuntime.unlocked);
+                }
+                if (skinDetailNameNode) {
+                    skinDetailNameNode.textContent = skinRuntime.unlocked ? skinRuntime.displayName : '???';
+                }
+                if (skinDetailUnlockNode) {
+                    skinDetailUnlockNode.textContent = skinRuntime.unlockCondition;
+                }
+                if (skinDetailDescriptionNode) {
+                    skinDetailDescriptionNode.hidden = !skinRuntime.unlocked;
+                    skinDetailDescriptionNode.textContent = skinRuntime.unlocked
+                        ? String(skinRuntime.description || '')
+                            .replace(/₩n/g, '\n')
+                            .replace(/\\n/g, '\n')
+                        : '';
+                }
+                if (skinSelectButton) {
+                    skinSelectButton.hidden = !skinRuntime.unlocked;
+                    skinSelectButton.disabled = selectedSkinName === skinConfig.name;
+                    skinSelectButton.textContent = selectedSkinName === skinConfig.name
+                        ? (window.document.documentElement.lang === 'en' ? 'Selected' : '선택됨')
+                        : (window.document.documentElement.lang === 'en' ? 'Select' : '선택');
+                }
+            });
+
+            item.appendChild(button);
+            skinListNode.appendChild(item);
+        });
+    };
+
+    const applySelectedSkin = function (skinName) {
+        const skinRuntime = getSkinConfig(skinName);
+        if (!skinRuntime.unlocked) {
+            return;
+        }
+        selectedSkinName = skinRuntime.name;
+        if (boostState === 'idle') {
+            currentMoveSpeed = getSelectedPlayerBaseSpeed();
+            serverReportedMoveSpeed = getSelectedPlayerBaseSpeed();
+        }
+        if (window.localStorage) {
+            window.localStorage.setItem('hanplanet-bumpercar-selected-skin', selectedSkinName);
+        }
+        updateStartCharacterPreview();
+        renderSkinList();
+    };
+
     const handleIdleTimeoutDisconnect = function () {
         idleReconnectBlocked = true;
         serverPlayers = [];
@@ -492,8 +719,8 @@
         lastSentInputAt = 0;
         predictedSelf = null;
         renderedSelf = null;
-        currentMoveSpeed = basePlayerSpeedPerSecond;
-        serverReportedMoveSpeed = basePlayerSpeedPerSecond;
+        currentMoveSpeed = getSelectedPlayerBaseSpeed();
+        serverReportedMoveSpeed = getSelectedPlayerBaseSpeed();
         collisionRecoveryActive = false;
         boostLockedActive = false;
         selfDeathActive = false;
@@ -730,7 +957,7 @@
 
     const getSpectatablePlayers = function () {
         return renderPlayers.filter(function (player) {
-            return !player.isNpc && player.id !== selfId && !player.deathActive;
+            return !player.isNpc && !player.isDummy && player.id !== selfId && !player.deathActive;
         });
     };
 
@@ -769,7 +996,7 @@
 
         const safeLivesRemaining = Math.max(0, Number(livesRemaining || 0));
         const spectatablePlayers = syncSpectateTarget();
-        const canSpectate = opened && safeLivesRemaining <= 0 && spectatablePlayers.length > 0;
+        const canSpectate = opened && respawnReady && spectatablePlayers.length > 0;
         const shouldHideForRespawn = respawnRequestPending && opened && respawnReady && safeLivesRemaining > 0;
         deathModal.hidden = !opened || shouldHideForRespawn;
         if (opened && roundResetAnnouncementActive) {
@@ -786,7 +1013,7 @@
             } else {
                 deathModalRespawnButton.textContent = safeLivesRemaining > 0 ? deathRespawnLabel : deathNoLivesLabel;
             }
-            deathModalRespawnButton.hidden = canSpectate;
+            deathModalRespawnButton.hidden = false;
             deathModalRespawnButton.disabled = !respawnReady || safeLivesRemaining <= 0;
         }
         if (deathModalSpectateWrap) {
@@ -794,7 +1021,8 @@
         }
         if (deathModalSpectateLabel) {
             deathModalSpectateLabel.textContent = canSpectate
-                ? (spectatablePlayers.find(function (player) { return player.id === spectateTargetId; }) || spectatablePlayers[0]).id
+                ? ((spectatablePlayers.find(function (player) { return player.id === spectateTargetId; }) || spectatablePlayers[0]).displayName
+                    || (spectatablePlayers.find(function (player) { return player.id === spectateTargetId; }) || spectatablePlayers[0]).id)
                 : deathSpectateEmptyLabel;
         }
         if (deathModalSpectatePrevButton) {
@@ -814,7 +1042,24 @@
         }
         mobileControls.hidden = !opened;
         if (mobileControlsToggle) {
-            mobileControlsToggle.hidden = opened;
+            mobileControlsToggle.classList.toggle('is-active', opened);
+            mobileControlsToggle.setAttribute('aria-pressed', opened ? 'true' : 'false');
+        }
+    };
+
+    const isMobileSizedViewport = function () {
+        const viewportWidth = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        return Math.min(viewportWidth, viewportHeight) <= 900;
+    };
+
+    const updateCompactViewportUI = function () {
+        isCompactViewport = isMobileSizedViewport();
+        if (topActions) {
+            topActions.hidden = !isCompactViewport;
+        }
+        if (!isCompactViewport) {
+            setMobileControlsOpen(false);
         }
     };
 
@@ -837,6 +1082,7 @@
             root.style.removeProperty('--multiplayer-mobile-vw');
             root.style.removeProperty('--multiplayer-mobile-vh');
         }
+        updateCompactViewportUI();
     };
 
     const setFullscreenMode = function (enabled) {
@@ -915,6 +1161,11 @@
     };
 
     const stopPlayerSound = function (playerId) {
+        const pendingTimer = pendingPlayerSoundTimers.get(playerId);
+        if (pendingTimer) {
+            window.clearTimeout(pendingTimer);
+            pendingPlayerSoundTimers.delete(playerId);
+        }
         const activeSound = activePlayerSounds.get(playerId);
         if (!activeSound) {
             return;
@@ -934,6 +1185,26 @@
         }
 
         activePlayerSounds.delete(playerId);
+    };
+
+    const stopPlayerSoundFamily = function (playerIdPrefix) {
+        if (!playerIdPrefix) {
+            return;
+        }
+        Array.from(pendingPlayerSoundTimers.keys()).forEach(function (key) {
+            if (key === playerIdPrefix || key.indexOf(playerIdPrefix + ':') === 0) {
+                const timerId = pendingPlayerSoundTimers.get(key);
+                if (timerId) {
+                    window.clearTimeout(timerId);
+                }
+                pendingPlayerSoundTimers.delete(key);
+            }
+        });
+        Array.from(activePlayerSounds.keys()).forEach(function (key) {
+            if (key === playerIdPrefix || key.indexOf(playerIdPrefix + ':') === 0) {
+                stopPlayerSound(key);
+            }
+        });
     };
 
     const getEffectiveVolume = function (volume) {
@@ -962,17 +1233,38 @@
         sound.play().catch(function () {});
     };
 
-    const playRandomBoostSound = function (volume, playerId) {
-        if (!boostSoundUrls.length) {
+    const playRandomSoundFromList = function (urls, fallbackVolume, volume, playerId) {
+        if (!Array.isArray(urls) || !urls.length) {
             return;
         }
-
-        const selectedUrl = boostSoundUrls[Math.floor(Math.random() * boostSoundUrls.length)];
+        const selectedUrl = urls[Math.floor(Math.random() * urls.length)];
         if (!selectedUrl) {
             return;
         }
+        playAudioFile(selectedUrl, typeof volume === 'number' ? volume : fallbackVolume, playerId);
+    };
 
-        playAudioFile(selectedUrl, typeof volume === 'number' ? volume : 0.9, playerId);
+    const playMergedDoubleSoundFromList = function (urls, fallbackVolume, volume, playerId) {
+        if (!Array.isArray(urls) || !urls.length || !playerId) {
+            return;
+        }
+        const selectedUrl = urls[Math.floor(Math.random() * urls.length)];
+        if (!selectedUrl) {
+            return;
+        }
+        const resolvedVolume = typeof volume === 'number' ? volume : fallbackVolume;
+        const secondaryPlayerId = playerId + ':merged-echo';
+        stopPlayerSoundFamily(playerId);
+        playAudioFile(selectedUrl, resolvedVolume, playerId);
+        const timerId = window.setTimeout(function () {
+            pendingPlayerSoundTimers.delete(secondaryPlayerId);
+            playAudioFile(selectedUrl, resolvedVolume, secondaryPlayerId);
+        }, 300);
+        pendingPlayerSoundTimers.set(secondaryPlayerId, timerId);
+    };
+
+    const playRandomBoostSound = function (urls, volume, playerId) {
+        playRandomSoundFromList(urls, 0.9, volume, playerId);
     };
 
     const getAudioContext = function () {
@@ -989,52 +1281,70 @@
         return audioContext;
     };
 
-    const playRandomCrashSound = function (volume, playerId) {
-        if (!crashSoundUrls.length) {
-            return;
-        }
-
-        const selectedUrl = crashSoundUrls[Math.floor(Math.random() * crashSoundUrls.length)];
-        playAudioFile(selectedUrl, typeof volume === 'number' ? volume : 0.95, playerId);
+    const playRandomCrashSound = function (urls, volume, playerId) {
+        playRandomSoundFromList(urls, 0.95, volume, playerId);
     };
 
-    const playRandomDefeatSound = function (volume, playerId) {
-        if (!defeatSoundUrls.length) {
-            return;
-        }
-
-        const selectedUrl = defeatSoundUrls[Math.floor(Math.random() * defeatSoundUrls.length)];
-        if (!selectedUrl) {
-            return;
-        }
-
-        playAudioFile(selectedUrl, typeof volume === 'number' ? volume : 0.95, playerId);
+    const playRandomDefeatSound = function (urls, volume, playerId) {
+        playRandomSoundFromList(urls, 0.95, volume, playerId);
     };
 
-    const playRandomDieSound = function (volume, playerId) {
-        if (!dieSoundUrls.length) {
-            return;
-        }
-
-        const selectedUrl = dieSoundUrls[Math.floor(Math.random() * dieSoundUrls.length)];
-        if (!selectedUrl) {
-            return;
-        }
-
-        playAudioFile(selectedUrl, typeof volume === 'number' ? volume : 0.98, playerId);
+    const playRandomDieSound = function (urls, volume, playerId) {
+        playRandomSoundFromList(urls, 0.98, volume, playerId);
     };
 
-    const playRandomRespawnSound = function (volume, playerId) {
-        if (!respawnSoundUrls.length) {
+    const playRandomRespawnSound = function (urls, volume, playerId) {
+        playRandomSoundFromList(urls, 0.92, volume, playerId);
+    };
+
+    const processDoubleUnitSounds = function (player, listenerPlayer, isSelfPlayer) {
+        if (!player || !player.doubleState || !Array.isArray(player.doubleState.units)) {
             return;
         }
 
-        const selectedUrl = respawnSoundUrls[Math.floor(Math.random() * respawnSoundUrls.length)];
-        if (!selectedUrl) {
-            return;
-        }
+        const skinRuntime = getSkinConfig('default');
+        player.doubleState.units.forEach(function (unit, unitIndex) {
+            const audioId = player.id + ':double:' + unitIndex;
+            const previousState = playerAudioStates.get(audioId) || {
+                boostState: 'idle',
+                collisionActive: false,
+                collisionVisualType: 'win',
+                inactive: false
+            };
+            const listenerVolume = isSelfPlayer
+                ? undefined
+                : getSpatialVolume(listenerPlayer, {
+                    x: Number(unit.x || player.x || 0),
+                    y: Number(unit.y || player.y || 0)
+                }, 0.95);
 
-        playAudioFile(selectedUrl, typeof volume === 'number' ? volume : 0.92, playerId);
+            if (unit.boostState === 'charging' && previousState.boostState !== 'charging') {
+                playRandomBoostSound(skinRuntime.sounds.boost, listenerVolume, audioId);
+            }
+
+            if (unit.collisionActive && !previousState.collisionActive) {
+                if ((unit.collisionVisualType || 'win') === 'defeat') {
+                    playRandomDefeatSound(skinRuntime.sounds.defeat, listenerVolume, audioId);
+                } else {
+                    playRandomCrashSound(skinRuntime.sounds.crash, listenerVolume, audioId);
+                }
+            }
+
+            if (Boolean(unit.inactive) && !previousState.inactive) {
+                playRandomDieSound(skinRuntime.sounds.die, listenerVolume, audioId);
+            }
+
+            if (!Boolean(unit.inactive) && previousState.inactive) {
+                playRandomRespawnSound(skinRuntime.sounds.respawn, listenerVolume, audioId);
+            }
+
+            playerAudioStates.set(audioId, {
+                boostState: unit.boostState || 'idle',
+                collisionActive: Boolean(unit.collisionActive),
+                collisionVisualType: unit.collisionVisualType || 'win',
+                inactive: Boolean(unit.inactive)
+            });
+        });
     };
 
     const playRandomNerTrackingSound = function (volume, playerId) {
@@ -1084,26 +1394,53 @@
                     playRandomNerAccelerationSound(volume, player.id);
                 }
             } else if (player.id !== selfId && !player.isNpc) {
+                if (getPlayerSkinProfile(player.skinName || 'default').type === 'double' && player.doubleState && !player.doubleState.merged) {
+                    processDoubleUnitSounds(player, listenerPlayer, false);
+                }
                 const volume = getSpatialVolume(listenerPlayer, player, 0.95);
+                const skinRuntime = getSkinConfig(player.skinName);
+                const isMergedDouble = getPlayerSkinProfile(player.skinName || 'default').type === 'double'
+                    && player.doubleState
+                    && Boolean(player.doubleState.merged);
 
                 if (player.boostState === 'charging' && previousState.boostState !== 'charging') {
-                    playRandomBoostSound(volume * 0.95, player.id);
+                    if (isMergedDouble) {
+                        playMergedDoubleSoundFromList(skinRuntime.sounds.boost, 0.9, volume * 0.95, player.id);
+                    } else {
+                        playRandomBoostSound(skinRuntime.sounds.boost, volume * 0.95, player.id);
+                    }
                 }
 
                 if (player.collisionActive && !previousState.collisionActive) {
                     if ((player.collisionVisualType || 'win') === 'defeat') {
-                        playRandomDefeatSound(volume, player.id);
+                        if (isMergedDouble) {
+                            playMergedDoubleSoundFromList(skinRuntime.sounds.defeat, 0.95, volume, player.id);
+                        } else {
+                            playRandomDefeatSound(skinRuntime.sounds.defeat, volume, player.id);
+                        }
                     } else {
-                        playRandomCrashSound(volume, player.id);
+                        if (isMergedDouble) {
+                            playMergedDoubleSoundFromList(skinRuntime.sounds.crash, 0.95, volume, player.id);
+                        } else {
+                            playRandomCrashSound(skinRuntime.sounds.crash, volume, player.id);
+                        }
                     }
                 }
 
                 if (player.deathActive && !previousState.deathActive) {
-                    playRandomDieSound(volume, player.id);
+                    if (isMergedDouble) {
+                        playMergedDoubleSoundFromList(skinRuntime.sounds.die, 0.98, volume, player.id);
+                    } else {
+                        playRandomDieSound(skinRuntime.sounds.die, volume, player.id);
+                    }
                 }
 
                 if (!player.deathActive && previousState.deathActive) {
-                    playRandomRespawnSound(volume, player.id);
+                    if (isMergedDouble) {
+                        playMergedDoubleSoundFromList(skinRuntime.sounds.respawn, 0.92, volume, player.id);
+                    } else {
+                        playRandomRespawnSound(skinRuntime.sounds.respawn, volume, player.id);
+                    }
                 }
             }
 
@@ -1118,7 +1455,24 @@
 
         playerAudioStates.forEach(function (_, id) {
             const stillExists = players.some(function (player) {
-                return player.id === id;
+                if (player.id === id) {
+                    return true;
+                }
+                if (id.indexOf(player.id + ':double:') !== 0) {
+                    return id.indexOf(player.id + ':merged-echo') === 0;
+                }
+                if (id.indexOf(player.id + ':merged-echo') === 0) {
+                    return Boolean(
+                        getPlayerSkinProfile(player.skinName || 'default').type === 'double' &&
+                        player.doubleState &&
+                        player.doubleState.merged
+                    );
+                }
+                return Boolean(
+                    getPlayerSkinProfile(player.skinName || 'default').type === 'double' &&
+                    player.doubleState &&
+                    !player.doubleState.merged
+                );
             });
             if (!stillExists) {
                 stopPlayerSound(id);
@@ -1144,7 +1498,15 @@
                 phaseShiftStartedAt: 0,
                 phaseShiftUntil: 0,
                 npcWinVisualActive: false,
-                npcWinIconIndex: 0
+                npcWinIconIndex: 0,
+                defaultIconSetIndex: Math.floor(Math.random() * 3),
+                collisionIconSetIndex: Math.floor(Math.random() * 3),
+                defeatIconIndex: 0,
+                playerWinVisualActive: false,
+                playerWinIconIndex: 0,
+                stopVisualActive: false,
+                stopIconIndex: 0,
+                collisionVisualActive: false
             });
         }
         return playerVisuals.get(id);
@@ -1163,6 +1525,17 @@
 
     const easeInOut = function (value) {
         return 0.5 - Math.cos(value * Math.PI) / 2;
+    };
+
+    const normalizeVector = function (dx, dy) {
+        const magnitude = Math.hypot(dx, dy);
+        if (magnitude < 0.0001) {
+            return { dx: 0, dy: 0 };
+        }
+        return {
+            dx: dx / magnitude,
+            dy: dy / magnitude
+        };
     };
 
     const setVisualDirection = function (visual, dx, dy, options) {
@@ -1198,12 +1571,36 @@
             return { dx: 0, dy: 0 };
         }
 
+        if (Boolean(player.collisionActive) || Boolean(player.collisionRecoveryActive)) {
+            const collisionVelocityX = Number(player.velocityX || 0);
+            const collisionVelocityY = Number(player.velocityY || 0);
+            if (Math.hypot(collisionVelocityX, collisionVelocityY) > 0.001) {
+                return {
+                    dx: collisionVelocityX,
+                    dy: collisionVelocityY
+                };
+            }
+            if (Math.abs(Number(player.collisionImpactX || 0)) > 0.001 || Math.abs(Number(player.collisionImpactY || 0)) > 0.001) {
+                return {
+                    dx: Number(player.collisionImpactX || 0),
+                    dy: Number(player.collisionImpactY || 0)
+                };
+            }
+        }
+
         if (player.id === selfId && (boostState === 'charging' || boostState === 'cooldown')) {
             if (Math.hypot(boostDirectionX, boostDirectionY) > 0.001) {
                 return {
                     dx: boostDirectionX,
                     dy: boostDirectionY
                 };
+            }
+        }
+
+        if (player.id === selfId) {
+            const inputVector = getInputVector();
+            if (Math.hypot(inputVector.dx, inputVector.dy) > 0.001) {
+                return inputVector;
             }
         }
 
@@ -1257,8 +1654,157 @@
         visual.currentFlipX += (visual.targetFlipX - visual.currentFlipX) * Math.min(1, 18 * deltaSeconds);
     };
 
+    const updatePredictedDoubleState = function (authoritativePlayer, deltaSeconds, inputVector, movementVector, selfReconcileLerp) {
+        if (!predictedSelf || !authoritativePlayer || !authoritativePlayer.doubleState || !Array.isArray(authoritativePlayer.doubleState.units)) {
+            return;
+        }
+
+        const authoritativeDoubleState = authoritativePlayer.doubleState;
+        if (!predictedSelf.doubleState || !Array.isArray(predictedSelf.doubleState.units) || predictedSelf.doubleState.units.length !== authoritativeDoubleState.units.length) {
+            predictedSelf.doubleState = JSON.parse(JSON.stringify(authoritativeDoubleState));
+        }
+
+        predictedSelf.doubleState.merged = Boolean(authoritativeDoubleState.merged);
+        predictedSelf.doubleState.phase = authoritativeDoubleState.phase;
+
+        const aliveUnits = [];
+        authoritativeDoubleState.units.forEach(function (unit, unitIndex) {
+            if (!predictedSelf.doubleState.units[unitIndex]) {
+                predictedSelf.doubleState.units[unitIndex] = JSON.parse(JSON.stringify(unit));
+            }
+            const predictedUnit = predictedSelf.doubleState.units[unitIndex];
+            const wasCollisionActive = Boolean(predictedUnit.collisionActive);
+            const wasRecoveryActive = Boolean(predictedUnit.collisionRecoveryActive);
+            predictedUnit.health = unit.health;
+            predictedUnit.currentSpeed = unit.currentSpeed;
+            predictedUnit.boostState = unit.boostState;
+            predictedUnit.collisionActive = unit.collisionActive;
+            predictedUnit.collisionImpactActive = unit.collisionImpactActive;
+            predictedUnit.collisionVisualType = unit.collisionVisualType;
+            predictedUnit.collisionImpactX = unit.collisionImpactX;
+            predictedUnit.collisionImpactY = unit.collisionImpactY;
+            predictedUnit.collisionRecoveryActive = unit.collisionRecoveryActive;
+            predictedUnit.collisionRecoveryRemainingMs = unit.collisionRecoveryRemainingMs;
+            predictedUnit.collisionRecoveryDurationMs = unit.collisionRecoveryDurationMs;
+            predictedUnit.boostLockedActive = unit.boostLockedActive;
+            predictedUnit.boostLockRemainingMs = unit.boostLockRemainingMs;
+            predictedUnit.boostLockDurationMs = unit.boostLockDurationMs;
+            predictedUnit.inactive = unit.inactive;
+            predictedUnit.facingAngle = typeof unit.facingAngle === 'number' ? unit.facingAngle : 0;
+            if (typeof predictedUnit.x !== 'number' || typeof predictedUnit.y !== 'number' || unit.inactive !== predictedUnit.inactive) {
+                predictedUnit.x = unit.x;
+                predictedUnit.y = unit.y;
+            }
+            if ((!wasCollisionActive && predictedUnit.collisionActive) || (!wasRecoveryActive && predictedUnit.collisionRecoveryActive)) {
+                predictedUnit.x = unit.x;
+                predictedUnit.y = unit.y;
+            }
+            if (!unit.inactive) {
+                aliveUnits.push(unitIndex);
+            } else {
+                predictedUnit.x = unit.x;
+                predictedUnit.y = unit.y;
+            }
+        });
+
+        if (!aliveUnits.length) {
+            return;
+        }
+
+        const localInputActive = Math.hypot(inputVector.dx, inputVector.dy) > 0.001;
+        const usingBoostVector = Math.hypot(movementVector.dx, movementVector.dy) > 0.001;
+
+        aliveUnits.forEach(function (unitIndex) {
+            const authoritativeUnit = authoritativeDoubleState.units[unitIndex];
+            const predictedUnit = predictedSelf.doubleState.units[unitIndex];
+            let desiredVector = { dx: 0, dy: 0 };
+
+            if (authoritativeUnit.collisionActive || authoritativeUnit.collisionRecoveryActive) {
+                desiredVector = normalizeVector(authoritativeUnit.velocityX || 0, authoritativeUnit.velocityY || 0);
+            } else if (aliveUnits.length === 1) {
+                if (usingBoostVector && (authoritativeUnit.boostState === 'charging' || authoritativeUnit.boostState === 'cooldown')) {
+                    desiredVector = normalizeVector(movementVector.dx, movementVector.dy);
+                } else if (localInputActive) {
+                    desiredVector = normalizeVector(inputVector.dx, inputVector.dy);
+                } else if (typeof authoritativeUnit.velocityX === 'number' || typeof authoritativeUnit.velocityY === 'number') {
+                    desiredVector = normalizeVector(authoritativeUnit.velocityX || 0, authoritativeUnit.velocityY || 0);
+                }
+            } else if (localInputActive && authoritativeUnit.boostState === 'idle') {
+                const otherIndex = aliveUnits.find(function (candidate) { return candidate !== unitIndex; });
+                const otherPredictedUnit = typeof otherIndex === 'number' ? predictedSelf.doubleState.units[otherIndex] : null;
+                if (otherPredictedUnit) {
+                    const diffX = otherPredictedUnit.x - predictedUnit.x;
+                    const diffY = otherPredictedUnit.y - predictedUnit.y;
+                    const distance = Math.hypot(diffX, diffY);
+                    if (distance > 0.001) {
+                        const attractionRatio = Math.max(0, Math.min(1, 1 - (distance / (((defaultPlayerAspectRatio * playerSpriteHeight) * 0.72) * 6))));
+                        const steerAngle = (5 * Math.PI / 180) + ((45 * Math.PI / 180) - (5 * Math.PI / 180)) * attractionRatio;
+                        const inputAngle = Math.atan2(inputVector.dy, inputVector.dx);
+                        const attractionAngle = Math.atan2(diffY, diffX);
+                        const angleDelta = normalizeAngle(attractionAngle - inputAngle);
+                        const lateralDistance = Math.abs((-inputVector.dy * diffX) + (inputVector.dx * diffY));
+                        if (Math.abs(angleDelta) <= (3 * Math.PI / 180) || lateralDistance <= ((defaultPlayerAspectRatio * playerSpriteHeight) * 0.72 * 0.35)) {
+                            desiredVector = normalizeVector(inputVector.dx, inputVector.dy);
+                        } else {
+                            const appliedAngle = Math.sign(angleDelta || 1) * Math.min(Math.abs(angleDelta), steerAngle);
+                            const rotated = {
+                                dx: inputVector.dx * Math.cos(appliedAngle) - inputVector.dy * Math.sin(appliedAngle),
+                                dy: inputVector.dx * Math.sin(appliedAngle) + inputVector.dy * Math.cos(appliedAngle)
+                            };
+                            desiredVector = normalizeVector(rotated.dx, rotated.dy);
+                        }
+                    }
+                }
+            } else if (usingBoostVector && (authoritativeUnit.boostState === 'charging' || authoritativeUnit.boostState === 'cooldown')) {
+                desiredVector = normalizeVector(movementVector.dx, movementVector.dy);
+            } else if (typeof authoritativeUnit.velocityX === 'number' || typeof authoritativeUnit.velocityY === 'number') {
+                desiredVector = normalizeVector(authoritativeUnit.velocityX || 0, authoritativeUnit.velocityY || 0);
+            }
+
+            predictedUnit.renderDirectionX = desiredVector.dx;
+            predictedUnit.renderDirectionY = desiredVector.dy;
+
+            predictedUnit.x = clampToWorld(predictedUnit.x + desiredVector.dx * Number(authoritativeUnit.currentSpeed || 0) * deltaSeconds);
+            predictedUnit.y = clampToWorld(predictedUnit.y + desiredVector.dy * Number(authoritativeUnit.currentSpeed || 0) * deltaSeconds);
+
+            const diffX = authoritativeUnit.x - predictedUnit.x;
+            const diffY = authoritativeUnit.y - predictedUnit.y;
+            const diffDistance = Math.hypot(diffX, diffY);
+            const unitSnapDistance = selfSnapDistance;
+            const unitIgnoreDistance = selfIgnoreDistance;
+            if (diffDistance > unitSnapDistance) {
+                predictedUnit.x = authoritativeUnit.x;
+                predictedUnit.y = authoritativeUnit.y;
+            } else if (diffDistance > unitIgnoreDistance) {
+                const unitReconcileLerp = (authoritativeUnit.collisionActive || authoritativeUnit.collisionRecoveryActive)
+                    ? Math.max(selfReconcileLerp, 0.55)
+                    : selfReconcileLerp;
+                predictedUnit.x += diffX * unitReconcileLerp;
+                predictedUnit.y += diffY * unitReconcileLerp;
+            }
+        });
+
+        if (aliveUnits.length > 1) {
+            const livePredictedUnits = aliveUnits.map(function (unitIndex) {
+                return predictedSelf.doubleState.units[unitIndex];
+            }).filter(Boolean);
+            if (livePredictedUnits.length) {
+                predictedSelf.x = livePredictedUnits.reduce(function (sum, unit) { return sum + unit.x; }, 0) / livePredictedUnits.length;
+                predictedSelf.y = livePredictedUnits.reduce(function (sum, unit) { return sum + unit.y; }, 0) / livePredictedUnits.length;
+            }
+        } else if (aliveUnits.length === 1) {
+            const liveUnit = predictedSelf.doubleState.units[aliveUnits[0]];
+            if (liveUnit) {
+                predictedSelf.x = liveUnit.x;
+                predictedSelf.y = liveUnit.y;
+            }
+        }
+    };
+
     const updateMoveSpeed = function (deltaSeconds, inputVector) {
         const isMoving = inputVector.dx !== 0 || inputVector.dy !== 0;
+        const selectedBaseSpeed = getSelectedPlayerBaseSpeed();
+        const selectedMaxBoostSpeed = getSelectedPlayerMaxBoostSpeed();
 
         if (boostLockedActive) {
             input.boost = false;
@@ -1271,15 +1817,19 @@
             boostState = 'charging';
             boostDirectionX = inputVector.dx;
             boostDirectionY = inputVector.dy;
-            playRandomBoostSound(undefined, selfId || '__self__');
+            if (getPlayerSkinProfile(selectedSkinName).type === 'double' && selfDoubleMerged) {
+                playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.boost, 0.9, undefined, selfId || '__self__');
+            } else {
+                playRandomBoostSound(getSkinConfig(selectedSkinName).sounds.boost, undefined, selfId || '__self__');
+            }
         }
 
         if (boostState === 'charging') {
             currentMoveSpeed = Math.min(
-                maxBoostedSpeedPerSecond,
+                selectedMaxBoostSpeed,
                 currentMoveSpeed + boostAccelerationPerSecond * deltaSeconds
             );
-            if (currentMoveSpeed >= maxBoostedSpeedPerSecond) {
+            if (currentMoveSpeed >= selectedMaxBoostSpeed) {
                 boostState = 'cooldown';
             }
             return;
@@ -1287,11 +1837,11 @@
 
         if (boostState === 'cooldown') {
             currentMoveSpeed = Math.max(
-                basePlayerSpeedPerSecond,
+                selectedBaseSpeed,
                 currentMoveSpeed - boostCooldownPerSecond * deltaSeconds
             );
-            if (currentMoveSpeed <= basePlayerSpeedPerSecond) {
-                currentMoveSpeed = basePlayerSpeedPerSecond;
+            if (currentMoveSpeed <= selectedBaseSpeed) {
+                currentMoveSpeed = selectedBaseSpeed;
                 if (!input.boost) {
                     boostState = 'idle';
                     boostDirectionX = 0;
@@ -1303,11 +1853,11 @@
 
         if (!isMoving) {
             currentMoveSpeed = Math.max(
-                basePlayerSpeedPerSecond,
+                selectedBaseSpeed,
                 currentMoveSpeed - boostCooldownPerSecond * deltaSeconds
             );
         } else {
-            currentMoveSpeed = basePlayerSpeedPerSecond;
+            currentMoveSpeed = selectedBaseSpeed;
             boostDirectionX = 0;
             boostDirectionY = 0;
         }
@@ -1322,7 +1872,9 @@
     };
 
     const fetchGameToken = async function () {
-        const response = await window.fetch(tokenUrl, {
+        const requestUrl = new URL(tokenUrl, window.location.origin);
+        requestUrl.searchParams.set('skin', selectedSkinName || 'default');
+        const response = await window.fetch(requestUrl.toString(), {
             method: 'GET',
             credentials: 'same-origin',
             headers: {
@@ -1518,9 +2070,19 @@
                 processRemotePlayerSounds(payload, selfPlayer || predictedSelf);
                 if (selfPlayer) {
                     const wasSelfDeathActive = selfDeathActive;
+                    const selfSkinType = getPlayerSkinProfile(selfPlayer.skinName || selectedSkinName).type;
+                    if (selfPlayer.skinName) {
+                        selectedSkinName = String(selfPlayer.skinName).trim().toLowerCase() || selectedSkinName;
+                        updateStartCharacterPreview();
+                    }
+                    selfDoubleMerged = Boolean(
+                        selfSkinType === 'double' &&
+                        selfPlayer.doubleState &&
+                        selfPlayer.doubleState.merged
+                    );
                     serverReportedMoveSpeed = typeof selfPlayer.currentSpeed === 'number'
                         ? selfPlayer.currentSpeed
-                        : basePlayerSpeedPerSecond;
+                        : getSelectedPlayerBaseSpeed();
                     collisionRecoveryActive = Boolean(selfPlayer.collisionRecoveryActive);
                     boostLockedActive = Boolean(selfPlayer.boostLockedActive);
                     selfDeathActive = Boolean(selfPlayer.deathActive);
@@ -1542,20 +2104,39 @@
                     if (defeatDealtCountNode) {
                         defeatDealtCountNode.textContent = String(selfPlayer.defeatDealtCount || 0);
                     }
-                    if (Boolean(selfPlayer.collisionActive) && !selfCollisionActive) {
+                    if (selfSkinType === 'double' && selfPlayer.doubleState && !selfPlayer.doubleState.merged) {
+                        processDoubleUnitSounds(selfPlayer, selfPlayer, true);
+                    } else if (Boolean(selfPlayer.collisionActive) && !selfCollisionActive) {
                         if ((selfPlayer.collisionVisualType || 'win') === 'defeat') {
-                            playRandomDefeatSound(undefined, selfId || '__self__');
+                            if (selfDoubleMerged) {
+                                playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.defeat, 0.95, undefined, selfId || '__self__');
+                            } else {
+                                playRandomDefeatSound(getSkinConfig(selectedSkinName).sounds.defeat, undefined, selfId || '__self__');
+                            }
                         } else {
-                            playRandomCrashSound(undefined, selfId || '__self__');
+                            if (selfDoubleMerged) {
+                                playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.crash, 0.95, undefined, selfId || '__self__');
+                            } else {
+                                playRandomCrashSound(getSkinConfig(selectedSkinName).sounds.crash, undefined, selfId || '__self__');
+                            }
                         }
                     }
                     if (selfDeathActive && !wasSelfDeathActive) {
-                        playRandomDieSound(undefined, selfId || '__self__');
+                        if (selfDoubleMerged) {
+                            playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.die, 0.98, undefined, selfId || '__self__');
+                        } else {
+                            playRandomDieSound(getSkinConfig(selectedSkinName).sounds.die, undefined, selfId || '__self__');
+                        }
                     }
                     if (!selfDeathActive && wasSelfDeathActive) {
-                        playRandomRespawnSound(undefined, selfId || '__self__');
+                        if (selfDoubleMerged) {
+                            playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.respawn, 0.92, undefined, selfId || '__self__');
+                        } else {
+                            playRandomRespawnSound(getSkinConfig(selectedSkinName).sounds.respawn, undefined, selfId || '__self__');
+                        }
                     }
                     selfCollisionActive = Boolean(selfPlayer.collisionActive);
+                    selfCollisionImpactActive = Boolean(selfPlayer.collisionImpactActive);
                     selfCollisionVisualType = selfPlayer.collisionVisualType || 'win';
                     if (selfDeathActive) {
                         input.up = false;
@@ -1580,7 +2161,7 @@
                     if (manualStartAutoRespawnPending && (!selfDeathActive || selfLivesRemaining <= 0)) {
                         manualStartAutoRespawnPending = false;
                     }
-                    if (collisionRecoveryActive || boostLockedActive) {
+                    if (boostLockedActive) {
                         input.boost = false;
                         currentMoveSpeed = serverReportedMoveSpeed;
                         boostState = 'idle';
@@ -1703,9 +2284,76 @@
         );
     };
 
+    const getImageEntryState = function (entry) {
+        return {
+            activeIcon: entry && entry.image ? entry.image : null,
+            activeIconReady: Boolean(entry && entry.ready)
+        };
+    };
+
+    const getPlayerSkinProfile = function (skinName) {
+        const normalizedName = String(skinName || 'default').trim().toLowerCase() || 'default';
+        if (normalizedName === 'evolution') {
+            return {
+                baseSpeed: basePlayerSpeedPerSecond * 0.8,
+                maxHealthSegments: 5,
+                type: 'evolution'
+            };
+        }
+        if (normalizedName === 'double') {
+            return {
+                baseSpeed: basePlayerSpeedPerSecond,
+                maxHealthSegments: 4,
+                type: 'double'
+            };
+        }
+        return {
+            baseSpeed: basePlayerSpeedPerSecond,
+            maxHealthSegments: 3,
+            type: 'classic'
+        };
+    };
+
+    const getSelectedPlayerBaseSpeed = function () {
+        return getPlayerSkinProfile(selectedSkinName).baseSpeed;
+    };
+
+    const getSelectedPlayerMaxBoostSpeed = function () {
+        return getSelectedPlayerBaseSpeed() + Math.max(0, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond);
+    };
+
+    currentMoveSpeed = getSelectedPlayerBaseSpeed();
+    serverReportedMoveSpeed = getSelectedPlayerBaseSpeed();
+
+    const usesLeftFacingSpriteForPlayer = function (player) {
+        if (!player) {
+            return false;
+        }
+        if (Boolean(player.isNpc)) {
+            return true;
+        }
+        return getPlayerSkinProfile(player.skinName || 'default').type === 'evolution';
+    };
+
+    const getPlayerHealthSegments = function (player) {
+        if (Boolean(player.deathActive)) {
+            return 0;
+        }
+        const skinProfile = getPlayerSkinProfile(player && player.skinName ? player.skinName : selectedSkinName);
+        const defeatReceivedCount = typeof player.defeatReceivedCount === 'number'
+            ? Math.max(0, player.defeatReceivedCount)
+            : 0;
+        const maxHealthSegments = skinProfile.maxHealthSegments;
+        const defeatsInCurrentLife = defeatReceivedCount % maxHealthSegments;
+        return defeatsInCurrentLife === 0 ? maxHealthSegments : Math.max(0, maxHealthSegments - defeatsInCurrentLife);
+    };
+
     const getPlayerSpriteState = function (player, isSelf, visual) {
         const isNpc = Boolean(player.isNpc);
+        const isDummy = Boolean(player.isDummy);
         const boostStateValue = isSelf ? boostState : (player.boostState || 'idle');
+        const skinName = !isNpc ? (isSelf ? selectedSkinName : (player.skinName || 'default')) : 'default';
+        const skinProfile = getPlayerSkinProfile(skinName);
         const npcState = player.npcState || '';
         const npcPhase = isNpc ? Math.max(1, Number(player.npcPhase || 1)) : 1;
         const npcDefeatDamageRatio = isNpc
@@ -1715,7 +2363,10 @@
         const isBoostVisualActive = isNpc
             ? (npcState === 'windup' || npcState === 'charging')
             : (boostStateValue === 'charging' || boostStateValue === 'cooldown');
+        const isPlayerWinVisualActive = !isNpc && Boolean(player.playerWinVisualActive);
+        const isStopVisualActive = !isNpc && Boolean(player.stopVisualActive);
         const isCollisionVisualActive = Boolean(player.collisionActive);
+        const isCollisionImpactActive = Boolean(player.collisionImpactActive);
         const isDefeatVisualActive = isCollisionVisualActive && player.collisionVisualType === 'defeat';
         const isDeathVisualActive = Boolean(player.deathActive);
         const npcChargeWindupProgress = typeof player.npcChargeWindupProgress === 'number'
@@ -1727,8 +2378,9 @@
         const spriteScale = isNpc
             ? (isNpcChargeVisualActive ? 2.0 : 2.8)
             : 1;
-        let activeIcon = playerIcon;
-        let activeIconReady = playerIconReady;
+        const skinRuntime = !isNpc ? getSkinConfig(skinName) : null;
+        let activeIcon = null;
+        let activeIconReady = false;
 
         if (isNpc) {
             if (npcPhase >= 3 && playerNpcPhase3IconReady) {
@@ -1763,26 +2415,116 @@
         } else if (isNpc && isDefeatVisualActive && npcDefeatDamageRatio >= 0.4 && playerNpcDefeat1IconReady) {
             activeIcon = playerNpcDefeat1Icon;
             activeIconReady = playerNpcDefeat1IconReady;
-        } else if (!isNpc && isDeathVisualActive && playerDefeatIconReady) {
-            activeIcon = playerDefeatIcon;
-            activeIconReady = playerDefeatIconReady;
-        } else if (!isNpc && isDefeatVisualActive && playerDefeatIconReady) {
-            activeIcon = playerDefeatIcon;
-            activeIconReady = playerDefeatIconReady;
-        } else if (!isNpc && isCollisionVisualActive && playerCollisionIconReady) {
-            activeIcon = playerCollisionIcon;
-            activeIconReady = playerCollisionIconReady;
-        } else if (!isNpc && isBoostVisualActive && playerBoostIconReady) {
-            activeIcon = playerBoostIcon;
-            activeIconReady = playerBoostIconReady;
+        } else if (!isNpc && skinRuntime) {
+            const healthSegments = getPlayerHealthSegments(player);
+            const defaultSet = skinRuntime.defaultIconSets.length
+                ? skinRuntime.defaultIconSets[visual.defaultIconSetIndex % skinRuntime.defaultIconSets.length]
+                : null;
+            const collisionSet = skinRuntime.collisionIconSets.length
+                ? skinRuntime.collisionIconSets[visual.collisionIconSetIndex % skinRuntime.collisionIconSets.length]
+                : null;
+            const movementSpeed = isSelf
+                ? Math.max(0, Number(currentMoveSpeed || 0))
+                : Math.max(0, Number(player.currentSpeed || 0));
+            const playerBaseSpeed = skinProfile.baseSpeed;
+            const playerMaxBoostedSpeed = playerBaseSpeed + Math.max(0, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond);
+            const boostRatio = Math.max(
+                0,
+                Math.min(
+                    0.999,
+                    (movementSpeed - playerBaseSpeed) / Math.max(1, playerMaxBoostedSpeed - playerBaseSpeed)
+                )
+            );
+            const boostStageIndex = Math.min(
+                Math.max(0, skinRuntime.boostStages.length - 1),
+                Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
+            );
+            const collisionRecoveryActive = Boolean(player.collisionRecoveryActive);
+            const collisionRecoveryRemainingMs = Math.max(0, Number(player.collisionRecoveryRemainingMs || 0));
+            const collisionRecoveryDurationMs = Math.max(1, Number(player.collisionRecoveryDurationMs || 1));
+            const collisionRecoveryProgress = Math.max(
+                0,
+                Math.min(1, 1 - (collisionRecoveryRemainingMs / collisionRecoveryDurationMs))
+            );
+            let selectedEntry = defaultSet
+                ? (healthSegments >= 3 ? defaultSet.healthy : defaultSet.damaged)
+                : skinRuntime.legacyIcon;
+
+            if (skinRuntime.skinType === 'evolution') {
+                if (skinRuntime.defaultStateIcons.length) {
+                    if (healthSegments >= 5) {
+                        selectedEntry = skinRuntime.defaultStateIcons[0] || selectedEntry;
+                    } else if (healthSegments >= 3) {
+                        selectedEntry = skinRuntime.defaultStateIcons[Math.min(1, skinRuntime.defaultStateIcons.length - 1)] || selectedEntry;
+                    } else {
+                        selectedEntry = skinRuntime.defaultStateIcons[Math.min(2, skinRuntime.defaultStateIcons.length - 1)] || selectedEntry;
+                    }
+                }
+
+                if (isPlayerWinVisualActive && skinRuntime.winStateIcons.length) {
+                    selectedEntry = skinRuntime.winStateIcons[visual.playerWinIconIndex % skinRuntime.winStateIcons.length];
+                } else if (isStopVisualActive && skinRuntime.stopStateIcons.length) {
+                    selectedEntry = skinRuntime.stopStateIcons[visual.stopIconIndex % skinRuntime.stopStateIcons.length];
+                } else if ((isDeathVisualActive || isDefeatVisualActive || (collisionRecoveryActive && player.collisionVisualType === 'defeat')) && skinRuntime.defeatStateIcons.length) {
+                    selectedEntry = skinRuntime.defeatStateIcons[visual.defeatIconIndex % skinRuntime.defeatStateIcons.length];
+                } else if (isCollisionVisualActive && skinRuntime.collisionStateIcons.length) {
+                    selectedEntry = skinRuntime.collisionStateIcons[visual.collisionIconSetIndex % skinRuntime.collisionStateIcons.length];
+                } else if (isBoostVisualActive && skinRuntime.boostStages.length) {
+                    if (healthSegments >= 5) {
+                        selectedEntry = skinRuntime.boostStages[0] || selectedEntry;
+                    } else if (healthSegments >= 3) {
+                        selectedEntry = skinRuntime.boostStages[Math.min(1, skinRuntime.boostStages.length - 1)] || selectedEntry;
+                    } else {
+                        selectedEntry = skinRuntime.boostStages[Math.min(2, skinRuntime.boostStages.length - 1)] || selectedEntry;
+                    }
+                }
+            } else if ((isDeathVisualActive || isDefeatVisualActive || (collisionRecoveryActive && player.collisionVisualType === 'defeat')) && skinRuntime.defeatStages.length) {
+                if (isDeathVisualActive) {
+                    selectedEntry = skinRuntime.defeatStages[0];
+                } else if (isDefeatVisualActive && isCollisionImpactActive) {
+                    selectedEntry = skinRuntime.defeatStages[0];
+                } else {
+                    let defeatStageIndex = 0;
+                    if (collisionRecoveryProgress >= (1 / 3)) {
+                        defeatStageIndex = 1;
+                    }
+                    if (collisionRecoveryProgress >= 0.5) {
+                        defeatStageIndex = 2;
+                    }
+                    defeatStageIndex = Math.min(skinRuntime.defeatStages.length - 1, Math.max(0, defeatStageIndex));
+                    selectedEntry = skinRuntime.defeatStages[defeatStageIndex];
+                }
+            } else if (
+                collisionSet &&
+                player.collisionVisualType !== 'defeat' &&
+                (isCollisionImpactActive || (collisionRecoveryActive && collisionRecoveryProgress <= (1 / 3)))
+            ) {
+                selectedEntry = collisionSet.impact;
+            } else if (collisionRecoveryActive && collisionSet && player.collisionVisualType !== 'defeat') {
+                selectedEntry = collisionSet.slow;
+            } else if (isBoostVisualActive && skinRuntime.boostStages.length) {
+                selectedEntry = skinRuntime.boostStages[boostStageIndex];
+            }
+
+            const selectedState = getImageEntryState(selectedEntry);
+            activeIcon = selectedState.activeIcon;
+            activeIconReady = selectedState.activeIconReady;
+
+            if (!activeIconReady) {
+                const fallbackState = getImageEntryState(skinRuntime.previewIcon.ready ? skinRuntime.previewIcon : skinRuntime.legacyIcon);
+                activeIcon = fallbackState.activeIcon;
+                activeIconReady = fallbackState.activeIconReady;
+            }
         }
 
         return {
             isNpc,
+            isDummy,
             npcPhase,
             npcDefeatDamageRatio,
             npcWinVisualActive,
             isCollisionVisualActive,
+            isCollisionImpactActive,
             isDefeatVisualActive,
             isDeathVisualActive,
             npcChargeWindupProgress,
@@ -1791,7 +2533,10 @@
             isNpcChargeVisualActive,
             isNpcDefeatIconActive,
             isBoostVisualActive,
+            isPlayerWinVisualActive,
+            isStopVisualActive,
             spriteScale,
+            skinRuntime,
             activeIcon,
             activeIconReady
         };
@@ -1856,6 +2601,536 @@
             height
         );
         drawCtx.restore();
+    };
+
+    const getDoubleUnitSpriteEntry = function (player, unit, unitVisual) {
+        const skinRuntime = getSkinConfig('default');
+        const defaultSet = skinRuntime.defaultIconSets.length
+            ? skinRuntime.defaultIconSets[unitVisual.defaultIconSetIndex % skinRuntime.defaultIconSets.length]
+            : null;
+        const collisionSet = skinRuntime.collisionIconSets.length
+            ? skinRuntime.collisionIconSets[unitVisual.collisionIconSetIndex % skinRuntime.collisionIconSets.length]
+            : null;
+        const collisionRecoveryActive = Boolean(unit.collisionRecoveryActive);
+        const collisionRecoveryRemainingMs = Math.max(0, Number(unit.collisionRecoveryRemainingMs || 0));
+        const collisionRecoveryDurationMs = Math.max(1, Number(unit.collisionRecoveryDurationMs || 1));
+        const collisionRecoveryProgress = Math.max(
+            0,
+            Math.min(1, 1 - (collisionRecoveryRemainingMs / collisionRecoveryDurationMs))
+        );
+        let selectedEntry = defaultSet
+            ? (Number(unit.health || 0) >= 2 ? defaultSet.healthy : defaultSet.damaged)
+            : skinRuntime.legacyIcon;
+
+        if ((Boolean(unit.deathActive) || Boolean(unit.collisionVisualType === 'defeat') || (collisionRecoveryActive && unit.collisionVisualType === 'defeat')) && skinRuntime.defeatStages.length) {
+            if (Boolean(unit.deathActive)) {
+                selectedEntry = skinRuntime.defeatStages[0];
+            } else if (Boolean(unit.collisionImpactActive) && unit.collisionVisualType === 'defeat') {
+                selectedEntry = skinRuntime.defeatStages[0];
+            } else {
+                let defeatStageIndex = 0;
+                if (collisionRecoveryProgress >= (1 / 3)) {
+                    defeatStageIndex = 1;
+                }
+                if (collisionRecoveryProgress >= 0.5) {
+                    defeatStageIndex = 2;
+                }
+                defeatStageIndex = Math.min(skinRuntime.defeatStages.length - 1, Math.max(0, defeatStageIndex));
+                selectedEntry = skinRuntime.defeatStages[defeatStageIndex];
+            }
+        } else if (
+            collisionSet &&
+            unit.collisionVisualType !== 'defeat' &&
+            (Boolean(unit.collisionImpactActive) || (collisionRecoveryActive && collisionRecoveryProgress <= (1 / 3)))
+        ) {
+            selectedEntry = collisionSet.impact;
+        } else if (collisionRecoveryActive && collisionSet && unit.collisionVisualType !== 'defeat') {
+            selectedEntry = collisionSet.slow;
+        } else if ((unit.boostState || 'idle') === 'charging' || (unit.boostState || 'idle') === 'cooldown') {
+            const movementSpeed = Math.max(0, Number(unit.currentSpeed || 0));
+            const boostRatio = Math.max(
+                0,
+                Math.min(0.999, (movementSpeed - basePlayerSpeedPerSecond) / Math.max(1, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond))
+            );
+            const boostStageIndex = Math.min(
+                Math.max(0, skinRuntime.boostStages.length - 1),
+                Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
+            );
+            if (skinRuntime.boostStages.length) {
+                selectedEntry = skinRuntime.boostStages[boostStageIndex];
+            }
+        }
+
+        return getImageEntryState(selectedEntry);
+    };
+
+    const getDoubleMergedSpriteEntry = function (player, visual, isSelf) {
+        const skinRuntime = getSkinConfig('double');
+        const defaultSet = skinRuntime.defaultIconSets.length
+            ? skinRuntime.defaultIconSets[visual.defaultIconSetIndex % skinRuntime.defaultIconSets.length]
+            : null;
+        const collisionSet = skinRuntime.collisionIconSets.length
+            ? skinRuntime.collisionIconSets[visual.collisionIconSetIndex % skinRuntime.collisionIconSets.length]
+            : null;
+        const movementSpeed = isSelf
+            ? Math.max(0, Number(currentMoveSpeed || 0))
+            : Math.max(0, Number(player.currentSpeed || 0));
+        const playerBaseSpeed = getPlayerSkinProfile('double').baseSpeed;
+        const playerMaxBoostedSpeed = playerBaseSpeed + Math.max(0, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond);
+        const boostRatio = Math.max(
+            0,
+            Math.min(
+                0.999,
+                (movementSpeed - playerBaseSpeed) / Math.max(1, playerMaxBoostedSpeed - playerBaseSpeed)
+            )
+        );
+        const boostStageIndex = Math.min(
+            Math.max(0, skinRuntime.boostStages.length - 1),
+            Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
+        );
+        const totalHealthSegments = (player.doubleState && Array.isArray(player.doubleState.units) ? player.doubleState.units : []).reduce(function (sum, unit) {
+            return sum + Math.max(0, Math.min(2, Number(unit.health || 0)));
+        }, 0);
+        const collisionRecoveryActive = Boolean(player.collisionRecoveryActive);
+        const collisionRecoveryRemainingMs = Math.max(0, Number(player.collisionRecoveryRemainingMs || 0));
+        const collisionRecoveryDurationMs = Math.max(1, Number(player.collisionRecoveryDurationMs || 1));
+        const collisionRecoveryProgress = Math.max(
+            0,
+            Math.min(1, 1 - (collisionRecoveryRemainingMs / collisionRecoveryDurationMs))
+        );
+        let selectedEntry = defaultSet
+            ? (totalHealthSegments >= 3 ? defaultSet.healthy : defaultSet.damaged)
+            : (skinRuntime.defaultStateIcons[0] || skinRuntime.previewIcon || skinRuntime.legacyIcon);
+
+        if ((Boolean(player.deathActive) || Boolean(player.collisionVisualType === 'defeat') || (collisionRecoveryActive && player.collisionVisualType === 'defeat')) && skinRuntime.defeatStages.length) {
+            if (Boolean(player.deathActive)) {
+                selectedEntry = skinRuntime.defeatStages[0];
+            } else if (Boolean(player.collisionImpactActive) && player.collisionVisualType === 'defeat') {
+                selectedEntry = skinRuntime.defeatStages[0];
+            } else {
+                let defeatStageIndex = 0;
+                if (collisionRecoveryProgress >= (1 / 3)) {
+                    defeatStageIndex = 1;
+                }
+                if (collisionRecoveryProgress >= 0.5) {
+                    defeatStageIndex = 2;
+                }
+                defeatStageIndex = Math.min(skinRuntime.defeatStages.length - 1, Math.max(0, defeatStageIndex));
+                selectedEntry = skinRuntime.defeatStages[defeatStageIndex];
+            }
+        } else if (
+            collisionSet &&
+            player.collisionVisualType !== 'defeat' &&
+            (Boolean(player.collisionImpactActive) || (collisionRecoveryActive && collisionRecoveryProgress <= (1 / 3)))
+        ) {
+            selectedEntry = collisionSet.impact;
+        } else if (collisionRecoveryActive && collisionSet && player.collisionVisualType !== 'defeat') {
+            selectedEntry = collisionSet.slow;
+        } else if (((player.boostState || 'idle') === 'charging' || (player.boostState || 'idle') === 'cooldown') && skinRuntime.boostStages.length) {
+            selectedEntry = skinRuntime.boostStages[boostStageIndex];
+        }
+
+        const selectedState = getImageEntryState(selectedEntry);
+        let activeIcon = selectedState.activeIcon;
+        let activeIconReady = selectedState.activeIconReady;
+        if (!activeIconReady) {
+            const fallbackState = getImageEntryState(
+                (defaultSet && (totalHealthSegments >= 3 ? defaultSet.healthy : defaultSet.damaged))
+                    ? (totalHealthSegments >= 3 ? defaultSet.healthy : defaultSet.damaged)
+                    : (skinRuntime.previewIcon.ready ? skinRuntime.previewIcon : skinRuntime.legacyIcon)
+            );
+            activeIcon = fallbackState.activeIcon;
+            activeIconReady = fallbackState.activeIconReady;
+        }
+
+        return {
+            skinRuntime: skinRuntime,
+            state: {
+                activeIcon: activeIcon,
+                activeIconReady: activeIconReady
+            }
+        };
+    };
+
+    const drawDoublePlayer = function (player, visual, cameraX, cameraY, zoom, nowMs, isSelf, deltaSeconds) {
+        const doubleState = player.doubleState;
+        if (!doubleState || !Array.isArray(doubleState.units) || !doubleState.units.length) {
+            return false;
+        }
+
+        const unitBarColors = ['rgba(125, 211, 252, 0.98)', 'rgba(37, 99, 235, 0.98)'];
+        const usesLeftFacingSprite = usesLeftFacingSpriteForPlayer(player);
+        const deathFadeProgress = typeof player.deathFadeProgress === 'number' ? player.deathFadeProgress : 0;
+        const playerAlpha = Boolean(player.deathActive) ? Math.max(0, 1 - deathFadeProgress) : 1;
+        if (!Array.isArray(visual.doubleUnitVisuals) || visual.doubleUnitVisuals.length !== doubleState.units.length) {
+            visual.doubleUnitVisuals = doubleState.units.map(function () {
+                return {
+                    x: null,
+                    y: null,
+                    previousX: null,
+                    previousY: null,
+                    currentFlipX: 1,
+                    targetFlipX: 1,
+                    flipFromX: 1,
+                    flipProgress: 1,
+                    currentRotation: 0,
+                    targetRotation: 0,
+                    defaultIconSetIndex: 0,
+                    collisionIconSetIndex: 0,
+                    collisionVisualActive: false,
+                    inactive: false,
+                    inactiveStartedAt: 0,
+                    trailPoints: [],
+                    lastTrailAt: 0
+                };
+            });
+        }
+        const aliveUnits = doubleState.units.filter(function (unit) {
+            return !unit.inactive;
+        });
+        const isMerged = Boolean(doubleState.merged) && aliveUnits.length > 1;
+        if (playerAlpha <= 0) {
+            return true;
+        }
+
+        if (isMerged) {
+            const mergedDirection = getPlayerDirectionVector(player, visual);
+            setVisualDirection(visual, mergedDirection.dx, mergedDirection.dy, {
+                usesLeftFacingSprite: usesLeftFacingSprite
+            });
+            updateVisualAnimation(visual, deltaSeconds);
+            const mergedSprite = getDoubleMergedSpriteEntry(player, visual, isSelf);
+            const activeIcon = mergedSprite.state.activeIcon;
+            const activeIconReady = mergedSprite.state.activeIconReady;
+            if (!activeIconReady || !activeIcon) {
+                return false;
+            }
+
+            const x = (player.x - cameraX) * zoom;
+            const y = (player.y - cameraY) * zoom;
+            const spriteHeight = playerSpriteHeight * zoom;
+            const mergedAspectRatio = activeIcon.naturalWidth && activeIcon.naturalHeight
+                ? (activeIcon.naturalWidth / activeIcon.naturalHeight)
+                : 1.48;
+            const spriteWidth = spriteHeight * mergedAspectRatio;
+
+            drawSpriteImage(
+                ctx,
+                activeIcon,
+                x,
+                y,
+                spriteWidth,
+                spriteHeight,
+                visual.currentRotation,
+                usesLeftFacingSprite ? -visual.currentFlipX : visual.currentFlipX,
+                playerAlpha
+            );
+
+            if (!player.deathActive) {
+                const pairWidth = Math.max(30, defaultPlayerAspectRatio * playerSpriteHeight * zoom * 0.9);
+                const segmentGap = Math.max(1, 1 * zoom);
+                const segmentWidth = (pairWidth - segmentGap) / 2;
+                const segmentHeight = Math.max(4, 5 * zoom);
+                const barGap = Math.max(2, 3 * zoom);
+                const totalBarsWidth = pairWidth * 2 + barGap;
+                const barsLeft = x - totalBarsWidth / 2;
+                const healthBarY = y + spriteHeight / 2 + 6 * zoom;
+                const cooldownY = healthBarY + segmentHeight + Math.max(2, 2 * zoom);
+
+                aliveUnits.slice(0, 2).forEach(function (unit, unitIndex) {
+                    const barX = barsLeft + unitIndex * (pairWidth + barGap);
+                    const filledSegments = Math.max(0, Math.min(2, Number(unit.health || 0)));
+                    ctx.save();
+                    for (let segmentIndex = 0; segmentIndex < 2; segmentIndex += 1) {
+                        const segmentX = barX + segmentIndex * (segmentWidth + segmentGap);
+                        ctx.fillStyle = segmentIndex < filledSegments
+                            ? 'rgba(34, 197, 94, 1)'
+                            : 'rgba(15, 23, 42, 0.28)';
+                        ctx.fillRect(segmentX, healthBarY, segmentWidth, segmentHeight);
+                    }
+                    const boostLockRemainingMs = Math.max(0, Number(unit.boostLockRemainingMs || 0));
+                    const boostLockDurationMs = Math.max(0, Number(unit.boostLockDurationMs || 0));
+                    const boostStateValue = String(unit.boostState || 'idle');
+                    let cooldownRatio = 1;
+                    if (boostStateValue === 'charging' || boostStateValue === 'cooldown') {
+                        cooldownRatio = 0;
+                    } else if (boostLockDurationMs > 0) {
+                        cooldownRatio = Math.max(0, Math.min(1, 1 - (boostLockRemainingMs / boostLockDurationMs)));
+                    }
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.14)';
+                    ctx.fillRect(barX, cooldownY, pairWidth, segmentHeight);
+                    ctx.fillStyle = unitBarColors[unitIndex % unitBarColors.length];
+                    ctx.fillRect(barX, cooldownY, pairWidth * cooldownRatio, segmentHeight);
+                    ctx.restore();
+                });
+
+                ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
+                ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.displayName || player.id, x, y - spriteHeight / 2 - 5 * zoom);
+            }
+            return true;
+        }
+
+        const unitStates = doubleState.units.map(function (unit, unitIndex) {
+            return {
+                unit: unit,
+                unitIndex: unitIndex
+            };
+        });
+
+        unitStates.forEach(function (unitState) {
+            const unit = unitState.unit;
+            const unitVisual = visual.doubleUnitVisuals[unitState.unitIndex] || {
+                x: null,
+                y: null,
+                previousX: null,
+                previousY: null,
+                currentFlipX: 1,
+                targetFlipX: 1,
+                flipFromX: 1,
+                flipProgress: 1,
+                currentRotation: 0,
+                targetRotation: 0,
+                defaultIconSetIndex: 0,
+                collisionIconSetIndex: 0,
+                collisionVisualActive: false,
+                inactive: false,
+                inactiveStartedAt: 0,
+                trailPoints: [],
+                lastTrailAt: 0
+            };
+            if (Boolean(unit.inactive) && !unitVisual.inactive) {
+                unitVisual.inactiveStartedAt = nowMs;
+            } else if (!Boolean(unit.inactive) && unitVisual.inactive) {
+                unitVisual.inactiveStartedAt = 0;
+            }
+            unitVisual.inactive = Boolean(unit.inactive);
+            const splitSkinRuntime = getSkinConfig('default');
+            if (unitVisual.defaultIconSetIndex === null || typeof unitVisual.defaultIconSetIndex !== 'number') {
+                unitVisual.defaultIconSetIndex = splitSkinRuntime.defaultIconSets.length
+                    ? Math.floor(Math.random() * splitSkinRuntime.defaultIconSets.length)
+                    : 0;
+            }
+            if (Boolean(unit.collisionActive) && !unitVisual.collisionVisualActive) {
+                unitVisual.defaultIconSetIndex = splitSkinRuntime.defaultIconSets.length
+                    ? Math.floor(Math.random() * splitSkinRuntime.defaultIconSets.length)
+                    : 0;
+                unitVisual.collisionIconSetIndex = splitSkinRuntime.collisionIconSets.length
+                    ? Math.floor(Math.random() * splitSkinRuntime.collisionIconSets.length)
+                    : 0;
+            }
+            unitVisual.collisionVisualActive = Boolean(unit.collisionActive);
+            const unitProjectionSeconds = isSelf ? 0.06 : remoteProjectionSeconds;
+            if (!unit.inactive) {
+                const targetUnitX = isSelf
+                    ? unit.x
+                    : (typeof unit.velocityX === 'number'
+                        ? unit.x + (unit.velocityX * unitProjectionSeconds)
+                        : unit.x);
+                const targetUnitY = isSelf
+                    ? unit.y
+                    : (typeof unit.velocityY === 'number'
+                        ? unit.y + (unit.velocityY * unitProjectionSeconds)
+                        : unit.y);
+                if (unitVisual.x === null || unitVisual.y === null) {
+                    unitVisual.x = targetUnitX;
+                    unitVisual.y = targetUnitY;
+                    unitVisual.previousX = targetUnitX;
+                    unitVisual.previousY = targetUnitY;
+                } else {
+                    unitVisual.previousX = unitVisual.x;
+                    unitVisual.previousY = unitVisual.y;
+                    const splitLerp = isSelf
+                        ? getFrameAdjustedLerp(selfRenderLerpPerFrame, deltaSeconds)
+                        : 0.4;
+                    unitVisual.x += (targetUnitX - unitVisual.x) * splitLerp;
+                    unitVisual.y += (targetUnitY - unitVisual.y) * splitLerp;
+                }
+            } else if (unitVisual.x === null || unitVisual.y === null) {
+                unitVisual.x = unit.x;
+                unitVisual.y = unit.y;
+                unitVisual.previousX = unit.x;
+                unitVisual.previousY = unit.y;
+            }
+            let directionDx = unitVisual.x - (typeof unitVisual.previousX === 'number' ? unitVisual.previousX : unitVisual.x);
+            let directionDy = unitVisual.y - (typeof unitVisual.previousY === 'number' ? unitVisual.previousY : unitVisual.y);
+            if (
+                isSelf &&
+                typeof unit.renderDirectionX === 'number' &&
+                typeof unit.renderDirectionY === 'number' &&
+                Math.hypot(unit.renderDirectionX, unit.renderDirectionY) > 0.001
+            ) {
+                directionDx = unit.renderDirectionX;
+                directionDy = unit.renderDirectionY;
+            }
+            if (Math.hypot(directionDx, directionDy) < 0.001 && typeof unit.velocityX === 'number' && typeof unit.velocityY === 'number') {
+                const velocityMagnitude = Math.hypot(unit.velocityX, unit.velocityY);
+                if (velocityMagnitude > 0.01) {
+                    directionDx = unit.velocityX;
+                    directionDy = unit.velocityY;
+                }
+            }
+            if (
+                Math.hypot(directionDx, directionDy) < 0.001 &&
+                typeof unit.facingAngle === 'number'
+            ) {
+                directionDx = Math.cos(unit.facingAngle);
+                directionDy = Math.sin(unit.facingAngle);
+            }
+            if (Math.hypot(directionDx, directionDy) < 0.001 && typeof player.facingAngle === 'number') {
+                directionDx = Math.cos(player.facingAngle);
+                directionDy = Math.sin(player.facingAngle);
+            }
+            setVisualDirection(unitVisual, directionDx, directionDy, {
+                usesLeftFacingSprite: usesLeftFacingSprite
+            });
+            updateVisualAnimation(unitVisual, deltaSeconds);
+            visual.doubleUnitVisuals[unitState.unitIndex] = unitVisual;
+            const entryState = getDoubleUnitSpriteEntry(player, unit, unitVisual);
+            const x = (unitVisual.x - cameraX) * zoom;
+            const y = (unitVisual.y - cameraY) * zoom;
+            const activeIcon = entryState.activeIcon;
+            const activeIconReady = entryState.activeIconReady;
+            if (!activeIconReady || !activeIcon) {
+                return;
+            }
+            let unitAlpha = playerAlpha;
+            if (!player.deathActive && unit.inactive) {
+                const inactiveFadeProgress = unitVisual.inactiveStartedAt
+                    ? Math.max(0, Math.min(1, (nowMs - unitVisual.inactiveStartedAt) / doubleUnitDeathFadeMs))
+                    : 0;
+                unitAlpha *= Math.max(0, 1 - inactiveFadeProgress);
+                if (unitAlpha <= 0) {
+                    visual.doubleUnitVisuals[unitState.unitIndex] = unitVisual;
+                    return;
+                }
+            }
+
+            const spriteHeight = playerSpriteHeight * zoom;
+            const spriteWidth = spriteHeight * defaultPlayerAspectRatio;
+            const unitTrailActive = activeIconReady &&
+                !player.deathActive &&
+                !unit.inactive &&
+                (unit.boostState === 'charging' || unit.boostState === 'cooldown');
+            const unitTrailFadeDurationMs = 280;
+            if (unitVisual.trailPoints.length) {
+                unitVisual.trailPoints = unitVisual.trailPoints.filter(function (trailPoint) {
+                    return !trailPoint.expiresAt || trailPoint.expiresAt > nowMs;
+                });
+            }
+            if (unitTrailActive) {
+                if (!unitVisual.lastTrailAt || nowMs - unitVisual.lastTrailAt >= 140) {
+                    unitVisual.trailPoints.push({
+                        x: unitVisual.x,
+                        y: unitVisual.y,
+                        rotation: unitVisual.currentRotation,
+                        flipX: unitVisual.currentFlipX,
+                        icon: activeIcon,
+                        width: spriteWidth,
+                        height: spriteHeight,
+                        createdAt: nowMs,
+                        expiresAt: 0
+                    });
+                    unitVisual.lastTrailAt = nowMs;
+                }
+                if (unitVisual.trailPoints.length > 4) {
+                    unitVisual.trailPoints.shift();
+                }
+            } else if (unitVisual.trailPoints.length) {
+                unitVisual.trailPoints.forEach(function (trailPoint) {
+                    if (!trailPoint.expiresAt) {
+                        trailPoint.expiresAt = nowMs + unitTrailFadeDurationMs;
+                    }
+                });
+                unitVisual.lastTrailAt = 0;
+            }
+
+            if (unitVisual.trailPoints.length) {
+                unitVisual.trailPoints.forEach(function (trailPoint, index) {
+                    const trailX = (trailPoint.x - cameraX) * zoom;
+                    const trailY = (trailPoint.y - cameraY) * zoom;
+                    const fadeRatio = trailPoint.expiresAt
+                        ? Math.max(0, Math.min(1, (trailPoint.expiresAt - nowMs) / unitTrailFadeDurationMs))
+                        : 1;
+                    const alpha = 0.25 * ((index + 1) / unitVisual.trailPoints.length) * fadeRatio;
+                    drawTrailSprite(
+                        ctx,
+                        trailPoint.icon || activeIcon,
+                        trailX,
+                        trailY,
+                        trailPoint.width || spriteWidth,
+                        trailPoint.height || spriteHeight,
+                        trailPoint.rotation,
+                        trailPoint.flipX,
+                        alpha,
+                        getTrailTintColor(index, false)
+                    );
+                });
+            }
+            drawSpriteImage(
+                ctx,
+                activeIcon,
+                x,
+                y,
+                spriteWidth,
+                spriteHeight,
+                unitVisual.currentRotation,
+                usesLeftFacingSprite ? -unitVisual.currentFlipX : unitVisual.currentFlipX,
+                unitAlpha
+            );
+
+            if (!player.deathActive && !unit.inactive) {
+                const healthBarWidth = Math.max(24, spriteWidth * 0.9);
+                const segmentGap = Math.max(1, 1 * zoom);
+                const segmentWidth = (healthBarWidth - segmentGap) / 2;
+                const segmentHeight = Math.max(4, 5 * zoom);
+                const barX = x - healthBarWidth / 2;
+                const barY = y + spriteHeight / 2 + 5 * zoom;
+                const healthSegmentsFilled = Math.max(0, Math.min(2, Number(unit.health || 0)));
+
+                ctx.save();
+                for (let segmentIndex = 0; segmentIndex < 2; segmentIndex += 1) {
+                    const segmentX = barX + segmentIndex * (segmentWidth + segmentGap);
+                    ctx.fillStyle = segmentIndex < healthSegmentsFilled
+                        ? 'rgba(34, 197, 94, 1)'
+                        : 'rgba(15, 23, 42, 0.28)';
+                    ctx.fillRect(segmentX, barY, segmentWidth, segmentHeight);
+                }
+                const boostLockRemainingMs = Math.max(0, Number(unit.boostLockRemainingMs || 0));
+                const boostLockDurationMs = Math.max(0, Number(unit.boostLockDurationMs || 0));
+                const boostStateValue = String(unit.boostState || 'idle');
+                let cooldownRatio = 1;
+                if (boostStateValue === 'charging' || boostStateValue === 'cooldown') {
+                    cooldownRatio = 0;
+                } else if (boostLockDurationMs > 0) {
+                    cooldownRatio = Math.max(0, Math.min(1, 1 - (boostLockRemainingMs / boostLockDurationMs)));
+                }
+                const cooldownY = barY + segmentHeight + Math.max(2, 2 * zoom);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.14)';
+                ctx.fillRect(barX, cooldownY, healthBarWidth, segmentHeight);
+                ctx.fillStyle = unitBarColors[unitState.unitIndex % unitBarColors.length];
+                ctx.fillRect(barX, cooldownY, healthBarWidth * cooldownRatio, segmentHeight);
+                ctx.restore();
+
+                ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
+                ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(
+                    player.displayName || player.id,
+                    x,
+                    y - spriteHeight / 2 - 5 * zoom
+                );
+            }
+        });
+
+        if (!player.deathActive && isMerged) {
+            ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
+            ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(player.displayName || player.id, (player.x - cameraX) * zoom, (player.y - cameraY) * zoom - (playerSpriteHeight * zoom) / 2 - 5 * zoom);
+        }
+        return true;
     };
 
     const drawNpcFocusLines = function (drawCtx, x, y, baseRadius, phase, nowMs) {
@@ -1988,6 +3263,43 @@
             }
             visual.npcWinVisualActive = Boolean(player.npcWinVisualActive);
             const spriteState = getPlayerSpriteState(player, isSelf, visual);
+            const currentPlayerSkinProfile = getPlayerSkinProfile(player.skinName || (isSelf ? selectedSkinName : 'default'));
+            const splitDoubleSkinRuntime = currentPlayerSkinProfile.type === 'double'
+                ? getSkinConfig('default')
+                : spriteState.skinRuntime;
+            if (Boolean(player.collisionActive) && !visual.collisionVisualActive) {
+                const defaultSetCount = splitDoubleSkinRuntime && splitDoubleSkinRuntime.defaultIconSets
+                    ? splitDoubleSkinRuntime.defaultIconSets.length
+                    : 0;
+                const collisionSetCount = splitDoubleSkinRuntime && splitDoubleSkinRuntime.collisionIconSets
+                    ? splitDoubleSkinRuntime.collisionIconSets.length
+                    : 0;
+                const defeatStateCount = spriteState.skinRuntime && spriteState.skinRuntime.defeatStateIcons
+                    ? spriteState.skinRuntime.defeatStateIcons.length
+                    : 0;
+                visual.defaultIconSetIndex = defaultSetCount ? Math.floor(Math.random() * defaultSetCount) : 0;
+                visual.collisionIconSetIndex = collisionSetCount ? Math.floor(Math.random() * collisionSetCount) : 0;
+                visual.defeatIconIndex = defeatStateCount ? Math.floor(Math.random() * defeatStateCount) : 0;
+            }
+            visual.collisionVisualActive = Boolean(player.collisionActive);
+            if (Boolean(player.playerWinVisualActive) && !visual.playerWinVisualActive) {
+                const winIconCount = spriteState.skinRuntime && spriteState.skinRuntime.winStateIcons
+                    ? spriteState.skinRuntime.winStateIcons.length
+                    : 0;
+                visual.playerWinIconIndex = winIconCount
+                    ? Math.floor(Math.random() * winIconCount)
+                    : 0;
+            }
+            visual.playerWinVisualActive = Boolean(player.playerWinVisualActive);
+            if (Boolean(player.stopVisualActive) && !visual.stopVisualActive) {
+                const stopIconCount = spriteState.skinRuntime && spriteState.skinRuntime.stopStateIcons
+                    ? spriteState.skinRuntime.stopStateIcons.length
+                    : 0;
+                visual.stopIconIndex = stopIconCount
+                    ? Math.floor(Math.random() * stopIconCount)
+                    : 0;
+            }
+            visual.stopVisualActive = Boolean(player.stopVisualActive);
             const isNpc = spriteState.isNpc;
             const isCollisionVisualActive = spriteState.isCollisionVisualActive;
             const isDefeatVisualActive = spriteState.isDefeatVisualActive;
@@ -2004,12 +3316,19 @@
             const activeIcon = spriteState.activeIcon;
             const activeIconReady = spriteState.activeIconReady;
             const fallbackSpriteHeight = playerSpriteHeight * spriteScale * zoom;
-            const useDomGifOverlay = Boolean(isNpc && activeIconReady && isAnimatedGifIcon(activeIcon));
+            const useDomGifOverlay = Boolean(activeIconReady && isAnimatedGifIcon(activeIcon));
             const fallbackNaturalWidth = activeIcon.naturalWidth || playerSpriteWidth;
             const fallbackNaturalHeight = activeIcon.naturalHeight || playerSpriteHeight;
             const fallbackAspectRatio = fallbackNaturalHeight > 0 ? fallbackNaturalWidth / fallbackNaturalHeight : 1;
-            const spriteHeight = fallbackSpriteHeight;
-            const spriteWidth = spriteHeight * fallbackAspectRatio;
+            let spriteHeight = fallbackSpriteHeight;
+            let spriteWidth = spriteHeight * fallbackAspectRatio;
+            if (!isNpc && spriteState.skinRuntime && spriteState.skinRuntime.skinType === 'evolution') {
+                const evolutionHealthSegments = getPlayerHealthSegments(player);
+                const evolutionBoostScale = isBoostVisualActive && evolutionHealthSegments >= 3 ? 1.2 : 1;
+                const classicReferenceWidth = fallbackSpriteHeight * defaultPlayerAspectRatio * 2 * evolutionBoostScale;
+                spriteWidth = classicReferenceWidth;
+                spriteHeight = spriteWidth / Math.max(0.1, fallbackAspectRatio);
+            }
             const trailActive = activeIconReady && !isDeathVisualActive && (
                 isNpc
                     ? (player.npcState === 'charging')
@@ -2020,6 +3339,13 @@
             const npcPhase = isNpc
                 ? Math.max(1, Number(player.npcPhase || 1))
                 : 1;
+            const playerSkinProfile = getPlayerSkinProfile(player.skinName || 'default');
+
+            if (!isNpc && playerSkinProfile.type === 'double' && drawDoublePlayer(player, visual, cameraX, cameraY, zoom, nowMs, isSelf, deltaSeconds)) {
+                visual.previousX = player.x;
+                visual.previousY = player.y;
+                return;
+            }
 
             if (isNpc) {
                 if (visual.lastNpcPhase === null) {
@@ -2203,20 +3529,28 @@
             }
 
             if (!isNpc) {
+                const skinProfile = getPlayerSkinProfile(player.skinName || 'default');
                 const defeatReceivedCount = typeof player.defeatReceivedCount === 'number' ? Math.max(0, player.defeatReceivedCount) : 0;
                 const healthSegmentsFilled = isDeathVisualActive
                     ? 0
-                    : Math.max(0, 3 - (defeatReceivedCount % 3 || 0));
+                    : Math.max(0, skinProfile.maxHealthSegments - (defeatReceivedCount % skinProfile.maxHealthSegments || 0));
                 if (!isDeathVisualActive) {
-                    const healthBarWidth = Math.max(24, spriteWidth * 0.9);
-                    const segmentGap = Math.max(2, 2 * zoom);
-                    const segmentWidth = (healthBarWidth - segmentGap * 2) / 3;
+                    const healthBarReferenceWidth = skinProfile.type === 'evolution'
+                        ? (playerSpriteHeight * spriteScale * zoom * defaultPlayerAspectRatio)
+                        : spriteWidth;
+                    const healthBarWidth = Math.max(24, healthBarReferenceWidth * 0.9);
+                    const totalSegments = Math.max(1, skinProfile.maxHealthSegments);
+                    const segmentGap = skinProfile.type === 'evolution'
+                        ? Math.max(1, 1 * zoom)
+                        : Math.max(2, 2 * zoom);
+                    const segmentWidth = (healthBarWidth - segmentGap * Math.max(0, totalSegments - 1)) / totalSegments;
                     const segmentHeight = Math.max(4, 5 * zoom);
                     const defaultSegmentStartX = x - healthBarWidth / 2;
-                    const defaultSegmentY = y + spriteHeight / 2 + 5 * zoom;
-                    const healthSegmentColor = healthSegmentsFilled >= 3
+                    const verticalOffset = skinProfile.type === 'evolution' ? 9 * zoom : 5 * zoom;
+                    const defaultSegmentY = y + spriteHeight / 2 + verticalOffset;
+                    const healthSegmentColor = healthSegmentsFilled >= Math.max(3, totalSegments)
                         ? 'rgba(34, 197, 94, 1)'
-                        : (healthSegmentsFilled === 2
+                        : (healthSegmentsFilled >= Math.max(2, Math.ceil(totalSegments / 2))
                             ? 'rgba(234, 179, 8, 1)'
                             : 'rgba(239, 68, 68, 1)');
                     const playerBoostState = typeof player.boostState === 'string' ? player.boostState : 'idle';
@@ -2231,11 +3565,11 @@
                     const segmentStartX = defaultSegmentStartX;
                     const segmentY = defaultSegmentY;
                     ctx.save();
-                    for (let segmentIndex = 0; segmentIndex < 3; segmentIndex += 1) {
+                    for (let segmentIndex = 0; segmentIndex < totalSegments; segmentIndex += 1) {
                         const segmentX = segmentStartX + segmentIndex * (segmentWidth + segmentGap);
                         ctx.fillStyle = segmentIndex < healthSegmentsFilled
                             ? healthSegmentColor
-                            : 'rgba(15, 23, 42, 0.14)';
+                            : 'rgba(15, 23, 42, 0.28)';
                         ctx.fillRect(segmentX, segmentY, segmentWidth, segmentHeight);
                     }
                     ctx.restore();
@@ -2255,7 +3589,11 @@
                     : 'rgba(17, 24, 39, 0.92)';
                 ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText(player.displayName || player.id, x, y - spriteHeight / 2 - 5 * zoom);
+                ctx.fillText(
+                    player.displayName || player.id,
+                    x,
+                    y - spriteHeight / 2 - (getPlayerSkinProfile(player.skinName || 'default').type === 'evolution' ? 9 * zoom : 5 * zoom)
+                );
             } else if (!isDeathVisualActive || isNpcDeathAnimating) {
                 const healthRatio = Math.max(0, Math.min(1, npcHealth / playerNpcMaxHealth));
                 const npcPhaseTwoRatio = typeof player.npcPhaseTwoRatio === 'number' ? player.npcPhaseTwoRatio : 0.6;
@@ -2360,7 +3698,7 @@
             currentMoveSpeed = 0;
             boostState = 'idle';
         }
-        if (collisionRecoveryActive || boostLockedActive) {
+        if (boostLockedActive) {
             input.boost = false;
             currentMoveSpeed = serverReportedMoveSpeed;
             boostState = 'idle';
@@ -2373,26 +3711,46 @@
 
         if (predictedSelf && selfId) {
             const authoritativeSelf = nextById.get(selfId);
-            if (selfDeathActive && authoritativeSelf) {
-                predictedSelf.x = authoritativeSelf.x;
-                predictedSelf.y = authoritativeSelf.y;
-            } else {
-                predictedSelf.x = clampToWorld(predictedSelf.x + movementVector.dx * currentMoveSpeed * deltaSeconds);
-                predictedSelf.y = clampToWorld(predictedSelf.y + movementVector.dy * currentMoveSpeed * deltaSeconds);
-            }
+            const authoritativeIsDouble = Boolean(
+                authoritativeSelf &&
+                getPlayerSkinProfile(authoritativeSelf.skinName || selectedSkinName).type === 'double'
+            );
 
-            if (authoritativeSelf) {
-                const diffX = authoritativeSelf.x - predictedSelf.x;
-                const diffY = authoritativeSelf.y - predictedSelf.y;
-                const diffDistance = Math.hypot(diffX, diffY);
-
-                if (diffDistance > selfSnapDistance) {
+            if (!authoritativeIsDouble) {
+                if (selfDeathActive && authoritativeSelf) {
                     predictedSelf.x = authoritativeSelf.x;
                     predictedSelf.y = authoritativeSelf.y;
-                } else if (diffDistance > selfIgnoreDistance) {
-                    predictedSelf.x += diffX * selfReconcileLerp;
-                    predictedSelf.y += diffY * selfReconcileLerp;
+                } else if (authoritativeSelf && (authoritativeSelf.collisionActive || authoritativeSelf.collisionRecoveryActive)) {
+                    const authoritativeVelocityX = Number(authoritativeSelf.velocityX || 0);
+                    const authoritativeVelocityY = Number(authoritativeSelf.velocityY || 0);
+                    predictedSelf.x = clampToWorld(predictedSelf.x + authoritativeVelocityX * deltaSeconds);
+                    predictedSelf.y = clampToWorld(predictedSelf.y + authoritativeVelocityY * deltaSeconds);
+                } else {
+                    predictedSelf.x = clampToWorld(predictedSelf.x + movementVector.dx * currentMoveSpeed * deltaSeconds);
+                    predictedSelf.y = clampToWorld(predictedSelf.y + movementVector.dy * currentMoveSpeed * deltaSeconds);
                 }
+
+                if (authoritativeSelf) {
+                    const diffX = authoritativeSelf.x - predictedSelf.x;
+                    const diffY = authoritativeSelf.y - predictedSelf.y;
+                    const diffDistance = Math.hypot(diffX, diffY);
+                    const selfSnapThreshold = selfSnapDistance;
+                    const selfIgnoreThreshold = selfIgnoreDistance;
+
+                    if (diffDistance > selfSnapThreshold) {
+                        predictedSelf.x = authoritativeSelf.x;
+                        predictedSelf.y = authoritativeSelf.y;
+                    } else if (diffDistance > selfIgnoreThreshold) {
+                        predictedSelf.x += diffX * selfReconcileLerp;
+                        predictedSelf.y += diffY * selfReconcileLerp;
+                    }
+                }
+            }
+
+            if (authoritativeIsDouble) {
+                updatePredictedDoubleState(authoritativeSelf, deltaSeconds, inputVector, movementVector, selfReconcileLerp);
+            } else if (predictedSelf) {
+                predictedSelf.doubleState = authoritativeSelf && authoritativeSelf.doubleState ? authoritativeSelf.doubleState : null;
             }
         }
 
@@ -2424,18 +3782,21 @@
 
                 if (current) {
                     current.displayName = serverPlayer.displayName || serverPlayer.id;
+                    current.skinName = serverPlayer.skinName || 'default';
                     current.x = renderedSelf.x;
                     current.y = renderedSelf.y;
                     current.velocityX = typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0;
                     current.velocityY = typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0;
                     current.facingAngle = typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0;
                     current.isDummy = Boolean(serverPlayer.isDummy);
+                    current.collisionImpactActive = Boolean(serverPlayer.collisionImpactActive);
                     current.collisionActive = Boolean(serverPlayer.collisionActive);
                     current.npcPhase = typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1;
                     current.npcPhaseTwoRatio = typeof serverPlayer.npcPhaseTwoRatio === 'number' ? serverPlayer.npcPhaseTwoRatio : 0.6;
                     current.npcPhaseThreeRatio = typeof serverPlayer.npcPhaseThreeRatio === 'number' ? serverPlayer.npcPhaseThreeRatio : 0.2;
                     current.npcState = serverPlayer.npcState || '';
                     current.collisionVisualType = serverPlayer.collisionVisualType || 'win';
+                    current.doubleState = predictedSelf && predictedSelf.doubleState ? predictedSelf.doubleState : (serverPlayer.doubleState || null);
                     current.collisionImpactX = typeof serverPlayer.collisionImpactX === 'number' ? serverPlayer.collisionImpactX : 0;
                     current.collisionImpactY = typeof serverPlayer.collisionImpactY === 'number' ? serverPlayer.collisionImpactY : 0;
                     current.deathActive = Boolean(serverPlayer.deathActive);
@@ -2447,8 +3808,15 @@
                     current.npcHealth = typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null;
                     current.npcDefeatDamageRatio = typeof serverPlayer.npcDefeatDamageRatio === 'number' ? serverPlayer.npcDefeatDamageRatio : 0;
                     current.npcWinVisualActive = Boolean(serverPlayer.npcWinVisualActive);
+                    current.playerWinVisualActive = Boolean(serverPlayer.playerWinVisualActive);
+                    current.stopVisualActive = Boolean(serverPlayer.stopVisualActive);
                     current.boostState = serverPlayer.boostState || 'idle';
-                    current.currentSpeed = typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond;
+                    current.currentSpeed = typeof serverPlayer.currentSpeed === 'number'
+                        ? serverPlayer.currentSpeed
+                        : getPlayerSkinProfile(serverPlayer.skinName || 'default').baseSpeed;
+                    current.collisionRecoveryActive = Boolean(serverPlayer.collisionRecoveryActive);
+                    current.collisionRecoveryRemainingMs = typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0;
+                    current.collisionRecoveryDurationMs = typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0;
                     current.defeatReceivedCount = typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0;
                     current.boostLockRemainingMs = typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0;
                     current.boostLockDurationMs = typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0;
@@ -2459,12 +3827,14 @@
                     renderPlayers.push({
                         id: renderedSelf.id,
                         displayName: serverPlayer.displayName || serverPlayer.id,
+                        skinName: serverPlayer.skinName || 'default',
                         x: renderedSelf.x,
                         y: renderedSelf.y,
                         velocityX: typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0,
                         velocityY: typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0,
                         facingAngle: typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0,
                         isDummy: Boolean(serverPlayer.isDummy),
+                        collisionImpactActive: Boolean(serverPlayer.collisionImpactActive),
                         isNpc: Boolean(serverPlayer.isNpc),
                         npcPhase: typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1,
                         npcPhaseTwoRatio: typeof serverPlayer.npcPhaseTwoRatio === 'number' ? serverPlayer.npcPhaseTwoRatio : 0.6,
@@ -2472,6 +3842,7 @@
                         npcState: serverPlayer.npcState || '',
                         collisionActive: Boolean(serverPlayer.collisionActive),
                         collisionVisualType: serverPlayer.collisionVisualType || 'win',
+                        doubleState: predictedSelf && predictedSelf.doubleState ? predictedSelf.doubleState : (serverPlayer.doubleState || null),
                         collisionImpactX: typeof serverPlayer.collisionImpactX === 'number' ? serverPlayer.collisionImpactX : 0,
                         collisionImpactY: typeof serverPlayer.collisionImpactY === 'number' ? serverPlayer.collisionImpactY : 0,
                         deathActive: Boolean(serverPlayer.deathActive),
@@ -2483,8 +3854,15 @@
                         npcHealth: typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null,
                         npcDefeatDamageRatio: typeof serverPlayer.npcDefeatDamageRatio === 'number' ? serverPlayer.npcDefeatDamageRatio : 0,
                         npcWinVisualActive: Boolean(serverPlayer.npcWinVisualActive),
+                        playerWinVisualActive: Boolean(serverPlayer.playerWinVisualActive),
+                        stopVisualActive: Boolean(serverPlayer.stopVisualActive),
                         boostState: serverPlayer.boostState || 'idle',
-                        currentSpeed: typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond,
+                        currentSpeed: typeof serverPlayer.currentSpeed === 'number'
+                            ? serverPlayer.currentSpeed
+                            : getPlayerSkinProfile(serverPlayer.skinName || 'default').baseSpeed,
+                        collisionRecoveryActive: Boolean(serverPlayer.collisionRecoveryActive),
+                        collisionRecoveryRemainingMs: typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0,
+                        collisionRecoveryDurationMs: typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0,
                         defeatReceivedCount: typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0,
                         boostLockRemainingMs: typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0,
                         boostLockDurationMs: typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0,
@@ -2508,9 +3886,13 @@
                 serverPlayer.y + ((typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0) * remoteProjectionSeconds)
             );
 
+            const remoteVelocityX = typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0;
+            const remoteVelocityY = typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0;
+
             if (current) {
                 const respawnTransition = Boolean(current.deathActive) && !Boolean(serverPlayer.deathActive);
                 current.displayName = serverPlayer.displayName || serverPlayer.id;
+                current.skinName = serverPlayer.skinName || 'default';
                 current.targetX = delayedTargetX;
                 current.targetY = delayedTargetY;
                 if (respawnTransition) {
@@ -2520,20 +3902,32 @@
                     visual.previousX = delayedTargetX;
                     visual.previousY = delayedTargetY;
                 } else {
-                    current.x += (current.targetX - current.x) * remoteLerp;
-                    current.y += (current.targetY - current.y) * remoteLerp;
+                    current.x = clampToWorld(current.x + remoteVelocityX * deltaSeconds);
+                    current.y = clampToWorld(current.y + remoteVelocityY * deltaSeconds);
+                    const reconcileDiffX = current.targetX - current.x;
+                    const reconcileDiffY = current.targetY - current.y;
+                    const reconcileDistance = Math.hypot(reconcileDiffX, reconcileDiffY);
+                    if (reconcileDistance > 220) {
+                        current.x = current.targetX;
+                        current.y = current.targetY;
+                    } else if (reconcileDistance > 1.5) {
+                        current.x += reconcileDiffX * remoteLerp;
+                        current.y += reconcileDiffY * remoteLerp;
+                    }
                 }
-                current.velocityX = typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0;
-                current.velocityY = typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0;
+                current.velocityX = remoteVelocityX;
+                current.velocityY = remoteVelocityY;
                 current.facingAngle = typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0;
                 current.isDummy = Boolean(serverPlayer.isDummy);
                 current.isNpc = Boolean(serverPlayer.isNpc);
+                current.collisionImpactActive = Boolean(serverPlayer.collisionImpactActive);
                 current.npcPhase = typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1;
                 current.npcPhaseTwoRatio = typeof serverPlayer.npcPhaseTwoRatio === 'number' ? serverPlayer.npcPhaseTwoRatio : 0.6;
                 current.npcPhaseThreeRatio = typeof serverPlayer.npcPhaseThreeRatio === 'number' ? serverPlayer.npcPhaseThreeRatio : 0.2;
                 current.npcState = serverPlayer.npcState || '';
                 current.collisionActive = Boolean(serverPlayer.collisionActive);
                 current.collisionVisualType = serverPlayer.collisionVisualType || 'win';
+                current.doubleState = serverPlayer.doubleState || null;
                 current.collisionImpactX = typeof serverPlayer.collisionImpactX === 'number' ? serverPlayer.collisionImpactX : 0;
                 current.collisionImpactY = typeof serverPlayer.collisionImpactY === 'number' ? serverPlayer.collisionImpactY : 0;
                 current.deathActive = Boolean(serverPlayer.deathActive);
@@ -2545,8 +3939,15 @@
                 current.npcHealth = typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null;
                 current.npcDefeatDamageRatio = typeof serverPlayer.npcDefeatDamageRatio === 'number' ? serverPlayer.npcDefeatDamageRatio : 0;
                 current.npcWinVisualActive = Boolean(serverPlayer.npcWinVisualActive);
+                current.playerWinVisualActive = Boolean(serverPlayer.playerWinVisualActive);
+                current.stopVisualActive = Boolean(serverPlayer.stopVisualActive);
                 current.boostState = serverPlayer.boostState || 'idle';
-                current.currentSpeed = typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond;
+                current.currentSpeed = typeof serverPlayer.currentSpeed === 'number'
+                    ? serverPlayer.currentSpeed
+                    : getPlayerSkinProfile(serverPlayer.skinName || 'default').baseSpeed;
+                current.collisionRecoveryActive = Boolean(serverPlayer.collisionRecoveryActive);
+                current.collisionRecoveryRemainingMs = typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0;
+                current.collisionRecoveryDurationMs = typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0;
                 current.defeatReceivedCount = typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0;
                 current.boostLockRemainingMs = typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0;
                 current.boostLockDurationMs = typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0;
@@ -2557,14 +3958,16 @@
                 renderPlayers.push({
                     id: serverPlayer.id,
                     displayName: serverPlayer.displayName || serverPlayer.id,
+                    skinName: serverPlayer.skinName || 'default',
                     x: delayedTargetX,
                     y: delayedTargetY,
                     targetX: delayedTargetX,
                     targetY: delayedTargetY,
-                    velocityX: typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0,
-                    velocityY: typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0,
+                    velocityX: remoteVelocityX,
+                    velocityY: remoteVelocityY,
                     facingAngle: typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0,
                     isDummy: Boolean(serverPlayer.isDummy),
+                    collisionImpactActive: Boolean(serverPlayer.collisionImpactActive),
                     isNpc: Boolean(serverPlayer.isNpc),
                     npcPhase: typeof serverPlayer.npcPhase === 'number' ? serverPlayer.npcPhase : 1,
                     npcPhaseTwoRatio: typeof serverPlayer.npcPhaseTwoRatio === 'number' ? serverPlayer.npcPhaseTwoRatio : 0.6,
@@ -2572,6 +3975,7 @@
                     npcState: serverPlayer.npcState || '',
                     collisionActive: Boolean(serverPlayer.collisionActive),
                     collisionVisualType: serverPlayer.collisionVisualType || 'win',
+                    doubleState: serverPlayer.doubleState || null,
                     collisionImpactX: typeof serverPlayer.collisionImpactX === 'number' ? serverPlayer.collisionImpactX : 0,
                     collisionImpactY: typeof serverPlayer.collisionImpactY === 'number' ? serverPlayer.collisionImpactY : 0,
                     deathActive: Boolean(serverPlayer.deathActive),
@@ -2583,8 +3987,15 @@
                     npcHealth: typeof serverPlayer.npcHealth === 'number' ? serverPlayer.npcHealth : null,
                     npcDefeatDamageRatio: typeof serverPlayer.npcDefeatDamageRatio === 'number' ? serverPlayer.npcDefeatDamageRatio : 0,
                     npcWinVisualActive: Boolean(serverPlayer.npcWinVisualActive),
+                    playerWinVisualActive: Boolean(serverPlayer.playerWinVisualActive),
+                    stopVisualActive: Boolean(serverPlayer.stopVisualActive),
                     boostState: serverPlayer.boostState || 'idle',
-                    currentSpeed: typeof serverPlayer.currentSpeed === 'number' ? serverPlayer.currentSpeed : basePlayerSpeedPerSecond,
+                    currentSpeed: typeof serverPlayer.currentSpeed === 'number'
+                        ? serverPlayer.currentSpeed
+                        : getPlayerSkinProfile(serverPlayer.skinName || 'default').baseSpeed,
+                    collisionRecoveryActive: Boolean(serverPlayer.collisionRecoveryActive),
+                    collisionRecoveryRemainingMs: typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0,
+                    collisionRecoveryDurationMs: typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0,
                     defeatReceivedCount: typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0,
                     boostLockRemainingMs: typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0,
                     boostLockDurationMs: typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0,
@@ -2608,13 +4019,13 @@
                 visual.previousX = player.x;
                 visual.previousY = player.y;
                 setVisualDirection(visual, directionVector.dx, directionVector.dy, {
-                    usesLeftFacingSprite: Boolean(player.isNpc)
+                    usesLeftFacingSprite: usesLeftFacingSpriteForPlayer(player)
                 });
                 return;
             }
 
             setVisualDirection(visual, directionVector.dx, directionVector.dy, {
-                usesLeftFacingSprite: Boolean(player.isNpc)
+                usesLeftFacingSprite: usesLeftFacingSpriteForPlayer(player)
             });
         });
 
@@ -2622,7 +4033,7 @@
         let cameraTargetPlayer = renderPlayers.find(function (player) {
             return player.id === selfId;
         });
-        if (selfDeathActive && selfLivesRemaining <= 0 && spectatablePlayers.length > 0) {
+        if (selfDeathActive && selfDeathRespawnReady && spectatablePlayers.length > 0) {
             cameraTargetPlayer = renderPlayers.find(function (player) {
                 return player.id === spectateTargetId;
             }) || spectatablePlayers[0];
@@ -2630,8 +4041,8 @@
         if (!cameraTargetPlayer) {
             cameraTargetPlayer = renderPlayers[0] || { x: worldSize / 2, y: worldSize / 2 };
         }
-        const viewportWorldWidth = getCanvasDisplayWidth() / effectiveZoom;
-        const viewportWorldHeight = getCanvasDisplayHeight() / effectiveZoom;
+        const viewportWorldWidth = getViewportDisplayWidth() / effectiveZoom;
+        const viewportWorldHeight = getViewportDisplayHeight() / effectiveZoom;
         const deadZoneWidth = viewportWorldWidth * cameraDeadZoneRatioX;
         const deadZoneHeight = viewportWorldHeight * cameraDeadZoneRatioY;
         const currentCenterX = cameraX + viewportWorldWidth / 2;
@@ -2686,13 +4097,13 @@
         return function (event) {
             if (event.key === ' ') {
                 event.preventDefault();
-                if (collisionRecoveryActive || boostLockedActive) {
+                if (boostLockedActive) {
                     input.boost = false;
                     sendInputNow();
                     return;
                 }
                 input.boost = value;
-                if (!value && boostState === 'cooldown' && currentMoveSpeed <= basePlayerSpeedPerSecond) {
+                if (!value && boostState === 'cooldown' && currentMoveSpeed <= getSelectedPlayerBaseSpeed()) {
                     boostState = 'idle';
                 }
                 sendInputNow();
@@ -2745,9 +4156,14 @@
             setDeathModalState(selfDeathActive, selfDeathRespawnReady, selfLivesRemaining);
         });
     }
-    if (fullscreenToggle) {
-        fullscreenToggle.addEventListener('click', function () {
-            setFullscreenMode(true);
+    if (fullscreenToggles.length) {
+        fullscreenToggles.forEach(function (fullscreenToggle) {
+            fullscreenToggle.addEventListener('click', function () {
+                if (!isCompactViewport) {
+                    return;
+                }
+                setFullscreenMode(true);
+            });
         });
     }
     if (fullscreenExitButton) {
@@ -2771,7 +4187,10 @@
     }
     if (mobileControlsToggle) {
         mobileControlsToggle.addEventListener('click', function () {
-            setMobileControlsOpen(true);
+            if (!isCompactViewport) {
+                return;
+            }
+            setMobileControlsOpen(mobileControls.hidden);
         });
     }
     if (joystick) {
@@ -2801,13 +4220,13 @@
     }
     if (mobileBoostButton) {
         const setBoostState = function (value) {
-            if (collisionRecoveryActive || boostLockedActive) {
+            if (boostLockedActive) {
                 input.boost = false;
                 sendInputNow();
                 return;
             }
             input.boost = value;
-            if (!value && boostState === 'cooldown' && currentMoveSpeed <= basePlayerSpeedPerSecond) {
+            if (!value && boostState === 'cooldown' && currentMoveSpeed <= getSelectedPlayerBaseSpeed()) {
                 boostState = 'idle';
             }
             sendInputNow();
@@ -2828,6 +4247,33 @@
             startGame();
         });
     }
+    if (startCharacterButton) {
+        startCharacterButton.addEventListener('click', function () {
+            renderSkinList();
+            setSkinModalOpen(true);
+        });
+    }
+    if (skinModalCloseButton) {
+        skinModalCloseButton.addEventListener('click', function () {
+            setSkinModalOpen(false);
+        });
+    }
+    if (skinModal) {
+        skinModal.addEventListener('click', function (event) {
+            if (event.target === skinModal) {
+                setSkinModalOpen(false);
+            }
+        });
+    }
+    if (skinSelectButton) {
+        skinSelectButton.addEventListener('click', function () {
+            if (!selectedSkinDetailName) {
+                return;
+            }
+            applySelectedSkin(selectedSkinDetailName);
+            setSkinModalOpen(false);
+        });
+    }
     if (reconnectButton) {
         reconnectButton.addEventListener('click', function () {
             startGame();
@@ -2843,7 +4289,11 @@
     }
 
     setFullscreenMode(false);
+    updateCompactViewportUI();
+    updateStartCharacterPreview();
+    renderSkinList();
     setStartOverlayOpen(true);
+    setSkinModalOpen(false);
     setLoadingOverlayOpen(true);
     setStatus(labels.disconnected, '#64748b');
     setPing(null);

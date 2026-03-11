@@ -1,6 +1,6 @@
 (function () {
     const viewportPadding = 10;
-    const popupSelector = "[data-popup-fit-bottom]";
+    const popupSelector = "[data-popup-fit-bottom], [data-popup-fit-top]";
 
     function isVisible(element) {
         if (!element || !element.isConnected) {
@@ -24,24 +24,43 @@
     }
 
     function repositionPopup(element) {
+        const skinModalParent = element.closest(".multiplayer-skin-modal");
+
         if (!isVisible(element)) {
             element.style.removeProperty("--popup-fit-bottom-shift");
+            element.style.removeProperty("--popup-fit-top-shift");
+            if (skinModalParent) {
+                skinModalParent.style.removeProperty("--popup-fit-child-top-shift");
+            }
             return;
         }
 
         element.style.setProperty("--popup-fit-bottom-shift", "0px");
+        element.style.setProperty("--popup-fit-top-shift", "0px");
+        if (skinModalParent) {
+            skinModalParent.style.setProperty("--popup-fit-child-top-shift", "0px");
+        }
 
         const rect = element.getBoundingClientRect();
         const viewportHeight = getViewportHeight();
         const overflowBottom = rect.bottom + viewportPadding - viewportHeight;
+        const overflowTop = viewportPadding - rect.top;
 
-        if (overflowBottom <= 0) {
-            return;
+        if (overflowBottom > 0) {
+            const availableTopShift = Math.max(0, rect.top - viewportPadding);
+            const shift = Math.min(overflowBottom, availableTopShift);
+            element.style.setProperty("--popup-fit-bottom-shift", String(shift) + "px");
         }
 
-        const availableTopShift = Math.max(0, rect.top - viewportPadding);
-        const shift = Math.min(overflowBottom, availableTopShift);
-        element.style.setProperty("--popup-fit-bottom-shift", String(shift) + "px");
+        if (overflowTop > 0) {
+            const shift = overflowTop;
+            if (skinModalParent) {
+                skinModalParent.style.setProperty("--popup-fit-child-top-shift", String(shift) + "px");
+                element.style.setProperty("--popup-fit-top-shift", "0px");
+            } else {
+                element.style.setProperty("--popup-fit-top-shift", String(shift) + "px");
+            }
+        }
     }
 
     function refreshPopupPositions() {

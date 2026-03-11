@@ -34,14 +34,19 @@
         <span class="ui-auth-account-profile-email">{{ account_email|default:"-" }}</span>
     </div>
     {% if show_account_bumpercar_spiky_stats and account_bumpercar_spiky_stats %}
-    <div class="ui-auth-account-stats">
-        <strong class="ui-auth-account-stats-title">
-            {% include 'partials/ui_i18n.html' with key='account_bumpercar_stats_title' %}
-        </strong>
+    <button
+        type="button"
+        class="ui-auth-account-menu-item ui-auth-account-stats-toggle"
+        data-auth-account-stats-toggle
+        aria-expanded="false"
+    >
+        {% include 'partials/ui_i18n.html' with key='account_bumpercar_stats_title' %}
+    </button>
+    <div class="ui-auth-account-stats" data-auth-account-stats-panel hidden>
         <div class="ui-auth-account-stats-list">
             <div class="ui-auth-account-stats-row">
-                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_dummy_kills' %}</span>
-                <strong>{{ account_bumpercar_spiky_stats.dummy_kills }}</strong>
+                <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_player_kills' %}</span>
+                <strong>{{ account_bumpercar_spiky_stats.player_kills }}</strong>
             </div>
             <div class="ui-auth-account-stats-row">
                 <span>{% include 'partials/ui_i18n.html' with key='account_bumpercar_deaths' %}</span>

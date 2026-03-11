@@ -63,11 +63,17 @@
         hosts.forEach(function (host) {
             const trigger = host.querySelector('[data-auth-account-trigger]');
             const menu = host.querySelector('[data-auth-account-menu]');
+            const statsToggle = host.querySelector('[data-auth-account-stats-toggle]');
+            const statsPanel = host.querySelector('[data-auth-account-stats-panel]');
             if (!menu || !trigger) {
                 return;
             }
             menu.hidden = true;
             trigger.setAttribute('aria-expanded', 'false');
+            if (statsToggle && statsPanel) {
+                statsToggle.setAttribute('aria-expanded', 'false');
+                statsPanel.hidden = true;
+            }
         });
     };
 
@@ -75,6 +81,8 @@
         const accountTrigger = host.querySelector('[data-auth-account-trigger]');
         const accountMenu = host.querySelector('[data-auth-account-menu]');
         const accountLogoutButton = host.querySelector('[data-auth-account-logout]');
+        const accountStatsToggle = host.querySelector('[data-auth-account-stats-toggle]');
+        const accountStatsPanel = host.querySelector('[data-auth-account-stats-panel]');
         const profileUploadForm = host.querySelector('[data-root-account-profile-upload-form]');
         const profileImageTrigger = host.querySelector('[data-root-account-profile-image-trigger]');
         const profileImageInput = host.querySelector('[data-root-account-profile-image-input]');
@@ -101,6 +109,10 @@
             }
             accountMenu.hidden = !opened;
             accountTrigger.setAttribute('aria-expanded', opened ? 'true' : 'false');
+            if (!opened && accountStatsToggle && accountStatsPanel) {
+                accountStatsToggle.setAttribute('aria-expanded', 'false');
+                accountStatsPanel.hidden = true;
+            }
         };
 
         const requestLogout = function () {
@@ -136,6 +148,15 @@
                 event.preventDefault();
                 setAccountMenuOpen(false);
                 requestLogout();
+            });
+        }
+
+        if (accountStatsToggle && accountStatsPanel) {
+            accountStatsToggle.addEventListener('click', function (event) {
+                event.preventDefault();
+                const expanded = accountStatsToggle.getAttribute('aria-expanded') === 'true';
+                accountStatsToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                accountStatsPanel.hidden = expanded;
             });
         }
 

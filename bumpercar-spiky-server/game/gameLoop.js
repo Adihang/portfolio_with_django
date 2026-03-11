@@ -45,12 +45,51 @@ function startGameLoop(world, wss) {
                 const npcDeathAnimating = p.isNpc && deathActive && now < (p.deathUntil || 0)
                 const boostLockRemainingMs = Math.max(0, (p.boostDisabledUntil || 0) - now)
                 const boostLockDurationMs = Math.max(0, (p.boostDisabledUntil || 0) - (p.boostDisabledStartedAt || 0))
+                const collisionRecoveryRemainingMs = Math.max(0, (p.collisionRecoveryUntil || 0) - now)
+                const collisionRecoveryDurationMs = Math.max(0, (p.collisionRecoveryUntil || 0) - (p.collisionRecoveryStartedAt || 0))
+                const playerWinVisualActive = !p.isNpc && !p.isDummy && now < Number(p.playerWinVisualUntil || 0)
+                const stopVisualActive = !p.isNpc && !p.isDummy &&
+                    !deathActive &&
+                    !playerWinVisualActive &&
+                    now - Number(p.lastActiveInputAt || 0) >= 3000 &&
+                    Math.abs(Number(p.lastMoveX || 0)) < 0.001 &&
+                    Math.abs(Number(p.lastMoveY || 0)) < 0.001 &&
+                    !Boolean(p.input && (p.input.up || p.input.down || p.input.left || p.input.right || p.input.boost))
+                const doubleState = (!p.isNpc && !p.isDummy && p.isDoubleSkin && Array.isArray(p.doubleUnits))
+                    ? {
+                        merged: Boolean(p.doubleMerged),
+                        phase: String(p.doubleSeparationPhase || "merged"),
+                        units: p.doubleUnits.map((unit) => ({
+                            health: Number(unit.health || 0),
+                            x: Number(unit.x || p.x || 0),
+                            y: Number(unit.y || p.y || 0),
+                            velocityX: Number(unit.lastMoveX || 0) * TICK_RATE,
+                            velocityY: Number(unit.lastMoveY || 0) * TICK_RATE,
+                            facingAngle: typeof unit.facingAngle === "number" ? unit.facingAngle : 0,
+                            currentSpeed: Number(unit.currentSpeed || p.currentSpeed || 0),
+                            boostState: String(unit.boostState || "idle"),
+                            collisionActive: now < Number(unit.collisionVisualUntil || 0),
+                            collisionImpactActive: now < Number(unit.collisionImpactUntil || 0),
+                            collisionVisualType: String(unit.collisionVisualType || "win"),
+                            collisionImpactX: Number(unit.collisionImpactX || 0),
+                            collisionImpactY: Number(unit.collisionImpactY || 0),
+                            collisionRecoveryActive: now < Number(unit.collisionRecoveryUntil || 0),
+                            collisionRecoveryRemainingMs: Math.max(0, Number(unit.collisionRecoveryUntil || 0) - now),
+                            collisionRecoveryDurationMs: Math.max(0, Number(unit.collisionRecoveryUntil || 0) - Number(unit.collisionRecoveryStartedAt || 0)),
+                            boostLockedActive: now < Number(unit.boostDisabledUntil || 0),
+                            boostLockRemainingMs: Math.max(0, Number(unit.boostDisabledUntil || 0) - now),
+                            boostLockDurationMs: Math.max(0, Number(unit.boostDisabledUntil || 0) - Number(unit.boostDisabledStartedAt || 0)),
+                            inactive: Number(unit.health || 0) <= 0 || now < Number(unit.inactiveUntil || 0),
+                        }))
+                    }
+                    : null
 
                 return {
                     // 클라이언트는 아래 상태값을 기반으로 보간, 회전, 아이콘 분기,
                     // 사망/충돌 UI, 미니맵, 체력바를 렌더한다.
                     id: p.id,
                     displayName: displayName,
+                    skinName: p.skinName || "default",
                     x: p.x,
                     y: p.y,
                     velocityX: (p.lastMoveX || 0) * TICK_RATE,
@@ -63,12 +102,17 @@ function startGameLoop(world, wss) {
                     npcPhaseThreeRatio: p.isNpc ? Number(GAMEPLAY_SETTINGS.npc_phase_three_health_ratio || 0.2) : null,
                     npcState: p.isNpc ? (p.npcState || "idle") : "",
                     collisionActive: now < (p.collisionVisualUntil || 0),
+                    collisionImpactActive: now < (p.collisionImpactUntil || 0),
                     collisionVisualType: p.collisionVisualType || "win",
                     collisionImpactX: p.collisionImpactX || 0,
                     collisionImpactY: p.collisionImpactY || 0,
                     boostState: p.boostState || "idle",
                     currentSpeed: p.currentSpeed,
                     collisionRecoveryActive: now < (p.collisionRecoveryUntil || 0),
+                    collisionRecoveryRemainingMs: collisionRecoveryRemainingMs,
+                    collisionRecoveryDurationMs: collisionRecoveryDurationMs,
+                    playerWinVisualActive: playerWinVisualActive,
+                    stopVisualActive: stopVisualActive,
                     boostLockedActive: now < (p.boostDisabledUntil || 0),
                     boostLockRemainingMs: boostLockRemainingMs,
                     boostLockDurationMs: boostLockDurationMs,
@@ -84,7 +128,8 @@ function startGameLoop(world, wss) {
                     npcChargeWindupProgress: Math.max(0, Math.min(1, npcChargeWindupProgress)),
                     defeatReceivedCount: p.defeatReceivedCount || 0,
                     defeatDealtCount: p.defeatDealtCount || 0,
-                    roundResetAnnouncementActive: roundResetAnnouncementActive
+                    roundResetAnnouncementActive: roundResetAnnouncementActive,
+                    doubleState: doubleState
                 }
             })
 

@@ -15,22 +15,14 @@
             data-ws-url="{{ game_ws_url }}"
             data-token-url="{{ game_token_url }}"
             data-player-name="{{ game_player_name }}"
-            data-player-icon-url="{% static_v 'Spikip/speaki_default/icon/default.png' %}"
-            data-player-npc-icon-url="{% static_v 'Spikip/ner/icon/default.gif' %}"
-            data-player-npc-phase2-icon-url="{% static_v 'Spikip/ner/icon/Phase2.gif' %}"
-            data-player-npc-phase3-icon-url="{% static_v 'Spikip/ner/icon/Phase3.gif' %}"
+            data-skin-catalog='{{ game_skin_catalog_json }}'
+            data-player-npc-icon-url="{% static_v 'Spikip/ner/icon/default.webp' %}"
+            data-player-npc-phase2-icon-url="{% static_v 'Spikip/ner/icon/Phase2.webp' %}"
+            data-player-npc-phase3-icon-url="{% static_v 'Spikip/ner/icon/Phase3.webp' %}"
             data-player-npc-boost-icon-url="{% static_v 'Spikip/ner/icon/Ner_acceleration.png' %}"
-            data-player-npc-defeat1-icon-url="{% static_v 'Spikip/ner/icon/defeat1.gif' %}"
-            data-player-npc-defeat2-icon-url="{% static_v 'Spikip/ner/icon/defeat2.gif' %}"
-            data-player-npc-die-icon-url="{% static_v 'Spikip/ner/icon/die.gif' %}"
-            data-player-boost-icon-url="{% static_v 'Spikip/speaki_default/icon/acceleration.png' %}"
-            data-player-collision-icon-url="{% static_v 'Spikip/speaki_default/icon/win.png' %}"
-            data-player-defeat-icon-url="{% static_v 'Spikip/speaki_default/icon/defeat.png' %}"
-            data-player-boost-sound-urls='{{ game_boost_sound_urls_json }}'
-            data-player-crash-sound-urls='{{ game_crash_sound_urls_json }}'
-            data-player-defeat-sound-urls='{{ game_defeat_sound_urls_json }}'
-            data-player-die-sound-urls='{{ game_die_sound_urls_json }}'
-            data-player-respawn-sound-urls='{{ game_respawn_sound_urls_json }}'
+            data-player-npc-defeat1-icon-url="{% static_v 'Spikip/ner/icon/defeat1.webp' %}"
+            data-player-npc-defeat2-icon-url="{% static_v 'Spikip/ner/icon/defeat2.webp' %}"
+            data-player-npc-die-icon-url="{% static_v 'Spikip/ner/icon/die.webp' %}"
             data-player-ner-tracking-sound-urls='{{ game_ner_tracking_sound_urls_json }}'
             data-player-ner-acceleration-sound-urls='{{ game_ner_acceleration_sound_urls_json }}'
             data-player-ner-win-icon-urls='{{ game_ner_win_icon_urls_json }}'
@@ -53,26 +45,20 @@
                                     {% include "partials/account_widget.html" %}
                                 </div>
                                 {% endif %}
-                                <button
-                                    class="multiplayer-start-fullscreen"
-                                    type="button"
-                                    data-game-fullscreen-toggle
-                                    aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_fullscreen' %}"
-                                >
-                                    <img
-                                        class="multiplayer-start-fullscreen-icon"
-                                        src="{% static_v 'icons/mob.png' %}"
-                                        alt=""
-                                    >
-                                </button>
                                 <p class="multiplayer-start-kicker">Bumper Car Spiky</p>
                                 <h3 class="multiplayer-start-title">{{ multiplayer_title }}</h3>
                                 <p class="multiplayer-start-description">{{ multiplayer_description }}</p>
-                                <img
-                                    class="multiplayer-start-character"
-                                    src="{% static_v 'Spikip/speaki_default/icon/default.png' %}"
-                                    alt="{{ multiplayer_title }}"
-                                >
+                                <p class="multiplayer-start-skin-hint">
+                                    {% include 'partials/ui_i18n.html' with key='multiplayer_start_skin_hint' %}
+                                </p>
+                                <button class="multiplayer-start-character-button" type="button" data-game-skin-open aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_skin_open' %}">
+                                    <img
+                                        class="multiplayer-start-character"
+                                        src="{{ bumpercar_default_skin.assets.preview_icon_url }}"
+                                        alt="{{ multiplayer_title }}"
+                                        data-game-start-character-image
+                                    >
+                                </button>
                                 <button class="ide-btn ide-btn-primary multiplayer-primary-btn multiplayer-start-button" type="button" data-game-start>
                                     {% include 'partials/ui_i18n.html' with key='multiplayer_start_button' %}
                                 </button>
@@ -117,6 +103,7 @@
                                 </div>
                                 {% endif %}
                             </div>
+                            {% include "popup/fun/multiplayer_skin_modal.html" %}
                         </div>
                         <div class="multiplayer-loading-overlay" data-game-loading-overlay>
                             <div class="multiplayer-loading-stack">
@@ -130,18 +117,44 @@
                                 {% include 'partials/ui_i18n.html' with key='multiplayer_connecting' %}
                             </strong>
                         </div>
-                        <label class="multiplayer-volume-control" aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}">
-                            <span class="multiplayer-volume-label">
-                                {% include 'partials/ui_i18n.html' with key='multiplayer_sound_volume' %}
-                            </span>
-                            <input class="multiplayer-volume-slider" type="range" min="0" max="100" step="1" value="20" data-game-master-volume>
-                        </label>
                         <div class="multiplayer-sprite-overlay" data-game-sprite-overlay aria-hidden="true"></div>
                         <canvas class="multiplayer-canvas" data-game-canvas></canvas>
-                        <canvas class="multiplayer-minimap-canvas" width="160" height="160" data-game-minimap aria-label="Player minimap"></canvas>
-                        <div class="multiplayer-lives" data-game-shared-lives aria-label="{% include 'partials/ui_i18n.html' with key='bumpercar_shared_lives' %}">
-                            <img class="multiplayer-lives-icon" src="{% static_v 'Spikip/speaki_default/icon/acceleration.png' %}" alt="">
-                            <span class="multiplayer-lives-count" data-game-shared-lives-count>x 3</span>
+                        <div class="multiplayer-minimap-hud">
+                            <div class="multiplayer-minimap-row">
+                                <div class="multiplayer-top-actions" data-game-top-actions hidden>
+                                    <button
+                                        class="multiplayer-top-button"
+                                        type="button"
+                                        data-game-mobile-controls-toggle
+                                        aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_joystick_toggle' %}"
+                                    >
+                                        <img
+                                            class="multiplayer-top-button-image"
+                                            src="{% static_v 'icons/mob.png' %}"
+                                            alt=""
+                                            aria-hidden="true"
+                                        >
+                                    </button>
+                                    <button
+                                        class="multiplayer-top-button"
+                                        type="button"
+                                        data-game-fullscreen-toggle
+                                        aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_rotate_mobile' %}"
+                                    >
+                                        <svg aria-hidden="true" viewBox="0 0 24 24" class="multiplayer-top-button-icon">
+                                            <path d="M8 6.5h8a1.5 1.5 0 0 1 1.5 1.5v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M15.2 11.2L17.8 14l2.6-2.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M16 17.5H8a1.5 1.5 0 0 1-1.5-1.5V10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M8.8 12.8L6.2 10l-2.6 2.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <canvas class="multiplayer-minimap-canvas" width="160" height="160" data-game-minimap aria-label="Player minimap"></canvas>
+                            </div>
+                            <div class="multiplayer-lives" data-game-shared-lives aria-label="{% include 'partials/ui_i18n.html' with key='bumpercar_shared_lives' %}">
+                                <img class="multiplayer-lives-icon" src="{% static_v 'Spikip/speaki_default/icon/main.png' %}" alt="">
+                                <span class="multiplayer-lives-count" data-game-shared-lives-count>x 3</span>
+                            </div>
                         </div>
                         {% include "popup/fun/multiplayer_death_modal.html" %}
                         <div class="multiplayer-mobile-controls" data-game-mobile-controls hidden>

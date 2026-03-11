@@ -16,3 +16,7 @@
 [data-popup-fit-bottom] {
     transform: translateY(calc(-1 * var(--popup-fit-bottom-shift, 0px)));
 }
+
+[data-popup-fit-top] {
+    transform: translateY(var(--popup-fit-top-shift, 0px));
+}

@@ -104,6 +104,7 @@ BUMPERCAR_SPIKY_SETTINGS_INT_KEYS = {
 BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS = {
     "dummy_kills": 0,
     "deaths": 0,
+    "player_kills": 0,
     "ner_kills": 0,
     "ner_phase1_attack_dodges": 0,
     "ner_phase2_attack_dodges": 0,
@@ -163,6 +164,220 @@ def normalize_bumpercar_spiky_account_stats(raw_stats=None):
         except (TypeError, ValueError):
             normalized[key] = BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS[key]
     return normalized
+
+
+def _collect_bumpercar_skin_sound_urls(skin_name, folder_name):
+    sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / folder_name
+    if not sound_dir.exists():
+        return []
+
+    return [
+        _static_with_mtime_version(f"Spikip/speaki_{skin_name}/{folder_name}/{sound_file.name}")
+        for sound_file in sorted(sound_dir.glob("*.mp3"))
+    ]
+
+
+def _find_bumpercar_skin_icon_url(skin_name, *parts):
+    icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / "icon"
+    relative_dir = Path("Spikip") / f"speaki_{skin_name}" / "icon"
+    for part in parts:
+        icon_dir /= str(part)
+        relative_dir /= str(part)
+
+    if icon_dir.is_file():
+        return _static_with_mtime_version(str(relative_dir))
+
+    extensions = (".png", ".webp", ".gif", ".jpg", ".jpeg") if skin_name == "default" else (".webp", ".gif", ".png", ".jpg", ".jpeg")
+    for extension in extensions:
+        candidate = icon_dir.with_suffix(extension)
+        if candidate.exists() and candidate.is_file():
+            return _static_with_mtime_version(str(relative_dir.with_suffix(extension)))
+
+    return ""
+
+
+def _collect_bumpercar_skin_icon_urls(skin_name, folder_name, *parts):
+    icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / "icon" / folder_name
+    for part in parts:
+        icon_dir /= str(part)
+    if not icon_dir.exists():
+        return []
+
+    def _sort_key(path):
+        stem = str(path.stem)
+        match = re.match(r"^(\d+)", stem)
+        if match:
+            return (0, int(match.group(1)), stem)
+        return (1, stem)
+
+    image_files = []
+    patterns = ("*.png", "*.webp", "*.gif", "*.jpg", "*.jpeg") if skin_name == "default" else ("*.webp", "*.gif", "*.png", "*.jpg", "*.jpeg")
+    seen_stems = set()
+    for extension in patterns:
+        for image_file in sorted(icon_dir.glob(extension), key=_sort_key):
+            stem_key = str(image_file.stem).lower()
+            if stem_key in seen_stems:
+                continue
+            seen_stems.add(stem_key)
+            image_files.append(image_file)
+
+    return [
+        _static_with_mtime_version(
+            str(Path("Spikip") / f"speaki_{skin_name}" / "icon" / folder_name / Path(*[str(part) for part in parts]) / image_file.name)
+        )
+        for image_file in sorted(image_files, key=_sort_key)
+    ]
+
+
+def _collect_bumpercar_skin_icon_sequence_urls(skin_name, folder_name, *parts):
+    return _collect_bumpercar_skin_icon_urls(skin_name, folder_name, *parts)
+
+
+def _collect_bumpercar_skin_variant_dirs(skin_name, folder_name):
+    icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / "icon" / folder_name
+    if not icon_dir.exists():
+        return []
+
+    variant_dirs = [entry for entry in icon_dir.iterdir() if entry.is_dir()]
+    return sorted(
+        [entry.name for entry in variant_dirs],
+        key=lambda value: (0, int(value)) if str(value).isdigit() else (1, str(value)),
+    )
+
+
+def _build_bumpercar_skin_catalog(ui_lang, account_stats=None):
+    stats = normalize_bumpercar_spiky_account_stats(account_stats)
+    total_ner_kills = int(stats.get("ner_kills", 0))
+    is_english = ui_lang == "en"
+    skin_specs = [
+        {
+            "name": "default",
+            "display_name": "Spiky" if is_english else "스핔이",
+            "unlock_condition": "Available from the start." if is_english else "기본 해금",
+            "description": (
+                "A mysterious lifeform that jumped out of Shady's dimensional gate.\n"
+                "\"Don't Spiky Ner!\""
+                if is_english
+                else "셰이디의 차원문에서 튀어나온\n정체불명의 생명체 입니다.\n\"스핔이 네르지 마세요!\""
+            ),
+            "unlocked": True,
+        },
+        {
+            "name": "double",
+            "asset_source_name": "double",
+            "preview_icon_name": "main",
+            "display_name": "Twin Spiky" if is_english else "쌍핔이",
+            "unlock_condition": "Die 20 times." if is_english else "사망 20회",
+            "description": (
+                "An unstable Spiky split in two while crossing a dimensional gate.\n"
+                "\"Don't Spiky Ner!\"\n"
+                "\"Don't Spiky Ner!\""
+                if is_english
+                else "차원문을 넘느라 상태가 불안정한 스핔이가\n네르당해 둘으로 분열되었습니다.\n\"스핔이 네르지 마세요!\"\n\"스핔이 네르지 마세요!\""
+            ),
+            "unlocked": int(stats.get("deaths", 0)) >= 20,
+        },
+        {
+            "name": "evolution",
+            "display_name": "Speaki" if is_english else "스피키",
+            "unlock_condition": "Defeat Ner 10 times." if is_english else "네르 10번 처치",
+            "description": (
+                "Only the strongest Spiky survived and evolved into bipedal form.\n"
+                "\"I think I've grown apart from my pumpkin friend.\""
+                if is_english
+                else "스핔이중 가장 강한 스핔이 만이 살아남아 이족보행으로 진화했습니다.\n\"호박친구하고 거리가 멀어진 것 같아요\""
+            ),
+            "unlocked": total_ner_kills >= 10,
+        },
+    ]
+
+    catalog = []
+    for skin_spec in skin_specs:
+        skin_name = skin_spec["name"]
+        asset_source_name = str(skin_spec.get("asset_source_name") or skin_name)
+        default_variants = []
+        for variant_name in _collect_bumpercar_skin_variant_dirs(asset_source_name, "default"):
+            variant_frames = _collect_bumpercar_skin_icon_sequence_urls(asset_source_name, "default", variant_name)
+            if len(variant_frames) >= 2:
+                default_variants.append({
+                    "healthy_icon_url": variant_frames[0],
+                    "damaged_icon_url": variant_frames[1],
+                })
+
+        collision_folder_name = "crash"
+        collision_variant_names = _collect_bumpercar_skin_variant_dirs(asset_source_name, collision_folder_name)
+        if not collision_variant_names:
+            collision_folder_name = "ch"
+            collision_variant_names = _collect_bumpercar_skin_variant_dirs(asset_source_name, collision_folder_name)
+
+        collision_variants = []
+        for variant_name in collision_variant_names:
+            variant_frames = _collect_bumpercar_skin_icon_sequence_urls(asset_source_name, collision_folder_name, variant_name)
+            if len(variant_frames) >= 2:
+                collision_variants.append({
+                    "impact_icon_url": variant_frames[0],
+                    "slow_icon_url": variant_frames[1],
+                })
+
+        defeat_frames = _collect_bumpercar_skin_icon_sequence_urls(asset_source_name, "defeat", "1")
+        boost_frames = _collect_bumpercar_skin_icon_sequence_urls(asset_source_name, "acc", "1")
+        preview_icon_name = str(skin_spec.get("preview_icon_name") or "main")
+        preview_icon_url = _find_bumpercar_skin_icon_url(asset_source_name, preview_icon_name)
+        skin_type = "classic"
+        if skin_name == "evolution":
+            skin_type = "evolution"
+        elif skin_name == "double":
+            skin_type = "double"
+        if skin_type == "evolution":
+            defeat_frames = _collect_bumpercar_skin_icon_urls(asset_source_name, "defeat")
+            boost_frames = _collect_bumpercar_skin_icon_urls(asset_source_name, "acc")
+        catalog.append({
+            **skin_spec,
+            "skin_type": skin_type,
+            "assets": {
+                "preview_icon_url": preview_icon_url,
+                "default_icon_sets": default_variants,
+                "boost_icon_stages": boost_frames,
+                "collision_icon_sets": collision_variants,
+                "defeat_icon_stages": defeat_frames,
+                "default_icon_url": _find_bumpercar_skin_icon_url(asset_source_name, "default"),
+                "boost_icon_url": _find_bumpercar_skin_icon_url(asset_source_name, "acceleration"),
+                "collision_icon_url": _find_bumpercar_skin_icon_url(asset_source_name, "win"),
+                "defeat_icon_url": _find_bumpercar_skin_icon_url(asset_source_name, "defeat"),
+                "default_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "default"),
+                "collision_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "crash"),
+                "defeat_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "defeat"),
+                "win_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "win"),
+                "stop_state_icons": _collect_bumpercar_skin_icon_urls(asset_source_name, "stop"),
+                "boost_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "acceleration"),
+                "crash_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "crash"),
+                "defeat_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "defeat"),
+                "die_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "die"),
+                "respawn_sound_urls": _collect_bumpercar_skin_sound_urls(asset_source_name, "respawn"),
+            },
+        })
+
+    return catalog
+
+
+def resolve_bumpercar_skin_name(user=None, requested_skin_name=""):
+    requested_skin_name = str(requested_skin_name or "").strip().lower() or "default"
+    if requested_skin_name == "default":
+        return "default"
+
+    profile = None
+    if getattr(user, "is_authenticated", False):
+        profile = UserProfile.objects.filter(user=user).only("bumpercar_spiky_stats").first()
+    catalog = _build_bumpercar_skin_catalog(
+        "ko",
+        (profile.bumpercar_spiky_stats if profile else None),
+    )
+    unlocked_names = {
+        str(skin["name"])
+        for skin in catalog
+        if bool(skin.get("unlocked"))
+    }
+    return requested_skin_name if requested_skin_name in unlocked_names else "default"
 
 
 class _DummyTagRelation:
@@ -816,7 +1031,7 @@ def set_bumpercar_spiky_npc_health(npc_health):
         return json.loads(response.read().decode("utf-8"))
 
 
-def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False):
+def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False, skin_name="default"):
     now = int(time.time())
     header = {"alg": "HS256", "typ": "JWT"}
     resolved_subject = str(
@@ -834,6 +1049,7 @@ def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=F
         "username": resolved_subject,
         "display_name": resolved_display_name,
         "is_guest": bool(is_guest),
+        "selected_skin": resolve_bumpercar_skin_name(user, skin_name),
         "iat": now,
         "nbf": now,
         "exp": now + int(getattr(settings, "GAME_JWT_EXP_SECONDS", 300) or 300),
@@ -1023,41 +1239,6 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     else:
         ws_url = str(getattr(settings, "GAME_WS_PUBLIC_URL", "wss://game.hanplanet.com") or "wss://game.hanplanet.com")
 
-    boost_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "acceleration"
-    boost_sound_urls = []
-    if boost_sound_dir.exists():
-        boost_sound_urls = [
-            _static_with_mtime_version(f"Spikip/speaki_default/acceleration/{sound_file.name}")
-            for sound_file in sorted(boost_sound_dir.glob("*.mp3"))
-        ]
-    crash_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "crash"
-    crash_sound_urls = []
-    if crash_sound_dir.exists():
-        crash_sound_urls = [
-            _static_with_mtime_version(f"Spikip/speaki_default/crash/{sound_file.name}")
-            for sound_file in sorted(crash_sound_dir.glob("*.mp3"))
-        ]
-    defeat_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "defeat"
-    defeat_sound_urls = []
-    if defeat_sound_dir.exists():
-        defeat_sound_urls = [
-            _static_with_mtime_version(f"Spikip/speaki_default/defeat/{sound_file.name}")
-            for sound_file in sorted(defeat_sound_dir.glob("*.mp3"))
-        ]
-    die_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "die"
-    die_sound_urls = []
-    if die_sound_dir.exists():
-        die_sound_urls = [
-            _static_with_mtime_version(f"Spikip/speaki_default/die/{sound_file.name}")
-            for sound_file in sorted(die_sound_dir.glob("*.mp3"))
-        ]
-    respawn_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "speaki_default" / "respawn"
-    respawn_sound_urls = []
-    if respawn_sound_dir.exists():
-        respawn_sound_urls = [
-            _static_with_mtime_version(f"Spikip/speaki_default/respawn/{sound_file.name}")
-            for sound_file in sorted(respawn_sound_dir.glob("*.mp3"))
-        ]
     ner_tracking_sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner" / "tracking"
     ner_tracking_sound_urls = []
     if ner_tracking_sound_dir.exists():
@@ -1075,12 +1256,25 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     ner_win_icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / "ner" / "icon" / "win"
     ner_win_icon_urls = []
     if ner_win_icon_dir.exists():
+        ner_win_icon_files = []
+        for pattern in ("*.webp", "*.gif", "*.png", "*.jpg", "*.jpeg"):
+            ner_win_icon_files.extend(ner_win_icon_dir.glob(pattern))
         ner_win_icon_urls = [
             _static_with_mtime_version(f"Spikip/ner/icon/win/{icon_file.name}")
-            for icon_file in sorted(ner_win_icon_dir.glob("*.gif"))
+            for icon_file in sorted(ner_win_icon_files, key=lambda path: path.name.lower())
         ]
 
     is_authenticated = bool(getattr(request.user, "is_authenticated", False))
+    profile = (
+        UserProfile.objects.filter(user=request.user).only("bumpercar_spiky_stats").first()
+        if is_authenticated
+        else None
+    )
+    skin_catalog = _build_bumpercar_skin_catalog(
+        resolved_lang,
+        profile.bumpercar_spiky_stats if profile else None,
+    )
+    default_skin = next((skin for skin in skin_catalog if skin["name"] == "default"), skin_catalog[0])
     portfolio_profile = (
         PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
         if is_authenticated
@@ -1115,13 +1309,9 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
             if request.user.is_authenticated
             else ("Spiky" if is_english else "스핔이")
         ),
+        "game_skin_catalog_json": mark_safe(json.dumps(skin_catalog)),
         "gameplay_settings": gameplay_settings,
         "gameplay_settings_json": mark_safe(json.dumps(gameplay_settings)),
-        "game_boost_sound_urls_json": mark_safe(json.dumps(boost_sound_urls)),
-        "game_crash_sound_urls_json": mark_safe(json.dumps(crash_sound_urls)),
-        "game_defeat_sound_urls_json": mark_safe(json.dumps(defeat_sound_urls)),
-        "game_die_sound_urls_json": mark_safe(json.dumps(die_sound_urls)),
-        "game_respawn_sound_urls_json": mark_safe(json.dumps(respawn_sound_urls)),
         "game_ner_tracking_sound_urls_json": mark_safe(json.dumps(ner_tracking_sound_urls)),
         "game_ner_acceleration_sound_urls_json": mark_safe(json.dumps(ner_acceleration_sound_urls)),
         "game_ner_win_icon_urls_json": mark_safe(json.dumps(ner_win_icon_urls)),
@@ -1129,8 +1319,9 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
         "meta_og_title": page_title,
         "meta_site_name": page_title,
         "meta_description": page_description,
-        "meta_og_image": build_public_absolute_url(static("Spikip/speaki_default/icon/win.png")),
-        "meta_twitter_image": build_public_absolute_url(static("Spikip/speaki_default/icon/win.png")),
+        "meta_og_image": build_public_absolute_url(static("Spikip/speaki_default/icon/main.png")),
+        "meta_twitter_image": build_public_absolute_url(static("Spikip/speaki_default/icon/main.png")),
+        "bumpercar_default_skin": default_skin,
         "show_account_bumpercar_spiky_stats": True,
     }
     context["meta_og_description"] = context["meta_description"]
@@ -1300,8 +1491,9 @@ def game_auth_token(request, ui_lang=None):
     if not secret:
         return JsonResponse({"error": "game_jwt_secret_not_configured"}, status=503)
 
+    requested_skin = resolve_bumpercar_skin_name(request.user, request.GET.get("skin"))
     if request.user.is_authenticated:
-        token = build_game_auth_token(request.user)
+        token = build_game_auth_token(request.user, skin_name=requested_skin)
     else:
         guest_subject = request.session.get("guest_game_subject")
         if not guest_subject:
@@ -1311,6 +1503,7 @@ def game_auth_token(request, ui_lang=None):
             subject=guest_subject,
             display_name="스핔이",
             is_guest=True,
+            skin_name=requested_skin,
         )
     response = JsonResponse(
         {

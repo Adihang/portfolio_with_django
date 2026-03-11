@@ -19,7 +19,7 @@
 {% elif key == "my_portfolio" %}{% if ui_lang|default:'ko' == 'en' %}My Portfolio{% else %}내 포트폴리오{% endif %}
 {% elif key == "close" %}{% if ui_lang|default:'ko' == 'en' %}Close{% else %}닫기{% endif %}
 {% elif key == "account_bumpercar_stats_title" %}{% if ui_lang|default:'ko' == 'en' %}Bumper Car Spiky Stats{% else %}범퍼카 스핔이 전적{% endif %}
-{% elif key == "account_bumpercar_dummy_kills" %}{% if ui_lang|default:'ko' == 'en' %}Dummy kills{% else %}더미 사망시킨 횟수{% endif %}
+{% elif key == "account_bumpercar_player_kills" %}{% if ui_lang|default:'ko' == 'en' %}Player kills{% else %}유저 사망시킨 횟수{% endif %}
 {% elif key == "account_bumpercar_deaths" %}{% if ui_lang|default:'ko' == 'en' %}Deaths{% else %}사망한 횟수{% endif %}
 {% elif key == "account_bumpercar_ner_kills" %}{% if ui_lang|default:'ko' == 'en' %}Ner kills{% else %}네르 사망시킨 횟수{% endif %}
 {% elif key == "account_bumpercar_ner_phase1_attack_dodges" %}{% if ui_lang|default:'ko' == 'en' %}Phase 1 counters{% else %}네르 1페이즈 반격한 횟수{% endif %}
@@ -44,6 +44,12 @@
 {% elif key == "multiplayer_connected" %}{% if ui_lang == 'en' %}Connected{% else %}연결됨{% endif %}
 {% elif key == "multiplayer_disconnected" %}{% if ui_lang == 'en' %}Disconnected{% else %}연결 끊김{% endif %}
 {% elif key == "multiplayer_start_button" %}Start!
+{% elif key == "multiplayer_skin_title" %}{% if ui_lang == 'en' %}Choose Skin{% else %}스킨 선택{% endif %}
+{% elif key == "multiplayer_skin_open" %}{% if ui_lang == 'en' %}Open skin selector{% else %}스킨 선택 열기{% endif %}
+{% elif key == "multiplayer_start_skin_hint" %}{% if ui_lang == 'en' %}Click Spiky to choose a skin{% else %}스핔이를 클릭해 스킨선택{% endif %}
+{% elif key == "multiplayer_skin_select" %}{% if ui_lang == 'en' %}Select{% else %}선택{% endif %}
+{% elif key == "multiplayer_skin_selected" %}{% if ui_lang == 'en' %}Selected{% else %}선택됨{% endif %}
+{% elif key == "multiplayer_skin_locked" %}{% if ui_lang == 'en' %}Locked{% else %}잠김{% endif %}
 {% elif key == "multiplayer_retry" %}{% if ui_lang == 'en' %}Reconnect{% else %}다시 연결{% endif %}
 {% elif key == "multiplayer_controls" %}{% if ui_lang == 'en' %}Controls{% else %}조작법{% endif %}
 {% elif key == "multiplayer_controls_help" %}{% if ui_lang == 'en' %}WASD or Arrow Keys
@@ -52,9 +58,11 @@ Spacebar{% else %}WASD or 방향키
 {% elif key == "multiplayer_fullscreen" %}{% if ui_lang == 'en' %}Fullscreen{% else %}전체화면{% endif %}
 {% elif key == "multiplayer_exit_fullscreen" %}{% if ui_lang == 'en' %}Exit fullscreen{% else %}전체화면 해제{% endif %}
 {% elif key == "multiplayer_spawn_joystick" %}{% if ui_lang == 'en' %}Create Joystick{% else %}조이스틱 생성{% endif %}
+{% elif key == "multiplayer_joystick_toggle" %}{% if ui_lang == 'en' %}Joystick{% else %}조이스틱{% endif %}
+{% elif key == "multiplayer_rotate_mobile" %}{% if ui_lang == 'en' %}Rotate{% else %}회전{% endif %}
 {% elif key == "multiplayer_restart_server" %}{% if ui_lang == 'en' %}Restart Server{% else %}서버 재시작{% endif %}
 {% elif key == "multiplayer_set_npc_health" %}{% if ui_lang == 'en' %}Apply{% else %}적용{% endif %}
-{% elif key == "multiplayer_boost_button" %}{% if ui_lang == 'en' %}Boost{% else %}가속{% endif %}
+{% elif key == "multiplayer_boost_button" %}»
 {% elif key == "multiplayer_idle_modal_title" %}{% if ui_lang == 'en' %}Connection Ended{% else %}연결 종료{% endif %}
 {% elif key == "multiplayer_idle_modal_description" %}{% if ui_lang == 'en' %}The server connection ends after 3 minutes without movement.{% else %}3분간 움직임이 없어 서버 연결이 종료됩니다.{% endif %}
 {% elif key == "multiplayer_idle_modal_close" %}{% if ui_lang == 'en' %}Close{% else %}닫기{% endif %}

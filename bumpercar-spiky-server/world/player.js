@@ -8,6 +8,34 @@ const NPC_BASE_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_base_speed
 const COLLISION_SLOW_SPEED_PER_SECOND = BASE_PLAYER_SPEED_PER_SECOND * 0.35
 const NPC_MAX_HEALTH = GAMEPLAY_SETTINGS.npc_max_health
 const PLAYER_STARTING_LIVES = GAMEPLAY_SETTINGS.user_lives
+const DOUBLE_SKIN_NAME = "double"
+const DOUBLE_UNIT_HEALTH = 2
+
+function createDoubleUnitState() {
+    return {
+        health: DOUBLE_UNIT_HEALTH,
+        x: 0,
+        y: 0,
+        lastMoveX: 0,
+        lastMoveY: 0,
+        facingAngle: 0,
+        currentSpeed: BASE_PLAYER_SPEED_PER_SECOND,
+        boostState: "idle",
+        boostDirectionX: 0,
+        boostDirectionY: 0,
+        collisionVisualUntil: 0,
+        collisionImpactUntil: 0,
+        collisionVisualType: "win",
+        collisionImpactX: 0,
+        collisionImpactY: 0,
+        collisionRecoveryStartedAt: 0,
+        collisionRecoveryUntil: 0,
+        boostDisabledStartedAt: 0,
+        boostDisabledUntil: 0,
+        splitProtectedUntil: 0,
+        inactiveUntil: 0
+    }
+}
 
 class Player {
     constructor(id) {
@@ -15,6 +43,19 @@ class Player {
         // connectionKey 는 재접속 시 저장 상태를 이어붙일 때 쓰고,
         // id 는 실제 화면/월드에서 보이는 현재 표시 이름이다.
         this.connectionKey = id
+        this.skinName = "default"
+        this.isDoubleSkin = false
+        this.doubleMerged = false
+        this.doubleSeparationPhase = "merged"
+        this.doubleMergeLockUntil = 0
+        this.doubleSeparatedAt = 0
+        this.doubleSplitProtectedUntil = 0
+        this.doubleSplitProtectedById = ""
+        this.doubleDefeatProtectedUntil = 0
+        this.doubleDefeatProtectedById = ""
+        this.doubleUnits = [createDoubleUnitState(), createDoubleUnitState()]
+        this.playerWinVisualUntil = 0
+        this.lastActiveInputAt = Date.now()
         this.x = Math.random() * WORLD_SIZE
         this.y = Math.random() * WORLD_SIZE
         this.isDummy = false
@@ -44,6 +85,7 @@ class Player {
         this.lastMoveY = 0
         // collisionVisual* 은 win/defeat 아이콘 및 피격 연출 타이밍을 의미한다.
         this.collisionVisualUntil = 0
+        this.collisionImpactUntil = 0
         this.collisionVisualType = "win"
         this.collisionImpactX = 0
         this.collisionImpactY = 0
@@ -103,6 +145,8 @@ class Player {
             this.baseSpeed = NPC_BASE_SPEED_PER_SECOND
             this.currentSpeed = NPC_BASE_SPEED_PER_SECOND
         }
+
+        this.isDoubleSkin = this.skinName === DOUBLE_SKIN_NAME
     }
 }
 
