@@ -208,6 +208,32 @@ img.ui-auth-account-avatar {
     gap: 10px;
 }
 
+.ui-auth-account-stats[hidden] {
+    display: none;
+}
+
+.ui-auth-account-stats-toggle {
+    width: calc(100% - 32px);
+    margin: 0 16px 14px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ide-text-stronger);
+}
+
+.ui-auth-account-stats-toggle:hover,
+.ui-auth-account-stats-toggle:focus-visible {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+body.theme-dark .ui-auth-account-stats-toggle {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark .ui-auth-account-stats-toggle:hover,
+body.theme-dark .ui-auth-account-stats-toggle:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+}
+
 .ui-auth-account-stats-title {
     font-size: 14px;
     line-height: 1.2;

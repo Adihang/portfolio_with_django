@@ -1,0 +1,22 @@
+<div class="multiplayer-skin-modal-backdrop" data-game-skin-modal hidden>
+    <div class="multiplayer-skin-modal" data-popup-fit-bottom role="dialog" aria-modal="true" aria-labelledby="multiplayer-skin-modal-title">
+        <div class="multiplayer-skin-modal-header">
+            <h2 class="multiplayer-skin-modal-title" id="multiplayer-skin-modal-title">
+                {% include 'partials/ui_i18n.html' with key='multiplayer_skin_title' %}
+            </h2>
+            <button class="multiplayer-skin-modal-close" type="button" data-game-skin-modal-close aria-label="{% include 'partials/ui_i18n.html' with key='close' %}">
+                ×
+            </button>
+        </div>
+        <div class="multiplayer-skin-grid" data-game-skin-list></div>
+        <div class="multiplayer-skin-detail-popover" data-game-skin-detail data-popup-fit-top hidden>
+            <img class="multiplayer-skin-detail-icon" src="" alt="" data-game-skin-detail-icon>
+            <strong class="multiplayer-skin-detail-name" data-game-skin-detail-name></strong>
+            <p class="multiplayer-skin-detail-unlock" data-game-skin-detail-unlock></p>
+            <p class="multiplayer-skin-detail-description" data-game-skin-detail-description></p>
+            <button class="ide-btn ide-btn-primary multiplayer-primary-btn multiplayer-skin-detail-select" type="button" data-game-skin-select>
+                {% include 'partials/ui_i18n.html' with key='multiplayer_skin_select' %}
+            </button>
+        </div>
+    </div>
+</div>
