@@ -215,9 +215,6 @@ def _maybe_backup_data_files():
         return
 
     backup_date = now.date()
-    if _last_backup_date == backup_date:
-        return
-
     backup_root = _resolve_backup_root()
     if backup_root is None:
         logger.info("DATA_BACKUP_ROOT is empty. Skipping daily data backup.")

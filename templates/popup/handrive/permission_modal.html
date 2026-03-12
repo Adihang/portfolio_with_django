@@ -1,0 +1,30 @@
+<div id="handrive-permission-modal" class="handrive-rename-modal" hidden>
+    <div class="handrive-rename-modal-backdrop" id="handrive-permission-modal-backdrop"></div>
+    <div class="handrive-rename-modal-dialog handrive-permission-modal-dialog" data-popup-fit-bottom role="dialog" aria-modal="true" aria-labelledby="handrive-permission-title">
+        <h3 id="handrive-permission-title" class="handrive-rename-title">{{ docs_text.permission_title }}</h3>
+        <div class="handrive-rename-target" id="handrive-permission-target"></div>
+        <div class="handrive-permission-grid">
+            <div class="handrive-permission-col">
+                <div class="handrive-permission-col-title">{{ docs_text.permission_read_users }}</div>
+                <div class="handrive-permission-list" id="handrive-permission-read-users-list"></div>
+            </div>
+            <div class="handrive-permission-col">
+                <div class="handrive-permission-col-title">{{ docs_text.permission_read_groups }}</div>
+                <div class="handrive-permission-list" id="handrive-permission-read-groups-list"></div>
+            </div>
+            <div class="handrive-permission-col">
+                <div class="handrive-permission-col-title">{{ docs_text.permission_write_users }}</div>
+                <div class="handrive-permission-list" id="handrive-permission-write-users-list"></div>
+            </div>
+            <div class="handrive-permission-col">
+                <div class="handrive-permission-col-title">{{ docs_text.permission_write_groups }}</div>
+                <div class="handrive-permission-list" id="handrive-permission-write-groups-list"></div>
+            </div>
+        </div>
+        <div class="handrive-permission-help">{{ docs_text.permission_help }}</div>
+        <div class="handrive-rename-actions">
+            <button type="button" class="handrive-btn" id="handrive-permission-cancel-btn">{{ docs_text.cancel }}</button>
+            <button type="button" class="handrive-btn handrive-btn-primary" id="handrive-permission-save-btn">{{ docs_text.permission_save_button }}</button>
+        </div>
+    </div>
+</div>

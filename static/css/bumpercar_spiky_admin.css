@@ -105,6 +105,6 @@
     color: #e5eefc;
 }
 
-.theme-dark .bumpercar-admin-input::placeholder {
-    color: rgba(226, 232, 240, 0.5);
+.bumpercar-admin-input::placeholder {
+    color: var(--site-placeholder);
 }

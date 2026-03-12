@@ -1,0 +1,12 @@
+<div id="{{ modal_id }}" class="handrive-help-modal" hidden>
+    <div class="handrive-help-modal-backdrop" id="{{ backdrop_id }}"></div>
+    <div class="handrive-help-modal-dialog" data-popup-fit-bottom role="dialog" aria-modal="true" aria-label="{{ aria_label }}">
+        <div class="handrive-help-modal-body">
+            {% if article_id %}
+            <article class="handrive-markdown handrive-help-markdown" id="{{ article_id }}">{{ article_html|default:'' }}</article>
+            {% else %}
+            <article class="handrive-markdown handrive-help-markdown">{{ article_html|default:'' }}</article>
+            {% endif %}
+        </div>
+    </div>
+</div>

@@ -11,11 +11,15 @@
     const isLightBackgroundPage = document.body.classList.contains('portfolio-page') ||
         document.body.classList.contains('project-page') ||
         document.body.classList.contains('docs-page') ||
+        document.body.classList.contains('handrive-page') ||
         currentPath === '/portfolio/' ||
         currentPath === '/portfolio' ||
         currentPath === '/docs/' ||
         currentPath === '/docs' ||
+        currentPath === '/handrive/' ||
+        currentPath === '/handrive' ||
         currentPath.startsWith('/docs/') ||
+        currentPath.startsWith('/handrive/') ||
         currentPath.startsWith('/project/') ||
         localizedLightBgPattern.test(currentPath);
     const bubbleCanvas = document.getElementById('interactiveBubbleCanvas');

@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% block body_class %}handrive-page{% endblock %}
+{% block content %}
+{% include 'handrive/_assets_head.html' %}
+
+<div class="handrive-toolbar-wrap ui-toolbar-wrap">
+    <div class="handrive-shell ui-shell handrive-toolbar ui-toolbar">
+        <div class="handrive-toolbar-left ui-toolbar-left">
+            <h1 class="handrive-title ui-title">{{ docs_text.auth_login_button }}</h1>
+            <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
+                <a class="handrive-path-link ui-path-link" href="{{ docs_auth_breadcrumb_url|default:docs_base_url }}">{{ docs_auth_breadcrumb_label }}</a>
+                <span class="handrive-path-sep ui-path-sep">/</span>
+                <span class="handrive-path-current ui-path-current">{{ docs_text.auth_login_button }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="handrive-shell ui-shell handrive-content ui-content">
+    <form method="post" class="handrive-login-form" id="handrive-login-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ docs_login_next }}">
+
+        {% if docs_login_error_message or docs_login_form.non_field_errors %}
+            <div class="handrive-login-error">{{ docs_login_error_message|default:docs_text.auth_login_error }}</div>
+        {% endif %}
+
+        <label class="handrive-field handrive-field-full">
+            <span>{{ docs_text.auth_username_label }}</span>
+            <input
+                type="text"
+                name="username"
+                value="{{ docs_login_form.username.value|default:'' }}"
+                autocomplete="username"
+                required
+                autofocus
+            >
+        </label>
+
+        <label class="handrive-field handrive-field-full">
+            <span>{{ docs_text.auth_password_label }}</span>
+            <input
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                required
+            >
+        </label>
+
+        <label class="handrive-field handrive-field-full" id="handrive-login-captcha-block"{% if not docs_login_show_captcha %} hidden{% endif %}>
+                <span>{{ docs_text.auth_login_captcha_label }}</span>
+                <span class="handrive-subtitle">{{ docs_text.auth_login_captcha_hint }}</span>
+                <span id="handrive-login-captcha-question">{{ docs_login_captcha_question }}</span>
+                <input
+                    type="text"
+                    name="handrive-captcha-answer"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="{{ docs_text.auth_login_captcha_placeholder }}"
+                    {% if docs_login_show_captcha %}required{% endif %}
+                >
+                {% if docs_turnstile_site_key %}
+                    <div id="handrive-turnstile-widget"></div>
+                {% endif %}
+        </label>
+
+        <div class="handrive-login-actions">
+            <a class="handrive-btn" href="{{ docs_base_url }}">{{ docs_text.cancel }}</a>
+            <button class="handrive-btn handrive-btn-primary" type="submit" id="handrive-login-submit-btn">{{ docs_text.auth_login_submit }}</button>
+        </div>
+    </form>
+</main>
+{% include "partials/site_footer_links.html" %}
+
+<script>
+    (function () {
+        const loginForm = document.getElementById("handrive-login-form");
+        const submitButton = document.getElementById("handrive-login-submit-btn");
+        if (!loginForm || !submitButton) {
+            return;
+        }
+
+        const handleEnterSubmit = function (event) {
+            if (event.key !== "Enter" || event.isComposing) {
+                return;
+            }
+            event.preventDefault();
+            if (typeof loginForm.requestSubmit === "function") {
+                loginForm.requestSubmit(submitButton);
+                return;
+            }
+            submitButton.click();
+        };
+
+        loginForm.querySelectorAll('input[name="username"], input[name="password"]').forEach(function (input) {
+            input.addEventListener("keydown", handleEnterSubmit);
+        });
+
+        const usernameInput = loginForm.querySelector('input[name="username"]');
+        const captchaBlock = document.getElementById("handrive-login-captcha-block");
+        const captchaQuestionNode = document.getElementById("handrive-login-captcha-question");
+        const captchaAnswerInput = loginForm.querySelector('input[name="handrive-captcha-answer"]');
+        const turnstileContainer = document.getElementById("handrive-turnstile-widget");
+        const captchaStatusUrl = "{{ docs_api_login_captcha_status_url|escapejs }}";
+        const turnstileSiteKey = "{{ docs_turnstile_site_key|escapejs }}";
+
+        const getTurnstileTheme = function () {
+            return document.body.classList.contains("theme-dark") ? "dark" : "light";
+        };
+
+        let lastTheme = "";
+        let turnstileWidgetId = null;
+        let mutationObserver = null;
+        let usernameCheckTimer = null;
+        let lastCheckedUsername = "";
+
+        const removeTurnstile = function () {
+            if (!window.turnstile || turnstileWidgetId === null) {
+                if (turnstileContainer) {
+                    turnstileContainer.innerHTML = "";
+                }
+                return;
+            }
+            try {
+                window.turnstile.remove(turnstileWidgetId);
+            } catch (error) {
+                turnstileContainer.innerHTML = "";
+            }
+            turnstileWidgetId = null;
+        };
+
+        const renderTurnstile = function () {
+            if (!window.turnstile || !turnstileContainer || !turnstileSiteKey) {
+                return;
+            }
+            const nextTheme = getTurnstileTheme();
+            if (
+                lastTheme === nextTheme &&
+                turnstileWidgetId !== null &&
+                turnstileContainer.childElementCount > 0
+            ) {
+                return;
+            }
+            removeTurnstile();
+            turnstileWidgetId = window.turnstile.render("#handrive-turnstile-widget", {
+                sitekey: turnstileSiteKey,
+                theme: nextTheme
+            });
+            lastTheme = nextTheme;
+        };
+
+        const setCaptchaVisible = function (visible, questionText) {
+            if (!captchaBlock) {
+                return;
+            }
+            if (visible) {
+                captchaBlock.removeAttribute("hidden");
+            } else {
+                captchaBlock.setAttribute("hidden", "");
+            }
+            if (captchaQuestionNode) {
+                captchaQuestionNode.textContent = visible ? (questionText || "") : "";
+            }
+            if (captchaAnswerInput) {
+                captchaAnswerInput.required = Boolean(visible);
+                if (!visible) {
+                    captchaAnswerInput.value = "";
+                }
+            }
+            if (visible) {
+                renderTurnstile();
+                return;
+            }
+            removeTurnstile();
+            lastTheme = "";
+        };
+
+        const fetchCaptchaStatus = function (force) {
+            if (!usernameInput || !captchaStatusUrl) {
+                return;
+            }
+            const usernameValue = usernameInput.value.trim();
+            if (!usernameValue) {
+                lastCheckedUsername = "";
+                setCaptchaVisible(false, "");
+                return;
+            }
+            if (!force && usernameValue === lastCheckedUsername) {
+                return;
+            }
+            lastCheckedUsername = usernameValue;
+
+            fetch(captchaStatusUrl + "?username=" + encodeURIComponent(usernameValue), {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("captcha status request failed");
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data || data.ok !== true) {
+                        return;
+                    }
+                    if (data.required) {
+                        setCaptchaVisible(true, data.question || "");
+                        return;
+                    }
+                    setCaptchaVisible(false, "");
+                })
+                .catch(function () {
+                    return;
+                });
+        };
+
+        window.ideTurnstileOnload = function () {
+            if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
+                renderTurnstile();
+            }
+            if (mutationObserver) {
+                mutationObserver.disconnect();
+            }
+            mutationObserver = new MutationObserver(function (mutations) {
+                for (const mutation of mutations) {
+                    if (mutation.attributeName === "class") {
+                        if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
+                            renderTurnstile();
+                        }
+                        break;
+                    }
+                }
+            });
+            mutationObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ["class"]
+            });
+        };
+
+        if (window.turnstile && typeof window.turnstile.render === "function") {
+            window.ideTurnstileOnload();
+        }
+
+        if (usernameInput) {
+            usernameInput.addEventListener("blur", function () {
+                fetchCaptchaStatus(true);
+            });
+            usernameInput.addEventListener("input", function () {
+                if (usernameCheckTimer) {
+                    window.clearTimeout(usernameCheckTimer);
+                }
+                usernameCheckTimer = window.setTimeout(function () {
+                    fetchCaptchaStatus(false);
+                }, 300);
+            });
+            fetchCaptchaStatus(true);
+        }
+    })();
+</script>
+{% if docs_turnstile_site_key %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=ideTurnstileOnload&render=explicit" async defer></script>
+{% endif %}
+{% endblock %}

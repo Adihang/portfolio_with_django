@@ -26,7 +26,7 @@
     --chat-input-field-bg: #ffffff;
     --chat-input-field-color: inherit;
     --chat-input-field-border: #dddddd;
-    --chat-input-placeholder-color: inherit;
+    --chat-input-placeholder-color: var(--site-placeholder);
     --chat-send-bg: #757575;
     --chat-send-color: #ffffff;
     --chat-send-hover-bg: #616161;
@@ -227,7 +227,6 @@ body.portfolio-page.theme-dark .chat-widget {
     --chat-input-field-bg: #363636;
     --chat-input-field-color: #f0f0f0;
     --chat-input-field-border: rgba(255, 255, 255, 0.22);
-    --chat-input-placeholder-color: #c1c1c1;
     --chat-send-bg: #676767;
     --chat-send-hover-bg: #7a7a7a;
 }

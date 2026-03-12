@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest import mock
 
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.core.cache import cache, caches
@@ -12,7 +13,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-from datetime import date
+from datetime import date, datetime
+from importlib import import_module
 
 from .models import (
     Career,
@@ -25,12 +27,13 @@ from .models import (
     Stratagem_Hero_Score,
     UserProfile,
 )
-from .docs_views import (
+from .handrive_views import (
     DOCS_EDIT_PERMISSION_CODE,
     DOCS_EDITOR_GROUP_NAME,
     DOCS_PUBLIC_WRITE_GROUP_NAME,
     DOCS_URL_ONLY_GROUP_NAME,
     _resolve_docs_post_login_url,
+    get_docs_upload_tmp_dir,
     get_docs_public_write_group,
     is_docs_editor,
 )
@@ -202,6 +205,44 @@ class CareerPeriodCalculationTests(TestCase):
 
         self.assertEqual(career.display_period, "1개월 6일")
         self.assertEqual(career.display_period_rounded, "1개월")
+
+
+class DataBackupRetentionTests(TestCase):
+    def test_same_day_backup_cleanup_still_prunes_to_retention_limit(self):
+        scheduler = import_module("main.access_log_scheduler")
+        with TemporaryDirectory() as tmpdir:
+            backup_root = Path(tmpdir)
+            for day in range(7, 13):
+                (backup_root / f"hanplanet_data_2026-03-{day:02d}.tar.gz").write_text("x", encoding="utf-8")
+
+            with mock.patch.dict(
+                "os.environ",
+                {
+                    "DJANGO_DATA_BACKUP_ROOT": str(backup_root),
+                    "DJANGO_DATA_BACKUP_RETENTION_DAYS": "3",
+                },
+                clear=False,
+            ), mock.patch.object(
+                scheduler.timezone,
+                "localtime",
+                return_value=timezone.make_aware(datetime(2026, 3, 12, 0, 6), timezone.get_current_timezone()),
+            ):
+                previous_last_backup_date = scheduler._last_backup_date
+                try:
+                    scheduler._last_backup_date = date(2026, 3, 12)
+                    scheduler._maybe_backup_data_files()
+                finally:
+                    scheduler._last_backup_date = previous_last_backup_date
+
+            remaining = sorted(path.name for path in backup_root.glob("hanplanet_data_*.tar.gz"))
+            self.assertEqual(
+                remaining,
+                [
+                    "hanplanet_data_2026-03-10.tar.gz",
+                    "hanplanet_data_2026-03-11.tar.gz",
+                    "hanplanet_data_2026-03-12.tar.gz",
+                ],
+            )
 
 
 class ChatLanguageHelperTests(TestCase):
@@ -1087,7 +1128,7 @@ class DocsAccessRuleTests(TestCase):
 
         list_response = self.client.get("/ko/docs/restricted/list/")
         self.assertEqual(list_response.status_code, 200)
-        self.assertContains(list_response, 'id="docs-write-btn"')
+        self.assertContains(list_response, 'id="handrive-write-btn"')
 
     def test_docs_view_uses_document_write_access_for_delete_button(self):
         writers_group = Group.objects.create(name="public_doc_writers")
@@ -1100,7 +1141,7 @@ class DocsAccessRuleTests(TestCase):
 
         view_response = self.client.get("/ko/docs/public/")
         self.assertEqual(view_response.status_code, 200)
-        self.assertContains(view_response, 'id="docs-delete-btn"')
+        self.assertContains(view_response, 'id="handrive-delete-btn"')
 
     def test_inherited_root_write_acl_stays_usable_when_child_acl_exists(self):
         root_rule = DocsAccessRule.objects.create(path="")
@@ -1148,9 +1189,9 @@ class DocsAccessRuleTests(TestCase):
         user.groups.add(url_only_group)
         self.client.force_login(user)
 
-        list_response = self.client.get("/ko/ide/list/")
+        list_response = self.client.get("/ko/handrive/list/")
         api_list = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
-        direct_view = self.client.get("/ko/ide/public/")
+        direct_view = self.client.get("/ko/handrive/public/")
 
         self.assertEqual(list_response.status_code, 200)
         self.assertNotContains(list_response, "public.md")
@@ -1169,7 +1210,7 @@ class DocsAccessRuleTests(TestCase):
         editor.groups.add(editors_group)
         self.client.force_login(editor)
 
-        list_response = self.client.get("/ko/ide/list/")
+        list_response = self.client.get("/ko/handrive/list/")
         api_list = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
 
         self.assertEqual(list_response.status_code, 200)
@@ -1185,7 +1226,7 @@ class DocsAccessRuleTests(TestCase):
         share_url = share_response.json()["share_url"]
 
         self.client.logout()
-        anonymous_direct_view = self.client.get("/ko/ide/public/")
+        anonymous_direct_view = self.client.get("/ko/handrive/public/")
         anonymous_shared_view = self.client.get(share_url)
         self.assertEqual(anonymous_direct_view.status_code, 403)
         self.assertEqual(anonymous_shared_view.status_code, 200)
@@ -1206,9 +1247,9 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(payload["slug_path"], "public")
         self.assertEqual(payload["owner_username"], "url_share_api_editor")
         self.assertEqual(payload["share_slug"], "public")
-        self.assertTrue(payload["share_url"].endswith("/ko/ide/share/url_share_api_editor/public"))
+        self.assertTrue(payload["share_url"].endswith("/ko/handrive/share/url_share_api_editor/public"))
 
-    def test_docs_root_for_superuser_shows_unscoped_root(self):
+    def test_docs_root_for_superuser_defaults_to_user_folder(self):
         admin_user = self.user_model.objects.create_user(
             username="docs_superuser_root",
             password="pw123456",
@@ -1217,14 +1258,49 @@ class DocsAccessRuleTests(TestCase):
         )
 
         self.client.force_login(admin_user)
-        response = self.client.get("/ko/ide/")
+        response = self.client.get("/ko/handrive/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/ko/handrive/users/docs_superuser_root/list")
+
+        redirected_response = self.client.get(response["Location"])
+        self.assertEqual(redirected_response.status_code, 200)
+        self.assertContains(redirected_response, 'data-current-dir="users/docs_superuser_root"')
+        self.assertContains(redirected_response, ">docs_superuser_root<")
+
+    def test_docs_superuser_can_still_open_unscoped_root_directly(self):
+        admin_user = self.user_model.objects.create_user(
+            username="docs_superuser_direct_root",
+            password="pw123456",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get("/ko/handrive/?root=1")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-current-dir=""')
-        self.assertContains(response, 'data-ide-base-url="/ko/ide"')
+        self.assertContains(response, 'data-handrive-base-url="/ko/handrive"')
         self.assertContains(response, ">Hanplanet<")
         self.assertContains(response, "manage.py")
-        self.assertContains(response, "스태틱파일 적용+구니콘 재시작")
+        self.assertContains(response, "Apply Static + Restart Gunicorn")
+
+    def test_docs_superuser_scoped_folder_shows_root_breadcrumb_link(self):
+        admin_user = self.user_model.objects.create_user(
+            username="admin",
+            password="pw123456",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get("/ko/handrive/users/admin/list")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'href="/ko/handrive?root=1"')
+        self.assertContains(response, ">Hanplanet<")
+        self.assertContains(response, ">admin<")
 
     def test_docs_root_for_staff_user_keeps_scoped_home_dir(self):
         staff_user = self.create_docs_editor("docs_staff_scoped")
@@ -1234,15 +1310,15 @@ class DocsAccessRuleTests(TestCase):
         staff_user.groups.add(public_group)
 
         self.client.force_login(staff_user)
-        response = self.client.get("/ko/ide/")
+        response = self.client.get("/ko/handrive/")
         redirected_response = self.client.get(response["Location"])
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/ko/ide/users/docs_staff_scoped/list", response["Location"])
+        self.assertIn("/ko/handrive/users/docs_staff_scoped/list", response["Location"])
         self.assertNotContains(redirected_response, "스태틱파일 적용+구니콘 재시작")
 
-    @mock.patch("main.docs_views.subprocess.Popen")
-    @mock.patch("main.docs_views.subprocess.run")
+    @mock.patch("main.handrive_views.subprocess.Popen")
+    @mock.patch("main.handrive_views.subprocess.run")
     def test_docs_ops_apply_static_runs_collectstatic_and_restart_for_superuser(
         self,
         mock_run,
@@ -1258,11 +1334,11 @@ class DocsAccessRuleTests(TestCase):
         self.client.force_login(admin_user)
         response = self.client.post(
             reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
-            data={"next": "/ko/ide/"},
+            data={"next": "/ko/handrive/"},
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/ko/ide/")
+        self.assertEqual(response["Location"], "/ko/handrive/")
         mock_run.assert_called_once_with(
             [mock.ANY, "manage.py", "collectstatic", "--noinput"],
             cwd=str(settings.BASE_DIR),
@@ -1276,7 +1352,7 @@ class DocsAccessRuleTests(TestCase):
 
         response = self.client.post(
             reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
-            data={"next": "/ko/ide/"},
+            data={"next": "/ko/handrive/"},
         )
 
         self.assertEqual(response.status_code, 403)
@@ -1372,6 +1448,106 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(response.json().get("path"), "C#/WPF")
         self.assertFalse((docs_root / "WPF").exists())
         self.assertTrue((docs_root / "C#" / "WPF").exists())
+
+    def test_docs_api_upload_saves_file_into_writable_directory(self):
+        editor = self.create_docs_editor("upload_editor")
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("main:docs_api_upload"),
+            data={
+                "dir": "restricted",
+                "files": SimpleUploadedFile("hello.txt", b"hello upload", content_type="text/plain"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue((Path(settings.MEDIA_ROOT) / "ide" / "restricted" / "hello.txt").exists())
+        payload = response.json()
+        self.assertEqual(payload["path"], "restricted")
+        self.assertEqual(payload["entries"][0]["path"], "restricted/hello.txt")
+
+    def test_docs_api_upload_requires_directory_write_access(self):
+        writers_group = Group.objects.create(name="upload_writers")
+        rule = DocsAccessRule.objects.create(path="restricted")
+        rule.write_groups.add(writers_group)
+
+        blocked_editor = self.create_docs_editor("blocked_upload_editor")
+        self.client.force_login(blocked_editor)
+
+        response = self.client.post(
+            reverse("main:docs_api_upload"),
+            data={
+                "dir": "restricted",
+                "files": SimpleUploadedFile("denied.txt", b"denied", content_type="text/plain"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse((Path(settings.MEDIA_ROOT) / "ide" / "restricted" / "denied.txt").exists())
+
+    def test_docs_api_upload_accepts_chunked_upload_and_finalizes_file(self):
+        editor = self.create_docs_editor("chunk_upload_editor")
+        self.client.force_login(editor)
+
+        first = self.client.post(
+            reverse("main:docs_api_upload"),
+            data={
+                "dir": "restricted",
+                "upload_id": "chunk-test-upload",
+                "file_name": "chunked.txt",
+                "chunk_index": "0",
+                "total_chunks": "2",
+                "chunk": SimpleUploadedFile("chunk.part", b"hello ", content_type="application/octet-stream"),
+            },
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(first.json().get("uploading"))
+
+        second = self.client.post(
+            reverse("main:docs_api_upload"),
+            data={
+                "dir": "restricted",
+                "upload_id": "chunk-test-upload",
+                "file_name": "chunked.txt",
+                "chunk_index": "1",
+                "total_chunks": "2",
+                "chunk": SimpleUploadedFile("chunk.part", b"world", content_type="application/octet-stream"),
+            },
+        )
+
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()["entries"][0]["path"], "restricted/chunked.txt")
+        saved_path = Path(settings.MEDIA_ROOT) / "ide" / "restricted" / "chunked.txt"
+        self.assertTrue(saved_path.exists())
+        self.assertEqual(saved_path.read_bytes(), b"hello world")
+
+    def test_docs_api_upload_cancel_removes_chunk_session(self):
+        editor = self.create_docs_editor("cancel_upload_editor")
+        self.client.force_login(editor)
+
+        self.client.post(
+            reverse("main:docs_api_upload"),
+            data={
+                "dir": "restricted",
+                "upload_id": "cancel-test-upload",
+                "file_name": "cancelled.txt",
+                "chunk_index": "0",
+                "total_chunks": "2",
+                "chunk": SimpleUploadedFile("chunk.part", b"hello ", content_type="application/octet-stream"),
+            },
+        )
+
+        session_dir = get_docs_upload_tmp_dir() / "cancel-test-upload"
+        self.assertTrue(session_dir.exists())
+
+        response = self.client.post(
+            reverse("main:docs_api_upload_cancel"),
+            data={"upload_id": "cancel-test-upload"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(session_dir.exists())
 
     def test_acl_api_is_admin_only(self):
         editor = self.create_docs_editor("acl_editor")
@@ -1714,6 +1890,43 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("<pre><code># heading", payload.get("html", ""))
         self.assertIn("**bold**", payload.get("html", ""))
         self.assertNotIn("<strong>bold</strong>", payload.get("html", ""))
+
+    def test_docs_view_renders_image_preview_and_hides_edit_button(self):
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        image_bytes = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8S7sAAAAASUVORK5CYII="
+        )
+        (docs_root / "sample.png").write_bytes(image_bytes)
+        editor = self.create_docs_editor("media_editor")
+        self.client.force_login(editor)
+
+        response = self.client.get(
+            reverse("main:docs_view_lang", kwargs={"ui_lang": "ko", "doc_path": "sample.png"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn('class="handrive-media handrive-media-image"', html)
+        self.assertIn("/handrive/api/download?path=sample.png", html)
+        self.assertNotIn("/ko/docs/write?path=sample.png", html)
+
+    def test_docs_api_preview_renders_audio_preview_for_media_file(self):
+        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        (docs_root / "sample.mp3").write_bytes(b"ID3")
+        editor = self.create_docs_editor("audio_editor")
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("main:docs_api_preview"),
+            data=json.dumps({"path": "sample.mp3"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("render_mode"), "media_audio")
+        self.assertIn("<audio", payload.get("html", ""))
+        self.assertIn("/handrive/api/download?path=sample.mp3", payload.get("html", ""))
 
     def test_docs_view_renders_html_live_with_same_name_css_and_js(self):
         docs_root = Path(settings.MEDIA_ROOT) / "docs"
