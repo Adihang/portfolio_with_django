@@ -59,16 +59,13 @@
         <div class="main_projects">
             {% include "main/Projects.html" %}
         </div>
-        {% if show_hobbys %}
+    {% if show_hobbys %}
         <div class="main_hobbys">
             {% include "main/Hobbys.html" %}
         </div>
         {% endif %}
     </div>
-    <div class = 'foot'>
-        <div>
-            Made with Django, Ollama, Cloudflare Tunnel
-        </div>
+    <div class="portfolio-floating-actions" aria-hidden="true">
         <button
             type="button"
             class="portfolio-print-btn ui-nav-link"
@@ -112,6 +109,7 @@
         </a>
         {% endfor %}
     </div>
+    {% include "partials/site_footer_links.html" %}
 </div>
 {% include "popup/portfolio/print_selector_template.html" %}
 {% endblock %}

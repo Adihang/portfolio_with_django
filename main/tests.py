@@ -330,6 +330,14 @@ class LegalPageTests(TestCase):
         self.assertContains(response, "이용약관")
         self.assertContains(response, "Terms of Service")
 
+    def test_licenses_page_renders(self):
+        response = self.client.get(reverse("main:licenses_page_lang", kwargs={"ui_lang": "ko"}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "오픈소스 라이선스")
+        self.assertContains(response, "Open Source Licenses")
+        self.assertContains(response, "Django 5.0.1")
+
 
 class PortfolioPerUserRoutingTests(TestCase):
     def setUp(self):

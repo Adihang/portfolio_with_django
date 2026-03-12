@@ -1,23 +1,28 @@
 {% extends 'base.html' %}
-{% block body_class %}page legal-page{% endblock %}
+{% block body_class %}ui-page legal-page{% endblock %}
 {% block content %}
-<div class="ui-toolbar-wrap">
-    <div class="ui-shell ui-toolbar">
-        <div class="ui-toolbar-left">
-            <div class="ui-title-row">
-                <h1 class="ui-title">{{ page_title }}</h1>
-            </div>
-            <div class="ui-subtitle ui-path-breadcrumbs">
-                <a class="ui-path-link" href="/{% if ui_lang == 'en' %}en/{% elif ui_lang == 'ko' %}ko/{% endif %}">{{ meta_site_name|default:'Hanplanet' }}</a>
-                <span class="ui-path-sep">/</span>
-                <span class="ui-path-current">{{ page_title }}</span>
+{% include 'docs/_assets_head.html' %}
+<div class="legal-page-shell">
+    <div class="ui-toolbar-wrap">
+        <div class="ui-shell ui-toolbar">
+            <div class="ui-toolbar-left">
+                <div class="ui-title-row">
+                    <h1 class="ui-title">{{ page_title }}</h1>
+                </div>
+                <div class="ui-subtitle ui-path-breadcrumbs">
+                    <a class="ui-path-link" href="/{% if ui_lang == 'en' %}en/{% elif ui_lang == 'ko' %}ko/{% endif %}">{{ meta_site_name|default:'Hanplanet' }}</a>
+                    <span class="ui-path-sep">/</span>
+                    <span class="ui-path-current">{{ page_title }}</span>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<main class="ui-shell ui-content legal-page-content">
-    <article class="ide-markdown legal-page-article">{{ page_content_html }}</article>
-</main>
-{% include "partials/site_footer_links.html" %}
+    <main class="ui-shell ui-content legal-page-content">
+        <article class="ide-markdown legal-page-article">
+            <div class="legal-page-prose">{{ page_content_html }}</div>
+        </article>
+    </main>
+    {% include "partials/site_footer_links.html" %}
+</div>
 {% endblock %}

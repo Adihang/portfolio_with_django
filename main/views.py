@@ -859,6 +859,7 @@ def apply_ui_context(request, context, ui_lang):
     context["user_preference_url"] = build_localized_url(request, "main:user_preferences_lang")
     context["privacy_url"] = build_localized_url(request, "main:privacy_page_lang")
     context["terms_url"] = build_localized_url(request, "main:terms_page_lang")
+    context["licenses_url"] = build_localized_url(request, "main:licenses_page_lang")
     context["account_privacy_policy_agreed_at"] = ""
     context["account_terms_of_service_agreed_at"] = ""
     if request.user.is_authenticated:
@@ -953,7 +954,7 @@ def privacy_page(request, ui_lang=None):
         ui_lang,
         title_ko="개인정보 처리방침",
         title_en="Privacy Policy",
-        filename="Privacy_Policy.txt",
+        filename="Privacy_Policy.md",
     )
 
 
@@ -963,7 +964,17 @@ def terms_page(request, ui_lang=None):
         ui_lang,
         title_ko="이용약관",
         title_en="Terms of Service",
-        filename="Terms_of_Service.txt",
+        filename="Terms_of_Service.md",
+    )
+
+
+def licenses_page(request, ui_lang=None):
+    return _render_legal_page(
+        request,
+        ui_lang,
+        title_ko="오픈소스 라이선스",
+        title_en="Open Source Licenses",
+        filename="Open_Source_Licenses.md",
     )
 
 

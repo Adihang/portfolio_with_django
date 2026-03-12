@@ -1419,10 +1419,12 @@
     const applyMusicMuteState = function () {
         if (backgroundMusicAudio) {
             backgroundMusicAudio.muted = musicMuted;
+            backgroundMusicAudio.volume = Math.max(0, Math.min(1, masterVolume * 0.5));
         }
         const musicNodes = root.querySelectorAll('audio[data-game-music]');
         musicNodes.forEach(function (node) {
             node.muted = musicMuted;
+            node.volume = Math.max(0, Math.min(1, masterVolume * 0.5));
         });
     };
 
@@ -1481,7 +1483,7 @@
         stopBackgroundMusic();
         backgroundMusicAudio = new window.Audio(nextUrl);
         backgroundMusicAudio.loop = true;
-        backgroundMusicAudio.volume = 0.34;
+        backgroundMusicAudio.volume = Math.max(0, Math.min(1, masterVolume * 0.5));
         currentBackgroundMusicKey = nextMusicKey;
         applyMusicMuteState();
         backgroundMusicAudio.play().catch(function () {});
