@@ -1,0 +1,15 @@
+<div id="{{ modal_id }}" class="handrive-rename-modal" hidden>
+    <div class="handrive-rename-modal-backdrop" id="{{ backdrop_id }}"></div>
+    <div class="handrive-rename-modal-dialog" data-popup-fit-bottom role="dialog" aria-modal="true" aria-labelledby="{{ title_id }}">
+        <h3 id="{{ title_id }}" class="handrive-rename-title">{{ title_text }}</h3>
+        <div class="handrive-rename-target" id="{{ target_id }}"></div>
+        <label class="handrive-field handrive-field-full">
+            <span>{{ field_label_text }}</span>
+            <input type="text" id="{{ input_id }}" placeholder="{{ input_placeholder_text }}">
+        </label>
+        <div class="handrive-rename-actions">
+            <button type="button" class="handrive-btn" id="{{ cancel_button_id }}">{{ cancel_text }}</button>
+            <button type="button" class="handrive-btn handrive-btn-primary" id="{{ confirm_button_id }}">{{ confirm_text }}</button>
+        </div>
+    </div>
+</div>

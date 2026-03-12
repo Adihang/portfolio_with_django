@@ -87,4 +87,5 @@ class GlobalRateLimitMiddleware:
             or path.startswith("/api/")
             or "/docs/api/" in path
             or "/ide/api/" in path
+            or "/handrive/api/" in path
         )

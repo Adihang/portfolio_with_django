@@ -2,7 +2,7 @@
 {% load static_versioned %}
 {% block body_class %}ui-page bumpercar-spiky-admin-page{% endblock %}
 {% block content %}
-{% include 'docs/_assets_head.html' %}
+{% include 'handrive/_assets_head.html' %}
 
 <main class="ui-shell ui-content">
     <section class="ui-card docs-card bumpercar-admin-card">
@@ -15,7 +15,7 @@
                     {% include 'partials/ui_i18n.html' with key='bumpercar_admin_connected_players' %}: {{ bumpercar_admin_connected_players }}
                 </p>
             </div>
-            <a class="ide-btn" href="{{ bumpercar_admin_game_url }}">
+            <a class="handrive-btn" href="{{ bumpercar_admin_game_url }}">
                 {% include 'partials/ui_i18n.html' with key='bumpercar_admin_open_game' %}
             </a>
         </div>
@@ -75,7 +75,7 @@
                 </section>
             </div>
             <div class="bumpercar-admin-actions">
-                <button class="ide-btn ide-btn-primary" type="submit">
+                <button class="handrive-btn handrive-btn-primary" type="submit">
                     {% include 'partials/ui_i18n.html' with key='bumpercar_admin_save' %}
                 </button>
             </div>

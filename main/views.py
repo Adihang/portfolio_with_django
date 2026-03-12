@@ -56,7 +56,7 @@ SCORE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _-]{1,20}$")
 MAX_SCORE_SECONDS = 3600.0
 SUPPORTED_UI_LANGS = {"ko", "en"}
 UI_LANG_SESSION_KEY = "portfolio_ui_lang"
-SUPPORTED_ROOT_SEARCH_ENGINES = {"google", "duckduckgo", "bing", "naver", "gpt", "claude", "gemini"}
+SUPPORTED_ROOT_SEARCH_ENGINES = {"google", "youtube", "duckduckgo", "bing", "naver", "gpt", "claude", "gemini"}
 UI_LANG_PATH_PREFIX_PATTERN = re.compile(r"^/(ko|en)(/|$)")
 IDENTITY_IMPERSONATION_PATTERNS = [
     re.compile(
@@ -290,7 +290,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 "A bored Spiky made a lot of friends.\n"
                 "\"I still miss my pumpkin friend.\""
                 if is_english
-                else "심심한 스핔이는 친구를 잔뜩 만들었습니다.\n\"그래도 호박친구가 보고 싶어요\""
+                else "심심한 스핔이는 친구를 잔뜩 만들었습니다.\n\"그래도 호박친구가 보고 싶은 거에요\""
             ),
             "unlocked": is_superuser,
         },
@@ -302,7 +302,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 "Only the strongest Spiky survived and evolved into bipedal form.\n"
                 "\"I think I've grown apart from my pumpkin friend.\""
                 if is_english
-                else "스핔이중 가장 강한 스핔이 만이 살아남아 이족보행으로 진화했습니다.\n\"호박친구하고 거리가 멀어진 것 같아요\""
+                else "스핔이중 가장 강한 스핔이 만이 살아남아 이족보행으로 진화했습니다.\n\"호박친구하고 거리가 멀어진 거에요ㅠ\""
             ),
             "unlocked": total_game_clears >= 1,
         },
@@ -450,7 +450,7 @@ def get_dummy_portfolio_projects(ui_lang):
                 ),
             },
             {
-                "title": "Docs IDE",
+                "title": "HanDrive",
                 "tags": ["Django", "Markdown", "ACL"],
                 "content": (
                     "A browser-based writing workspace with folder controls.\n\n"
@@ -513,7 +513,7 @@ def get_dummy_portfolio_projects(ui_lang):
             ),
         },
         {
-            "title": "문서 IDE",
+            "title": "HanDrive",
             "tags": ["Django", "Markdown", "ACL"],
             "content": (
                 "브라우저에서 동작하는 문서 작성 작업공간입니다.\n\n"
@@ -896,9 +896,11 @@ def apply_ui_context(request, context, ui_lang):
             name_value = str(getattr(link, "name", "") or "")
             url_value = str(getattr(link, "url", "") or "")
             if name_value.strip().lower() == "docs":
-                link.name = "IDE"
+                link.name = "HanDrive"
             if url_value.startswith("/docs"):
-                link.url = "/ide" + url_value[len("/docs"):]
+                link.url = "/handrive" + url_value[len("/docs"):]
+            elif url_value.startswith("/ide"):
+                link.url = "/handrive" + url_value[len("/ide"):]
         resolved_links = [
             link for link in nav_links
             if str(getattr(link, "name", "") or "").strip().lower() not in removed_nav_names
@@ -906,7 +908,7 @@ def apply_ui_context(request, context, ui_lang):
         context["nav_links"] = resolved_links
     except (OperationalError, ProgrammingError):
         context["nav_links"] = [
-            {"name": "IDE", "url": "/ide/list"},
+            {"name": "HanDrive", "url": "/handrive/list"},
             {"name": "Mini Game", "url": "/fun/minigame/"},
         ]
 
@@ -1790,13 +1792,13 @@ def sitemap_xml(request):
             "lastmod": now_iso,
         },
         {
-            "loc": build_public_absolute_url("/ko/ide/"),
+            "loc": build_public_absolute_url("/ko/handrive/"),
             "changefreq": "weekly",
             "priority": "0.8",
             "lastmod": now_iso,
         },
         {
-            "loc": build_public_absolute_url("/en/ide/"),
+            "loc": build_public_absolute_url("/en/handrive/"),
             "changefreq": "weekly",
             "priority": "0.8",
             "lastmod": now_iso,

@@ -1,0 +1,12 @@
+{% if user.is_superuser %}
+<form
+    class="handrive-superuser-ops-form"
+    method="post"
+    action="{{ docs_ops_apply_static_url }}"
+    data-bypass-unsaved-guard="1"
+>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button class="handrive-btn" type="submit">{{ docs_text.ops_apply_static_and_restart_button }}</button>
+</form>
+{% endif %}

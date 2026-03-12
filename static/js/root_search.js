@@ -24,6 +24,24 @@
         return;
     }
 
+    const focusRootSearchInput = function () {
+        if (!document.body.classList.contains('root-page')) {
+            return;
+        }
+        if (document.activeElement && document.activeElement !== document.body) {
+            return;
+        }
+        window.requestAnimationFrame(function () {
+            input.focus({ preventScroll: true });
+        });
+    };
+
+    if (document.readyState === 'complete') {
+        focusRootSearchInput();
+    } else {
+        window.addEventListener('load', focusRootSearchInput, { once: true });
+    }
+
     const relocateRootNavigationBlocks = function () {
         if (!document.body.classList.contains('root-page')) {
             return;
@@ -195,6 +213,7 @@
 
     const ENGINE_URLS = {
         google: function (query) { return 'https://www.google.com/search?q=' + encodeURIComponent(query); },
+        youtube: function (query) { return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query); },
         duckduckgo: function (query) { return 'https://duckduckgo.com/?q=' + encodeURIComponent(query); },
         bing: function (query) { return 'https://www.bing.com/search?q=' + encodeURIComponent(query); },
         naver: function (query) { return 'https://search.naver.com/search.naver?query=' + encodeURIComponent(query); },
@@ -709,7 +728,7 @@
             card.style.transition = 'none';
             card.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
             window.requestAnimationFrame(function () {
-                card.style.transition = 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)';
+                card.style.transition = 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)';
                 card.style.transform = '';
             });
             card.addEventListener('transitionend', function clearFlip() {
@@ -749,7 +768,7 @@
                 : '';
 
             return '' +
-                '<a class="root-shortcuts-item" href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
+                '<a class="root-shortcuts-item" href="' + safeUrl + '">' +
                     '<span class="root-shortcuts-icon">' + iconMarkup + '</span>' +
                     '<span class="root-shortcuts-name">' + safeName + '</span>' +
                 '</a>' +

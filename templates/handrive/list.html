@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block body_class %}handrive-page{% endblock %}
+{% block content %}
+{% include 'handrive/_assets_head.html' %}
+
+<div class="handrive-toolbar-wrap ui-toolbar-wrap">
+    <div class="handrive-shell ui-shell handrive-toolbar ui-toolbar">
+        <div class="handrive-toolbar-left ui-toolbar-left">
+            <div class="handrive-title-row ui-title-row">
+                <h1 class="handrive-title ui-title">{{ docs_text.list_title }}</h1>
+                <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
+            </div>
+            <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
+                {% for crumb in breadcrumbs %}
+                    {% if not forloop.first %}<span class="handrive-path-sep ui-path-sep">/</span>{% endif %}
+                    {% if crumb.is_current %}
+                        <span class="handrive-path-current ui-path-current" data-handrive-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</span>
+                    {% else %}
+                        <a class="handrive-path-link ui-path-link" href="{{ crumb.url }}" data-handrive-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        <div class="handrive-toolbar-right ui-toolbar-right">
+            {% include "handrive/_auth_account.html" %}
+            <div class="handrive-toolbar-actions ui-toolbar-actions">
+                {% include "handrive/_auth_button.html" %}
+                {% include "handrive/_superuser_ops_button.html" %}
+                {% if user.is_staff %}
+                <a class="handrive-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<main
+    class="handrive-shell ui-shell handrive-content ui-content"
+    data-handrive-page="list"
+    data-is-superuser="{% if user.is_superuser %}1{% else %}0{% endif %}"
+    data-current-dir="{{ current_dir }}"
+    data-current-dir-can-edit="{% if current_dir_can_edit %}1{% else %}0{% endif %}"
+    data-current-dir-can-write-children="{% if current_dir_can_write_children %}1{% else %}0{% endif %}"
+    data-scoped-home-dir="{{ scoped_home_dir|default:'' }}"
+    data-handrive-base-url="{{ docs_base_url }}"
+    data-handrive-root-url="{{ docs_root_url }}"
+    data-list-api-url="{{ docs_api_list_url }}"
+    data-save-api-url="{{ docs_api_save_url }}"
+    data-rename-api-url="{{ docs_api_rename_url }}"
+    data-delete-api-url="{{ docs_api_delete_url }}"
+    data-mkdir-api-url="{{ docs_api_mkdir_url }}"
+    data-move-api-url="{{ docs_api_move_url }}"
+    data-upload-api-url="{{ docs_api_upload_url }}"
+    data-upload-cancel-api-url="{{ docs_api_upload_cancel_url }}"
+    data-download-api-url="{{ docs_api_download_url }}"
+    data-preview-api-url="{{ docs_api_preview_url }}"
+    data-handrive-root-label="{{ docs_root_label }}"
+    data-acl-api-url="{{ docs_api_acl_url }}"
+    data-acl-options-api-url="{{ docs_api_acl_options_url }}"
+    data-url-share-api-url="{{ docs_api_url_share_url }}"
+    data-write-url="{{ docs_write_url }}"
+    data-ui-lang="{{ ui_lang|default:'ko' }}"
+>
+    <div class="handrive-list-layout" id="handrive-list-layout">
+        <div class="handrive-list-pane">
+            <ul id="handrive-list" class="handrive-list" aria-label="{{ docs_text.list_aria_label }}"></ul>
+        </div>
+        <aside class="handrive-list-preview" id="handrive-list-preview" aria-live="polite" aria-hidden="true" hidden>
+            <header class="handrive-list-preview-head">
+                <h2 class="handrive-list-preview-title" id="handrive-list-preview-title">{{ docs_text.list_preview_title }}</h2>
+                <div class="handrive-list-preview-actions">
+                    <button
+                        id="handrive-list-preview-url-share-btn"
+                        class="handrive-btn handrive-list-preview-open-btn"
+                        type="button"
+                        hidden
+                    >{{ docs_text.url_share_button }}</button>
+                    <a
+                        id="handrive-list-preview-download-btn"
+                        class="handrive-btn handrive-list-preview-open-btn"
+                        href="#"
+                        hidden
+                    >{{ docs_text.download_button }}</a>
+                    <a
+                        id="handrive-list-preview-edit-btn"
+                        class="handrive-btn handrive-list-preview-open-btn"
+                        href="#"
+                        hidden
+                    >{{ docs_text.edit_button }}</a>
+                    <button
+                        id="handrive-list-preview-delete-btn"
+                        class="handrive-btn handrive-list-preview-open-btn"
+                        type="button"
+                        hidden
+                    >{{ docs_text.delete_button }}</button>
+                </div>
+            </header>
+            <div class="handrive-list-preview-body">
+                <div class="handrive-list-preview-zoom" id="handrive-list-preview-zoom" hidden>
+                    <button class="handrive-btn handrive-list-preview-zoom-btn" type="button" id="handrive-list-preview-zoom-out" aria-label="{{ docs_text.zoom_out_button|default:'축소' }}">
+                        <svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true">
+                            <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                            <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                            <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                        </svg>
+                    </button>
+                    <button class="handrive-btn handrive-list-preview-zoom-btn" type="button" id="handrive-list-preview-zoom-in" aria-label="{{ docs_text.zoom_in_button|default:'확대' }}">
+                        <svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true">
+                            <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                            <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                            <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                            <line x1="10" y1="7" x2="10" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                        </svg>
+                    </button>
+                </div>
+                <article class="handrive-markdown handrive-list-preview-content" id="handrive-list-preview-content">
+                    <p class="handrive-list-preview-placeholder">{{ docs_text.list_preview_empty }}</p>
+                </article>
+            </div>
+        </aside>
+        <!-- 편집기 요소 (초기에는 hidden) -->
+        <aside class="handrive-list-editor" id="handrive-list-editor" aria-live="polite" aria-hidden="true" hidden>
+            <header class="handrive-list-editor-head">
+                <div class="handrive-list-editor-actions">
+                    <div class="handrive-filename-field">
+                        <input type="text" id="handrive-list-filename-input" placeholder="{{ docs_text.filename_placeholder }}">
+                    </div>
+                    <button class="handrive-btn" type="button" id="handrive-list-cancel-btn">{{ docs_text.cancel }}</button>
+                    <button class="handrive-btn handrive-btn-primary" type="button" id="handrive-list-save-btn">{{ docs_text.save_button }}</button>
+                </div>
+            </header>
+            <div class="handrive-list-editor-body">
+                <div class="handrive-editor-surface" id="handrive-list-editor-surface">
+                    <pre class="handrive-editor-highlight handrive-plain-text" id="handrive-list-editor-highlight" aria-hidden="true"><code id="handrive-list-editor-highlight-code"></code></pre>
+                    <div class="handrive-editor-suggest" id="handrive-list-editor-suggest" hidden>
+                        <span class="handrive-editor-suggest-label" id="handrive-list-editor-suggest-label"></span>
+                        <span class="handrive-editor-suggest-hint"><kbd>Tab</kbd> 적용</span>
+                    </div>
+                    <textarea id="handrive-list-content-input" spellcheck="false" wrap="off"></textarea>
+                </div>
+            </div>
+        </aside>
+    </div>
+</main>
+{% include "partials/site_footer_links.html" %}
+
+{% include "popup/handrive/context_menu.html" %}
+{% include "popup/handrive/markdown_snippet_menu.html" %}
+
+{% include "popup/handrive/rename_modal.html" %}
+{% include "popup/handrive/folder_create_modal.html" %}
+
+{% if docs_can_manage_acl %}
+    {% include "popup/handrive/permission_modal.html" %}
+{% endif %}
+
+{% include "popup/handrive/confirm_modal.html" %}
+{% include "popup/handrive/url_share_modal.html" %}
+{% include "popup/handrive/auth_logout_modal.html" %}
+{% include "popup/handrive/page_help_modal.html" %}
+{% include "popup/handrive/job_queue_panel.html" %}
+
+{{ docs_text|json_script:"handrive-i18n" }}
+{{ initial_entries|json_script:"handrive-initial-entries" }}
+{% include 'handrive/_assets_script.html' %}
+{% endblock %}

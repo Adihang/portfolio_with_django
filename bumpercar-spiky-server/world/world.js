@@ -147,6 +147,13 @@ function isDoubleSkinPlayer(player) {
     return Boolean(player) && String(player.skinName || "").trim().toLowerCase() === DOUBLE_SKIN_NAME
 }
 
+function getPlayerAttackDamageScale(player) {
+    if (isDoubleSkinPlayer(player)) {
+        return 0.65
+    }
+    return 1
+}
+
 function createDoubleUnitState(now = Date.now()) {
     return {
         health: DOUBLE_UNIT_HEALTH,
@@ -1093,9 +1100,6 @@ class World {
                 unit.boostDirectionX = direction.dx
                 unit.boostDirectionY = direction.dy
                 unit.currentSpeed = baseSpeed
-                if (isMerged && aliveIndices.length > 1) {
-                    unit.splitProtectedUntil = now + DOUBLE_SPLIT_PROTECTION_MS
-                }
             })
         }
 
@@ -2100,13 +2104,15 @@ class World {
             Math.min(1, (effectiveClampedSpeed - baseSpeed) / maxSpeedRange)
         )
 
-        return Math.max(
+        const baseDamage = Math.max(
             NPC_DAMAGE_MIN,
             Math.min(
                 NPC_DAMAGE_MAX,
                 Math.round(NPC_DAMAGE_MIN + (NPC_DAMAGE_MAX - NPC_DAMAGE_MIN) * speedRatio)
             )
         )
+
+        return Math.max(1, Math.round(baseDamage * getPlayerAttackDamageScale(attacker)))
     }
 
     applyNpcCollisionDamage(targetNpc, attacker, now) {
@@ -2337,11 +2343,6 @@ class World {
         if (!aliveIndices.length) {
             return false
         }
-        if (Number(player.doubleSplitProtectedUntil || 0) > now) {
-            if (defeatedByPlayer && String(player.doubleSplitProtectedById || "") === String(defeatedByPlayer.id || "")) {
-                return true
-            }
-        }
         if (aliveIndices.length > 1 && Number(player.doubleDefeatProtectedUntil || 0) > now) {
             if (defeatedByPlayer && String(player.doubleDefeatProtectedById || "") === String(defeatedByPlayer.id || "")) {
                 return true
@@ -2357,10 +2358,6 @@ class World {
         if (!targetUnit || Number(targetUnit.health || 0) <= 0) {
             return false
         }
-        if (Number(targetUnit.splitProtectedUntil || 0) > now) {
-            return true
-        }
-
         // 쌍핔이도 기본 스핔이와 같은 충돌 후 정지/감속 흐름을 탄다.
         aliveIndices.forEach((unitIndex) => {
             const unit = player.doubleUnits[unitIndex]
@@ -2389,8 +2386,6 @@ class World {
             player.doubleSeparationPhase = "split"
             player.doubleMergeLockUntil = now + DOUBLE_REMERGE_LOCK_MS
             player.doubleSeparatedAt = now
-            player.doubleSplitProtectedUntil = now + DOUBLE_SPLIT_PROTECTION_MS
-            player.doubleSplitProtectedById = defeatedByPlayer ? String(defeatedByPlayer.id || "") : ""
             player.doubleDefeatProtectedUntil = Math.max(
                 now + COLLISION_IMPACT_DURATION_MS,
                 Number(player.collisionRecoveryUntil || 0)
@@ -2428,8 +2423,6 @@ class World {
             unitB.x = this.clampToWorld(unitB.x + unitB.lastMoveX * 0.35)
             unitB.y = this.clampToWorld(unitB.y + unitB.lastMoveY * 0.35)
             this.recenterDoublePlayer(player)
-            unitA.splitProtectedUntil = now + DOUBLE_SPLIT_PROTECTION_MS
-            unitB.splitProtectedUntil = now + DOUBLE_SPLIT_PROTECTION_MS
             return true
         }
 

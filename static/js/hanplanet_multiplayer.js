@@ -258,6 +258,7 @@
     let effectsMuted = false;
     let backgroundMusicAudio = null;
     let currentBackgroundMusicKey = '';
+    let backgroundMusicAutoplayBlocked = false;
     let loadingCaptionTimer = null;
     let loadingCaptionMessageIndex = 0;
     let loadingCaptionStep = 0;
@@ -1431,6 +1432,7 @@
     const stopBackgroundMusic = function () {
         if (!backgroundMusicAudio) {
             currentBackgroundMusicKey = '';
+            backgroundMusicAutoplayBlocked = false;
             return;
         }
         try {
@@ -1439,11 +1441,26 @@
         } catch (error) {}
         backgroundMusicAudio = null;
         currentBackgroundMusicKey = '';
+        backgroundMusicAutoplayBlocked = false;
+    };
+
+    const tryPlayBackgroundMusic = function () {
+        if (!backgroundMusicAudio) {
+            return;
+        }
+        backgroundMusicAudio.play().then(function () {
+            backgroundMusicAutoplayBlocked = false;
+        }).catch(function () {
+            backgroundMusicAutoplayBlocked = true;
+        });
     };
 
     const getEncounterMusicKey = function () {
-        if (!gameStarted || !activeSocket || activeSocket.readyState !== window.WebSocket.OPEN) {
-            return '';
+        if (!gameStarted) {
+            return '1pa';
+        }
+        if (!activeSocket || activeSocket.readyState !== window.WebSocket.OPEN) {
+            return encounterStage === 0 ? '1pa' : currentBackgroundMusicKey;
         }
         if (encounterStage === 0) {
             return '1pa';
@@ -1478,6 +1495,9 @@
         }
         if (currentBackgroundMusicKey === nextMusicKey && backgroundMusicAudio) {
             applyMusicMuteState();
+            if (backgroundMusicAudio.paused || backgroundMusicAutoplayBlocked) {
+                tryPlayBackgroundMusic();
+            }
             return;
         }
         stopBackgroundMusic();
@@ -1486,7 +1506,7 @@
         backgroundMusicAudio.volume = Math.max(0, Math.min(1, masterVolume * 0.5));
         currentBackgroundMusicKey = nextMusicKey;
         applyMusicMuteState();
-        backgroundMusicAudio.play().catch(function () {});
+        tryPlayBackgroundMusic();
     };
 
     const updateAudioToggleButtons = function () {
@@ -4565,6 +4585,18 @@
     effectsMuted = readMutePreference(SFX_MUTED_STORAGE_KEY);
     applyMusicMuteState();
     updateAudioToggleButtons();
+    const unlockBackgroundMusicPlayback = function () {
+        if (!backgroundMusicAudio) {
+            updateBackgroundMusic();
+            return;
+        }
+        if (backgroundMusicAudio.paused || backgroundMusicAutoplayBlocked) {
+            tryPlayBackgroundMusic();
+        }
+    };
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (eventName) {
+        document.addEventListener(eventName, unlockBackgroundMusicPlayback, { passive: true });
+    });
     if (musicMuteToggleButton) {
         musicMuteToggleButton.addEventListener('click', function () {
             musicMuted = !musicMuted;
@@ -4575,10 +4607,13 @@
     }
     if (sfxMuteToggleButton) {
         sfxMuteToggleButton.addEventListener('click', function () {
+            const wasMuted = effectsMuted;
             effectsMuted = !effectsMuted;
             writeMutePreference(SFX_MUTED_STORAGE_KEY, effectsMuted);
             if (effectsMuted) {
                 stopAllPlayerSounds();
+            } else if (wasMuted) {
+                playRandomCrashSound(getSkinConfig('default').sounds.crash, undefined, '__sfx_toggle__');
             }
             updateAudioToggleButtons();
         });
@@ -4760,6 +4795,7 @@
     setLoadingOverlayOpen(true);
     setStatus(labels.disconnected, '#64748b');
     setPing(null);
+    updateBackgroundMusic();
     render();
     releaseInitialLoadingOverlay();
 })();

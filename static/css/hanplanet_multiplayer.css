@@ -328,17 +328,17 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     color: #ffffff;
 }
 
-.multiplayer-start-card .ide-btn.ide-btn-primary,
-.multiplayer-start-card .ide-btn.ide-btn-primary:visited,
-.multiplayer-start-card .ide-btn.ide-btn-primary:hover,
-.multiplayer-start-card .ide-btn.ide-btn-primary:focus-visible,
-.multiplayer-start-card .ide-btn.ide-btn-primary:active {
-    --ide-btn-current-bg: #5f5f5f;
-    --ide-btn-current-border: #5f5f5f;
-    --ide-btn-current-color: #ffffff;
-    --ide-btn-current-hover-bg: #565656;
-    --ide-btn-current-hover-border: #565656;
-    --ide-btn-current-hover-color: #ffffff;
+.multiplayer-start-card .handrive-btn.handrive-btn-primary,
+.multiplayer-start-card .handrive-btn.handrive-btn-primary:visited,
+.multiplayer-start-card .handrive-btn.handrive-btn-primary:hover,
+.multiplayer-start-card .handrive-btn.handrive-btn-primary:focus-visible,
+.multiplayer-start-card .handrive-btn.handrive-btn-primary:active {
+    --handrive-btn-current-bg: #5f5f5f;
+    --handrive-btn-current-border: #5f5f5f;
+    --handrive-btn-current-color: #ffffff;
+    --handrive-btn-current-hover-bg: #565656;
+    --handrive-btn-current-hover-border: #565656;
+    --handrive-btn-current-hover-color: #ffffff;
 }
 
 .multiplayer-start-audio-button.is-muted::after {
@@ -369,12 +369,12 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     margin-right: auto;
 }
 
-.multiplayer-start-auth-actions .ide-btn {
+.multiplayer-start-auth-actions .handrive-btn {
     justify-content: center;
     min-width: 108px;
 }
 
-.multiplayer-start-auth-actions .ide-btn:not(.ide-btn-primary) {
+.multiplayer-start-auth-actions .handrive-btn:not(.handrive-btn-primary) {
     color: #111827;
     border-color: #111827;
 }
@@ -697,17 +697,17 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     min-width: 132px;
 }
 
-.multiplayer-primary-btn.ide-btn.ide-btn-primary,
-.multiplayer-primary-btn.ide-btn.ide-btn-primary:visited,
-.multiplayer-primary-btn.ide-btn.ide-btn-primary:hover,
-.multiplayer-primary-btn.ide-btn.ide-btn-primary:focus-visible,
-.multiplayer-primary-btn.ide-btn.ide-btn-primary:active {
-    --ide-btn-current-bg: #5f5f5f;
-    --ide-btn-current-border: #5f5f5f;
-    --ide-btn-current-color: #ffffff;
-    --ide-btn-current-hover-bg: #565656;
-    --ide-btn-current-hover-border: #565656;
-    --ide-btn-current-hover-color: #ffffff;
+.multiplayer-primary-btn.handrive-btn.handrive-btn-primary,
+.multiplayer-primary-btn.handrive-btn.handrive-btn-primary:visited,
+.multiplayer-primary-btn.handrive-btn.handrive-btn-primary:hover,
+.multiplayer-primary-btn.handrive-btn.handrive-btn-primary:focus-visible,
+.multiplayer-primary-btn.handrive-btn.handrive-btn-primary:active {
+    --handrive-btn-current-bg: #5f5f5f;
+    --handrive-btn-current-border: #5f5f5f;
+    --handrive-btn-current-color: #ffffff;
+    --handrive-btn-current-hover-bg: #565656;
+    --handrive-btn-current-hover-border: #565656;
+    --handrive-btn-current-hover-color: #ffffff;
 }
 
 .multiplayer-start-admin-actions {
@@ -728,7 +728,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     justify-content: center;
 }
 
-.multiplayer-start-admin-actions .ide-btn {
+.multiplayer-start-admin-actions .handrive-btn {
     min-width: 0;
     width: auto;
 }
@@ -1238,14 +1238,14 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     line-height: 1.5;
 }
 
-.multiplayer-idle-modal .ide-btn {
+.multiplayer-idle-modal .handrive-btn {
     background: #111827;
     border-color: #111827;
     color: #f9fafb;
 }
 
-.multiplayer-idle-modal .ide-btn:hover,
-.multiplayer-idle-modal .ide-btn:focus-visible {
+.multiplayer-idle-modal .handrive-btn:hover,
+.multiplayer-idle-modal .handrive-btn:focus-visible {
     background: #1f2937;
     border-color: #1f2937;
     color: #f9fafb;

@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block body_class %}handrive-page{% endblock %}
+{% block content %}
+{% include 'handrive/_assets_head.html' %}
+
+<div class="handrive-toolbar-wrap ui-toolbar-wrap">
+    <div class="handrive-shell ui-shell handrive-toolbar ui-toolbar">
+        <div class="handrive-toolbar-left ui-toolbar-left">
+            {% if is_docs_shared_view %}
+            <div class="handrive-shared-head">
+                <div class="handrive-shared-controls">
+                    {% include "partials/ui_controls_stack.html" %}
+                </div>
+                <div class="handrive-title-row ui-title-row">
+                    <h1 class="handrive-title ui-title">{{ doc_title }}</h1>
+                    <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
+                </div>
+            </div>
+            {% else %}
+            <div class="handrive-title-row ui-title-row">
+                <h1 class="handrive-title ui-title">{{ doc_title }}</h1>
+                <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
+            </div>
+            <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
+                {% for crumb in view_breadcrumbs %}
+                    {% if not forloop.first %}<span class="handrive-path-sep ui-path-sep">/</span>{% endif %}
+                    <a class="handrive-path-link ui-path-link" href="{{ crumb.url }}">{{ crumb.label }}</a>
+                {% endfor %}
+                <span class="handrive-path-sep ui-path-sep">/</span>
+                <span class="handrive-path-current ui-path-current">{{ view_current_file_name }}</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="handrive-toolbar-right ui-toolbar-right">
+            {% include "handrive/_auth_account.html" %}
+            <div class="handrive-toolbar-actions ui-toolbar-actions">
+                {% include "handrive/_auth_button.html" %}
+                {% include "handrive/_superuser_ops_button.html" %}
+                {% if user.is_staff %}
+                    <a class="handrive-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
+                {% endif %}
+                {% if doc_can_edit %}
+                    <button class="handrive-btn" type="button" id="handrive-url-share-btn">
+                        {% if doc_is_url_only %}{{ docs_text.url_unshare_button }}{% else %}{{ docs_text.url_share_button }}{% endif %}
+                    </button>
+                {% endif %}
+                <a class="handrive-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.download_button }}</a>
+                {% if doc_can_show_edit %}
+                    <a class="handrive-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
+                {% endif %}
+                {% if doc_can_edit %}
+                    <button class="handrive-btn" type="button" id="handrive-delete-btn">{{ docs_text.delete_button }}</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<main
+    class="handrive-shell ui-shell handrive-content ui-content"
+    data-handrive-page="view"
+    data-handrive-base-url="{{ docs_base_url }}"
+    data-handrive-root-url="{{ docs_root_url }}"
+    data-delete-api-url="{{ docs_api_delete_url }}"
+    data-url-share-api-url="{{ docs_api_url_share_url }}"
+    data-doc-path="{{ doc_relative_path }}"
+    data-doc-slug-path="{{ doc_slug_path }}"
+    data-doc-is-url-only="{% if doc_is_url_only %}1{% else %}0{% endif %}"
+    data-parent-dir="{{ doc_parent_dir }}"
+    data-ui-lang="{{ ui_lang|default:'ko' }}"
+>
+    <div class="handrive-view-zoom" id="handrive-view-zoom" hidden>
+        <button class="handrive-btn handrive-view-zoom-btn" type="button" id="handrive-view-zoom-out" aria-label="{{ docs_text.zoom_out_button|default:'축소' }}">
+            <svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true">
+                <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            </svg>
+        </button>
+        <button class="handrive-btn handrive-view-zoom-btn" type="button" id="handrive-view-zoom-in" aria-label="{{ docs_text.zoom_in_button|default:'확대' }}">
+            <svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true">
+                <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="10" y1="7" x2="10" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            </svg>
+        </button>
+    </div>
+    <article class="{{ doc_content_class }}">{{ doc_content_html }}</article>
+</main>
+{% include "partials/site_footer_links.html" %}
+
+{% include "popup/handrive/confirm_modal.html" %}
+{% include "popup/handrive/url_share_modal.html" %}
+{% include "popup/handrive/auth_logout_modal.html" %}
+{% include "popup/handrive/page_help_modal.html" %}
+
+{{ docs_text|json_script:"handrive-i18n" }}
+{% include 'handrive/_assets_script.html' %}
+{% endblock %}

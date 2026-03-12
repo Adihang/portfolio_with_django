@@ -330,6 +330,7 @@ class UserProfile(models.Model):
     ]
     ROOT_SEARCH_ENGINE_CHOICES = [
         ("google", "Google"),
+        ("youtube", "YouTube"),
         ("duckduckgo", "DuckDuckGo"),
         ("bing", "Bing"),
         ("naver", "Naver"),
