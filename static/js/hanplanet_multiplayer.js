@@ -2987,7 +2987,7 @@
             : 'classic';
         return {
             baseSpeed: basePlayerSpeedPerSecond * resolvedBaseSpeedMultiplier,
-            maxBoostSpeed: basePlayerSpeedPerSecond * resolvedMaxBoostSpeedMultiplier,
+            maxBoostSpeed: basePlayerSpeedPerSecond * resolvedBaseSpeedMultiplier * resolvedMaxBoostSpeedMultiplier,
             maxHealthSegments: resolvedMaxHealthSegments,
             type: skinProfile.type,
             movementType: resolvedMovementType

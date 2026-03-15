@@ -1,4 +1,6 @@
 class SpatialGrid {
+    // 공간 분할 그리드를 초기화한다.
+    // size: 각 셀의 한 변 길이(픽셀 단위)
     constructor(size) {
         // 월드를 고정 크기 셀로 나눈 단순 공간 분할 구조.
         // 매 틱 전체 플레이어를 모두 훑지 않고, 주변 셀만 조회하기 위해 쓴다.
@@ -6,6 +8,9 @@ class SpatialGrid {
         this.cells = new Map()
     }
 
+    // 월드 좌표 (x, y)가 속하는 셀 키 문자열을 반환한다.
+    // x, y: 월드 좌표
+    // 반환값: "cx:cy" 형식의 셀 키 문자열
     getCell(x, y) {
         const cx = Math.floor(x / this.size)
         const cy = Math.floor(y / this.size)
@@ -13,6 +18,8 @@ class SpatialGrid {
         return `${cx}:${cy}`
     }
 
+    // 플레이어를 현재 위치에 해당하는 셀에 추가하고 player.cell 을 갱신한다.
+    // player: 그리드에 등록할 플레이어 객체
     add(player) {
         const key = this.getCell(player.x, player.y)
 
@@ -24,6 +31,8 @@ class SpatialGrid {
         player.cell = key
     }
 
+    // 플레이어의 현재 위치를 기준으로 셀이 바뀌었을 때만 그리드 내 위치를 갱신한다.
+    // player: 이동한 플레이어 객체
     move(player) {
         const newKey = this.getCell(player.x, player.y)
 
@@ -40,6 +49,8 @@ class SpatialGrid {
         player.cell = newKey
     }
 
+    // 플레이어를 그리드에서 제거하고, 셀이 비면 셀 항목도 삭제한다.
+    // player: 제거할 플레이어 객체
     remove(player) {
         if (!player || !player.cell) {
             return
@@ -59,6 +70,10 @@ class SpatialGrid {
         player.cell = null
     }
 
+    // 플레이어 주변 셀 범위 내의 모든 플레이어 배열을 반환한다.
+    // player: 기준 플레이어 객체
+    // radius: 탐색 반경 (셀 단위, 기본값 1 → 3x3 범위)
+    // 반환값: 주변 플레이어 객체 배열 (중복 없음)
     getNearby(player, radius = 1) {
         if (!player || !player.cell) {
             return []

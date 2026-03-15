@@ -2,6 +2,9 @@ const WebSocket = require("ws")
 const { PORT, JWT_SECRET } = require("../config/config")
 const { verifyToken } = require("../auth/jwt")
 
+// 원시 IP 문자열을 정규화한다. IPv4-mapped IPv6 주소(::ffff: 접두사)를 IPv4 형식으로 변환한다.
+// rawIp: 정규화할 원시 IP 문자열
+// 반환값: 정규화된 IP 문자열
 function normalizeClientIp(rawIp) {
     const ip = String(rawIp || "").trim()
     if (!ip) {
@@ -13,6 +16,9 @@ function normalizeClientIp(rawIp) {
     return ip
 }
 
+// HTTP 요청에서 클라이언트 IP를 추출한다. 프록시 헤더(x-forwarded-for)를 우선 사용한다.
+// request: WebSocket 업그레이드 HTTP 요청 객체
+// 반환값: 정규화된 클라이언트 IP 문자열
 function getClientIp(request) {
     // 프록시/터널 뒤에 있을 수 있으므로 x-forwarded-for 를 먼저 본다.
     const forwardedFor = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim()
@@ -22,6 +28,10 @@ function getClientIp(request) {
     return normalizeClientIp(request.socket?.remoteAddress)
 }
 
+// 연결 요청의 JWT 토큰을 검증하고 인증 결과 객체를 반환한다.
+// request: WebSocket 업그레이드 HTTP 요청 객체
+// world: 월드 인스턴스 (게스트 display ID 할당에 사용)
+// 반환값: { ok, reason?, connectionKey, userId, isGuest, skinName } 형태의 인증 결과 객체
 function getConnectionAuth(request, world) {
     const requestUrl = new URL(request.url, "ws://localhost")
     const token = requestUrl.searchParams.get("token")
@@ -48,6 +58,9 @@ function getConnectionAuth(request, world) {
     }
 }
 
+// WebSocket 서버를 생성하고 연결, 메시지, 종료 이벤트 핸들러를 등록한다.
+// world: 월드 인스턴스 (플레이어 추가/제거 및 입력 처리에 사용)
+// 반환값: 생성된 WebSocket.Server 인스턴스
 function createServer(world) {
     const wss = new WebSocket.Server({ port: PORT })
 

@@ -13,6 +13,8 @@ const DOUBLE_SKIN_NAME = "double"
 const DOUBLE_UNIT_HEALTH = 2
 const PUMPKIN_SKIN_NAME = "pumkin"
 
+// 더블 스킨의 분리 유닛 초기 상태 객체를 생성한다.
+// 반환값: 체력, 위치, 이동 방향, 부스트 상태 등 유닛 단위 필드를 포함하는 객체
 function createDoubleUnitState() {
     return {
         health: DOUBLE_UNIT_HEALTH,
@@ -40,6 +42,8 @@ function createDoubleUnitState() {
 }
 
 class Player {
+    // 새 플레이어 인스턴스를 생성하고 모든 상태 필드를 초기화한다.
+    // id: 화면에 표시되는 플레이어 식별자
     constructor(id) {
         this.id = id
         // connectionKey 는 재접속 시 저장 상태를 이어붙일 때 쓰고,
