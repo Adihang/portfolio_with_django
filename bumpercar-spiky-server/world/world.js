@@ -1907,7 +1907,8 @@ class World {
 
     handleInput(player, data) {
         try {
-            const input = JSON.parse(data)
+            // data 는 websocket.js 에서 이미 파싱된 객체다.
+            const input = data
             const rawMoveX = Number(input.moveX || 0)
             const rawMoveY = Number(input.moveY || 0)
             let moveX = Number.isFinite(rawMoveX) ? rawMoveX : 0
@@ -2131,6 +2132,40 @@ class World {
         return { x: axisValue, y: WORLD_SIZE - padding }
     }
 
+    // 위치(x, y)가 속한 사분면을 1~4로 반환한다.
+    // 1: 좌상, 2: 우상, 3: 좌하, 4: 우하
+    getQuadrantFromPosition(x, y) {
+        const mid = WORLD_SIZE / 2
+        if (x < mid && y < mid) return 1
+        if (x >= mid && y < mid) return 2
+        if (x < mid && y >= mid) return 3
+        return 4
+    }
+
+    // 지정한 사분면의 가장자리에서 랜덤 위치를 반환한다.
+    // 각 사분면은 두 변(세로/가로)을 가지며 그 중 하나를 무작위로 선택한다.
+    getRandomEdgeSpawnPositionInQuadrant(quadrant) {
+        const padding = RESPAWN_EDGE_PADDING
+        const mid = WORLD_SIZE / 2
+        const useSideEdge = Math.random() < 0.5
+
+        if (quadrant === 1) {
+            if (useSideEdge) return { x: padding, y: padding + Math.random() * Math.max(0, mid - padding) }
+            return { x: padding + Math.random() * Math.max(0, mid - padding), y: padding }
+        }
+        if (quadrant === 2) {
+            if (useSideEdge) return { x: WORLD_SIZE - padding, y: padding + Math.random() * Math.max(0, mid - padding) }
+            return { x: mid + Math.random() * Math.max(0, WORLD_SIZE - padding - mid), y: padding }
+        }
+        if (quadrant === 3) {
+            if (useSideEdge) return { x: padding, y: mid + Math.random() * Math.max(0, WORLD_SIZE - padding - mid) }
+            return { x: padding + Math.random() * Math.max(0, mid - padding), y: WORLD_SIZE - padding }
+        }
+        // quadrant === 4
+        if (useSideEdge) return { x: WORLD_SIZE - padding, y: mid + Math.random() * Math.max(0, WORLD_SIZE - padding - mid) }
+        return { x: mid + Math.random() * Math.max(0, WORLD_SIZE - padding - mid), y: WORLD_SIZE - padding }
+    }
+
     getRandomQuadrantSpawnPosition(quadrant) {
         const padding = RESPAWN_EDGE_PADDING
         const midpoint = WORLD_SIZE / 2
@@ -2325,10 +2360,22 @@ class World {
             return false
         }
 
-        // 더미는 중앙, 그 외 플레이어는 맵 가장자리에서 리스폰한다.
-        const spawnPosition = player.isDummy
-            ? this.getRandomQuadrantSpawnPosition(player.dummyQuadrant || 1)
-            : this.getRandomEdgeSpawnPosition()
+        // 더미는 고유 사분면, 인간 유저는 네르와 다른 사분면 가장자리에서 리스폰한다.
+        let spawnPosition
+        if (player.isDummy) {
+            spawnPosition = this.getRandomQuadrantSpawnPosition(player.dummyQuadrant || 1)
+        } else {
+            const aliveNerPlayers = this.getNerPlayers().filter((p) => !this.isPlayerDead(p))
+            if (aliveNerPlayers.length > 0) {
+                const ner = aliveNerPlayers[0]
+                const nerQuadrant = this.getQuadrantFromPosition(ner.x, ner.y)
+                const availableQuadrants = [1, 2, 3, 4].filter((q) => q !== nerQuadrant)
+                const chosenQuadrant = availableQuadrants[Math.floor(Math.random() * availableQuadrants.length)]
+                spawnPosition = this.getRandomEdgeSpawnPositionInQuadrant(chosenQuadrant)
+            } else {
+                spawnPosition = this.getRandomEdgeSpawnPosition()
+            }
+        }
         player.x = spawnPosition.x
         player.y = spawnPosition.y
         player.currentSpeed = getBaseSpeedForPlayer(player)
