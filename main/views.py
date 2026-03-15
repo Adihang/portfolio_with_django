@@ -71,7 +71,7 @@ FENCED_BLOCK_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})")
 FENCED_BLOCK_START_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<fence>`{3,}|~{3,})(?P<info>[^\n]*)$")
 FENCED_BLOCK_END_PATTERN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*$")
 BUMPERCAR_SPIKY_SETTINGS_DEFAULTS = {
-    "user_base_speed": 225.0,
+    "user_base_speed": 286.0,
     "user_boost_distance": 399.3,
     "user_boost_duration_ms": 1238,
     "user_post_boost_cooldown_ms": 3000,
@@ -92,6 +92,43 @@ BUMPERCAR_SPIKY_SETTINGS_DEFAULTS = {
     "npc_damage_min": 1,
     "npc_damage_max": 5,
 }
+BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER = round(359.0726978998385 / 286.0, 4)
+BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS = {
+    "default": {
+        "base_speed_multiplier": 1.0,
+        "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        "max_health_segments": 3,
+        "movement_type": "classic",
+    },
+    "double": {
+        "base_speed_multiplier": 1.0,
+        "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        "max_health_segments": 4,
+        "movement_type": "classic",
+    },
+    "many": {
+        "base_speed_multiplier": 1.0,
+        "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        "max_health_segments": 5,
+        "movement_type": "classic",
+    },
+    "pumkin": {
+        "base_speed_multiplier": 1.4,
+        "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        "max_health_segments": 3,
+        "movement_type": "classic",
+    },
+    "evolution": {
+        "base_speed_multiplier": 0.8,
+        "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        "max_health_segments": 5,
+        "movement_type": "evolution",
+    },
+}
+BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE = 220.0
+BUMPERCAR_SPIKY_ADMIN_USER_BASE_SPEED_MULTIPLIER_KEY = "user_base_speed_multiplier"
+BUMPERCAR_SPIKY_ADMIN_NPC_BASE_SPEED_MULTIPLIER_KEY = "npc_base_speed_multiplier"
+BUMPERCAR_SPIKY_ADMIN_NPC_MAX_BOOST_SPEED_MULTIPLIER_KEY = "npc_max_boost_speed_multiplier"
 BUMPERCAR_SPIKY_SETTINGS_INT_KEYS = {
     "user_boost_duration_ms",
     "user_lives",
@@ -1039,6 +1076,9 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
     if not isinstance(raw_settings, dict):
         raw_settings = {}
 
+    raw_character_settings = raw_settings.get("character_settings")
+    normalized_character_settings = json.loads(json.dumps(BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS))
+
     for key, default_value in BUMPERCAR_SPIKY_SETTINGS_DEFAULTS.items():
         if key not in raw_settings:
             continue
@@ -1050,6 +1090,50 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
                 normalized[key] = float(candidate)
         except (TypeError, ValueError):
             normalized[key] = default_value
+
+    if isinstance(raw_character_settings, dict):
+        for skin_name, default_skin_settings in BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS.items():
+            candidate_skin_settings = raw_character_settings.get(skin_name)
+            if not isinstance(candidate_skin_settings, dict):
+                continue
+            for field_name, default_field_value in default_skin_settings.items():
+                candidate_value = candidate_skin_settings.get(field_name)
+                if field_name == "movement_type":
+                    normalized_character_settings[skin_name][field_name] = (
+                        "evolution"
+                        if str(candidate_value or "").strip().lower() == "evolution"
+                        else "classic"
+                    )
+                    continue
+                try:
+                    numeric_value = int(candidate_value) if field_name == "max_health_segments" else float(candidate_value)
+                except (TypeError, ValueError):
+                    numeric_value = default_field_value
+                normalized_character_settings[skin_name][field_name] = numeric_value
+
+    try:
+        submitted_user_base_multiplier = float(
+            raw_settings.get(BUMPERCAR_SPIKY_ADMIN_USER_BASE_SPEED_MULTIPLIER_KEY)
+        )
+        normalized["user_base_speed"] = max(1.0, submitted_user_base_multiplier) * BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        submitted_npc_base_multiplier = float(
+            raw_settings.get(BUMPERCAR_SPIKY_ADMIN_NPC_BASE_SPEED_MULTIPLIER_KEY)
+        )
+        normalized["npc_base_speed"] = max(0.1, submitted_npc_base_multiplier) * max(1.0, normalized["user_base_speed"])
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        submitted_npc_max_boost_multiplier = float(
+            raw_settings.get(BUMPERCAR_SPIKY_ADMIN_NPC_MAX_BOOST_SPEED_MULTIPLIER_KEY)
+        )
+        normalized["npc_max_boost_speed"] = max(0.1, submitted_npc_max_boost_multiplier) * max(1.0, normalized["user_base_speed"])
+    except (TypeError, ValueError):
+        pass
 
     normalized["user_base_speed"] = max(1.0, normalized["user_base_speed"])
     normalized["user_post_boost_cooldown_ms"] = max(0, int(normalized["user_post_boost_cooldown_ms"]))
@@ -1069,6 +1153,11 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
     normalized["npc_respawn_delay_ms"] = max(1000, normalized["npc_respawn_delay_ms"])
     normalized["npc_damage_min"] = max(1, normalized["npc_damage_min"])
     normalized["npc_damage_max"] = max(normalized["npc_damage_min"], normalized["npc_damage_max"])
+    for skin_name, skin_settings in normalized_character_settings.items():
+        skin_settings["base_speed_multiplier"] = max(0.1, float(skin_settings["base_speed_multiplier"]))
+        skin_settings["max_boost_speed_multiplier"] = max(0.1, float(skin_settings["max_boost_speed_multiplier"]))
+        skin_settings["max_health_segments"] = max(1, int(skin_settings["max_health_segments"]))
+        skin_settings["movement_type"] = "evolution" if skin_settings["movement_type"] == "evolution" else "classic"
 
     if "user_boost_distance" not in raw_settings or "user_boost_duration_ms" not in raw_settings:
         legacy_user_max_speed = float(raw_settings.get("user_max_boost_speed") or 420.0)
@@ -1103,6 +1192,7 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
     normalized["user_max_boost_speed"] = user_boost_profile["max_speed"]
     normalized["user_boost_acceleration"] = user_boost_profile["acceleration"]
     normalized["user_boost_cooldown"] = user_boost_profile["cooldown"]
+    normalized["character_settings"] = normalized_character_settings
     return normalized
 
 
@@ -1122,8 +1212,23 @@ def save_bumpercar_spiky_settings(next_settings):
     settings_path = get_bumpercar_spiky_settings_path()
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     normalized = _normalize_bumpercar_spiky_settings(next_settings)
-    settings_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    storage_payload = dict(next_settings if isinstance(next_settings, dict) else {})
+    for key in (
+        "user_base_speed",
+        "npc_base_speed",
+        "npc_max_boost_speed",
+        "user_max_boost_speed",
+        "user_boost_acceleration",
+        "user_boost_cooldown",
+    ):
+        storage_payload.pop(key, None)
+    settings_path.write_text(json.dumps(storage_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return normalized
+
+
+def _to_admin_speed_multiplier(value, reference):
+    safe_reference = max(0.0001, float(reference))
+    return round(float(value) / safe_reference, 4)
 
 
 def restart_bumpercar_spiky_runtime():
@@ -1579,6 +1684,47 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         submitted_settings = {}
         for key in BUMPERCAR_SPIKY_SETTINGS_DEFAULTS:
             submitted_settings[key] = request.POST.get(key, current_settings.get(key))
+        submitted_character_settings = {}
+        for skin_name, skin_defaults in BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS.items():
+            submitted_character_settings[skin_name] = {}
+            for field_name, default_value in skin_defaults.items():
+                input_name = f"character_settings__{skin_name}__{field_name}"
+                submitted_character_settings[skin_name][field_name] = request.POST.get(
+                    input_name,
+                    current_settings.get("character_settings", {}).get(skin_name, {}).get(field_name, default_value),
+                )
+        submitted_settings["character_settings"] = submitted_character_settings
+
+        try:
+            submitted_user_base_multiplier = float(submitted_settings.get("user_base_speed") or 1.0)
+        except (TypeError, ValueError):
+            submitted_user_base_multiplier = _to_admin_speed_multiplier(
+                current_settings.get("user_base_speed", BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE),
+                BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE,
+            )
+        submitted_user_base_multiplier = max(1.0, submitted_user_base_multiplier)
+        submitted_settings[BUMPERCAR_SPIKY_ADMIN_USER_BASE_SPEED_MULTIPLIER_KEY] = submitted_user_base_multiplier
+        submitted_settings.pop("user_base_speed", None)
+
+        try:
+            submitted_npc_base_multiplier = float(submitted_settings.get("npc_base_speed") or 1.0)
+        except (TypeError, ValueError):
+            submitted_npc_base_multiplier = _to_admin_speed_multiplier(
+                current_settings.get("npc_base_speed", current_settings.get("user_base_speed", BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE)),
+                max(1.0, current_settings.get("user_base_speed", BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE)),
+            )
+        submitted_settings[BUMPERCAR_SPIKY_ADMIN_NPC_BASE_SPEED_MULTIPLIER_KEY] = max(0.1, submitted_npc_base_multiplier)
+        submitted_settings.pop("npc_base_speed", None)
+
+        try:
+            submitted_npc_max_boost_multiplier = float(submitted_settings.get("npc_max_boost_speed") or 1.0)
+        except (TypeError, ValueError):
+            submitted_npc_max_boost_multiplier = _to_admin_speed_multiplier(
+                current_settings.get("npc_max_boost_speed", current_settings.get("npc_base_speed", current_settings.get("user_base_speed", BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE))),
+                max(1.0, current_settings.get("user_base_speed", BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE)),
+            )
+        submitted_settings[BUMPERCAR_SPIKY_ADMIN_NPC_MAX_BOOST_SPEED_MULTIPLIER_KEY] = max(0.1, submitted_npc_max_boost_multiplier)
+        submitted_settings.pop("npc_max_boost_speed", None)
 
         try:
             current_settings = save_bumpercar_spiky_settings(submitted_settings)
@@ -1594,12 +1740,12 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         connected_players = 0
 
     field_specs = [
-        ("user_base_speed", "bumpercar_admin_user_base_speed", "0.1"),
+        ("user_base_speed", "bumpercar_admin_user_base_speed", "0.01"),
         ("user_boost_distance", "bumpercar_admin_user_boost_distance", "0.1"),
         ("user_boost_duration_ms", "bumpercar_admin_user_boost_duration_ms", "1"),
         ("user_post_boost_cooldown_ms", "bumpercar_admin_user_post_boost_cooldown_ms", "1"),
         ("user_lives", "bumpercar_admin_user_lives", "1"),
-        ("npc_base_speed", "bumpercar_admin_npc_base_speed", "0.1"),
+        ("npc_base_speed", "bumpercar_admin_npc_base_speed", "0.01"),
         ("npc_max_health", "bumpercar_admin_npc_max_health", "1"),
         ("npc_phase_two_health_ratio", "bumpercar_admin_npc_phase_two_health_ratio", "0.01"),
         ("npc_phase_three_health_ratio", "bumpercar_admin_npc_phase_three_health_ratio", "0.01"),
@@ -1608,7 +1754,7 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         ("npc_extra_charge_distance_multiplier", "bumpercar_admin_npc_extra_charge_distance_multiplier", "0.1"),
         ("npc_charge_windup_ms", "bumpercar_admin_npc_charge_windup_ms", "1"),
         ("npc_rest_ms", "bumpercar_admin_npc_rest_ms", "1"),
-        ("npc_max_boost_speed", "bumpercar_admin_npc_max_boost_speed", "0.1"),
+        ("npc_max_boost_speed", "bumpercar_admin_npc_max_boost_speed", "0.01"),
         ("npc_boost_acceleration", "bumpercar_admin_npc_boost_acceleration", "0.1"),
         ("npc_boost_cooldown", "bumpercar_admin_npc_boost_cooldown", "0.1"),
         ("npc_respawn_delay_ms", "bumpercar_admin_npc_respawn_delay_ms", "1"),
@@ -1621,9 +1767,72 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
             "name": key,
             "i18n_key": i18n_key,
             "step": step,
-            "value": current_settings[key],
+            "value": (
+                _to_admin_speed_multiplier(current_settings[key], BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE)
+                if key == "user_base_speed"
+                else _to_admin_speed_multiplier(
+                    current_settings[key],
+                    max(1.0, current_settings.get("user_base_speed", BUMPERCAR_SPIKY_ADMIN_BASE_USER_SPEED_REFERENCE)),
+                )
+                if key in {"npc_base_speed", "npc_max_boost_speed"}
+                else current_settings[key]
+            ),
+            "hint": (
+                ("x 220 base spiky speed" if resolved_lang == "en" else "기준 스핔이 속도 220배수")
+                if key == "user_base_speed"
+                else ("x current user base speed" if resolved_lang == "en" else "현재 유저 기본 이동속도 배수")
+                if key in {"npc_base_speed", "npc_max_boost_speed"}
+                else ""
+            ),
         }
         for key, i18n_key, step in field_specs
+    ]
+    character_field_specs = [
+        ("base_speed_multiplier", "bumpercar_admin_character_base_speed_multiplier", "0.01"),
+        ("max_boost_speed_multiplier", "bumpercar_admin_character_max_boost_speed_multiplier", "0.01"),
+        ("max_health_segments", "bumpercar_admin_character_max_health_segments", "1"),
+        ("movement_type", "bumpercar_admin_character_movement_type", "1"),
+    ]
+    character_labels = {
+        "default": "Spiky" if resolved_lang == "en" else "스핔이",
+        "double": "Twin Spiky" if resolved_lang == "en" else "쌍핔이",
+        "many": "Spikies" if resolved_lang == "en" else "스핔이들",
+        "pumkin": "Hopiki" if resolved_lang == "en" else "호핔이",
+        "evolution": "Speaki" if resolved_lang == "en" else "스피키",
+    }
+    character_settings = current_settings.get("character_settings", BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS)
+    admin_character_options = [
+        {
+            "name": skin_name,
+            "label": character_labels.get(skin_name, skin_name),
+        }
+        for skin_name in BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS
+    ]
+    admin_character_sections = [
+        {
+            "name": skin_name,
+            "label": character_labels.get(skin_name, skin_name),
+            "fields": [
+                {
+                    "name": f"character_settings__{skin_name}__{field_name}",
+                    "i18n_key": i18n_key,
+                    "step": step,
+                    "value": character_settings.get(skin_name, {}).get(field_name, default_value),
+                    "input_type": "select" if field_name == "movement_type" else "number",
+                    "options": (
+                        [
+                            {"value": "classic", "label": "Classic" if resolved_lang == "en" else "클래식"},
+                            {"value": "evolution", "label": "Evolution" if resolved_lang == "en" else "에볼루션"},
+                        ]
+                        if field_name == "movement_type"
+                        else []
+                    ),
+                }
+                for field_name, i18n_key, step in character_field_specs
+                for default_value in [BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS[skin_name][field_name]]
+            ],
+        }
+        for skin_name in BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS
     ]
 
     context = {
@@ -1646,6 +1855,8 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
         "bumpercar_admin_save_error": save_error,
         "bumpercar_admin_game_url": reverse("main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}),
         "bumpercar_admin_connected_players": connected_players,
+        "bumpercar_admin_character_options": admin_character_options,
+        "bumpercar_admin_character_sections": admin_character_sections,
     }
     apply_ui_context(request, context, resolved_lang)
     return render(request, "fun/bumpercar_spiky_admin.html", context)

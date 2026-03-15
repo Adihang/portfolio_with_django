@@ -163,7 +163,6 @@
     const worldSize = 2000;
     const basePlayerSpeedPerSecond = Number(gameplaySettings.user_base_speed || 225);
     const npcBaseSpeedPerSecond = Number(gameplaySettings.npc_base_speed || 281.25);
-    const maxBoostedSpeedPerSecond = Number(gameplaySettings.user_max_boost_speed || 420);
     const boostAccelerationPerSecond = Number(gameplaySettings.user_boost_acceleration || 360);
     const boostCooldownPerSecond = Number(gameplaySettings.user_boost_cooldown || 280);
     const npcMaxHealth = Number(gameplaySettings.npc_max_health || 20);
@@ -228,6 +227,7 @@
     let joystickPointerId = null;
     let mouseMoveActive = false;
     let mouseLeftHeld = false;
+    let mouseRightHeld = false;
     let mouseBoostRequested = false;
     let mouseScreenDX = 0;
     let mouseScreenDY = 0;
@@ -684,6 +684,47 @@
         updateMouseDirectionalInput();
     };
 
+    const triggerMouseBoostPulse = function () {
+        if (mouseBoostPulseTimer) {
+            window.clearTimeout(mouseBoostPulseTimer);
+            mouseBoostPulseTimer = null;
+        }
+        if (boostLockedActive) {
+            mouseBoostRequested = false;
+            refreshMouseMoveState();
+            input.boost = false;
+            sendInputNow();
+            return;
+        }
+        mouseBoostRequested = true;
+        refreshMouseMoveState();
+        input.boost = true;
+        sendInputNow(true);
+        mouseBoostPulseTimer = window.setTimeout(function () {
+            mouseBoostRequested = false;
+            refreshMouseMoveState();
+            input.boost = false;
+            if (boostState === 'cooldown' && currentMoveSpeed <= getSelectedPlayerBaseSpeed()) {
+                boostState = 'idle';
+            }
+            sendInputNow(true);
+            mouseBoostPulseTimer = null;
+        }, 90);
+    };
+
+    const syncMouseButtons = function (buttons, event) {
+        const normalizedButtons = Number(buttons || 0);
+        const nextLeftHeld = Boolean(normalizedButtons & 1);
+        const nextRightHeld = Boolean(normalizedButtons & 2);
+        mouseLeftHeld = nextLeftHeld;
+        if (nextRightHeld && !mouseRightHeld && event) {
+            updateMouseTarget(event.clientX, event.clientY);
+            triggerMouseBoostPulse();
+        }
+        mouseRightHeld = nextRightHeld;
+        refreshMouseMoveState();
+    };
+
     const getMouseVector = function (allowWhenInactive) {
         if ((!mouseMoveActive && !allowWhenInactive) || selfDeathActive) {
             return { dx: 0, dy: 0 };
@@ -1052,6 +1093,7 @@
         selfPumpkinNtrVisualUntil = 0;
         mouseMoveActive = false;
         mouseLeftHeld = false;
+        mouseRightHeld = false;
         mouseBoostRequested = false;
         mouseScreenDX = 0;
         mouseScreenDY = 0;
@@ -2874,43 +2916,81 @@
 
     const getPlayerSkinProfile = function (skinName) {
         const normalizedName = String(skinName || 'default').trim().toLowerCase() || 'default';
-        if (normalizedName === 'evolution') {
-            return {
-                baseSpeed: basePlayerSpeedPerSecond * 0.8,
-                maxHealthSegments: 5,
-                type: 'evolution',
-                movementType: 'evolution'
-            };
-        }
-        if (normalizedName === 'double') {
-            return {
-                baseSpeed: basePlayerSpeedPerSecond,
-                maxHealthSegments: 4,
-                type: 'double',
-                movementType: 'classic'
-            };
-        }
-        if (normalizedName === 'pumkin') {
-            return {
-                baseSpeed: basePlayerSpeedPerSecond * 1.4,
+        const defaultCharacterBoostSpeedMultiplier = 359.0726978998385 / 286;
+        const defaultSkinProfiles = {
+            default: {
+                baseSpeedMultiplier: 1,
+                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
                 maxHealthSegments: 3,
-                type: 'pumkin',
+                type: 'classic',
                 movementType: 'classic'
-            };
-        }
-        if (normalizedName === 'many') {
-            return {
-                baseSpeed: basePlayerSpeedPerSecond,
+            },
+            many: {
+                baseSpeedMultiplier: 1,
+                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
                 maxHealthSegments: 5,
                 type: 'many',
                 movementType: 'classic'
-            };
-        }
+            },
+            double: {
+                baseSpeedMultiplier: 1,
+                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
+                maxHealthSegments: 4,
+                type: 'double',
+                movementType: 'classic'
+            },
+            evolution: {
+                baseSpeedMultiplier: 0.8,
+                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
+                maxHealthSegments: 5,
+                type: 'evolution',
+                movementType: 'evolution'
+            },
+            pumkin: {
+                baseSpeedMultiplier: 1.4,
+                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
+                maxHealthSegments: 3,
+                type: 'pumkin',
+                movementType: 'classic'
+            }
+        };
+        const configuredCharacterSettings = gameplaySettings && gameplaySettings.character_settings && gameplaySettings.character_settings[normalizedName]
+            ? gameplaySettings.character_settings[normalizedName]
+            : null;
+        const skinProfile = defaultSkinProfiles[normalizedName] || defaultSkinProfiles.default;
+        const resolvedBaseSpeedMultiplier = Math.max(
+            0.1,
+            Number(configuredCharacterSettings && configuredCharacterSettings.base_speed_multiplier !== undefined
+                ? configuredCharacterSettings.base_speed_multiplier
+                : skinProfile.baseSpeedMultiplier)
+        );
+        const resolvedMaxBoostSpeedMultiplier = Math.max(
+            0.1,
+            Number(configuredCharacterSettings && configuredCharacterSettings.max_boost_speed_multiplier !== undefined
+                ? configuredCharacterSettings.max_boost_speed_multiplier
+                : skinProfile.maxBoostSpeedMultiplier)
+        );
+        const resolvedMaxHealthSegments = Math.max(
+            1,
+            Math.round(Number(
+                configuredCharacterSettings && configuredCharacterSettings.max_health_segments !== undefined
+                    ? configuredCharacterSettings.max_health_segments
+                    : skinProfile.maxHealthSegments
+            ))
+        );
+        const resolvedMovementType = String(
+            configuredCharacterSettings && configuredCharacterSettings.movement_type !== undefined
+                ? configuredCharacterSettings.movement_type
+                : skinProfile.movementType
+        ).trim().toLowerCase() === 'evolution'
+            ? 'evolution'
+            : 'classic';
         return {
-            baseSpeed: basePlayerSpeedPerSecond,
-            maxHealthSegments: 3,
-            type: 'classic',
-            movementType: 'classic'
+            baseSpeed: basePlayerSpeedPerSecond * resolvedBaseSpeedMultiplier,
+            maxBoostSpeed: basePlayerSpeedPerSecond * resolvedMaxBoostSpeedMultiplier,
+            maxHealthSegments: resolvedMaxHealthSegments,
+            type: skinProfile.type,
+            movementType: resolvedMovementType
         };
     };
 
@@ -2919,7 +2999,7 @@
     };
 
     const getSelectedPlayerMaxBoostSpeed = function () {
-        return getSelectedPlayerBaseSpeed() + Math.max(0, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond);
+        return getPlayerSkinProfile(activeSelfSkinName || selectedSkinName).maxBoostSpeed;
     };
 
     currentMoveSpeed = getSelectedPlayerBaseSpeed();
@@ -3073,7 +3153,7 @@
                 ? Math.max(0, Number(currentMoveSpeed || 0))
                 : Math.max(0, Number(player.currentSpeed || 0));
             const playerBaseSpeed = skinProfile.baseSpeed;
-            const playerMaxBoostedSpeed = playerBaseSpeed + Math.max(0, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond);
+            const playerMaxBoostedSpeed = skinProfile.maxBoostSpeed;
             const boostRatio = Math.max(
                 0,
                 Math.min(
@@ -3309,9 +3389,11 @@
             selectedEntry = collisionSet.slow;
         } else if ((unit.boostState || 'idle') === 'charging' || (unit.boostState || 'idle') === 'cooldown') {
             const movementSpeed = Math.max(0, Number(unit.currentSpeed || 0));
+            const playerBaseSpeed = getPlayerSkinProfile('double').baseSpeed;
+            const playerMaxBoostedSpeed = getPlayerSkinProfile('double').maxBoostSpeed;
             const boostRatio = Math.max(
                 0,
-                Math.min(0.999, (movementSpeed - basePlayerSpeedPerSecond) / Math.max(1, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond))
+                Math.min(0.999, (movementSpeed - playerBaseSpeed) / Math.max(1, playerMaxBoostedSpeed - playerBaseSpeed))
             );
             const boostStageIndex = Math.min(
                 Math.max(0, skinRuntime.boostStages.length - 1),
@@ -3337,7 +3419,7 @@
             ? Math.max(0, Number(currentMoveSpeed || 0))
             : Math.max(0, Number(player.currentSpeed || 0));
         const playerBaseSpeed = getPlayerSkinProfile('double').baseSpeed;
-        const playerMaxBoostedSpeed = playerBaseSpeed + Math.max(0, maxBoostedSpeedPerSecond - basePlayerSpeedPerSecond);
+        const playerMaxBoostedSpeed = getPlayerSkinProfile('double').maxBoostSpeed;
         const boostRatio = Math.max(
             0,
             Math.min(
@@ -5155,45 +5237,28 @@
         if (!gameStarted || selfDeathActive) {
             return;
         }
+        syncMouseButtons(event.buttons, event);
         updateMouseTarget(event.clientX, event.clientY);
         if (event.button === 0) {
             event.preventDefault();
-            mouseLeftHeld = true;
-            refreshMouseMoveState();
             sendInputNow();
-        } else if (event.button === 2) {
+        }
+    });
+    canvas.addEventListener('mousedown', function (event) {
+        if (!gameStarted || selfDeathActive) {
+            return;
+        }
+        syncMouseButtons(event.buttons, event);
+        if (event.button === 2) {
             event.preventDefault();
-            if (mouseBoostPulseTimer) {
-                window.clearTimeout(mouseBoostPulseTimer);
-                mouseBoostPulseTimer = null;
-            }
-            if (boostLockedActive) {
-                mouseBoostRequested = false;
-                refreshMouseMoveState();
-                input.boost = false;
-                sendInputNow();
-                return;
-            }
-            mouseBoostRequested = true;
-            refreshMouseMoveState();
-            input.boost = true;
             sendInputNow(true);
-            mouseBoostPulseTimer = window.setTimeout(function () {
-                mouseBoostRequested = false;
-                refreshMouseMoveState();
-                input.boost = false;
-                if (boostState === 'cooldown' && currentMoveSpeed <= getSelectedPlayerBaseSpeed()) {
-                    boostState = 'idle';
-                }
-                sendInputNow(true);
-                mouseBoostPulseTimer = null;
-            }, 90);
         }
     });
     canvas.addEventListener('pointermove', function (event) {
         if (!gameStarted) {
             return;
         }
+        syncMouseButtons(event.buttons, event);
         updateMouseTarget(event.clientX, event.clientY);
         if (mouseMoveActive) {
             updateMouseDirectionalInput();
@@ -5202,13 +5267,17 @@
     });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (eventName) {
         canvas.addEventListener(eventName, function (event) {
-            if (event.button === 0 || eventName !== 'pointerup') {
+            if (eventName === 'pointerleave' || eventName === 'pointercancel') {
                 mouseLeftHeld = false;
-                refreshMouseMoveState();
-            }
-            if (event.button === 2) {
+                mouseRightHeld = false;
                 mouseBoostRequested = false;
                 refreshMouseMoveState();
+            } else {
+                syncMouseButtons(event.buttons, event);
+                if (event.button === 2) {
+                    mouseBoostRequested = false;
+                    refreshMouseMoveState();
+                }
             }
             sendInputNow();
         });

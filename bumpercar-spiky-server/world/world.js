@@ -9,6 +9,7 @@ const BASE_PLAYER_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_base_speed
 const DUMMY_BASE_SPEED_PER_SECOND = BASE_PLAYER_SPEED_PER_SECOND * 1.5
 const NPC_BASE_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_base_speed
 const MAX_BOOSTED_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_max_boost_speed
+const DEFAULT_PLAYER_BOOST_SPEED_MULTIPLIER = Math.max(1, MAX_BOOSTED_SPEED_PER_SECOND / Math.max(1, BASE_PLAYER_SPEED_PER_SECOND))
 const BOOST_ACCELERATION_PER_SECOND = GAMEPLAY_SETTINGS.user_boost_acceleration
 const BOOST_COOLDOWN_PER_SECOND = GAMEPLAY_SETTINGS.user_boost_cooldown
 const USER_POST_BOOST_COOLDOWN_MS = GAMEPLAY_SETTINGS.user_post_boost_cooldown_ms
@@ -105,8 +106,22 @@ const ENCOUNTER_ANNOUNCEMENT_FINALE = "ner_true_finale"
 // 전체 인간 유저 입력이 이 시간 동안 없으면 진행 상태를 초기화한다.
 const INPUT_IDLE_RESET_MS = 10 * 60 * 1000
 const EVOLUTION_SKIN_NAME = "evolution"
+const DEFAULT_SKIN_NAME = "default"
+const MANY_SKIN_NAME = "many"
+const DOUBLE_SKIN_NAME = "double"
+const PUMPKIN_SKIN_NAME = "pumkin"
+const DEFAULT_PLAYER_SPEED_MULTIPLIER = 1
+const MANY_SPEED_MULTIPLIER = 1
+const DOUBLE_SPEED_MULTIPLIER = 1
 const EVOLUTION_SPEED_MULTIPLIER = 0.8
 const PUMPKIN_SPEED_MULTIPLIER = 1.4
+const PLAYER_SPEED_MULTIPLIERS = {
+    [DEFAULT_SKIN_NAME]: DEFAULT_PLAYER_SPEED_MULTIPLIER,
+    [MANY_SKIN_NAME]: MANY_SPEED_MULTIPLIER,
+    [DOUBLE_SKIN_NAME]: DOUBLE_SPEED_MULTIPLIER,
+    [EVOLUTION_SKIN_NAME]: EVOLUTION_SPEED_MULTIPLIER,
+    [PUMPKIN_SKIN_NAME]: PUMPKIN_SPEED_MULTIPLIER,
+}
 const EVOLUTION_HEALTH_SEGMENTS = 5
 const PUMPKIN_NPC_HEALTH_SEGMENTS = 4
 const PUMPKIN_NPC_DEFEAT_DASH_DURATION_MS = 420
@@ -119,10 +134,7 @@ const PUMPKIN_NPC_DEFEAT_DASH_SPEED_PER_SECOND = Math.max(
     BASE_PLAYER_SPEED_PER_SECOND * 2
 )
 const NEUTRAL_PUMPKIN_SPAWN_PADDING = 180
-const MANY_SKIN_NAME = "many"
 const MANY_HEALTH_SEGMENTS = 5
-const DOUBLE_SKIN_NAME = "double"
-const PUMPKIN_SKIN_NAME = "pumkin"
 const DOUBLE_UNIT_HEALTH = 2
 const DOUBLE_UNIT_COUNT = 2
 const DOUBLE_SEPARATION_ANGLE_DEGREES = 7
@@ -147,6 +159,37 @@ function getNpcBaseSpeed(player) {
     return NPC_BASE_SPEED_PER_SECOND * multiplier
 }
 
+function getCharacterGameplaySettings(skinName) {
+    const normalizedSkinName = String(skinName || DEFAULT_SKIN_NAME).trim().toLowerCase() || DEFAULT_SKIN_NAME
+    const configuredSettings = GAMEPLAY_SETTINGS.character_settings && typeof GAMEPLAY_SETTINGS.character_settings === "object"
+        ? GAMEPLAY_SETTINGS.character_settings[normalizedSkinName]
+        : null
+    const fallbackSettings = {
+        base_speed_multiplier: PLAYER_SPEED_MULTIPLIERS[normalizedSkinName] || DEFAULT_PLAYER_SPEED_MULTIPLIER,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: normalizedSkinName === MANY_SKIN_NAME
+            ? MANY_HEALTH_SEGMENTS
+            : (normalizedSkinName === DOUBLE_SKIN_NAME
+                ? 4
+                : (normalizedSkinName === EVOLUTION_SKIN_NAME
+                    ? EVOLUTION_HEALTH_SEGMENTS
+                    : PLAYER_DEATH_TRIGGER_COUNT)),
+        movement_type: normalizedSkinName === EVOLUTION_SKIN_NAME ? "evolution" : "classic",
+    }
+    return {
+        base_speed_multiplier: Math.max(0.1, Number(configuredSettings && configuredSettings.base_speed_multiplier || fallbackSettings.base_speed_multiplier)),
+        max_boost_speed_multiplier: Math.max(0.1, Number(configuredSettings && configuredSettings.max_boost_speed_multiplier || fallbackSettings.max_boost_speed_multiplier)),
+        max_health_segments: Math.max(1, Math.round(Number(configuredSettings && configuredSettings.max_health_segments || fallbackSettings.max_health_segments))),
+        movement_type: String(configuredSettings && configuredSettings.movement_type || fallbackSettings.movement_type).trim().toLowerCase() === "evolution"
+            ? "evolution"
+            : "classic",
+    }
+}
+
+function getPlayerSpeedMultiplier(player) {
+    return getCharacterGameplaySettings(player && player.skinName).base_speed_multiplier
+}
+
 function getBaseSpeedForPlayer(player) {
     if (player && player.isNpc) {
         return getNpcBaseSpeed(player)
@@ -154,14 +197,7 @@ function getBaseSpeedForPlayer(player) {
     if (player && player.isDummy) {
         return DUMMY_BASE_SPEED_PER_SECOND
     }
-    const skinName = String(player && player.skinName || "").trim().toLowerCase()
-    if (skinName === EVOLUTION_SKIN_NAME) {
-        return BASE_PLAYER_SPEED_PER_SECOND * EVOLUTION_SPEED_MULTIPLIER
-    }
-    if (skinName === PUMPKIN_SKIN_NAME) {
-        return BASE_PLAYER_SPEED_PER_SECOND * PUMPKIN_SPEED_MULTIPLIER
-    }
-    return BASE_PLAYER_SPEED_PER_SECOND
+    return BASE_PLAYER_SPEED_PER_SECOND * getPlayerSpeedMultiplier(player)
 }
 
 function isDoubleSkinPlayer(player) {
@@ -281,8 +317,7 @@ function getMaxBoostedSpeedForPlayer(player) {
     if (player && player.isNpc) {
         return NPC_MAX_BOOSTED_SPEED_PER_SECOND
     }
-    const defaultBoostDelta = MAX_BOOSTED_SPEED_PER_SECOND - BASE_PLAYER_SPEED_PER_SECOND
-    return getBaseSpeedForPlayer(player) + defaultBoostDelta
+    return BASE_PLAYER_SPEED_PER_SECOND * getCharacterGameplaySettings(player && player.skinName).max_boost_speed_multiplier
 }
 
 function getCollisionSlowSpeedForPlayer(player) {
@@ -300,16 +335,10 @@ function getPlayerDeathTriggerCount(player) {
         return PLAYER_DEATH_TRIGGER_COUNT
     }
     const skinName = String(player.skinName || "").trim().toLowerCase()
-    if (skinName === EVOLUTION_SKIN_NAME) {
-        return EVOLUTION_HEALTH_SEGMENTS
-    }
-    if (skinName === MANY_SKIN_NAME) {
-        return MANY_HEALTH_SEGMENTS
-    }
     if (skinName === PUMPKIN_SKIN_NAME) {
         return getPumpkinLifeSegments(player)
     }
-    return PLAYER_DEATH_TRIGGER_COUNT
+    return getCharacterGameplaySettings(skinName).max_health_segments
 }
 
 function getNpcPhase(player) {

@@ -1,10 +1,10 @@
 {
-  "user_base_speed": 220.0,
+  "user_base_speed_multiplier": 1.3,
   "user_boost_distance": 399.3,
   "user_boost_duration_ms": 1238,
   "user_post_boost_cooldown_ms": 3000,
   "user_lives": 3,
-  "npc_base_speed": 230.0,
+  "npc_base_speed_multiplier": 0.8042,
   "npc_max_health": 100,
   "npc_phase_two_health_ratio": 0.6,
   "npc_phase_three_health_ratio": 0.2,
@@ -13,13 +13,42 @@
   "npc_extra_charge_distance_multiplier": 1.5,
   "npc_charge_windup_ms": 500,
   "npc_rest_ms": 1800,
-  "npc_max_boost_speed": 2800.0,
+  "npc_max_boost_speed_multiplier": 9.7902,
   "npc_boost_acceleration": 1400.0,
   "npc_boost_cooldown": 1100.0,
   "npc_respawn_delay_ms": 60000,
   "npc_damage_min": 1,
   "npc_damage_max": 10,
-  "user_max_boost_speed": 425.07269789983843,
-  "user_boost_acceleration": 248.47257419204985,
-  "user_boost_cooldown": 496.9451483840997
+  "character_settings": {
+    "default": {
+      "base_speed_multiplier": 1.0,
+      "max_boost_speed_multiplier": 1.2555,
+      "max_health_segments": 3,
+      "movement_type": "classic"
+    },
+    "double": {
+      "base_speed_multiplier": 1.0,
+      "max_boost_speed_multiplier": 1.2555,
+      "max_health_segments": 4,
+      "movement_type": "classic"
+    },
+    "many": {
+      "base_speed_multiplier": 1.0,
+      "max_boost_speed_multiplier": 1.2555,
+      "max_health_segments": 5,
+      "movement_type": "classic"
+    },
+    "pumkin": {
+      "base_speed_multiplier": 1.4,
+      "max_boost_speed_multiplier": 1.2555,
+      "max_health_segments": 3,
+      "movement_type": "classic"
+    },
+    "evolution": {
+      "base_speed_multiplier": 0.8,
+      "max_boost_speed_multiplier": 1.2555,
+      "max_health_segments": 5,
+      "movement_type": "evolution"
+    }
+  }
 }
