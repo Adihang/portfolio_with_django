@@ -4,7 +4,7 @@ const path = require("path")
 // Django 관리 페이지에서 바꾸는 공용 수치와 1:1로 맞춰지는 기본값.
 // 파일을 읽지 못하더라도 서버가 죽지 않게 항상 fallback 을 제공한다.
 const DEFAULT_SETTINGS = {
-    user_base_speed: 225,
+    user_base_speed: 286,
     user_boost_distance: 399.3,
     user_boost_duration_ms: 1238,
     user_post_boost_cooldown_ms: 3000,
@@ -25,6 +25,43 @@ const DEFAULT_SETTINGS = {
     npc_damage_min: 1,
     npc_damage_max: 5
 }
+const DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER = Number((359.0726978998385 / 286).toFixed(4))
+const DEFAULT_CHARACTER_SETTINGS = {
+    default: {
+        base_speed_multiplier: 1,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: 3,
+        movement_type: "classic"
+    },
+    double: {
+        base_speed_multiplier: 1,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: 4,
+        movement_type: "classic"
+    },
+    many: {
+        base_speed_multiplier: 1,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: 5,
+        movement_type: "classic"
+    },
+    pumkin: {
+        base_speed_multiplier: 1.4,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: 3,
+        movement_type: "classic"
+    },
+    evolution: {
+        base_speed_multiplier: 0.8,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: 5,
+        movement_type: "evolution"
+    }
+}
+const ADMIN_BASE_USER_SPEED_REFERENCE = 220
+const USER_BASE_SPEED_MULTIPLIER_KEY = "user_base_speed_multiplier"
+const NPC_BASE_SPEED_MULTIPLIER_KEY = "npc_base_speed_multiplier"
+const NPC_MAX_BOOST_SPEED_MULTIPLIER_KEY = "npc_max_boost_speed_multiplier"
 
 const SETTINGS_PATH = process.env.BUMPERCAR_SPIKY_SETTINGS_PATH ||
     path.resolve(__dirname, "../../config/bumpercar_spiky_settings.json")
@@ -64,6 +101,48 @@ function normalizeSettings(rawSettings) {
         normalized[key] = Number.isFinite(numericValue) ? numericValue : defaultValue
     }
 
+    {
+        const userBaseMultiplier = Number(rawSettings[USER_BASE_SPEED_MULTIPLIER_KEY])
+        if (Number.isFinite(userBaseMultiplier)) {
+            normalized.user_base_speed = Math.max(1, userBaseMultiplier) * ADMIN_BASE_USER_SPEED_REFERENCE
+        }
+    }
+
+    {
+        const npcBaseMultiplier = Number(rawSettings[NPC_BASE_SPEED_MULTIPLIER_KEY])
+        if (Number.isFinite(npcBaseMultiplier)) {
+            normalized.npc_base_speed = Math.max(0.1, npcBaseMultiplier) * Math.max(1, normalized.user_base_speed)
+        }
+    }
+
+    {
+        const npcMaxBoostMultiplier = Number(rawSettings[NPC_MAX_BOOST_SPEED_MULTIPLIER_KEY])
+        if (Number.isFinite(npcMaxBoostMultiplier)) {
+            normalized.npc_max_boost_speed = Math.max(0.1, npcMaxBoostMultiplier) * Math.max(1, normalized.user_base_speed)
+        }
+    }
+
+    const normalizedCharacterSettings = JSON.parse(JSON.stringify(DEFAULT_CHARACTER_SETTINGS))
+    if (rawSettings.character_settings && typeof rawSettings.character_settings === "object") {
+        for (const [skinName, defaultSkinSettings] of Object.entries(DEFAULT_CHARACTER_SETTINGS)) {
+            const candidateSkinSettings = rawSettings.character_settings[skinName]
+            if (!candidateSkinSettings || typeof candidateSkinSettings !== "object") {
+                continue
+            }
+            for (const [fieldName, defaultFieldValue] of Object.entries(defaultSkinSettings)) {
+                if (fieldName === "movement_type") {
+                    normalizedCharacterSettings[skinName][fieldName] =
+                        String(candidateSkinSettings[fieldName] || "").trim().toLowerCase() === "evolution"
+                            ? "evolution"
+                            : "classic"
+                    continue
+                }
+                const numericValue = Number(candidateSkinSettings[fieldName])
+                normalizedCharacterSettings[skinName][fieldName] = Number.isFinite(numericValue) ? numericValue : defaultFieldValue
+            }
+        }
+    }
+
     // 게임이 깨지지 않게 각 값에 최소 범위를 적용한다.
     normalized.user_base_speed = Math.max(1, normalized.user_base_speed)
     normalized.user_post_boost_cooldown_ms = Math.max(0, Math.round(normalized.user_post_boost_cooldown_ms))
@@ -83,6 +162,12 @@ function normalizeSettings(rawSettings) {
     normalized.npc_respawn_delay_ms = Math.max(1000, Math.round(normalized.npc_respawn_delay_ms))
     normalized.npc_damage_min = Math.max(1, Math.round(normalized.npc_damage_min))
     normalized.npc_damage_max = Math.max(normalized.npc_damage_min, Math.round(normalized.npc_damage_max))
+    for (const skinSettings of Object.values(normalizedCharacterSettings)) {
+        skinSettings.base_speed_multiplier = Math.max(0.1, Number(skinSettings.base_speed_multiplier || 1))
+        skinSettings.max_boost_speed_multiplier = Math.max(0.1, Number(skinSettings.max_boost_speed_multiplier || 1))
+        skinSettings.max_health_segments = Math.max(1, Math.round(Number(skinSettings.max_health_segments || 1)))
+        skinSettings.movement_type = skinSettings.movement_type === "evolution" ? "evolution" : "classic"
+    }
 
     if (rawSettings.user_boost_distance === undefined || rawSettings.user_boost_duration_ms === undefined) {
         const legacyUserMaxSpeed = Number(rawSettings.user_max_boost_speed || 420)
@@ -116,6 +201,7 @@ function normalizeSettings(rawSettings) {
     normalized.user_max_boost_speed = userBoostProfile.maxSpeed
     normalized.user_boost_acceleration = userBoostProfile.acceleration
     normalized.user_boost_cooldown = userBoostProfile.cooldown
+    normalized.character_settings = normalizedCharacterSettings
     return normalized
 }
 

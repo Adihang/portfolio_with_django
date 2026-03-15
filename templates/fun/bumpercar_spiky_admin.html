@@ -43,6 +43,9 @@
                                 <span class="bumpercar-admin-label">
                                     {% include 'partials/ui_i18n.html' with key=field.i18n_key %}
                                 </span>
+                                {% if field.hint %}
+                                    <span class="ui-muted bumpercar-admin-field-hint">{{ field.hint }}</span>
+                                {% endif %}
                                 <input
                                     class="ui-input bumpercar-admin-input"
                                     type="number"
@@ -62,6 +65,9 @@
                                 <span class="bumpercar-admin-label">
                                     {% include 'partials/ui_i18n.html' with key=field.i18n_key %}
                                 </span>
+                                {% if field.hint %}
+                                    <span class="ui-muted bumpercar-admin-field-hint">{{ field.hint }}</span>
+                                {% endif %}
                                 <input
                                     class="ui-input bumpercar-admin-input"
                                     type="number"
@@ -70,6 +76,55 @@
                                     value="{{ field.value }}"
                                 >
                             </label>
+                        {% endfor %}
+                    </div>
+                </section>
+                <section class="ui-card bumpercar-admin-section bumpercar-admin-section-full">
+                    <h2 class="bumpercar-admin-section-title">Character</h2>
+                    <div class="bumpercar-admin-character-picker">
+                        <label class="bumpercar-admin-label" for="bumpercar-admin-character-select">Character</label>
+                        <select
+                            class="ui-input bumpercar-admin-input bumpercar-admin-character-select"
+                            id="bumpercar-admin-character-select"
+                            data-bumpercar-admin-character-select
+                        >
+                            {% for option in bumpercar_admin_character_options %}
+                                <option value="{{ option.name }}">{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="bumpercar-admin-character-panels">
+                        {% for character in bumpercar_admin_character_sections %}
+                            <div
+                                class="bumpercar-admin-character-panel{% if forloop.first %} is-active{% endif %}"
+                                data-bumpercar-admin-character-panel="{{ character.name }}"
+                                {% if not forloop.first %}hidden{% endif %}
+                            >
+                                <div class="bumpercar-admin-grid">
+                                    {% for field in character.fields %}
+                                        <label class="ui-card bumpercar-admin-field">
+                                            <span class="bumpercar-admin-label">
+                                                {% include 'partials/ui_i18n.html' with key=field.i18n_key %}
+                                            </span>
+                                            {% if field.input_type == 'select' %}
+                                                <select class="ui-input bumpercar-admin-input" name="{{ field.name }}">
+                                                    {% for option in field.options %}
+                                                        <option value="{{ option.value }}"{% if option.value == field.value %} selected{% endif %}>{{ option.label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            {% else %}
+                                                <input
+                                                    class="ui-input bumpercar-admin-input"
+                                                    type="number"
+                                                    name="{{ field.name }}"
+                                                    step="{{ field.step }}"
+                                                    value="{{ field.value }}"
+                                                >
+                                            {% endif %}
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         {% endfor %}
                     </div>
                 </section>
@@ -83,4 +138,5 @@
     </section>
 </main>
 <link rel="stylesheet" type="text/css" href="{% static_v 'css/bumpercar_spiky_admin.css' %}">
+<script src="{% static_v 'js/bumpercar_spiky_admin.js' %}"></script>
 {% endblock %}
