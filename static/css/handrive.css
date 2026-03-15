@@ -1,4 +1,4 @@
-/* Docs UI design tokens */
+/* HanDrive UI design tokens */
 body.handrive-page,
 body.ui-page {
     --handrive-bg: var(--site-bg);
@@ -58,6 +58,7 @@ body.ui-page {
     --handrive-drop-target-bg: rgba(34, 197, 94, 0.12);
     --handrive-drop-target-row-bg: rgba(34, 197, 94, 0.1);
     --handrive-drop-target-border: #22c55e;
+    --handrive-generic-icon-color: #000000;
     --handrive-radius-sm: 8px;
     --handrive-radius-md: 10px;
     --handrive-radius-lg: 12px;
@@ -106,6 +107,7 @@ body.ui-page.theme-dark {
     --handrive-drop-target-bg: rgba(74, 222, 128, 0.18);
     --handrive-drop-target-row-bg: rgba(74, 222, 128, 0.14);
     --handrive-drop-target-border: #4ade80;
+    --handrive-generic-icon-color: #d8e5fb;
 }
 
 body.handrive-page .chat-widget,
@@ -1581,9 +1583,24 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     justify-content: center;
     width: 16px;
     height: 16px;
-    font-size: 14px;
     line-height: 1;
     flex-shrink: 0;
+    overflow: visible;
+    text-align: center;
+}
+
+.handrive-item-type-icon::before {
+    content: "";
+    display: block;
+    width: 18px;
+    height: 18px;
+    margin: 0 auto;
+    transform: scale(1.425);
+    transform-origin: center center;
+    box-sizing: border-box;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 115% 115%;
 }
 
 .handrive-item-type-icon.is-dir {
@@ -1592,7 +1609,17 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
 }
 
 .handrive-item-type-icon.is-dir::before {
+    background-image: none;
     content: "📁";
+    width: 18px;
+    min-width: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    transform: scale(1.286);
+    background: none;
+    line-height: 1;
 }
 
 .handrive-item-type-icon.is-file {
@@ -1601,7 +1628,169 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
 }
 
 .handrive-item-type-icon.is-file::before {
-    content: "📄";
+    background-image: url("/static/icons/handrive/file.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic::before {
+    width: 22px;
+    height: 22px;
+    margin: -3px;
+    transform: none;
+    background-image: none;
+    background-color: var(--handrive-generic-icon-color);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: 130% 130%;
+    mask-size: 130% 130%;
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="file"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/file.svg");
+    mask-image: url("/static/icons/handrive/file.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="image"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/image.svg");
+    mask-image: url("/static/icons/handrive/image.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="video"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/video.svg");
+    mask-image: url("/static/icons/handrive/video.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="audio"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/audio.svg");
+    mask-image: url("/static/icons/handrive/audio.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="archive"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/archive.svg");
+    mask-image: url("/static/icons/handrive/archive.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="pdf"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/pdf.svg");
+    mask-image: url("/static/icons/handrive/pdf.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="text"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/text.svg");
+    mask-image: url("/static/icons/handrive/text.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="document"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/document.svg");
+    mask-image: url("/static/icons/handrive/document.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="sheet"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/sheet.svg");
+    mask-image: url("/static/icons/handrive/sheet.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="presentation"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/presentation.svg");
+    mask-image: url("/static/icons/handrive/presentation.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="data"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/data.svg");
+    mask-image: url("/static/icons/handrive/data.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="js"]::before {
+    background-image: url("/static/icons/handrive/js.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="ts"]::before {
+    background-image: url("/static/icons/handrive/ts.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="jsx"]::before {
+    background-image: url("/static/icons/handrive/react.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="py"]::before {
+    background-image: url("/static/icons/handrive/python.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="java"]::before {
+    background-image: url("/static/icons/handrive/java.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="kotlin"]::before {
+    background-image: url("/static/icons/handrive/kotlin.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="swift"]::before {
+    background-image: url("/static/icons/handrive/swift.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="go"]::before {
+    background-image: url("/static/icons/handrive/go.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="rust"]::before {
+    background-image: url("/static/icons/handrive/rust.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="ruby"]::before {
+    background-image: url("/static/icons/handrive/ruby.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="php"]::before {
+    background-image: url("/static/icons/handrive/php.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="c"]::before {
+    background-image: url("/static/icons/handrive/c.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="cpp"]::before {
+    background-image: url("/static/icons/handrive/cpp.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="csharp"]::before {
+    background-image: url("/static/icons/handrive/csharp.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="scala"]::before {
+    background-image: url("/static/icons/handrive/scala.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="shell"]::before {
+    background-image: url("/static/icons/handrive/bash.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="html"]::before {
+    background-image: url("/static/icons/handrive/html5.svg");
+}
+
+.handrive-item-type-icon.is-file[data-file-icon="css"]::before {
+    background-image: url("/static/icons/handrive/css3.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="code"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/file.svg");
+    mask-image: url("/static/icons/handrive/file.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="json"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/data.svg");
+    mask-image: url("/static/icons/handrive/data.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="markdown"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/text.svg");
+    mask-image: url("/static/icons/handrive/text.svg");
+}
+
+.handrive-item-type-icon.is-file.is-generic[data-file-icon="font"]::before {
+    -webkit-mask-image: url("/static/icons/handrive/font.svg");
+    mask-image: url("/static/icons/handrive/font.svg");
 }
 
 .handrive-context-menu {
@@ -2383,6 +2572,7 @@ body.handrive-page.theme-dark .handrive-md-src-token-codeblock {
 
 .handrive-media-audio-element {
     width: min(560px, 100%);
+    filter: brightness(1.03) saturate(0.88);
 }
 
 .handrive-list-preview-content.handrive-media {
@@ -2439,7 +2629,7 @@ body.handrive-page.theme-dark .handrive-md-src-token-codeblock {
 }
 
 body.handrive-page.theme-dark .handrive-media-audio-element {
-    filter: brightness(0.94);
+    filter: brightness(1.08) saturate(0.76);
 }
 
 .handrive-form-grid {

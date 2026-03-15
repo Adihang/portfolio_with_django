@@ -8,7 +8,7 @@ from main.handrive_views import DOCS_EDITOR_GROUP_NAME, DOCS_EDIT_PERMISSION_COD
 
 
 class Command(BaseCommand):
-    help = "Create or update a docs editor account (DocsEditors group)."
+    help = "Create or update a HanDrive editor account (DocsEditors group)."
 
     def add_arguments(self, parser):
         parser.add_argument("--username", required=True, help="Login username")

@@ -107,6 +107,7 @@ BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS = {
     "deaths": 0,
     "player_kills": 0,
     "ner_kills": 0,
+    "max_ner_party_size": 0,
     "game_clears": 0,
     "ner_phase1_attack_dodges": 0,
     "ner_phase2_attack_dodges": 0,
@@ -251,7 +252,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
     stats = normalize_bumpercar_spiky_account_stats(account_stats)
     total_game_clears = int(stats.get("game_clears", 0))
     is_english = ui_lang == "en"
-    is_superuser = bool(getattr(user, "is_superuser", False))
+    is_admin = bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
     skin_specs = [
         {
             "name": "default",
@@ -278,7 +279,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 if is_english
                 else "차원문을 넘느라 상태가 불안정한 스핔이가\n네르당해 둘으로 분열되었습니다.\n\"스핔이 네르지 마세요!\"\n\"스핔이 네르지 마세요!\""
             ),
-            "unlocked": int(stats.get("deaths", 0)) >= 20,
+            "unlocked": is_admin or int(stats.get("deaths", 0)) >= 20,
         },
         {
             "name": "many",
@@ -292,7 +293,23 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 if is_english
                 else "심심한 스핔이는 친구를 잔뜩 만들었습니다.\n\"그래도 호박친구가 보고 싶은 거에요\""
             ),
-            "unlocked": is_superuser,
+            "unlocked": is_admin,
+        },
+        {
+            "name": "pumkin",
+            "asset_source_name": "pumkin",
+            "preview_icon_name": "main",
+            "display_name": "Hopiki" if is_english else "호핔이",
+            "unlock_condition": "Defeat Ner with a friend." if is_english else "친구와 네르 쓰러트리기",
+            "description": (
+                "Spiky made a new friend.\n"
+                "Be careful not to let another Spiky steal it! "
+                "\"No way, I'm the real Spiky!\""
+                if is_english
+                else "스핔이가 새 친구를 사귀었습니다.\n다른 스핔이에게 빼앗기지 않게 조심하세요! "
+                    "\"호박친구가 나중에 스핔이 만큼 커지면\n같이 수다 떨면서 노는 거에요\""
+            ),
+            "unlocked": is_admin or int(stats.get("max_ner_party_size", 0)) >= 2,
         },
         {
             "name": "evolution",
@@ -304,7 +321,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 if is_english
                 else "스핔이중 가장 강한 스핔이 만이 살아남아 이족보행으로 진화했습니다.\n\"호박친구하고 거리가 멀어진 거에요ㅠ\""
             ),
-            "unlocked": total_game_clears >= 1,
+            "unlocked": is_admin or total_game_clears >= 1,
         },
     ]
 
@@ -312,7 +329,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
     for skin_spec in skin_specs:
         skin_name = skin_spec["name"]
         asset_source_name = str(skin_spec.get("asset_source_name") or skin_name)
-        fallback_sound_source_name = "default" if skin_name in {"double", "many"} else asset_source_name
+        fallback_sound_source_name = "default" if skin_name in {"double", "many", "pumkin"} else asset_source_name
         default_variants = []
         for variant_name in _collect_bumpercar_skin_variant_dirs(asset_source_name, "default"):
             variant_frames = _collect_bumpercar_skin_icon_sequence_urls(asset_source_name, "default", variant_name)
@@ -348,6 +365,8 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
             skin_type = "double"
         elif skin_name == "many":
             skin_type = "many"
+        elif skin_name == "pumkin":
+            skin_type = "pumkin"
         if skin_type == "evolution":
             defeat_frames = _collect_bumpercar_skin_icon_urls(asset_source_name, "defeat")
             boost_frames = _collect_bumpercar_skin_icon_urls(asset_source_name, "acc")
@@ -356,6 +375,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
         defeat_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "defeat")
         die_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "die")
         respawn_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "respawn")
+        ntr_sound_urls = _collect_bumpercar_skin_sound_urls(asset_source_name, "ntr")
         if fallback_sound_source_name != asset_source_name:
             if not boost_sound_urls:
                 boost_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "acceleration")
@@ -367,11 +387,14 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 die_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "die")
             if not respawn_sound_urls:
                 respawn_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "respawn")
+            if not ntr_sound_urls:
+                ntr_sound_urls = _collect_bumpercar_skin_sound_urls(fallback_sound_source_name, "ntr")
         catalog.append({
             **skin_spec,
             "skin_type": skin_type,
             "assets": {
                 "preview_icon_url": preview_icon_url,
+                "pumpkin_npc_icon_url": _find_bumpercar_skin_icon_url(asset_source_name, "pumkin") if skin_name == "pumkin" else "",
                 "default_icon_sets": default_variants,
                 "boost_icon_stages": boost_frames,
                 "collision_icon_sets": collision_variants,
@@ -390,6 +413,7 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 "defeat_sound_urls": defeat_sound_urls,
                 "die_sound_urls": die_sound_urls,
                 "respawn_sound_urls": respawn_sound_urls,
+                "ntr_sound_urls": ntr_sound_urls,
             },
         })
 
@@ -455,7 +479,7 @@ def get_dummy_portfolio_projects(ui_lang):
                 "content": (
                     "A browser-based writing workspace with folder controls.\n\n"
                     "- Markdown editing with preview.\n"
-                    "- Access control for private/public docs.\n"
+                    "- Access control for private/public Handrive files.\n"
                     "- Path-oriented file operations."
                 ),
             },
@@ -996,7 +1020,7 @@ def redirect_to_localized_route(request, route_name, **kwargs):
 def _redirect_to_docs_login_with_next(request):
     next_path = request.get_full_path() or "/"
     encoded_next = quote(next_path, safe="/")
-    return redirect(f"/docs/login/?next={encoded_next}")
+    return redirect(f"{reverse('main:docs_login')}?next={encoded_next}")
 
 
 def _base64url_encode(raw_bytes):
@@ -1678,7 +1702,8 @@ def bumpercar_spiky_stats_record(request):
 
     username = str(payload.get("username") or "").strip()
     increments = payload.get("increments") or {}
-    if not username or not isinstance(increments, dict):
+    maxima = payload.get("maxima") or {}
+    if not username or not isinstance(increments, dict) or not isinstance(maxima, dict):
         return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
 
     user = get_user_model().objects.filter(username=username).first()
@@ -1697,6 +1722,16 @@ def bumpercar_spiky_stats_record(request):
         if increment <= 0:
             continue
         next_stats[key] += increment
+
+    for key in BUMPERCAR_SPIKY_ACCOUNT_STATS_KEYS:
+        raw_maximum = maxima.get(key, 0)
+        try:
+            maximum = int(raw_maximum or 0)
+        except (TypeError, ValueError):
+            continue
+        if maximum <= next_stats[key]:
+            continue
+        next_stats[key] = maximum
 
     profile.bumpercar_spiky_stats = next_stats
     profile.save(update_fields=["bumpercar_spiky_stats", "updated_at"])

@@ -43,7 +43,7 @@
     data-current-dir-can-write-children="{% if current_dir_can_write_children %}1{% else %}0{% endif %}"
     data-scoped-home-dir="{{ scoped_home_dir|default:'' }}"
     data-handrive-base-url="{{ docs_base_url }}"
-    data-handrive-root-url="{{ docs_root_url }}"
+    data-handrive-root-url="{{ handrive_root_url }}"
     data-list-api-url="{{ docs_api_list_url }}"
     data-save-api-url="{{ docs_api_save_url }}"
     data-rename-api-url="{{ docs_api_rename_url }}"
@@ -54,7 +54,7 @@
     data-upload-cancel-api-url="{{ docs_api_upload_cancel_url }}"
     data-download-api-url="{{ docs_api_download_url }}"
     data-preview-api-url="{{ docs_api_preview_url }}"
-    data-handrive-root-label="{{ docs_root_label }}"
+    data-handrive-root-label="{{ handrive_root_label }}"
     data-acl-api-url="{{ docs_api_acl_url }}"
     data-acl-options-api-url="{{ docs_api_acl_options_url }}"
     data-url-share-api-url="{{ docs_api_url_share_url }}"
@@ -159,6 +159,7 @@
 {% include "popup/handrive/auth_logout_modal.html" %}
 {% include "popup/handrive/page_help_modal.html" %}
 {% include "popup/handrive/job_queue_panel.html" %}
+<input id="handrive-context-upload-input" type="file" multiple hidden>
 
 {{ docs_text|json_script:"handrive-i18n" }}
 {{ initial_entries|json_script:"handrive-initial-entries" }}

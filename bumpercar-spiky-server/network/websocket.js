@@ -107,7 +107,10 @@ function createServer(world) {
             world.handleInput(player, rawMessage)
             try {
                 const input = JSON.parse(rawMessage)
-                if (Boolean(input.up) || Boolean(input.down) || Boolean(input.left) || Boolean(input.right) || Boolean(input.boost) || Boolean(input.respawn)) {
+                const moveX = Number(input.moveX || 0)
+                const moveY = Number(input.moveY || 0)
+                const hasAnalogMovement = Number.isFinite(moveX) && Number.isFinite(moveY) && Math.hypot(moveX, moveY) > 0.01
+                if (Boolean(input.up) || Boolean(input.down) || Boolean(input.left) || Boolean(input.right) || hasAnalogMovement || Boolean(input.boost) || Boolean(input.respawn)) {
                     ws.lastActiveInputAt = Date.now()
                     // 인간 유저의 마지막 실제 입력 시각을 따로 갱신해서
                     // "오래 무입력 시 라운드 초기화" 판정에 사용한다.

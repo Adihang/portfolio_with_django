@@ -31,10 +31,10 @@ function startGameLoop(world, wss) {
             const state = Array.from(world.players.values()).map((p) => {
                 const displayName = p.isDummy
                     ? (p.dummyRetaliationTargetId ? "네르는 이렇게 폭력적인 역할이 아니란 말이에요!" : (p.dummyDefaultDisplayName || "저는 네르에요"))
-                    : p.id
+                    : (p.isPumpkinNpc ? "" : p.id)
                 const deathActive = Boolean(p.deathUntil)
                 const deathAnimating = now < (p.deathUntil || 0)
-                const livesRemaining = p.isNpc || p.isDummy ? null : Math.max(0, Number(world.sharedLivesRemaining || 0))
+                const livesRemaining = p.isNpc || p.isDummy || p.isPumpkinNpc ? null : Math.max(0, Number(world.sharedLivesRemaining || 0))
                 const deathFadeProgress = deathAnimating && p.deathStartedAt && p.deathUntil > p.deathStartedAt
                     ? (now - p.deathStartedAt) / (p.deathUntil - p.deathStartedAt)
                     : (deathActive ? 1 : 0)
@@ -47,6 +47,10 @@ function startGameLoop(world, wss) {
                 const boostLockDurationMs = Math.max(0, (p.boostDisabledUntil || 0) - (p.boostDisabledStartedAt || 0))
                 const collisionRecoveryRemainingMs = Math.max(0, (p.collisionRecoveryUntil || 0) - now)
                 const collisionRecoveryDurationMs = Math.max(0, (p.collisionRecoveryUntil || 0) - (p.collisionRecoveryStartedAt || 0))
+                const pumpkinFadeOutActive = p.isPumpkinNpc && now < Number(p.pumpkinFadeOutUntil || 0)
+                const pumpkinFadeOutProgress = pumpkinFadeOutActive && p.pumpkinFadeOutStartedAt && p.pumpkinFadeOutUntil > p.pumpkinFadeOutStartedAt
+                    ? (now - p.pumpkinFadeOutStartedAt) / (p.pumpkinFadeOutUntil - p.pumpkinFadeOutStartedAt)
+                    : (pumpkinFadeOutActive ? 0 : 1)
                 const playerWinVisualActive = !p.isNpc && !p.isDummy && now < Number(p.playerWinVisualUntil || 0)
                 const stopVisualActive = !p.isNpc && !p.isDummy &&
                     !deathActive &&
@@ -90,6 +94,8 @@ function startGameLoop(world, wss) {
                     id: p.id,
                     displayName: displayName,
                     skinName: p.skinName || "default",
+                    pumpkinBaseSkinName: String(p.pumpkinBaseSkinName || ""),
+                    pumpkinNtrTriggerCount: Number(p.pumpkinNtrTriggerCount || 0),
                     x: p.x,
                     y: p.y,
                     velocityX: (p.lastMoveX || 0) * TICK_RATE,
@@ -97,6 +103,7 @@ function startGameLoop(world, wss) {
                     facingAngle: typeof p.facingAngle === "number" ? p.facingAngle : 0,
                     isDummy: Boolean(p.isDummy),
                     isNpc: Boolean(p.isNpc),
+                    isPumpkinNpc: Boolean(p.isPumpkinNpc),
                     isHouse: Boolean(p.isHouse),
                     houseStage: p.isHouse ? Number(p.houseStage || 0) : 0,
                     houseHealth: p.isHouse ? Number(p.houseHealth || 0) : null,
@@ -116,6 +123,8 @@ function startGameLoop(world, wss) {
                     collisionRecoveryActive: now < (p.collisionRecoveryUntil || 0),
                     collisionRecoveryRemainingMs: collisionRecoveryRemainingMs,
                     collisionRecoveryDurationMs: collisionRecoveryDurationMs,
+                    pumpkinFadeOutActive: pumpkinFadeOutActive,
+                    pumpkinFadeOutProgress: Math.max(0, Math.min(1, pumpkinFadeOutProgress)),
                     playerWinVisualActive: playerWinVisualActive,
                     stopVisualActive: stopVisualActive,
                     boostLockedActive: now < (p.boostDisabledUntil || 0),

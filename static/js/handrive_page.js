@@ -165,6 +165,76 @@
         return fallbackValue;
     }
 
+    const HANDRIVE_MEDIA_AUDIO_VOLUME_STORAGE_KEY = "handrive-media-audio-volume";
+
+    function getStoredMediaAudioVolume() {
+        try {
+            const rawValue = window.localStorage
+                ? window.localStorage.getItem(HANDRIVE_MEDIA_AUDIO_VOLUME_STORAGE_KEY)
+                : "";
+            const parsedValue = Number(rawValue);
+            if (!Number.isFinite(parsedValue)) {
+                return 1;
+            }
+            return Math.max(0, Math.min(1, parsedValue));
+        } catch (error) {
+            return 1;
+        }
+    }
+
+    function storeMediaAudioVolume(volume) {
+        try {
+            if (!window.localStorage) {
+                return;
+            }
+            const normalizedVolume = Math.max(0, Math.min(1, Number(volume)));
+            window.localStorage.setItem(HANDRIVE_MEDIA_AUDIO_VOLUME_STORAGE_KEY, String(normalizedVolume));
+        } catch (error) {
+            // ignore storage failures
+        }
+    }
+
+    function resetAudioPlaybackPosition(audioElement) {
+        if (!audioElement) {
+            return;
+        }
+        const applyReset = function () {
+            try {
+                audioElement.currentTime = 0;
+            } catch (error) {
+                return;
+            }
+        };
+        if (audioElement.readyState > 0) {
+            applyReset();
+            return;
+        }
+        audioElement.addEventListener("loadedmetadata", applyReset, { once: true });
+    }
+
+    function hydrateMediaAudioElements(container) {
+        if (!container || !(container instanceof Element)) {
+            return;
+        }
+        const storedVolume = getStoredMediaAudioVolume();
+        container.querySelectorAll(".handrive-media-audio-element").forEach(function (audioElement) {
+            if (!(audioElement instanceof HTMLMediaElement)) {
+                return;
+            }
+            audioElement.volume = storedVolume;
+            audioElement.preload = "metadata";
+            audioElement.autoplay = false;
+            resetAudioPlaybackPosition(audioElement);
+            if (audioElement.dataset.handriveVolumeBound === "1") {
+                return;
+            }
+            audioElement.dataset.handriveVolumeBound = "1";
+            audioElement.addEventListener("volumechange", function () {
+                storeMediaAudioVolume(audioElement.volume);
+            });
+        });
+    }
+
     // 템플릿을 포맷팅하는 함수
     function formatTemplate(template, values) {
         return String(template || "").replace(/\{(\w+)\}/g, function (_, token) {
@@ -1215,8 +1285,8 @@
     }
 
     function initializeListPage() {
-        const ideBaseUrl = root.dataset.handriveBaseUrl || "/handrive";
-        const ideRootUrl = root.dataset.handriveRootUrl || ideBaseUrl;
+        const handriveBaseUrl = root.dataset.handriveBaseUrl || "/handrive";
+        const handriveRootUrl = root.dataset.handriveRootUrl || handriveBaseUrl;
         const listApiUrl = root.dataset.listApiUrl;
         const saveApiUrl = root.dataset.saveApiUrl;
         const renameApiUrl = root.dataset.renameApiUrl;
@@ -1273,10 +1343,11 @@
             : null;
         const breadcrumbRootLabel = (initialBreadcrumbNode && initialBreadcrumbNode.textContent
             ? initialBreadcrumbNode.textContent
-            : "ide").trim() || "ide";
+            : "HanDrive").trim() || "HanDrive";
         const contextMenu = document.getElementById("handrive-context-menu");
         const contextOpenButton = contextMenu ? contextMenu.querySelector('button[data-action="open"]') : null;
         const contextDownloadButton = contextMenu ? contextMenu.querySelector('button[data-action="download"]') : null;
+        const contextUploadButton = contextMenu ? contextMenu.querySelector('button[data-action="upload"]') : null;
         const contextEditButton = contextMenu ? contextMenu.querySelector('button[data-action="edit"]') : null;
         const contextRenameButton = contextMenu ? contextMenu.querySelector('button[data-action="rename"]') : null;
         const contextDeleteButton = contextMenu ? contextMenu.querySelector('button[data-action="delete"]') : null;
@@ -1308,6 +1379,7 @@
         const uploadQueueSummary = document.getElementById("handrive-job-queue-summary");
         const uploadQueueList = document.getElementById("handrive-job-queue-list");
         const uploadQueueCloseButton = document.getElementById("handrive-job-queue-close");
+        const contextUploadInput = document.getElementById("handrive-context-upload-input");
         const defaultContextButtonLabels = {
             open: contextOpenButton ? contextOpenButton.textContent : "",
             delete: contextDeleteButton ? contextDeleteButton.textContent : "",
@@ -1340,7 +1412,152 @@
         const currentDirCanWriteChildren =
             root.dataset.currentDirCanWriteChildren === "1" || currentDirCanEdit;
         const docsRootLabel = (root.dataset.handriveRootLabel || breadcrumbRootLabel || "HanDrive").trim() || "HanDrive";
+        const effectiveRootLabel = (isSuperuser && scopedHomeDir) ? "Hanplanet" : docsRootLabel;
         const initialEntries = getJsonScriptData("handrive-initial-entries", []);
+
+        function getPathFileExtension(pathValue) {
+            const normalized = normalizePath(pathValue, true);
+            if (!normalized) {
+                return "";
+            }
+            const segments = normalized.split("/");
+            const fileName = segments[segments.length - 1] || "";
+            const dotIndex = fileName.lastIndexOf(".");
+            if (dotIndex <= 0) {
+                return "";
+            }
+            return fileName.slice(dotIndex).toLowerCase();
+        }
+
+        function getFileIconKey(pathValue) {
+            const extension = getPathFileExtension(pathValue);
+            if (!extension) {
+                return "file";
+            }
+            if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico", ".avif", ".heic"].includes(extension)) {
+                return "image";
+            }
+            if ([".mp4", ".mov", ".webm", ".mkv", ".avi", ".wmv", ".m4v"].includes(extension)) {
+                return "video";
+            }
+            if ([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"].includes(extension)) {
+                return "audio";
+            }
+            if ([".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz"].includes(extension)) {
+                return "archive";
+            }
+            if (extension === ".pdf") {
+                return "pdf";
+            }
+            if ([".md", ".txt", ".rtf"].includes(extension)) {
+                return "text";
+            }
+            if ([".doc", ".docx", ".odt", ".pages", ".hwp", ".hwpx"].includes(extension)) {
+                return "document";
+            }
+            if ([".xls", ".xlsx", ".csv", ".tsv", ".ods", ".numbers"].includes(extension)) {
+                return "sheet";
+            }
+            if ([".ppt", ".pptx", ".odp", ".key"].includes(extension)) {
+                return "presentation";
+            }
+            if ([".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
+                return "data";
+            }
+            if ([".js", ".mjs", ".cjs"].includes(extension)) {
+                return "js";
+            }
+            if ([".ts", ".tsx"].includes(extension)) {
+                return "ts";
+            }
+            if (extension === ".jsx") {
+                return "jsx";
+            }
+            if (extension === ".py") {
+                return "py";
+            }
+            if (extension === ".java") {
+                return "java";
+            }
+            if (extension === ".kt") {
+                return "kotlin";
+            }
+            if (extension === ".swift") {
+                return "swift";
+            }
+            if (extension === ".go") {
+                return "go";
+            }
+            if (extension === ".rs") {
+                return "rust";
+            }
+            if (extension === ".rb") {
+                return "ruby";
+            }
+            if (extension === ".php") {
+                return "php";
+            }
+            if (extension === ".c") {
+                return "c";
+            }
+            if ([".cpp", ".hpp", ".h"].includes(extension)) {
+                return "cpp";
+            }
+            if (extension === ".cs") {
+                return "csharp";
+            }
+            if (extension === ".scala") {
+                return "scala";
+            }
+            if ([".sql"].includes(extension)) {
+                return "data";
+            }
+            if ([".sh", ".zsh", ".bash"].includes(extension)) {
+                return "shell";
+            }
+            if ([".html", ".htm"].includes(extension)) {
+                return "html";
+            }
+            if ([".css", ".scss", ".sass", ".less"].includes(extension)) {
+                return "css";
+            }
+            if ([".json"].includes(extension)) {
+                return "json";
+            }
+            if ([".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
+                return "data";
+            }
+            if ([".md"].includes(extension)) {
+                return "markdown";
+            }
+            if ([".lua", ".dart", ".elm", ".ex", ".exs", ".erl", ".fs", ".fsx", ".groovy", ".jl", ".nim", ".pl", ".r", ".vb"].includes(extension)) {
+                return "code";
+            }
+            if ([".ttf", ".otf", ".woff", ".woff2"].includes(extension)) {
+                return "font";
+            }
+            return "file";
+        }
+
+        function isGenericFileIconKey(iconKey) {
+            return [
+                "file",
+                "image",
+                "video",
+                "audio",
+                "archive",
+                "pdf",
+                "text",
+                "document",
+                "sheet",
+                "presentation",
+                "data",
+                "code",
+                "json",
+                "markdown",
+                "font",
+            ].includes(iconKey);
+        }
 
         const state = {
             selectedPath: "",
@@ -1381,6 +1598,7 @@
             uploadRefreshPending: false,
             uploadQueueDismissed: false,
             uploadQueueContextItem: null,
+            pendingContextUploadDir: "",
         };
 
         let activeListEditorSuggestions = [];
@@ -2455,6 +2673,7 @@
             previewContent.innerHTML = safeHtml;
             state.previewImageZoom = getPreviewImageMinZoom();
             applyDocsCodeHighlighting(previewContent, normalizedRenderClass || "handrive-markdown");
+            hydrateMediaAudioElements(previewContent);
             setPreviewActionTargets(entry);
             window.requestAnimationFrame(function () {
                 setPreviewImageZoom(getPreviewImageMinZoom());
@@ -2576,6 +2795,7 @@
                 });
                 setContextButtonVisible(contextOpenButton, true);
                 setContextButtonVisible(contextDownloadButton, canDownloadAllFiles);
+                setContextButtonVisible(contextUploadButton, false);
                 setContextButtonVisible(contextEditButton, false);
                 setContextButtonVisible(contextRenameButton, false);
                 setContextButtonVisible(contextDeleteButton, canDeleteAll);
@@ -2587,6 +2807,7 @@
 
             setContextButtonVisible(contextOpenButton, !isCurrentFolder);
             setContextButtonVisible(contextDownloadButton, !isCurrentFolder && !isDirectory);
+            setContextButtonVisible(contextUploadButton, isDirectory && canWriteChildren);
             setContextButtonVisible(contextEditButton, !isDirectory && canShowEditEntry);
             setContextButtonVisible(contextRenameButton, !isCurrentFolder && canEditEntry && !isPublicWriteFile);
             setContextButtonVisible(contextDeleteButton, isEntryDeletable(targetEntry));
@@ -2766,7 +2987,10 @@
 
         function buildBreadcrumbItems(pathValue) {
             const normalized = normalizePath(pathValue, true);
-            if (scopedHomeDir) {
+            const useScopedBreadcrumb = scopedHomeDir && (
+                !isSuperuser || !normalized || normalized === scopedHomeDir || normalized.startsWith(scopedHomeDir + "/")
+            );
+            if (useScopedBreadcrumb) {
                 const homeParts = scopedHomeDir.split("/").filter(Boolean);
                 const homeLabel = homeParts.length ? homeParts[homeParts.length - 1] : scopedHomeDir;
                 const effectivePath = normalized && (
@@ -2778,7 +3002,7 @@
                 const crumbs = [];
                 if (isSuperuser) {
                     crumbs.push({
-                        label: docsRootLabel,
+                        label: effectiveRootLabel,
                         path: "",
                         isCurrent: effectivePath === ""
                     });
@@ -2805,7 +3029,7 @@
             }
 
             const crumbs = [{
-                label: breadcrumbRootLabel,
+                label: effectiveRootLabel,
                 path: "",
                 isCurrent: normalized === ""
             }];
@@ -2833,6 +3057,18 @@
 
             const fragment = document.createDocumentFragment();
             const crumbs = buildBreadcrumbItems(pathValue);
+            if (isSuperuser && scopedHomeDir) {
+                const hasRootCrumb = crumbs.some(function (crumb) {
+                    return crumb.path === "";
+                });
+                if (!hasRootCrumb) {
+                    crumbs.unshift({
+                        label: effectiveRootLabel,
+                        path: "",
+                        isCurrent: false
+                    });
+                }
+            }
             crumbs.forEach(function (crumb, index) {
                 if (index > 0) {
                     const separator = document.createElement("span");
@@ -2852,7 +3088,7 @@
 
                 const link = document.createElement("a");
                 link.className = "handrive-path-link";
-                link.href = buildListUrl(ideBaseUrl, crumb.path, ideRootUrl);
+                link.href = buildListUrl(handriveBaseUrl, crumb.path, handriveRootUrl);
                 link.setAttribute("data-handrive-dir", crumb.path);
                 link.textContent = crumb.label;
                 fragment.appendChild(link);
@@ -3766,6 +4002,15 @@
             processUploadQueue().catch(alertError);
         }
 
+        function openContextUploadPicker(entry) {
+            if (!contextUploadInput || !entry || entry.type !== "dir" || !entry.can_write_children) {
+                return;
+            }
+            state.pendingContextUploadDir = normalizePath(entry.path, true);
+            contextUploadInput.value = "";
+            contextUploadInput.click();
+        }
+
         function shouldIgnorePasteUploadTarget() {
             const activeElement = document.activeElement;
             if (!activeElement) {
@@ -4035,10 +4280,10 @@
         function getCurrentFolderName(pathValue) {
             const normalized = normalizePath(pathValue, true);
             if (!normalized) {
-                return docsRootLabel;
+                return effectiveRootLabel;
             }
             const parts = normalized.split("/");
-            return parts[parts.length - 1] || docsRootLabel;
+            return parts[parts.length - 1] || effectiveRootLabel;
         }
 
         function addCurrentDirectoryNode(fragment) {
@@ -4486,10 +4731,10 @@
                 return;
             }
             if (entry.type === "dir") {
-                window.location.href = buildListUrl(ideBaseUrl, entry.path, ideRootUrl);
+                window.location.href = buildListUrl(handriveBaseUrl, entry.path, handriveRootUrl);
                 return;
             }
-            window.location.href = buildViewUrl(ideBaseUrl, entry.slug_path || entry.path);
+            window.location.href = buildViewUrl(handriveBaseUrl, entry.slug_path || entry.path);
         }
 
         function openEntriesInNewTabs(entries) {
@@ -4498,8 +4743,8 @@
             }
             entries.forEach(function (entry) {
                 const targetUrl = entry.type === "dir"
-                    ? buildListUrl(ideBaseUrl, entry.path, ideRootUrl)
-                    : buildViewUrl(ideBaseUrl, entry.slug_path || entry.path);
+                    ? buildListUrl(handriveBaseUrl, entry.path, handriveRootUrl)
+                    : buildViewUrl(handriveBaseUrl, entry.slug_path || entry.path);
                 window.open(targetUrl, "_blank", "noopener");
             });
         }
@@ -4596,6 +4841,13 @@
             const typeMarker = document.createElement("span");
             typeMarker.className = "handrive-item-type-icon " + (entry.type === "dir" ? "is-dir" : "is-file");
             typeMarker.setAttribute("aria-hidden", "true");
+            if (entry.type === "file") {
+                const fileIconKey = getFileIconKey(entry.path);
+                typeMarker.setAttribute("data-file-icon", fileIconKey);
+                if (isGenericFileIconKey(fileIconKey)) {
+                    typeMarker.classList.add("is-generic");
+                }
+            }
 
             const aclLabels = Array.isArray(entry.write_acl_labels) ? entry.write_acl_labels : [];
             const aclLabelLimit = 3;
@@ -4823,16 +5075,16 @@
                         if (uploadQueueItem.kind === "operation") {
                             if (uploadQueueItem.operationType === "move" && (uploadQueueItem.savedPath || uploadQueueItem.targetDirPath)) {
                                 window.location.href = buildListUrl(
-                                    ideBaseUrl,
+                                    handriveBaseUrl,
                                     getParentDirectory(uploadQueueItem.savedPath || "") || uploadQueueItem.targetDirPath,
-                                    ideRootUrl
+                                    handriveRootUrl
                                 );
                             }
                             return;
                         }
                         if (uploadQueueItem.savedPath || uploadQueueItem.savedSlugPath) {
                             window.location.href = buildViewUrl(
-                                ideBaseUrl,
+                                handriveBaseUrl,
                                 uploadQueueItem.savedSlugPath || uploadQueueItem.savedPath
                             );
                         }
@@ -4867,6 +5119,10 @@
                     downloadEntries(entries);
                     return;
                 }
+                if (action === "upload") {
+                    openContextUploadPicker(entry);
+                    return;
+                }
                 if (action === "rename") {
                     renameEntry(entry);
                     return;
@@ -4890,6 +5146,19 @@
                 if (action === "delete") {
                     deleteEntries(entries.length > 1 ? entries : entry).catch(alertError);
                 }
+            });
+        }
+
+        if (contextUploadInput) {
+            contextUploadInput.addEventListener("change", function () {
+                const targetDirPath = normalizePath(state.pendingContextUploadDir || "", true);
+                state.pendingContextUploadDir = "";
+                if (!contextUploadInput.files || contextUploadInput.files.length === 0) {
+                    contextUploadInput.value = "";
+                    return;
+                }
+                enqueueUploadFiles(contextUploadInput.files, targetDirPath);
+                contextUploadInput.value = "";
             });
         }
 
@@ -5315,6 +5584,8 @@
         } else if (contentArticle && contentArticle.classList.contains("handrive-markdown")) {
             applyDocsCodeHighlighting(contentArticle, "handrive-markdown");
         }
+
+        hydrateMediaAudioElements(contentArticle);
 
         viewImageZoom = getViewImageMinZoom();
         syncViewImageZoom();
@@ -5961,6 +6232,116 @@
             return fileName.slice(dotIndex).toLowerCase();
         }
 
+        function getFileIconKey(pathValue) {
+            const extension = getPathFileExtension(pathValue);
+            if (!extension) {
+                return "file";
+            }
+            if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico", ".avif", ".heic"].includes(extension)) {
+                return "image";
+            }
+            if ([".mp4", ".mov", ".webm", ".mkv", ".avi", ".wmv", ".m4v"].includes(extension)) {
+                return "video";
+            }
+            if ([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"].includes(extension)) {
+                return "audio";
+            }
+            if ([".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz"].includes(extension)) {
+                return "archive";
+            }
+            if (extension === ".pdf") {
+                return "pdf";
+            }
+            if ([".md", ".txt", ".rtf"].includes(extension)) {
+                return "text";
+            }
+            if ([".doc", ".docx", ".odt", ".pages", ".hwp", ".hwpx"].includes(extension)) {
+                return "document";
+            }
+            if ([".xls", ".xlsx", ".csv", ".tsv", ".ods", ".numbers"].includes(extension)) {
+                return "sheet";
+            }
+            if ([".ppt", ".pptx", ".odp", ".key"].includes(extension)) {
+                return "presentation";
+            }
+            if ([".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
+                return "data";
+            }
+            if ([".js", ".mjs", ".cjs"].includes(extension)) {
+                return "js";
+            }
+            if ([".ts", ".tsx"].includes(extension)) {
+                return "ts";
+            }
+            if (extension === ".jsx") {
+                return "jsx";
+            }
+            if (extension === ".py") {
+                return "py";
+            }
+            if (extension === ".java") {
+                return "java";
+            }
+            if (extension === ".kt") {
+                return "kotlin";
+            }
+            if (extension === ".swift") {
+                return "swift";
+            }
+            if (extension === ".go") {
+                return "go";
+            }
+            if (extension === ".rs") {
+                return "rust";
+            }
+            if (extension === ".rb") {
+                return "ruby";
+            }
+            if (extension === ".php") {
+                return "php";
+            }
+            if (extension === ".c") {
+                return "c";
+            }
+            if ([".cpp", ".hpp", ".h"].includes(extension)) {
+                return "cpp";
+            }
+            if (extension === ".cs") {
+                return "csharp";
+            }
+            if (extension === ".scala") {
+                return "scala";
+            }
+            if ([".sql"].includes(extension)) {
+                return "data";
+            }
+            if ([".sh", ".zsh", ".bash"].includes(extension)) {
+                return "shell";
+            }
+            if ([".html", ".htm"].includes(extension)) {
+                return "html";
+            }
+            if ([".css", ".scss", ".sass", ".less"].includes(extension)) {
+                return "css";
+            }
+            if ([".json"].includes(extension)) {
+                return "json";
+            }
+            if ([".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
+                return "data";
+            }
+            if ([".md"].includes(extension)) {
+                return "markdown";
+            }
+            if ([".lua", ".dart", ".elm", ".ex", ".exs", ".erl", ".fs", ".fsx", ".groovy", ".jl", ".nim", ".pl", ".r", ".vb"].includes(extension)) {
+                return "code";
+            }
+            if ([".ttf", ".otf", ".woff", ".woff2"].includes(extension)) {
+                return "font";
+            }
+            return "file";
+        }
+
         function getPathFileStem(pathValue) {
             const normalized = normalizePath(pathValue, true);
             if (!normalized) {
@@ -6406,7 +6787,7 @@
 
         function getSaveBrowserRootLabel() {
             if (!scopedHomeDir) {
-                return docsRootLabel;
+                return effectiveRootLabel;
             }
             const homeParts = scopedHomeDir.split("/").filter(Boolean);
             const homeLabel = homeParts.length ? homeParts[homeParts.length - 1] : scopedHomeDir;
@@ -6509,7 +6890,7 @@
             return getWritableAncestorPaths(pathValue)
                 .map(function (ancestorPath) {
                     if (!ancestorPath) {
-                        return docsRootLabel;
+                        return effectiveRootLabel;
                     }
                     return ancestorPath.split("/").slice(-1)[0];
                 })
@@ -6589,7 +6970,7 @@
             const writableAncestors = getWritableAncestorPaths(currentPath);
             if (!writableAncestors.length) {
                 if (isSuperuser) {
-                    addCrumb(docsRootLabel, "", true);
+                    addCrumb(effectiveRootLabel, "", true);
                 }
             } else {
                 writableAncestors.forEach(function (ancestorPath, index) {
@@ -6601,7 +6982,7 @@
                     }
                     const label = ancestorPath
                         ? ancestorPath.split("/").slice(-1)[0]
-                        : docsRootLabel;
+                        : effectiveRootLabel;
                     addCrumb(label, ancestorPath, ancestorPath === currentPath);
                 });
             }
@@ -6628,7 +7009,7 @@
                 if (pathValue === scopedHomeDir) {
                     button.textContent = getSaveBrowserRootLabel();
                 } else if (!pathValue) {
-                    button.textContent = docsRootLabel;
+                    button.textContent = effectiveRootLabel;
                 }
                 button.addEventListener("click", function () {
                     state.browserDir = pathValue;
@@ -6712,7 +7093,7 @@
                     })
                     .join("/");
             }
-            return getWritablePathLabel(pathValue) || (isSuperuser ? docsRootLabel : "");
+            return getWritablePathLabel(pathValue) || (isSuperuser ? effectiveRootLabel : "");
         }
 
         function getFolderCreateBasePath() {

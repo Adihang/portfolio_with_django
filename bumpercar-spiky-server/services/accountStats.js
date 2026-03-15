@@ -4,7 +4,7 @@ const { DJANGO_INTERNAL_BASE_URL } = require("../config/config")
 
 const STATS_ENDPOINT_PATH = "/api/internal/bumpercar-spiky/stats/"
 
-function postStatsUpdate(username, increments) {
+function postStatsUpdate(username, increments, maxima = null) {
     const safeUsername = String(username || "").trim()
     if (!safeUsername || !increments || typeof increments !== "object") {
         return
@@ -16,6 +16,16 @@ function postStatsUpdate(username, increments) {
             .filter(([key, value]) => key && value !== 0)
     )
     if (!Object.keys(normalizedIncrements).length) {
+        if (!maxima || typeof maxima !== "object") {
+            return
+        }
+    }
+    const normalizedMaxima = Object.fromEntries(
+        Object.entries(maxima || {})
+            .map(([key, value]) => [String(key || "").trim(), Number(value || 0)])
+            .filter(([key, value]) => key && value > 0)
+    )
+    if (!Object.keys(normalizedIncrements).length && !Object.keys(normalizedMaxima).length) {
         return
     }
 
@@ -24,6 +34,7 @@ function postStatsUpdate(username, increments) {
     const requestBody = JSON.stringify({
         username: safeUsername,
         increments: normalizedIncrements,
+        maxima: normalizedMaxima,
     })
     const request = transport.request({
         protocol: baseUrl.protocol,

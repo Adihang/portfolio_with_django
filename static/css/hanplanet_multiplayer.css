@@ -181,6 +181,7 @@ body.hanplanet-multiplayer-page .root-auth-modal-dialog {
     background: rgba(255, 252, 246, 0.9);
     box-shadow: 0 18px 48px rgba(15, 23, 42, 0.1);
     text-align: center;
+    overflow: visible;
 }
 
 .multiplayer-start-audio-actions {
@@ -511,12 +512,17 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     transform: scale(1.5);
 }
 
+.multiplayer-start-character.is-pumkin {
+    transform: scale(1.2);
+}
+
 .multiplayer-start-character-button {
     display: block;
     margin: 0 auto;
     padding: 0;
     border: 0;
     background: transparent;
+    overflow: visible;
 }
 
 .multiplayer-skin-modal-backdrop {
@@ -543,6 +549,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     background: rgba(255, 252, 246, 0.96);
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
     transform: translateY(var(--popup-fit-child-top-shift, 0px));
+    overflow: visible;
 }
 
 .multiplayer-skin-modal-header {
@@ -575,6 +582,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
+    overflow: visible;
 }
 
 .multiplayer-skin-item {
@@ -582,6 +590,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     border: 1px solid rgba(95, 95, 95, 0.18);
     border-radius: 16px;
     background: #fffdf8;
+    overflow: visible;
 }
 
 .multiplayer-skin-item.is-selected {
@@ -608,6 +617,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     flex-direction: column;
     align-items: center;
     gap: 8px;
+    overflow: visible;
 }
 
 .multiplayer-skin-item-icon {
@@ -619,6 +629,10 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
 
 .multiplayer-skin-item-icon.is-evolution {
     transform: scale(1.5);
+}
+
+.multiplayer-skin-item-icon.is-pumkin {
+    transform: scale(1.2);
 }
 
 .multiplayer-skin-item-name {
@@ -647,6 +661,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     background: rgba(255, 252, 246, 0.98);
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
     text-align: center;
+    overflow: visible;
 }
 
 .multiplayer-skin-detail-popover[hidden] {
@@ -662,6 +677,10 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
 
 .multiplayer-skin-detail-icon.is-evolution {
     transform: scale(1.5);
+}
+
+.multiplayer-skin-detail-icon.is-pumkin {
+    transform: scale(1.2);
 }
 
 .multiplayer-skin-detail-name {
@@ -1192,7 +1211,7 @@ body.hanplanet-multiplayer-page .ui-auth-account-stats-toggle {
     touch-action: none;
     background: rgba(22, 163, 74, 0.9);
     color: #fff;
-    font-size: 72px;
+    font-size: 122px;
     font-weight: 800;
     line-height: 1;
     letter-spacing: 0.02em;

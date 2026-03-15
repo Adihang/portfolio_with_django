@@ -10,6 +10,7 @@ const NPC_MAX_HEALTH = GAMEPLAY_SETTINGS.npc_max_health
 const PLAYER_STARTING_LIVES = GAMEPLAY_SETTINGS.user_lives
 const DOUBLE_SKIN_NAME = "double"
 const DOUBLE_UNIT_HEALTH = 2
+const PUMPKIN_SKIN_NAME = "pumkin"
 
 function createDoubleUnitState() {
     return {
@@ -44,7 +45,31 @@ class Player {
         // id 는 실제 화면/월드에서 보이는 현재 표시 이름이다.
         this.connectionKey = id
         this.skinName = "default"
+        this.initialSkinName = "default"
         this.isDoubleSkin = false
+        this.isPumpkinSkin = false
+        this.isPumpkinNpc = false
+        this.pumpkinEliminated = false
+        this.pumpkinNtrTriggerCount = 0
+        this.pumpkinOwnerConnectionKey = ""
+        this.pumpkinDroppedByPlayerId = ""
+        this.pumpkinOriginalOwnerConnectionKey = ""
+        this.pumpkinBaseSkinName = ""
+        this.pumpkinBaseDoubleHealth = 0
+        this.isNeutralPumpkinNpc = false
+        this.pumpkinDashDirectionX = 0
+        this.pumpkinDashDirectionY = 0
+        this.pumpkinDashStartedAt = 0
+        this.pumpkinDashUntil = 0
+        this.pumpkinDashProtectedUntil = 0
+        this.pumpkinDashProtectedById = ""
+        this.pumpkinClaimLockedUntil = 0
+        this.pumpkinClaimLockedById = ""
+        this.pumpkinInvulnerableUntil = 0
+        this.pumpkinFadeOutStartedAt = 0
+        this.pumpkinFadeOutUntil = 0
+        this.splitDefeatProtectedUntil = 0
+        this.splitDefeatProtectedById = ""
         this.doubleMerged = false
         this.doubleSeparationPhase = "merged"
         this.doubleMergeLockUntil = 0
@@ -82,7 +107,10 @@ class Player {
             down: false,
             left: false,
             right: false,
-            boost: false
+            boost: false,
+            respawn: false,
+            moveX: 0,
+            moveY: 0
         }
         // lastMove 는 직전 틱 실제 이동량이다.
         // 충돌 방향 판정, 반발 세기, 클라이언트 속도 보간에 같이 쓴다.
@@ -153,6 +181,7 @@ class Player {
         }
 
         this.isDoubleSkin = this.skinName === DOUBLE_SKIN_NAME
+        this.isPumpkinSkin = this.skinName === PUMPKIN_SKIN_NAME
     }
 }
 
