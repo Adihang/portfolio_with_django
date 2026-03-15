@@ -103,33 +103,34 @@ function createServer(world) {
         }))
 
         ws.on("message", (msg) => {
-            const rawMessage = msg.toString()
+            // JSON 파싱을 한 번만 수행한다.
+            let parsed
             try {
-                const parsed = JSON.parse(rawMessage)
-                if (parsed && parsed.type === "ping") {
-                    // RTT 측정용 ping/pong 은 월드 입력 처리와 분리한다.
-                    ws.send(JSON.stringify({
-                        type: "pong",
-                        sentAt: parsed.sentAt || 0
-                    }))
-                    return
-                }
-            } catch (error) {}
+                parsed = JSON.parse(msg.toString())
+            } catch (error) {
+                return
+            }
 
-            // 일반 입력 메시지는 world 가 그대로 해석한다.
-            world.handleInput(player, rawMessage)
-            try {
-                const input = JSON.parse(rawMessage)
-                const moveX = Number(input.moveX || 0)
-                const moveY = Number(input.moveY || 0)
-                const hasAnalogMovement = Number.isFinite(moveX) && Number.isFinite(moveY) && Math.hypot(moveX, moveY) > 0.01
-                if (Boolean(input.up) || Boolean(input.down) || Boolean(input.left) || Boolean(input.right) || hasAnalogMovement || Boolean(input.boost) || Boolean(input.respawn)) {
-                    ws.lastActiveInputAt = Date.now()
-                    // 인간 유저의 마지막 실제 입력 시각을 따로 갱신해서
-                    // "오래 무입력 시 라운드 초기화" 판정에 사용한다.
-                    world.markHumanInput(player, ws.lastActiveInputAt)
-                }
-            } catch (error) {}
+            if (parsed && parsed.type === "ping") {
+                // RTT 측정용 ping/pong 은 월드 입력 처리와 분리한다.
+                ws.send(JSON.stringify({
+                    type: "pong",
+                    sentAt: parsed.sentAt || 0
+                }))
+                return
+            }
+
+            // 파싱된 객체를 그대로 전달해 world 내부에서 재파싱하지 않도록 한다.
+            world.handleInput(player, parsed)
+            const moveX = Number(parsed.moveX || 0)
+            const moveY = Number(parsed.moveY || 0)
+            const hasAnalogMovement = Number.isFinite(moveX) && Number.isFinite(moveY) && Math.hypot(moveX, moveY) > 0.01
+            if (Boolean(parsed.up) || Boolean(parsed.down) || Boolean(parsed.left) || Boolean(parsed.right) || hasAnalogMovement || Boolean(parsed.boost) || Boolean(parsed.respawn)) {
+                ws.lastActiveInputAt = Date.now()
+                // 인간 유저의 마지막 실제 입력 시각을 따로 갱신해서
+                // "오래 무입력 시 라운드 초기화" 판정에 사용한다.
+                world.markHumanInput(player, ws.lastActiveInputAt)
+            }
         })
 
         ws.on("close", () => {
