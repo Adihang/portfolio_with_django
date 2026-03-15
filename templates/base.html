@@ -30,10 +30,10 @@
                 document.documentElement.classList.add('preload-light-bg');
                 return;
             }
-            const explicitLightPaths = new Set(['/portfolio/', '/portfolio', '/docs/', '/docs']);
-            const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|docs(?:\/.*)?)$/;
+            const explicitLightPaths = new Set(['/portfolio/', '/portfolio', '/handrive/', '/handrive']);
+            const localizedLightBgPattern = /^\/(?:ko|en)\/(?:portfolio\/?|project\/\d+\/?|handrive(?:\/.*)?)$/;
             const shouldUseLightBg = explicitLightPaths.has(path) ||
-                path.startsWith('/docs/') ||
+                path.startsWith('/handrive/') ||
                 path.startsWith('/project/') ||
                 localizedLightBgPattern.test(path);
 

@@ -31,6 +31,8 @@ from .handrive_views import (
     DOCS_EDIT_PERMISSION_CODE,
     DOCS_EDITOR_GROUP_NAME,
     DOCS_PUBLIC_WRITE_GROUP_NAME,
+    DOCS_USER_SCOPED_ENTRY_LIMIT,
+    DOCS_USER_SCOPED_QUOTA_BYTES,
     DOCS_URL_ONLY_GROUP_NAME,
     _resolve_docs_post_login_url,
     get_docs_upload_tmp_dir,
@@ -300,19 +302,19 @@ class LanguageUrlRoutingTests(TestCase):
         response = self.client.get("/portfolio/?tab=projects", HTTP_ACCEPT_LANGUAGE="en-US,en;q=0.9")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/%3Ftab%3Dprojects")
+        self.assertEqual(response["Location"], "/login?next=/portfolio/%3Ftab%3Dprojects")
 
     def test_legacy_portfolio_redirects_to_ko_when_accept_language_missing(self):
         response = self.client.get("/portfolio/", HTTP_ACCEPT_LANGUAGE="")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
+        self.assertEqual(response["Location"], "/login?next=/portfolio/")
 
     def test_legacy_portfolio_redirects_to_en_for_non_korean_language(self):
         response = self.client.get("/portfolio/", HTTP_ACCEPT_LANGUAGE="ja-JP,ja;q=0.9")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
+        self.assertEqual(response["Location"], "/login?next=/portfolio/")
 
 
 class DocsSignupAutoLoginTests(TestCase):
@@ -486,13 +488,13 @@ class PortfolioPerUserRoutingTests(TestCase):
         response = self.client.get("/ko/portfolio/")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/docs/login/?next=/ko/portfolio/")
+        self.assertEqual(response["Location"], "/login?next=/ko/portfolio/")
 
     def test_unauthenticated_user_redirects_from_legacy_portfolio_to_login(self):
         response = self.client.get("/portfolio/")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/docs/login/?next=/portfolio/")
+        self.assertEqual(response["Location"], "/login?next=/portfolio/")
 
     def test_own_portfolio_shows_edit_widget(self):
         self.client.login(username="GuestUser", password="pw12345")
@@ -552,7 +554,7 @@ class DocsEditorPermissionTests(TestCase):
         self.docs_permission, _ = Permission.objects.get_or_create(
             content_type=content_type,
             codename=DOCS_EDIT_PERMISSION_CODE.split(".", 1)[1],
-            defaults={"name": "Can edit docs content"},
+            defaults={"name": "Can edit HanDrive content"},
         )
         self.docs_editor_group.permissions.set([self.docs_permission])
 
@@ -776,6 +778,48 @@ class HanplanetMultiplayerPageTests(TestCase):
         GAME_JWT_AUDIENCE="hanplanet-game",
         GAME_JWT_EXP_SECONDS=300,
     )
+    def test_game_auth_token_api_uses_unlocked_pumkin_skin_for_superuser(self):
+        UserProfile.objects.create(user=self.admin_user, bumpercar_spiky_stats={"max_ner_party_size": 2})
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get("/ko/api/game-auth-token/?skin=pumkin")
+
+        self.assertEqual(response.status_code, 200)
+        token = response.json()["token"]
+        payload_segment = token.split(".")[1]
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload_segment + "==").decode("utf-8"))
+        self.assertEqual(decoded_payload["selected_skin"], "pumkin")
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
+    def test_game_auth_token_api_uses_unlocked_pumkin_skin_for_staff_admin(self):
+        staff_user = get_user_model().objects.create_user(
+            username="staff-pumkin-admin",
+            email="staff-pumkin-admin@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        UserProfile.objects.create(user=staff_user, bumpercar_spiky_stats={})
+        self.client.force_login(staff_user)
+
+        response = self.client.get("/ko/api/game-auth-token/?skin=pumkin")
+
+        self.assertEqual(response.status_code, 200)
+        token = response.json()["token"]
+        payload_segment = token.split(".")[1]
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload_segment + "==").decode("utf-8"))
+        self.assertEqual(decoded_payload["selected_skin"], "pumkin")
+
+    @override_settings(
+        GAME_JWT_SECRET="test-game-secret",
+        GAME_JWT_ISSUER="https://hanplanet.com",
+        GAME_JWT_AUDIENCE="hanplanet-game",
+        GAME_JWT_EXP_SECONDS=300,
+    )
     def test_game_auth_token_api_returns_signed_guest_token_for_unauthenticated_user(self):
         response = self.client.get("/ko/api/game-auth-token/")
 
@@ -879,6 +923,9 @@ class HanplanetMultiplayerPageTests(TestCase):
                         "ner_phase3_attack_dodges": 6,
                         "ner_hits": 5,
                     },
+                    "maxima": {
+                        "max_ner_party_size": 3,
+                    },
                 }
             ),
             content_type="application/json",
@@ -894,6 +941,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "deaths": 1,
                 "player_kills": 4,
                 "ner_kills": 3,
+                "max_ner_party_size": 3,
                 "game_clears": 1,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
@@ -901,6 +949,28 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "ner_hits": 5,
             },
         )
+
+    def test_bumpercar_spiky_stats_record_keeps_larger_existing_maximum(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"max_ner_party_size": 4})
+
+        response = self.client.post(
+            reverse("main:bumpercar_spiky_stats_record"),
+            data=json.dumps(
+                {
+                    "username": self.user.username,
+                    "increments": {},
+                    "maxima": {
+                        "max_ner_party_size": 2,
+                    },
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="127.0.0.1",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        profile = UserProfile.objects.get(user=self.user)
+        self.assertEqual(profile.bumpercar_spiky_stats["max_ner_party_size"], 4)
 
     def test_bumpercar_spiky_stats_record_rejects_non_local_request(self):
         response = self.client.post(
@@ -923,6 +993,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "deaths": 2,
                 "player_kills": 7,
                 "ner_kills": 3,
+                "max_ner_party_size": 0,
                 "game_clears": 0,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
@@ -942,6 +1013,7 @@ class HanplanetMultiplayerPageTests(TestCase):
                 "deaths": 2,
                 "player_kills": 7,
                 "ner_kills": 3,
+                "max_ner_party_size": 0,
                 "game_clears": 0,
                 "ner_phase1_attack_dodges": 4,
                 "ner_phase2_attack_dodges": 5,
@@ -1001,6 +1073,43 @@ class HanplanetMultiplayerPageTests(TestCase):
         many_skin = next(skin for skin in skin_catalog if skin["name"] == "many")
         self.assertTrue(many_skin["unlocked"])
 
+    def test_multiplayer_page_unlocks_all_skins_for_admin_without_stats(self):
+        admin_user = get_user_model().objects.create_superuser(
+            username="all-skins-admin",
+            email="all-skins-admin@example.com",
+            password="testpass123",
+        )
+        UserProfile.objects.create(user=admin_user, bumpercar_spiky_stats={})
+        self.client.force_login(admin_user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        self.assertTrue(all(bool(skin["unlocked"]) for skin in skin_catalog))
+
+    def test_multiplayer_page_marks_pumkin_skin_locked_for_regular_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        pumkin_skin = next(skin for skin in skin_catalog if skin["name"] == "pumkin")
+        self.assertFalse(pumkin_skin["unlocked"])
+        self.assertEqual(pumkin_skin["unlock_condition"], "친구와 네르 쓰러트리기")
+
+    def test_multiplayer_page_marks_pumkin_skin_unlocked_when_party_size_reaches_two(self):
+        UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"max_ner_party_size": 2})
+        self.client.force_login(self.user)
+
+        response = self.client.get("/ko/fun/bumpercar-spiky/")
+
+        self.assertEqual(response.status_code, 200)
+        skin_catalog = json.loads(response.context["game_skin_catalog_json"])
+        pumkin_skin = next(skin for skin in skin_catalog if skin["name"] == "pumkin")
+        self.assertTrue(pumkin_skin["unlocked"])
+
     def test_minigame_page_shows_stats_button_but_not_account_stats_menu(self):
         UserProfile.objects.create(user=self.user, bumpercar_spiky_stats={"dummy_kills": 1})
         self.client.force_login(self.user)
@@ -1026,7 +1135,7 @@ class DocsAccessRuleTests(TestCase):
         self.docs_permission, _ = Permission.objects.get_or_create(
             content_type=content_type,
             codename=DOCS_EDIT_PERMISSION_CODE.split(".", 1)[1],
-            defaults={"name": "Can edit docs content"},
+            defaults={"name": "Can edit HanDrive content"},
         )
         self.docs_editor_group.permissions.set([self.docs_permission])
 
@@ -1038,6 +1147,14 @@ class DocsAccessRuleTests(TestCase):
     def create_docs_editor(self, username):
         user = self.user_model.objects.create_user(username=username, password="pw123456")
         user.groups.add(self.docs_editor_group)
+        return user
+
+    def create_scoped_docs_editor(self, username):
+        user = self.create_docs_editor(username)
+        public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
+        user.groups.add(public_group)
+        user_home = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / username
+        user_home.mkdir(parents=True, exist_ok=True)
         return user
 
     def test_restricted_path_blocks_non_allowed_user_from_read(self):
@@ -1286,6 +1403,34 @@ class DocsAccessRuleTests(TestCase):
         self.assertContains(response, "manage.py")
         self.assertContains(response, "Apply Static + Restart Gunicorn")
 
+    def test_docs_superuser_can_open_unscoped_root_file_directly(self):
+        admin_user = self.user_model.objects.create_user(
+            username="docs_superuser_root_file",
+            password="pw123456",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get("/ko/handrive/media/HanDrive/help/list_en")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "list_en")
+
+    def test_docs_superuser_can_open_unscoped_root_folder_directly(self):
+        admin_user = self.user_model.objects.create_user(
+            username="docs_superuser_root_folder",
+            password="pw123456",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get("/ko/handrive/media/HanDrive/help/list")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-current-dir="media/HanDrive/help"')
+
     def test_docs_superuser_scoped_folder_shows_root_breadcrumb_link(self):
         admin_user = self.user_model.objects.create_user(
             username="admin",
@@ -1462,7 +1607,7 @@ class DocsAccessRuleTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue((Path(settings.MEDIA_ROOT) / "ide" / "restricted" / "hello.txt").exists())
+        self.assertTrue((Path(settings.MEDIA_ROOT) / "HanDrive" / "restricted" / "hello.txt").exists())
         payload = response.json()
         self.assertEqual(payload["path"], "restricted")
         self.assertEqual(payload["entries"][0]["path"], "restricted/hello.txt")
@@ -1484,7 +1629,7 @@ class DocsAccessRuleTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertFalse((Path(settings.MEDIA_ROOT) / "ide" / "restricted" / "denied.txt").exists())
+        self.assertFalse((Path(settings.MEDIA_ROOT) / "HanDrive" / "restricted" / "denied.txt").exists())
 
     def test_docs_api_upload_accepts_chunked_upload_and_finalizes_file(self):
         editor = self.create_docs_editor("chunk_upload_editor")
@@ -1518,7 +1663,7 @@ class DocsAccessRuleTests(TestCase):
 
         self.assertEqual(second.status_code, 200)
         self.assertEqual(second.json()["entries"][0]["path"], "restricted/chunked.txt")
-        saved_path = Path(settings.MEDIA_ROOT) / "ide" / "restricted" / "chunked.txt"
+        saved_path = Path(settings.MEDIA_ROOT) / "HanDrive" / "restricted" / "chunked.txt"
         self.assertTrue(saved_path.exists())
         self.assertEqual(saved_path.read_bytes(), b"hello world")
 
@@ -1548,6 +1693,71 @@ class DocsAccessRuleTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(session_dir.exists())
+
+    def test_scoped_docs_api_mkdir_blocks_when_entry_limit_would_be_exceeded(self):
+        editor = self.create_scoped_docs_editor("quota_mkdir_editor")
+        scoped_root = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / editor.username
+        for index in range(DOCS_USER_SCOPED_ENTRY_LIMIT):
+            (scoped_root / f"entry_{index}.txt").write_text("x", encoding="utf-8")
+
+        self.client.force_login(editor)
+        response = self.client.post(
+            reverse("main:docs_api_mkdir"),
+            data=json.dumps(
+                {
+                    "parent_dir": f"users/{editor.username}",
+                    "folder_name": "blocked_folder",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("하위 폴더/파일 수가 100개를 초과", response.json().get("error", ""))
+        self.assertFalse((scoped_root / "blocked_folder").exists())
+
+    def test_scoped_docs_api_upload_blocks_when_quota_would_be_exceeded(self):
+        editor = self.create_scoped_docs_editor("quota_upload_editor")
+        scoped_root = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / editor.username
+        with (scoped_root / "existing.bin").open("wb") as handle:
+            handle.truncate(DOCS_USER_SCOPED_QUOTA_BYTES)
+
+        self.client.force_login(editor)
+        response = self.client.post(
+            reverse("main:docs_api_upload"),
+            data={
+                "dir": f"users/{editor.username}",
+                "files": SimpleUploadedFile("extra.txt", b"b", content_type="text/plain"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("용량이 1GB를 초과", response.json().get("error", ""))
+        self.assertFalse((scoped_root / "extra.txt").exists())
+
+    def test_scoped_docs_api_save_blocks_when_entry_limit_would_be_exceeded(self):
+        editor = self.create_scoped_docs_editor("quota_save_editor")
+        scoped_root = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / editor.username
+        for index in range(DOCS_USER_SCOPED_ENTRY_LIMIT):
+            (scoped_root / f"entry_{index}.txt").write_text("x", encoding="utf-8")
+
+        self.client.force_login(editor)
+        response = self.client.post(
+            reverse("main:docs_api_save"),
+            data=json.dumps(
+                {
+                    "original_path": "",
+                    "target_dir": f"users/{editor.username}",
+                    "filename": "blocked_note",
+                    "content": "# blocked",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("하위 폴더/파일 수가 100개를 초과", response.json().get("error", ""))
+        self.assertFalse((scoped_root / "blocked_note.md").exists())
 
     def test_acl_api_is_admin_only(self):
         editor = self.create_docs_editor("acl_editor")

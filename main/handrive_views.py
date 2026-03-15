@@ -74,6 +74,8 @@ DOCS_META_TITLE = "HanDrive"
 DOCS_META_DESCRIPTION = "HanDrive workspace"
 DOCS_LOGIN_CAPTCHA_THRESHOLD = 1
 DOCS_UPLOAD_RATE_LIMIT_BYTES_PER_SECOND = 10 * 1024 * 1024
+DOCS_USER_SCOPED_QUOTA_BYTES = 1024 * 1024 * 1024
+DOCS_USER_SCOPED_ENTRY_LIMIT = 100
 DOCS_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "docs_login_captcha_question"
 DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY = "docs_login_captcha_answer"
 DOCS_SIGNUP_FORBIDDEN_TERMS = (
@@ -231,6 +233,7 @@ DOCS_TEXT = {
         "list_aria_label": "목록",
         "menu_open": "열기",
         "menu_download": "다운로드",
+        "menu_upload": "업로드",
         "menu_rename": "이름 바꾸기",
         "menu_permissions": "권한",
         "menu_edit": "수정",
@@ -379,7 +382,7 @@ DOCS_TEXT = {
         "js_empty_documents": "파일이 없습니다.",
         "js_confirm_delete_doc": "이 파일을 삭제할까요?",
         "js_current_folder_label": "현재 폴더",
-        "js_docs_root_label": "HanDrive",
+        "js_handrive_root_label": "HanDrive",
         "js_no_child_folders": "하위 폴더가 없습니다.",
         "js_filename_required": "파일명을 입력해주세요.",
         "js_extension_required": "확장자를 입력해주세요.",
@@ -425,6 +428,7 @@ DOCS_TEXT = {
         "list_aria_label": "File list",
         "menu_open": "Open",
         "menu_download": "Download",
+        "menu_upload": "Upload",
         "menu_rename": "Rename",
         "menu_permissions": "Permissions",
         "menu_edit": "Edit",
@@ -573,7 +577,7 @@ DOCS_TEXT = {
         "js_empty_documents": "No files found.",
         "js_confirm_delete_doc": "Delete this file?",
         "js_current_folder_label": "Current folder",
-        "js_docs_root_label": "HanDrive",
+        "js_handrive_root_label": "HanDrive",
         "js_no_child_folders": "No subfolders.",
         "js_filename_required": "Please enter a file name.",
         "js_extension_required": "Please enter a file extension.",
@@ -628,11 +632,14 @@ def get_request_docs_root_dir(request=None) -> Path:
         return Path(settings.BASE_DIR).resolve()
 
     media_root = Path(settings.MEDIA_ROOT)
-    root = media_root / "ide"
+    root = media_root / "HanDrive"
     legacy_root = media_root / "docs"
-    # 기존 docs 저장소를 ide로 자동 이전해 기존 파일 접근이 끊기지 않게 유지한다.
+    legacy_ide_root = media_root / "ide"
+    # 기존 docs/ide 저장소를 HanDrive 로 자동 이전해 기존 파일 접근이 끊기지 않게 유지한다.
     if not root.exists() and legacy_root.exists():
         legacy_root.rename(root)
+    if not root.exists() and legacy_ide_root.exists():
+        legacy_ide_root.rename(root)
     root.mkdir(parents=True, exist_ok=True)
     return root.resolve()
 
@@ -869,7 +876,7 @@ def build_docs_html_live_document(html_source: str, *, companion_css: str = "", 
 
     if css_text:
         safe_css_text = css_text.replace("</style", "<\\/style")
-        css_block = f"\n<style data-ide-linked-css>\n{safe_css_text}\n</style>\n"
+        css_block = f"\n<style data-handrive-linked-css>\n{safe_css_text}\n</style>\n"
         if re.search(r"</head\s*>", document, flags=re.IGNORECASE):
             document = _inject_before_first_closing_tag(document, "</head>", css_block)
         else:
@@ -877,7 +884,7 @@ def build_docs_html_live_document(html_source: str, *, companion_css: str = "", 
 
     if js_text:
         safe_js_text = js_text.replace("</script", "<\\/script")
-        js_block = f"\n<script data-ide-linked-js>\n{safe_js_text}\n</script>\n"
+        js_block = f"\n<script data-handrive-linked-js>\n{safe_js_text}\n</script>\n"
         if re.search(r"</body\s*>", document, flags=re.IGNORECASE):
             document = _inject_before_first_closing_tag(document, "</body>", js_block)
         else:
@@ -894,8 +901,8 @@ def render_docs_html_live_safely(html_source: str, *, companion_css: str = "", c
     )
     escaped_srcdoc = escape(live_document)
     iframe_html = (
-        '<div class="ide-html-live-wrap">'
-        '<iframe class="ide-html-live-frame" '
+        '<div class="handrive-html-live-wrap">'
+        '<iframe class="handrive-html-live-frame" '
         'sandbox="allow-scripts" '
         'referrerpolicy="no-referrer" '
         f'srcdoc="{escaped_srcdoc}"></iframe>'
@@ -956,7 +963,7 @@ def get_docs_save_extension_options() -> list[str]:
     for extension, profile in DOCS_RENDER_PROFILES_BY_EXTENSION.items():
         if (
             profile.get("mode") == DOCS_RENDER_MODE_MARKDOWN
-            or profile.get("css_class") != "ide-plain-text"
+            or profile.get("css_class") != "handrive-plain-text"
         ):
             options.append(extension)
 
@@ -976,7 +983,7 @@ def render_docs_content(
     request=None,
 ) -> tuple[str, dict[str, str]]:
     profile = resolve_docs_render_profile(file_extension)
-    if profile["css_class"] == "ide-html":
+    if profile["css_class"] == "handrive-html":
         companion_css = ""
         companion_js = ""
         if source_path is not None:
@@ -1493,6 +1500,55 @@ def ensure_scoped_home_dir(scoped_home_dir: str) -> None:
     path_obj.mkdir(parents=True, exist_ok=True)
 
 
+def get_docs_scoped_quota_root(request, path_value: str | None) -> Path | None:
+    scoped_home_dir = get_scoped_docs_home_dir(request)
+    if not scoped_home_dir:
+        return None
+    normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
+        return None
+    scoped_root, _ = resolve_path(scoped_home_dir, must_exist=False)
+    scoped_root.mkdir(parents=True, exist_ok=True)
+    return scoped_root
+
+
+def calculate_docs_tree_usage(root_path: Path) -> tuple[int, int]:
+    total_bytes = 0
+    total_entries = 0
+    if not root_path.exists():
+        return total_bytes, total_entries
+
+    for path_obj in root_path.rglob("*"):
+        total_entries += 1
+        if path_obj.is_file():
+            try:
+                total_bytes += path_obj.stat().st_size
+            except OSError:
+                continue
+    return total_bytes, total_entries
+
+
+def enforce_docs_scoped_quota(
+    request,
+    *,
+    quota_path: str | None,
+    extra_bytes: int = 0,
+    extra_entries: int = 0,
+) -> None:
+    scoped_root = get_docs_scoped_quota_root(request, quota_path)
+    if scoped_root is None:
+        return
+
+    current_bytes, current_entries = calculate_docs_tree_usage(scoped_root)
+    projected_bytes = current_bytes + max(0, extra_bytes)
+    projected_entries = current_entries + max(0, extra_entries)
+
+    if projected_bytes > DOCS_USER_SCOPED_QUOTA_BYTES:
+        raise ValueError("개인 폴더 용량이 1GB를 초과해 더 이상 업로드하거나 생성할 수 없습니다.")
+    if projected_entries > DOCS_USER_SCOPED_ENTRY_LIMIT:
+        raise ValueError("개인 폴더의 하위 폴더/파일 수가 100개를 초과해 더 이상 업로드하거나 생성할 수 없습니다.")
+
+
 def build_docs_breadcrumbs(
     base_url: str,
     current_dir: str,
@@ -1558,7 +1614,7 @@ def build_docs_breadcrumbs(
     return breadcrumbs
 
 
-def get_docs_root_label(request, scoped_home_dir: str = "") -> str:
+def get_handrive_root_label(request, scoped_home_dir: str = "") -> str:
     if scoped_home_dir:
         home_parts = [part for part in scoped_home_dir.split("/") if part]
         return home_parts[-1] if home_parts else scoped_home_dir
@@ -1566,6 +1622,13 @@ def get_docs_root_label(request, scoped_home_dir: str = "") -> str:
     if user and user.is_authenticated and user.is_superuser:
         return "Hanplanet"
     return "HanDrive"
+
+
+def get_handrive_js_root_label(request, scoped_home_dir: str = "") -> str:
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated and user.is_superuser:
+        return get_handrive_root_label(request, "")
+    return get_handrive_root_label(request, scoped_home_dir)
 
 
 def is_docs_editor(request) -> bool:
@@ -1647,7 +1710,7 @@ def resolve_auth_breadcrumb_url(request, fallback_url: str) -> str:
 
 def is_docs_share_auth_entry(request, fallback_url: str) -> bool:
     next_url = resolve_next_url(request, fallback_url)
-    if "/handrive/share/" in next_url or "/ide/share/" in next_url:
+    if "/handrive/share/" in next_url or "/handrive/share/" in next_url:
         return True
 
     referer = str(request.META.get("HTTP_REFERER", "") or "").strip()
@@ -1657,7 +1720,7 @@ def is_docs_share_auth_entry(request, fallback_url: str) -> bool:
         require_https=request.is_secure(),
     ):
         parsed = urlparse(referer)
-        return "/handrive/share/" in (parsed.path or "") or "/ide/share/" in (parsed.path or "")
+        return "/handrive/share/" in (parsed.path or "") or "/handrive/share/" in (parsed.path or "")
 
     return False
 
@@ -1835,9 +1898,9 @@ def docs_common_context(request, ui_lang):
         docs_logout_url = reverse("main:docs_logout")
         docs_ops_apply_static_url = reverse("main:docs_ops_apply_static")
     docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
-    docs_root_url = docs_base_url
+    handrive_root_url = docs_base_url
     if request.user.is_authenticated and request.user.is_superuser:
-        docs_root_url = f"{docs_base_url}?root=1"
+        handrive_root_url = f"{docs_base_url}?root=1"
     if request.user.is_authenticated:
         profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
         docs_my_portfolio_url = reverse(
@@ -1870,7 +1933,7 @@ def docs_common_context(request, ui_lang):
             "meta_og_description": DOCS_META_DESCRIPTION,
             "meta_robots": "index,follow",
             "docs_base_url": docs_base_url,
-            "docs_root_url": docs_root_url,
+            "handrive_root_url": handrive_root_url,
             "docs_write_url": docs_write_url,
             "docs_login_url": docs_login_url,
             "docs_signup_url": docs_signup_url,
@@ -1939,24 +2002,24 @@ def docs_root(request, ui_lang=None):
     return docs_list(request, folder_path="", ui_lang=ui_lang)
 
 
-def docs_root_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:docs_root_lang")
+def docs_root_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:docs_root_lang", ui_lang=ui_lang)
 
 
-def docs_list_root_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:docs_root_lang")
+def docs_list_root_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:docs_root_lang", ui_lang=ui_lang)
 
 
-def docs_write_legacy_redirect(request):
-    return redirect_to_localized_route(request, "main:docs_write_lang")
+def docs_write_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:docs_write_lang", ui_lang=ui_lang)
 
 
-def docs_list_legacy_redirect(request, folder_path):
-    return redirect_to_localized_route(request, "main:docs_list_lang", folder_path=folder_path)
+def docs_list_legacy_redirect(request, folder_path, ui_lang=None):
+    return redirect_to_localized_route(request, "main:docs_list_lang", ui_lang=ui_lang, folder_path=folder_path)
 
 
-def docs_view_legacy_redirect(request, doc_path):
-    return redirect_to_localized_route(request, "main:docs_view_lang", doc_path=doc_path)
+def docs_view_legacy_redirect(request, doc_path, ui_lang=None):
+    return redirect_to_localized_route(request, "main:docs_view_lang", ui_lang=ui_lang, doc_path=doc_path)
 
 
 def _resolve_docs_login_target_user(username_value: str | None):
@@ -2060,7 +2123,7 @@ def _build_docs_login_captcha(request, refresh: bool = False) -> str:
 
 def _verify_docs_login_captcha_answer(request) -> bool:
     expected = str(request.session.get(DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
-    provided = str(request.POST.get("ide-captcha-answer", "") or "").strip()
+    provided = str(request.POST.get("handrive-captcha-answer", "") or "").strip()
     if not expected or not provided:
         return False
     return provided == expected
@@ -2336,9 +2399,10 @@ def docs_list(request, folder_path="", ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
+    is_superuser = bool(getattr(request.user, "is_superuser", False))
     root_requested = str(request.GET.get("root", "") or "").strip().lower() in {"1", "true", "yes"}
     scoped_home_dir = get_scoped_docs_home_dir(request)
-    if getattr(request.user, "is_superuser", False) and root_requested:
+    if is_superuser and root_requested:
         scoped_home_dir = ""
     requested_dir = normalize_relative_path(folder_path, allow_empty=True)
     if scoped_home_dir:
@@ -2349,7 +2413,7 @@ def docs_list(request, folder_path="", ui_lang=None):
                     reverse("main:docs_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": scoped_home_dir})
                 )
             return redirect(reverse("main:docs_list", kwargs={"folder_path": scoped_home_dir}))
-        if not is_path_in_docs_scope(requested_dir, scoped_home_dir):
+        if not is_superuser and not is_path_in_docs_scope(requested_dir, scoped_home_dir):
             raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     try:
@@ -2365,9 +2429,9 @@ def docs_list(request, folder_path="", ui_lang=None):
     context.update(
         {
             "current_dir": current_dir,
-            "current_dir_display": current_dir or get_docs_root_label(request, scoped_home_dir),
-            "current_path_label": current_dir or get_docs_root_label(request, scoped_home_dir),
-            "docs_root_label": get_docs_root_label(request, scoped_home_dir),
+            "current_dir_display": current_dir or get_handrive_root_label(request, scoped_home_dir),
+            "current_path_label": current_dir or get_handrive_root_label(request, scoped_home_dir),
+            "handrive_root_label": get_handrive_js_root_label(request, scoped_home_dir),
             "scoped_home_dir": scoped_home_dir,
             "current_dir_can_edit": has_docs_write_access(request, current_dir),
             "current_dir_can_write_children": has_docs_directory_write_access(request, current_dir),
@@ -2375,10 +2439,10 @@ def docs_list(request, folder_path="", ui_lang=None):
                 context["docs_base_url"],
                 current_dir,
                 scoped_home_dir=scoped_home_dir,
-                root_label=get_docs_root_label(request, scoped_home_dir),
-                root_url=context["docs_root_url"],
+                root_label=get_handrive_root_label(request, scoped_home_dir),
+                root_url=context["handrive_root_url"],
                 include_root_parent=bool(getattr(request.user, "is_superuser", False) and scoped_home_dir),
-                root_parent_label=get_docs_root_label(request, ""),
+                root_parent_label=get_handrive_root_label(request, ""),
             ),
             "initial_entries": list_directory_entries(directory, request=request),
             "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
@@ -2393,12 +2457,13 @@ def docs_view(request, doc_path, ui_lang=None):
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
     scoped_home_dir = get_scoped_docs_home_dir(request)
+    is_superuser = bool(getattr(request.user, "is_superuser", False))
 
     try:
         file_path, relative_file_path = normalize_docs_relative_path(doc_path, must_exist=True)
     except (ValueError, FileNotFoundError):
         raise Http404("파일을 찾을 수 없습니다.")
-    if not is_path_in_docs_scope(relative_file_path, scoped_home_dir):
+    if not is_superuser and not is_path_in_docs_scope(relative_file_path, scoped_home_dir):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
     if not has_docs_read_access(request, relative_file_path):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
@@ -2433,10 +2498,10 @@ def docs_view(request, doc_path, ui_lang=None):
                 context["docs_base_url"],
                 parent_dir,
                 scoped_home_dir=scoped_home_dir,
-                root_label=get_docs_root_label(request, scoped_home_dir),
-                root_url=context["docs_root_url"],
+                root_label=get_handrive_root_label(request, scoped_home_dir),
+                root_url=context["handrive_root_url"],
                 include_root_parent=bool(getattr(request.user, "is_superuser", False) and scoped_home_dir),
-                root_parent_label=get_docs_root_label(request, ""),
+                root_parent_label=get_handrive_root_label(request, ""),
             ),
             "view_current_file_name": file_path.name,
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
@@ -2507,6 +2572,7 @@ def docs_write(request, ui_lang=None):
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
     scoped_home_dir = get_scoped_docs_home_dir(request)
+    is_superuser = bool(getattr(request.user, "is_superuser", False))
     if scoped_home_dir:
         ensure_scoped_home_dir(scoped_home_dir)
 
@@ -2528,7 +2594,7 @@ def docs_write(request, ui_lang=None):
             file_path, original_relative_path = normalize_markdown_relative_path(requested_path, must_exist=True)
         except (ValueError, FileNotFoundError):
             raise Http404("수정할 파일을 찾을 수 없습니다.")
-        if not is_path_in_docs_scope(original_relative_path, scoped_home_dir):
+        if not is_superuser and not is_path_in_docs_scope(original_relative_path, scoped_home_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         if not has_docs_write_access(request, original_relative_path):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
@@ -2544,7 +2610,7 @@ def docs_write(request, ui_lang=None):
         initial_content = file_path.read_text(encoding="utf-8")
     elif requested_dir:
         initial_dir = normalize_relative_path(requested_dir)
-        if not is_path_in_docs_scope(initial_dir, scoped_home_dir):
+        if not is_superuser and not is_path_in_docs_scope(initial_dir, scoped_home_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         target_dir, _ = resolve_path(initial_dir, must_exist=True)
         if not target_dir.is_dir():
@@ -2589,8 +2655,8 @@ def docs_write(request, ui_lang=None):
                 context["docs_base_url"],
                 initial_dir,
                 scoped_home_dir=scoped_home_dir,
-                root_label=get_docs_root_label(request, scoped_home_dir),
-                root_url=context["docs_root_url"],
+                root_label=get_handrive_root_label(request, scoped_home_dir),
+                root_url=context["handrive_root_url"],
             ),
             "write_current_file_name": write_current_file_name,
             "write_public_direct_save": write_public_direct_save,
@@ -3020,6 +3086,7 @@ def docs_api_mkdir(request):
         parent_dir = normalize_relative_path(payload.get("parent_dir"), allow_empty=True)
         folder_name = validate_name(payload.get("folder_name"), for_file=False)
         parent_path, _ = resolve_path(parent_dir, must_exist=True)
+        enforce_docs_scoped_quota(request, quota_path=parent_dir, extra_entries=1)
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
@@ -3179,6 +3246,16 @@ def docs_api_upload(request):
 
         try:
             destination_path = build_available_upload_path(target_dir_path, original_name)
+            upload_size = sum(
+                (session_dir / f"{index:06d}.part").stat().st_size
+                for index in range(total_chunks)
+            )
+            enforce_docs_scoped_quota(
+                request,
+                quota_path=target_dir_relative,
+                extra_bytes=upload_size,
+                extra_entries=1,
+            )
         except ValueError as exc:
             return json_error(str(exc), status=400)
 
@@ -3203,12 +3280,28 @@ def docs_api_upload(request):
         return json_error("업로드할 파일이 없습니다.", status=400)
 
     uploaded_entries = []
+    upload_total_size = 0
+    upload_total_entries = 0
     for uploaded_file in uploaded_files:
         try:
             destination_path = build_available_upload_path(target_dir_path, uploaded_file.name)
         except ValueError as exc:
             return json_error(str(exc), status=400)
+        upload_total_size += uploaded_file.size or 0
+        upload_total_entries += 1
 
+    try:
+        enforce_docs_scoped_quota(
+            request,
+            quota_path=target_dir_relative,
+            extra_bytes=upload_total_size,
+            extra_entries=upload_total_entries,
+        )
+    except ValueError as exc:
+        return json_error(str(exc), status=400)
+
+    for uploaded_file in uploaded_files:
+        destination_path = build_available_upload_path(target_dir_path, uploaded_file.name)
         with destination_path.open("wb") as destination_handle:
             for chunk in uploaded_file.chunks():
                 destination_handle.write(chunk)
@@ -3366,6 +3459,34 @@ def docs_api_save(request):
         if destination.exists():
             if source_path is None or destination.resolve() != source_path.resolve():
                 return json_error("같은 이름의 파일이 이미 존재합니다.", status=409)
+
+        destination_relative = relative_from_root(destination)
+        destination_in_scope = get_docs_scoped_quota_root(request, destination_relative) is not None
+        source_in_scope = bool(source_relative) and get_docs_scoped_quota_root(request, source_relative) is not None
+        source_size = source_path.stat().st_size if source_path is not None and source_path.exists() else 0
+        destination_size = destination.stat().st_size if destination_exists else 0
+        new_size = len(content.encode("utf-8"))
+        quota_extra_bytes = 0
+        quota_extra_entries = 0
+
+        if destination_in_scope:
+            if source_path is None:
+                quota_extra_bytes = new_size
+                quota_extra_entries = 1
+            elif is_same_as_source:
+                quota_extra_bytes = new_size - source_size
+            elif source_in_scope:
+                quota_extra_bytes = new_size - source_size
+            else:
+                quota_extra_bytes = new_size - destination_size
+                quota_extra_entries = 0 if destination_exists else 1
+
+        enforce_docs_scoped_quota(
+            request,
+            quota_path=destination_relative,
+            extra_bytes=quota_extra_bytes,
+            extra_entries=quota_extra_entries,
+        )
 
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)

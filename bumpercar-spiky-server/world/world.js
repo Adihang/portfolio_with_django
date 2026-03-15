@@ -16,6 +16,9 @@ const TICK_DELTA_SECONDS = 1 / TICK_RATE
 // 유저 충돌 판정은 아이콘 비율에 맞춘 둥근 직사각형 기반으로 계산한다.
 const PLAYER_COLLISION_HALF_HEIGHT = 20
 const PLAYER_COLLISION_HALF_WIDTH = PLAYER_COLLISION_HALF_HEIGHT * (300 / 306)
+const PUMPKIN_PLAYER_COLLISION_SCALE = 1.5
+const PUMPKIN_NPC_COLLISION_WIDTH_SCALE = PUMPKIN_PLAYER_COLLISION_SCALE * 0.8
+const PUMPKIN_NPC_COLLISION_HEIGHT_SCALE = PUMPKIN_PLAYER_COLLISION_SCALE * 0.5
 const NPC_COLLISION_SCALE = 3.75
 const NPC_COLLISION_SIZE_MULTIPLIER = 0.6
 const NPC_COLLISION_HALF_HEIGHT = PLAYER_COLLISION_HALF_HEIGHT * NPC_COLLISION_SCALE * NPC_COLLISION_SIZE_MULTIPLIER
@@ -103,10 +106,23 @@ const ENCOUNTER_ANNOUNCEMENT_FINALE = "ner_true_finale"
 const INPUT_IDLE_RESET_MS = 10 * 60 * 1000
 const EVOLUTION_SKIN_NAME = "evolution"
 const EVOLUTION_SPEED_MULTIPLIER = 0.8
+const PUMPKIN_SPEED_MULTIPLIER = 1.4
 const EVOLUTION_HEALTH_SEGMENTS = 5
+const PUMPKIN_NPC_HEALTH_SEGMENTS = 4
+const PUMPKIN_NPC_DEFEAT_DASH_DURATION_MS = 420
+const PUMPKIN_NPC_DASH_PROTECTION_MS = 260
+const PUMPKIN_NPC_CLAIM_LOCK_MS = 500
+const PUMPKIN_NPC_DAMAGE_INVULNERABLE_MS = 1000
+const PUMPKIN_NPC_FADE_OUT_DURATION_MS = 520
+const PUMPKIN_NPC_DEFEAT_DASH_SPEED_PER_SECOND = Math.max(
+    MAX_BOOSTED_SPEED_PER_SECOND * 1.1,
+    BASE_PLAYER_SPEED_PER_SECOND * 2
+)
+const NEUTRAL_PUMPKIN_SPAWN_PADDING = 180
 const MANY_SKIN_NAME = "many"
 const MANY_HEALTH_SEGMENTS = 5
 const DOUBLE_SKIN_NAME = "double"
+const PUMPKIN_SKIN_NAME = "pumkin"
 const DOUBLE_UNIT_HEALTH = 2
 const DOUBLE_UNIT_COUNT = 2
 const DOUBLE_SEPARATION_ANGLE_DEGREES = 7
@@ -116,6 +132,7 @@ const DOUBLE_SPLIT_PROBABILITY = 0.3
 const DOUBLE_REJOIN_EXTRA_DISTANCE = PLAYER_COLLISION_HALF_HEIGHT * 0.25
 const DOUBLE_REMERGE_LOCK_MS = 3000
 const DOUBLE_SPLIT_PROTECTION_MS = 1000
+const SPLIT_DEFEAT_PROTECTION_MS = 300
 const DOUBLE_IDLE_REMERGE_DELAY_MS = 2000
 const DOUBLE_STEER_MIN_RADIANS = 5 * (Math.PI / 180)
 const DOUBLE_STEER_MAX_RADIANS = 45 * (Math.PI / 180)
@@ -123,6 +140,7 @@ const DOUBLE_STEER_DEADZONE_RADIANS = 3 * (Math.PI / 180)
 const DOUBLE_ALIGNMENT_DEADZONE_DISTANCE = DOUBLE_MERGED_SIDE_OFFSET * 0.35
 const DOUBLE_INACTIVE_FADE_MS = 200
 const NPC_DEFEAT_BOUNCE_MULTIPLIER = 1.5
+const PUMPKIN_NPC_ID_PREFIX = "pumpkin-"
 
 function getNpcBaseSpeed(player) {
     const multiplier = Math.max(0.1, Number(player && player.npcSpeedMultiplier || 1))
@@ -140,6 +158,9 @@ function getBaseSpeedForPlayer(player) {
     if (skinName === EVOLUTION_SKIN_NAME) {
         return BASE_PLAYER_SPEED_PER_SECOND * EVOLUTION_SPEED_MULTIPLIER
     }
+    if (skinName === PUMPKIN_SKIN_NAME) {
+        return BASE_PLAYER_SPEED_PER_SECOND * PUMPKIN_SPEED_MULTIPLIER
+    }
     return BASE_PLAYER_SPEED_PER_SECOND
 }
 
@@ -147,11 +168,74 @@ function isDoubleSkinPlayer(player) {
     return Boolean(player) && String(player.skinName || "").trim().toLowerCase() === DOUBLE_SKIN_NAME
 }
 
+function isPumpkinSkinPlayer(player) {
+    return Boolean(player) && String(player.skinName || "").trim().toLowerCase() === PUMPKIN_SKIN_NAME
+}
+
+function isClassicDefaultPlayer(player) {
+    return Boolean(player) &&
+        !player.isNpc &&
+        !player.isDummy &&
+        !player.isHouse &&
+        !player.isPumpkinNpc &&
+        String(player.skinName || "").trim().toLowerCase() === "default"
+}
+
+function isSingleDoublePlayer(player) {
+    return Boolean(player) &&
+        !player.isNpc &&
+        !player.isDummy &&
+        !player.isHouse &&
+        !player.isPumpkinNpc &&
+        isDoubleSkinPlayer(player) &&
+        getDoubleAliveUnitIndices(player).length === 1
+}
+
+function getSingleDoublePlayerHealth(player) {
+    const aliveIndices = getDoubleAliveUnitIndices(player)
+    if (!aliveIndices.length) {
+        return 0
+    }
+    const liveUnit = player.doubleUnits[aliveIndices[0]]
+    return Math.max(0, Math.min(DOUBLE_UNIT_HEALTH, Number(liveUnit && liveUnit.health || 0)))
+}
+
+function getPumpkinLifeSegments(player) {
+    if (player && String(player.pumpkinBaseSkinName || "").trim().toLowerCase() === "double_single") {
+        return DOUBLE_UNIT_HEALTH
+    }
+    return PLAYER_DEATH_TRIGGER_COUNT
+}
+
 function getPlayerAttackDamageScale(player) {
     if (isDoubleSkinPlayer(player)) {
         return 0.65
     }
     return 1
+}
+
+function isUserBoostAttacking(player) {
+    if (!player || player.isNpc || player.isDummy || player.isPumpkinNpc || player.isHouse) {
+        return false
+    }
+    return (
+        player.boostState === "charging" ||
+        player.boostState === "cooldown" ||
+        Number(player.currentSpeed || 0) > getBaseSpeedForPlayer(player)
+    )
+}
+
+function isPlayerAttackingForCollision(player) {
+    if (!player) {
+        return false
+    }
+    if (player.isNpc) {
+        return player.npcState === "charging"
+    }
+    if (player.isDummy) {
+        return player.dummyState === "charging"
+    }
+    return isUserBoostAttacking(player)
 }
 
 function createDoubleUnitState(now = Date.now()) {
@@ -222,6 +306,9 @@ function getPlayerDeathTriggerCount(player) {
     if (skinName === MANY_SKIN_NAME) {
         return MANY_HEALTH_SEGMENTS
     }
+    if (skinName === PUMPKIN_SKIN_NAME) {
+        return getPumpkinLifeSegments(player)
+    }
     return PLAYER_DEATH_TRIGGER_COUNT
 }
 
@@ -260,7 +347,7 @@ function getDummyPhase(player) {
 }
 
 function isPersistentHumanPlayer(player) {
-    return Boolean(player) && !player.isNpc && !player.isDummy
+    return Boolean(player) && !player.isNpc && !player.isDummy && !player.isPumpkinNpc && !player.isHouse
 }
 
 class World {
@@ -280,9 +367,11 @@ class World {
         this.encounterFinaleUntil = 0
         this.encounterFinaleRewarded = false
         this.encounterResetOnAllDead = false
+        this.lastTrackedNerCombatPhase = 1
         this.grid = new SpatialGrid(CELL_SIZE)
         this.addDummyPlayers()
         this.addNerNpcPlayer()
+        this.spawnNeutralPumpkinNpc()
     }
 
     addDummyPlayers() {
@@ -378,12 +467,443 @@ class World {
         }
     }
 
+    removePumpkinPlayers() {
+        for (const player of Array.from(this.players.values())) {
+            if (!player.isPumpkinNpc) {
+                continue
+            }
+            this.grid.remove(player)
+            this.players.delete(player.id)
+        }
+    }
+
     getNerPlayers() {
         return Array.from(this.players.values()).filter((player) => player.isNpc)
     }
 
+    getPumpkinPlayers() {
+        return Array.from(this.players.values()).filter((player) => player.isPumpkinNpc)
+    }
+
+    getNeutralPumpkinNpc() {
+        return this.getPumpkinPlayers().find((player) => Boolean(player.isNeutralPumpkinNpc)) || null
+    }
+
+    getRandomNeutralPumpkinSpawnPosition() {
+        const padding = Math.max(0, Math.min(NEUTRAL_PUMPKIN_SPAWN_PADDING, WORLD_SIZE / 2 - 1))
+        const minAxis = padding
+        const maxAxis = Math.max(minAxis, WORLD_SIZE - padding)
+        return {
+            x: minAxis + Math.random() * Math.max(0, maxAxis - minAxis),
+            y: minAxis + Math.random() * Math.max(0, maxAxis - minAxis),
+        }
+    }
+
+    spawnNeutralPumpkinNpc() {
+        const existingNeutralPumpkin = this.getNeutralPumpkinNpc()
+        if (existingNeutralPumpkin) {
+            return existingNeutralPumpkin
+        }
+        const spawnPosition = this.getRandomNeutralPumpkinSpawnPosition()
+        const neutralPumpkin = this.spawnPumpkinNpc(spawnPosition, null)
+        neutralPumpkin.isNeutralPumpkinNpc = true
+        neutralPumpkin.pumpkinOwnerConnectionKey = ""
+        neutralPumpkin.pumpkinOriginalOwnerConnectionKey = ""
+        return neutralPumpkin
+    }
+
+    respawnNeutralPumpkinNpc() {
+        const existingNeutralPumpkin = this.getNeutralPumpkinNpc()
+        if (existingNeutralPumpkin) {
+            this.removePumpkinNpc(existingNeutralPumpkin)
+        }
+        return this.spawnNeutralPumpkinNpc()
+    }
+
     getAliveNerPlayers() {
         return this.getNerPlayers().filter((player) => !this.isPlayerDead(player))
+    }
+
+    createPumpkinNpcId() {
+        let suffix = 1
+        while (this.players.has(`${PUMPKIN_NPC_ID_PREFIX}${suffix}`)) {
+            suffix += 1
+        }
+        return `${PUMPKIN_NPC_ID_PREFIX}${suffix}`
+    }
+
+    spawnPumpkinNpc(position = {}, ownerPlayer = null) {
+        const player = new Player(this.createPumpkinNpcId())
+        player.skinName = PUMPKIN_SKIN_NAME
+        player.isPumpkinSkin = true
+        player.isPumpkinNpc = true
+        player.x = this.clampToWorld(Number(position.x || 0))
+        player.y = this.clampToWorld(Number(position.y || 0))
+        player.currentSpeed = 0
+        player.baseSpeed = getBaseSpeedForPlayer(player)
+        player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
+        player.defeatReceivedCount = 0
+        player.pumpkinDashDirectionX = 0
+        player.pumpkinDashDirectionY = 0
+        player.pumpkinDashStartedAt = 0
+        player.pumpkinDashUntil = 0
+        player.pumpkinDashProtectedUntil = 0
+        player.pumpkinDashProtectedById = ""
+        player.pumpkinClaimLockedUntil = 0
+        player.pumpkinClaimLockedById = ""
+        player.pumpkinInvulnerableUntil = 0
+        player.pumpkinFadeOutStartedAt = 0
+        player.pumpkinFadeOutUntil = 0
+        const originalOwnerConnectionKey = String(
+            ownerPlayer && (ownerPlayer.pumpkinOriginalOwnerConnectionKey || ownerPlayer.pumpkinOwnerConnectionKey || ownerPlayer.connectionKey) || ""
+        ).trim()
+        player.pumpkinOwnerConnectionKey = originalOwnerConnectionKey
+        player.pumpkinOriginalOwnerConnectionKey = originalOwnerConnectionKey
+        player.isNeutralPumpkinNpc = !originalOwnerConnectionKey
+        player.pumpkinDroppedByPlayerId = String(ownerPlayer && ownerPlayer.id || "").trim()
+        this.players.set(player.id, player)
+        this.grid.add(player)
+        return player
+    }
+
+    removePumpkinNpc(player) {
+        if (!player || !player.isPumpkinNpc) {
+            return
+        }
+        this.grid.remove(player)
+        this.players.delete(player.id)
+    }
+
+    isPumpkinNpcFading(player, now = Date.now()) {
+        return Boolean(player && player.isPumpkinNpc && Number(player.pumpkinFadeOutUntil || 0) > now)
+    }
+
+    fadeOutPumpkinNpc(player, now) {
+        if (!player || !player.isPumpkinNpc) {
+            return false
+        }
+        const fadeNow = Number(now || Date.now())
+        if (Number(player.pumpkinFadeOutUntil || 0) > fadeNow) {
+            return true
+        }
+        player.pumpkinDashDirectionX = 0
+        player.pumpkinDashDirectionY = 0
+        player.pumpkinDashStartedAt = 0
+        player.pumpkinDashUntil = 0
+        player.boostState = "idle"
+        player.currentSpeed = 0
+        player.lastMoveX = 0
+        player.lastMoveY = 0
+        player.pumpkinFadeOutStartedAt = fadeNow
+        player.pumpkinFadeOutUntil = fadeNow + PUMPKIN_NPC_FADE_OUT_DURATION_MS
+        return true
+    }
+
+    startPumpkinNpcDefeatDash(player, directionX, directionY, now) {
+        if (!player || !player.isPumpkinNpc) {
+            return false
+        }
+        const magnitude = Math.hypot(directionX, directionY)
+        if (magnitude <= 0.0001) {
+            return false
+        }
+        const normalizedX = directionX / magnitude
+        const normalizedY = directionY / magnitude
+        player.pumpkinDashDirectionX = normalizedX
+        player.pumpkinDashDirectionY = normalizedY
+        player.pumpkinDashStartedAt = now
+        player.pumpkinDashUntil = now + PUMPKIN_NPC_DEFEAT_DASH_DURATION_MS
+        player.boostState = "charging"
+        player.currentSpeed = PUMPKIN_NPC_DEFEAT_DASH_SPEED_PER_SECOND
+        player.facingAngle = Math.atan2(normalizedY, normalizedX)
+        return true
+    }
+
+    isPumpkinDashProtectedFromPlayer(pumpkinNpc, otherPlayer, now) {
+        if (!pumpkinNpc || !pumpkinNpc.isPumpkinNpc || !otherPlayer) {
+            return false
+        }
+        return (
+            Number(pumpkinNpc.pumpkinDashProtectedUntil || 0) > now &&
+            String(pumpkinNpc.pumpkinDashProtectedById || "") === String(otherPlayer.id || "")
+        )
+    }
+
+    dropPumpkinFromPlayer(player, now, options = {}) {
+        if (!player || player.isNpc || player.isDummy || player.isHouse || player.isPumpkinNpc || !isPumpkinSkinPlayer(player)) {
+            return null
+        }
+        const dropX = this.clampToWorld(Number(options.x !== undefined ? options.x : player.x || 0))
+        const dropY = this.clampToWorld(Number(options.y !== undefined ? options.y : player.y || 0))
+        const pumpkinBaseSkinName = String(player.pumpkinBaseSkinName || "").trim().toLowerCase()
+        if (pumpkinBaseSkinName === "double_single") {
+            const pumpkinDefeats = Number(player.defeatReceivedCount || 0) % DOUBLE_UNIT_HEALTH
+            const remainingDoubleHealth = pumpkinDefeats === 0
+                ? DOUBLE_UNIT_HEALTH
+                : Math.max(0, DOUBLE_UNIT_HEALTH - pumpkinDefeats)
+            const liveUnit = createDoubleUnitState(now)
+            liveUnit.health = remainingDoubleHealth
+            liveUnit.x = dropX
+            liveUnit.y = dropY
+            const inactiveUnit = createDoubleUnitState(now)
+            inactiveUnit.health = 0
+            inactiveUnit.x = dropX
+            inactiveUnit.y = dropY
+            inactiveUnit.inactiveUntil = now + DOUBLE_INACTIVE_FADE_MS
+            player.skinName = DOUBLE_SKIN_NAME
+            player.isDoubleSkin = true
+            player.doubleMerged = false
+            player.doubleSeparationPhase = "single"
+            player.doubleMergeLockUntil = 0
+            player.doubleUnits = [liveUnit, inactiveUnit]
+            player.defeatReceivedCount = 0
+        } else {
+            player.skinName = "default"
+        }
+        player.isPumpkinSkin = false
+        const originalOwnerConnectionKey = String(player.pumpkinOriginalOwnerConnectionKey || player.pumpkinOwnerConnectionKey || player.connectionKey || "").trim()
+        player.pumpkinOwnerConnectionKey = ""
+        player.pumpkinOriginalOwnerConnectionKey = ""
+        player.pumpkinBaseSkinName = ""
+        player.pumpkinBaseDoubleHealth = 0
+        player.baseSpeed = getBaseSpeedForPlayer(player)
+        player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
+        if (player.currentSpeed > 0) {
+            player.currentSpeed = Math.max(player.currentSpeed, player.baseSpeed)
+        }
+        this.syncDoubleSkinState(player, now)
+        const pumpkinNpc = this.spawnPumpkinNpc({
+            x: dropX,
+            y: dropY,
+        }, {
+            ...player,
+            pumpkinOriginalOwnerConnectionKey: originalOwnerConnectionKey,
+            pumpkinOwnerConnectionKey: originalOwnerConnectionKey,
+        })
+        pumpkinNpc.pumpkinClaimLockedUntil = now + PUMPKIN_NPC_CLAIM_LOCK_MS
+        pumpkinNpc.pumpkinClaimLockedById = String(player.id || "")
+        this.updateStoredPlayerProgress(player)
+        return pumpkinNpc
+    }
+
+    applyPumpkinSkinDefeatSplit(player, now, oppositeNormalX, oppositeNormalY, defeatedByPlayer = null, splitBounceMagnitude = null, options = {}) {
+        if (!player || !isPumpkinSkinPlayer(player) || player.isPumpkinNpc) {
+            return null
+        }
+        const pumpkinNpc = this.dropPumpkinFromPlayer(player, now)
+        if (!pumpkinNpc) {
+            return null
+        }
+        const startPumpkinDash = options.startPumpkinDash === true
+
+        const appliedSplitBounceMagnitude = Math.max(
+            0,
+            Number(splitBounceMagnitude || 0) * 0.7 * (defeatedByPlayer && defeatedByPlayer.isNpc ? NPC_DEFEAT_BOUNCE_MULTIPLIER : 1)
+        )
+        if (appliedSplitBounceMagnitude <= 0) {
+            return pumpkinNpc
+        }
+
+        const leftBounce = this.rotateVector(oppositeNormalX, oppositeNormalY, -(40 * Math.PI / 180))
+        const rightBounce = this.rotateVector(oppositeNormalX, oppositeNormalY, (40 * Math.PI / 180))
+        const playerBounceDistance = Math.hypot(leftBounce.dx, leftBounce.dy) || 1
+        const pumpkinBounceDistance = Math.hypot(rightBounce.dx, rightBounce.dy) || 1
+
+        player.lastMoveX = (leftBounce.dx / playerBounceDistance) * appliedSplitBounceMagnitude
+        player.lastMoveY = (leftBounce.dy / playerBounceDistance) * appliedSplitBounceMagnitude
+        pumpkinNpc.lastMoveX = (rightBounce.dx / pumpkinBounceDistance) * appliedSplitBounceMagnitude
+        pumpkinNpc.lastMoveY = (rightBounce.dy / pumpkinBounceDistance) * appliedSplitBounceMagnitude
+
+        player.x = this.clampToWorld(player.x + player.lastMoveX * 0.35)
+        player.y = this.clampToWorld(player.y + player.lastMoveY * 0.35)
+        pumpkinNpc.x = this.clampToWorld(pumpkinNpc.x + pumpkinNpc.lastMoveX * 0.35)
+        pumpkinNpc.y = this.clampToWorld(pumpkinNpc.y + pumpkinNpc.lastMoveY * 0.35)
+        if (startPumpkinDash) {
+            this.startPumpkinNpcDefeatDash(
+                pumpkinNpc,
+                rightBounce.dx,
+                rightBounce.dy,
+                now
+            )
+        }
+        player.splitDefeatProtectedUntil = now + SPLIT_DEFEAT_PROTECTION_MS
+        player.splitDefeatProtectedById = defeatedByPlayer ? String(defeatedByPlayer.id || "") : ""
+        player.collisionImpactX = oppositeNormalX
+        player.collisionImpactY = oppositeNormalY
+        pumpkinNpc.collisionImpactX = oppositeNormalX
+        pumpkinNpc.collisionImpactY = oppositeNormalY
+        pumpkinNpc.collisionVisualType = "defeat"
+        pumpkinNpc.collisionVisualUntil = Number(player.collisionVisualUntil || now + COLLISION_VISUAL_BASE_DURATION_MS)
+        pumpkinNpc.collisionImpactUntil = Number(player.collisionImpactUntil || now + COLLISION_IMPACT_DURATION_MS)
+        pumpkinNpc.defeatReceivedCount = Math.max(0, Number(pumpkinNpc.defeatReceivedCount || 0) + 1)
+        if (defeatedByPlayer) {
+            pumpkinNpc.pumpkinDashProtectedById = String(defeatedByPlayer.id || "")
+            pumpkinNpc.pumpkinDashProtectedUntil = now + PUMPKIN_NPC_DAMAGE_INVULNERABLE_MS
+            pumpkinNpc.pumpkinInvulnerableUntil = now + PUMPKIN_NPC_DAMAGE_INVULNERABLE_MS
+        }
+        this.grid.move(player)
+        this.grid.move(pumpkinNpc)
+        this.updateStoredPlayerProgress(player)
+        return pumpkinNpc
+    }
+
+    applyPumpkinSkinBoostSplit(player, now, awayNormalX, awayNormalY, splitBounceMagnitude = null) {
+        const pumpkinNpc = this.applyPumpkinSkinDefeatSplit(
+            player,
+            now,
+            awayNormalX,
+            awayNormalY,
+            null,
+            splitBounceMagnitude,
+            { startPumpkinDash: true }
+        )
+        if (!pumpkinNpc) {
+            return null
+        }
+        pumpkinNpc.defeatReceivedCount = Math.max(0, Number(pumpkinNpc.defeatReceivedCount || 0) - 1)
+        pumpkinNpc.collisionVisualType = "win"
+        pumpkinNpc.collisionVisualUntil = now + COLLISION_VISUAL_BASE_DURATION_MS
+        pumpkinNpc.collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+        pumpkinNpc.collisionImpactX = awayNormalX
+        pumpkinNpc.collisionImpactY = awayNormalY
+        player.collisionVisualType = "win"
+        player.collisionVisualUntil = now + COLLISION_VISUAL_BASE_DURATION_MS
+        player.collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+        player.collisionImpactX = awayNormalX
+        player.collisionImpactY = awayNormalY
+        player.splitDefeatProtectedById = ""
+        this.grid.move(player)
+        this.grid.move(pumpkinNpc)
+        this.updateStoredPlayerProgress(player)
+        return pumpkinNpc
+    }
+
+    claimPumpkinNpc(player, pumpkinNpc, now) {
+        const canClaimPumpkin = isClassicDefaultPlayer(player) || isSingleDoublePlayer(player)
+        if (!canClaimPumpkin || !pumpkinNpc || !pumpkinNpc.isPumpkinNpc || this.isPumpkinNpcFading(pumpkinNpc, now)) {
+            return false
+        }
+        if (
+            Number(pumpkinNpc.pumpkinClaimLockedUntil || 0) > now &&
+            String(pumpkinNpc.pumpkinClaimLockedById || "") === String(player.id || "")
+        ) {
+            return false
+        }
+        const originalOwnerConnectionKey = String(
+            pumpkinNpc.pumpkinOriginalOwnerConnectionKey || pumpkinNpc.pumpkinOwnerConnectionKey || ""
+        ).trim()
+        const singleDoubleClaim = isSingleDoublePlayer(player)
+        const singleDoubleHealth = singleDoubleClaim ? getSingleDoublePlayerHealth(player) : 0
+        player.skinName = PUMPKIN_SKIN_NAME
+        player.isPumpkinSkin = true
+        player.isDoubleSkin = false
+        player.pumpkinEliminated = false
+        player.isNeutralPumpkinNpc = false
+        player.pumpkinBaseSkinName = singleDoubleClaim ? "double_single" : "default"
+        player.pumpkinBaseDoubleHealth = singleDoubleClaim ? singleDoubleHealth : 0
+        if (singleDoubleClaim) {
+            player.defeatReceivedCount = Math.max(0, DOUBLE_UNIT_HEALTH - singleDoubleHealth)
+            player.doubleMerged = false
+            player.doubleSeparationPhase = "single"
+            player.doubleMergeLockUntil = 0
+        }
+        player.pumpkinOwnerConnectionKey = String(pumpkinNpc.pumpkinOwnerConnectionKey || "").trim()
+        player.pumpkinOriginalOwnerConnectionKey = String(
+            pumpkinNpc.pumpkinOriginalOwnerConnectionKey || pumpkinNpc.pumpkinOwnerConnectionKey || ""
+        ).trim()
+        player.baseSpeed = getBaseSpeedForPlayer(player)
+        player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
+        player.currentSpeed = Math.max(player.currentSpeed || 0, player.baseSpeed)
+        if (originalOwnerConnectionKey && originalOwnerConnectionKey !== String(player.connectionKey || "").trim()) {
+            this.incrementPumpkinNtrTriggerCount(originalOwnerConnectionKey)
+        }
+        this.setPumpkinEliminatedState(player.pumpkinOriginalOwnerConnectionKey || player.pumpkinOwnerConnectionKey, false, now)
+        this.removePumpkinNpc(pumpkinNpc)
+        this.updateStoredPlayerProgress(player)
+        return true
+    }
+
+    applyPumpkinNpcDefeat(pumpkinNpc, attacker, now) {
+        if (!pumpkinNpc || !pumpkinNpc.isPumpkinNpc) {
+            return false
+        }
+        if (!attacker || this.isPumpkinNpcFading(pumpkinNpc, now)) {
+            return false
+        }
+        const attackedByNpcCharge = Boolean(attacker.isNpc && attacker.npcState === "charging")
+        const attackedByUserBoost = isUserBoostAttacking(attacker)
+        if (!attackedByNpcCharge && !attackedByUserBoost) {
+            return false
+        }
+        const attackDirectionX = attackedByNpcCharge
+            ? Number(attacker.npcChargeDirectionX || attacker.boostDirectionX || attacker.lastMoveX || 0)
+            : Number(attacker.boostDirectionX || attacker.lastMoveX || 0)
+        const attackDirectionY = attackedByNpcCharge
+            ? Number(attacker.npcChargeDirectionY || attacker.boostDirectionY || attacker.lastMoveY || 0)
+            : Number(attacker.boostDirectionY || attacker.lastMoveY || 0)
+
+        pumpkinNpc.collisionVisualType = "defeat"
+        pumpkinNpc.collisionVisualUntil = now + COLLISION_VISUAL_BASE_DURATION_MS
+        pumpkinNpc.collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+        pumpkinNpc.collisionImpactX = attackDirectionX
+        pumpkinNpc.collisionImpactY = attackDirectionY
+        this.startPumpkinNpcDefeatDash(
+            pumpkinNpc,
+            attackDirectionX,
+            attackDirectionY,
+            now
+        )
+        pumpkinNpc.pumpkinDashProtectedUntil = now + PUMPKIN_NPC_DASH_PROTECTION_MS
+        pumpkinNpc.pumpkinDashProtectedById = String(attacker.id || "")
+
+        if (attackedByNpcCharge && Number(pumpkinNpc.pumpkinInvulnerableUntil || 0) <= now) {
+            pumpkinNpc.defeatReceivedCount = Math.max(0, Number(pumpkinNpc.defeatReceivedCount || 0) + 1)
+            pumpkinNpc.pumpkinInvulnerableUntil = now + PUMPKIN_NPC_DAMAGE_INVULNERABLE_MS
+        }
+
+        if (attackedByNpcCharge && pumpkinNpc.defeatReceivedCount >= PUMPKIN_NPC_HEALTH_SEGMENTS) {
+            this.incrementPumpkinNtrTriggerCount(
+                pumpkinNpc.pumpkinOriginalOwnerConnectionKey || pumpkinNpc.pumpkinOwnerConnectionKey
+            )
+            this.setPumpkinEliminatedState(
+                pumpkinNpc.pumpkinOriginalOwnerConnectionKey || pumpkinNpc.pumpkinOwnerConnectionKey,
+                true,
+                now
+            )
+            this.fadeOutPumpkinNpc(pumpkinNpc, now)
+        }
+        return true
+    }
+
+    revokePumpkinOwnershipForConnection(connectionKey, now = Date.now()) {
+        const ownerKey = String(connectionKey || "").trim()
+        if (!ownerKey) {
+            return
+        }
+
+        for (const player of Array.from(this.players.values())) {
+            if (player.isPumpkinNpc && String(player.pumpkinOwnerConnectionKey || "").trim() === ownerKey) {
+                this.fadeOutPumpkinNpc(player, now)
+                continue
+            }
+            if (!player.isPumpkinNpc && isPumpkinSkinPlayer(player)) {
+                const pumpkinSourceKey = String(
+                    player.pumpkinOriginalOwnerConnectionKey || player.pumpkinOwnerConnectionKey || ""
+                ).trim()
+                if (pumpkinSourceKey !== ownerKey) {
+                    continue
+                }
+                player.skinName = "default"
+                player.isPumpkinSkin = false
+                player.pumpkinOwnerConnectionKey = ""
+                player.pumpkinOriginalOwnerConnectionKey = ""
+                player.baseSpeed = getBaseSpeedForPlayer(player)
+                player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
+                player.currentSpeed = Math.max(Number(player.currentSpeed || 0), player.baseSpeed)
+                this.syncDoubleSkinState(player, now)
+                this.updateStoredPlayerProgress(player)
+            }
+        }
     }
 
     getHousePlayers() {
@@ -446,6 +966,7 @@ class World {
                 player.livesRemaining = this.sharedLivesRemaining
             }
         }
+        this.restoreEliminatedPumpkinPlayers(now)
         this.spawnNerNpcPlayer(NPC_ID, {
             x: WORLD_SIZE / 2,
             y: WORLD_SIZE / 2,
@@ -480,6 +1001,7 @@ class World {
                 player.livesRemaining = this.sharedLivesRemaining
             }
         }
+        this.restoreEliminatedPumpkinPlayers(now)
         const humanCount = Math.max(1, this.getHumanPlayerCount())
         const spawnCount = humanCount + 1
         const spacing = 140
@@ -526,6 +1048,9 @@ class World {
         this.encounterResetOnAllDead = false
         this.clearEncounterAnnouncement()
         this.removeHousePlayers()
+        this.removePumpkinPlayers()
+        this.lastTrackedNerCombatPhase = 1
+        this.restoreInitialPumpkinPlayersForFullReset(now)
         for (const player of Array.from(this.players.values())) {
             if (player.isNpc) {
                 this.grid.remove(player)
@@ -544,12 +1069,11 @@ class World {
             }
         }
         this.addNerNpcPlayer()
+        this.spawnNeutralPumpkinNpc()
     }
 
     getHumanPlayerCount() {
-        return Array.from(this.players.values()).filter((player) => (
-            !player.isNpc && !player.isDummy
-        )).length
+        return Array.from(this.players.values()).filter((player) => isPersistentHumanPlayer(player)).length
     }
 
     getScaledNpcMaxHealth() {
@@ -611,6 +1135,11 @@ class World {
         this.playerProgress.set(connectionKey, {
             displayId: player.id,
             skinName: player.skinName || "default",
+            initialSkinName: player.initialSkinName || player.skinName || "default",
+            pumpkinEliminated: Boolean(player.pumpkinEliminated),
+            pumpkinNtrTriggerCount: Number(player.pumpkinNtrTriggerCount || 0),
+            pumpkinBaseSkinName: String(player.pumpkinBaseSkinName || ""),
+            pumpkinBaseDoubleHealth: Number(player.pumpkinBaseDoubleHealth || 0),
             x: Number(player.x || 0),
             y: Number(player.y || 0),
             facingAngle: typeof player.facingAngle === "number" ? player.facingAngle : 0,
@@ -660,6 +1189,114 @@ class World {
         })
     }
 
+    setPumpkinEliminatedState(connectionKey, eliminated, now = Date.now()) {
+        const ownerKey = String(connectionKey || "").trim()
+        if (!ownerKey) {
+            return
+        }
+        const nextValue = Boolean(eliminated)
+        const savedProgress = this.playerProgress.get(ownerKey)
+        if (savedProgress) {
+            savedProgress.pumpkinEliminated = nextValue
+            this.playerProgress.set(ownerKey, savedProgress)
+        }
+        for (const player of this.players.values()) {
+            if (!isPersistentHumanPlayer(player)) {
+                continue
+            }
+            if (String(player.connectionKey || "").trim() !== ownerKey) {
+                continue
+            }
+            player.pumpkinEliminated = nextValue
+            this.updateStoredPlayerProgress(player)
+            if (nextValue) {
+                continue
+            }
+            player.lastActiveInputAt = Math.max(Number(player.lastActiveInputAt || 0), Number(now || Date.now()))
+        }
+    }
+
+    incrementPumpkinNtrTriggerCount(connectionKey) {
+        const ownerKey = String(connectionKey || "").trim()
+        if (!ownerKey) {
+            return
+        }
+        const savedProgress = this.playerProgress.get(ownerKey)
+        if (savedProgress) {
+            savedProgress.pumpkinNtrTriggerCount = Number(savedProgress.pumpkinNtrTriggerCount || 0) + 1
+            this.playerProgress.set(ownerKey, savedProgress)
+        }
+        for (const player of this.players.values()) {
+            if (!isPersistentHumanPlayer(player)) {
+                continue
+            }
+            if (String(player.connectionKey || "").trim() !== ownerKey) {
+                continue
+            }
+            player.pumpkinNtrTriggerCount = Number(player.pumpkinNtrTriggerCount || 0) + 1
+            this.updateStoredPlayerProgress(player)
+        }
+    }
+
+    restoreEliminatedPumpkinPlayers(now = Date.now()) {
+        for (const player of this.players.values()) {
+            if (!isPersistentHumanPlayer(player)) {
+                continue
+            }
+            if (String(player.initialSkinName || "").trim().toLowerCase() !== PUMPKIN_SKIN_NAME) {
+                continue
+            }
+            if (!Boolean(player.pumpkinEliminated)) {
+                continue
+            }
+            if (isPumpkinSkinPlayer(player)) {
+                player.pumpkinEliminated = false
+                this.updateStoredPlayerProgress(player)
+                continue
+            }
+            player.skinName = PUMPKIN_SKIN_NAME
+            player.initialSkinName = PUMPKIN_SKIN_NAME
+            player.isPumpkinSkin = true
+            player.pumpkinEliminated = false
+            player.pumpkinOwnerConnectionKey = player.connectionKey
+            player.pumpkinOriginalOwnerConnectionKey = player.connectionKey
+            player.baseSpeed = getBaseSpeedForPlayer(player)
+            player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
+            player.currentSpeed = Math.max(Number(player.currentSpeed || 0), player.baseSpeed)
+            this.syncDoubleSkinState(player, now)
+            this.updateStoredPlayerProgress(player)
+        }
+    }
+
+    restoreInitialPumpkinPlayersForFullReset(now = Date.now()) {
+        for (const player of this.players.values()) {
+            if (!isPersistentHumanPlayer(player)) {
+                continue
+            }
+            if (String(player.initialSkinName || "").trim().toLowerCase() !== PUMPKIN_SKIN_NAME) {
+                continue
+            }
+            if (isPumpkinSkinPlayer(player)) {
+                player.pumpkinEliminated = false
+                player.pumpkinOwnerConnectionKey = player.connectionKey
+                player.pumpkinOriginalOwnerConnectionKey = player.connectionKey
+                this.updateStoredPlayerProgress(player)
+                continue
+            }
+            player.skinName = PUMPKIN_SKIN_NAME
+            player.initialSkinName = PUMPKIN_SKIN_NAME
+            player.isPumpkinSkin = true
+            player.pumpkinEliminated = false
+            player.pumpkinOwnerConnectionKey = player.connectionKey
+            player.pumpkinOriginalOwnerConnectionKey = player.connectionKey
+            player.baseSpeed = getBaseSpeedForPlayer(player)
+            player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
+            player.currentSpeed = Math.max(Number(player.currentSpeed || 0), player.baseSpeed)
+            this.syncDoubleSkinState(player, now)
+            this.updateStoredPlayerProgress(player)
+        }
+    }
+
     getOrAssignGuestDisplayId(connectionKey) {
         const savedProgress = this.getStoredPlayerProgress(connectionKey)
         if (savedProgress && savedProgress.displayId) {
@@ -691,7 +1328,7 @@ class World {
         }
 
         const humanPlayers = Array.from(this.players.values()).filter((player) => (
-            !player.isNpc && !player.isDummy
+            isPersistentHumanPlayer(player)
         ))
         if (!humanPlayers.length) {
             return false
@@ -724,7 +1361,9 @@ class World {
             left: false,
             right: false,
             boost: false,
-            respawn: false
+            respawn: false,
+            moveX: 0,
+            moveY: 0
         }
         player.lastMoveX = 0
         player.lastMoveY = 0
@@ -768,6 +1407,9 @@ class World {
         this.roundResetAnnouncementUntil = now + PLAYER_DEATH_DURATION_MS
         this.pendingRoundResetAt = 0
         this.encounterResetOnAllDead = false
+        this.removePumpkinPlayers()
+        this.lastTrackedNerCombatPhase = 1
+        this.restoreInitialPumpkinPlayersForFullReset(now)
 
         for (const player of this.players.values()) {
             if (player.isNpc) {
@@ -782,6 +1424,7 @@ class World {
             player.respawnRequested = false
             this.updateStoredPlayerProgress(player)
         }
+        this.spawnNeutralPumpkinNpc()
     }
 
     resetHumanProgressAfterIdle(now) {
@@ -789,6 +1432,8 @@ class World {
         // 공용 목숨, 통계, 저장 진행도를 모두 초기화한다.
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
         this.playerProgress.clear()
+        this.removePumpkinPlayers()
+        this.lastTrackedNerCombatPhase = 1
 
         for (const player of this.players.values()) {
             if (player.isNpc) {
@@ -805,6 +1450,7 @@ class World {
             player.respawnRequested = false
             this.respawnPlayer(player, now)
         }
+        this.spawnNeutralPumpkinNpc()
     }
 
     maybeResetAfterInputIdle(now) {
@@ -821,6 +1467,7 @@ class World {
             return
         }
 
+        player.isPumpkinSkin = isPumpkinSkinPlayer(player)
         const wasDoubleSkin = Boolean(player.isDoubleSkin)
         const shouldUseDoubleSkin = isDoubleSkinPlayer(player)
         player.isDoubleSkin = shouldUseDoubleSkin
@@ -1313,6 +1960,12 @@ class World {
         player.connectionKey = resolvedConnectionKey || resolvedDisplayId
         const requestedSkinName = String(options.skinName || "").trim() || ""
         player.skinName = requestedSkinName || "default"
+        player.initialSkinName = player.skinName
+        player.pumpkinEliminated = false
+        if (isPumpkinSkinPlayer(player)) {
+            player.pumpkinOwnerConnectionKey = player.connectionKey
+            player.pumpkinOriginalOwnerConnectionKey = player.connectionKey
+        }
         player.baseSpeed = getBaseSpeedForPlayer(player)
         player.currentSpeed = getBaseSpeedForPlayer(player)
         player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
@@ -1321,7 +1974,50 @@ class World {
         // 같은 connectionKey 로 재접속하면 이전 통계를 이어받는다.
         const savedProgress = this.getStoredPlayerProgress(player.connectionKey)
         if (savedProgress) {
-            player.skinName = requestedSkinName || (String(savedProgress.skinName || player.skinName || "default").trim() || "default")
+            const savedSkinName = String(savedProgress.skinName || player.skinName || "default").trim() || "default"
+            const savedInitialSkinName = String(savedProgress.initialSkinName || player.initialSkinName || "default").trim() || "default"
+            const requestedNormalizedSkinName = String(requestedSkinName || "").trim() || ""
+            const savedPumpkinEliminated = Boolean(savedProgress.pumpkinEliminated)
+            const savedPumpkinNtrTriggerCount = Number(savedProgress.pumpkinNtrTriggerCount || 0)
+            const savedPumpkinBaseSkinName = String(savedProgress.pumpkinBaseSkinName || "")
+            const savedPumpkinBaseDoubleHealth = Number(savedProgress.pumpkinBaseDoubleHealth || 0)
+            const shouldHonorRequestedSkinDirectly = Boolean(
+                requestedNormalizedSkinName &&
+                requestedNormalizedSkinName !== "default" &&
+                requestedNormalizedSkinName !== PUMPKIN_SKIN_NAME
+            )
+            const canSwitchToRequestedPumpkin =
+                requestedNormalizedSkinName === PUMPKIN_SKIN_NAME &&
+                savedSkinName !== PUMPKIN_SKIN_NAME &&
+                !savedPumpkinEliminated
+
+            if (shouldHonorRequestedSkinDirectly) {
+                player.skinName = requestedNormalizedSkinName
+                player.initialSkinName = requestedNormalizedSkinName
+                player.pumpkinEliminated = false
+            } else {
+                player.skinName = canSwitchToRequestedPumpkin
+                    ? PUMPKIN_SKIN_NAME
+                    : savedSkinName
+                player.initialSkinName = canSwitchToRequestedPumpkin
+                    ? PUMPKIN_SKIN_NAME
+                    : savedInitialSkinName
+                player.pumpkinEliminated = canSwitchToRequestedPumpkin
+                    ? false
+                    : savedPumpkinEliminated
+            }
+            player.pumpkinNtrTriggerCount = savedPumpkinNtrTriggerCount
+            player.pumpkinBaseSkinName = savedPumpkinBaseSkinName
+            player.pumpkinBaseDoubleHealth = savedPumpkinBaseDoubleHealth
+            if (isPumpkinSkinPlayer(player)) {
+                player.pumpkinOwnerConnectionKey = player.connectionKey
+                player.pumpkinOriginalOwnerConnectionKey = player.connectionKey
+            } else {
+                player.pumpkinOwnerConnectionKey = ""
+                player.pumpkinOriginalOwnerConnectionKey = ""
+                player.pumpkinBaseSkinName = ""
+                player.pumpkinBaseDoubleHealth = 0
+            }
             player.baseSpeed = getBaseSpeedForPlayer(player)
             player.collisionSlowSpeed = getCollisionSlowSpeedForPlayer(player)
             this.syncDoubleSkinState(player)
@@ -1351,7 +2047,7 @@ class World {
             player.respawnRequested = Boolean(savedProgress.respawnRequested)
             player.lastActiveInputAt = Number(savedProgress.lastActiveInputAt || player.lastActiveInputAt || Date.now())
             const hasSavedDoubleState = Array.isArray(savedProgress.doubleUnits) && savedProgress.doubleUnits.length === DOUBLE_UNIT_COUNT
-            if (hasSavedDoubleState) {
+            if (hasSavedDoubleState && player.isDoubleSkin) {
                 player.doubleMerged = typeof savedProgress.doubleMerged === "boolean" ? savedProgress.doubleMerged : true
                 player.doubleSeparationPhase = String(savedProgress.doubleSeparationPhase || (player.doubleMerged ? "merged" : "split"))
                 player.doubleMergeLockUntil = Number(savedProgress.doubleMergeLockUntil || 0)
@@ -1385,6 +2081,7 @@ class World {
     }
 
     removePlayer(player) {
+        this.revokePumpkinOwnershipForConnection(player && player.connectionKey, Date.now())
         this.updateStoredPlayerProgress(player)
         this.grid.remove(player)
         this.players.delete(player.id)
@@ -1394,6 +2091,15 @@ class World {
     handleInput(player, data) {
         try {
             const input = JSON.parse(data)
+            const rawMoveX = Number(input.moveX || 0)
+            const rawMoveY = Number(input.moveY || 0)
+            let moveX = Number.isFinite(rawMoveX) ? rawMoveX : 0
+            let moveY = Number.isFinite(rawMoveY) ? rawMoveY : 0
+            const moveMagnitude = Math.hypot(moveX, moveY)
+            if (moveMagnitude > 1) {
+                moveX /= moveMagnitude
+                moveY /= moveMagnitude
+            }
 
             // 클라이언트 입력 구조는 이 키 집합으로 고정한다.
             player.input = {
@@ -1402,7 +2108,9 @@ class World {
                 left: Boolean(input.left),
                 right: Boolean(input.right),
                 boost: Boolean(input.boost),
-                respawn: Boolean(input.respawn)
+                respawn: Boolean(input.respawn),
+                moveX,
+                moveY
             }
         } catch (error) {
             player.input = {
@@ -1411,7 +2119,9 @@ class World {
                 left: false,
                 right: false,
                 boost: false,
-                respawn: false
+                respawn: false,
+                moveX: 0,
+                moveY: 0
             }
         }
     }
@@ -1492,6 +2202,15 @@ class World {
             return
         }
 
+        if (isPumpkinSkinPlayer(player)) {
+            this.applyPumpkinSkinBoostSplit(
+                player,
+                now,
+                hitNormalX,
+                hitNormalY,
+                this.getWallBounceDistance(Math.max(Math.abs(player.lastMoveX || 0), Math.abs(player.lastMoveY || 0)))
+            )
+        }
         this.applyCollisionSlow(player, now, collisionVisualUntil)
     }
 
@@ -1507,6 +2226,18 @@ class World {
             return {
                 halfWidth: NPC_COLLISION_HALF_WIDTH,
                 halfHeight: NPC_COLLISION_HALF_HEIGHT
+            }
+        }
+        if (player && player.isPumpkinNpc) {
+            return {
+                halfWidth: PLAYER_COLLISION_HALF_WIDTH * PUMPKIN_NPC_COLLISION_WIDTH_SCALE,
+                halfHeight: PLAYER_COLLISION_HALF_HEIGHT * PUMPKIN_NPC_COLLISION_HEIGHT_SCALE
+            }
+        }
+        if (player && isPumpkinSkinPlayer(player)) {
+            return {
+                halfWidth: PLAYER_COLLISION_HALF_WIDTH * PUMPKIN_PLAYER_COLLISION_SCALE,
+                halfHeight: PLAYER_COLLISION_HALF_HEIGHT * PUMPKIN_PLAYER_COLLISION_SCALE
             }
         }
 
@@ -1614,7 +2345,9 @@ class World {
             left: false,
             right: false,
             boost: false,
-            respawn: false
+            respawn: false,
+            moveX: 0,
+            moveY: 0
         }
         player.currentSpeed = 0
         player.boostDirectionX = 0
@@ -1664,7 +2397,9 @@ class World {
             left: false,
             right: false,
             boost: false,
-            respawn: false
+            respawn: false,
+            moveX: 0,
+            moveY: 0
         }
         player.currentSpeed = 0
         player.boostDirectionX = 0
@@ -1741,6 +2476,13 @@ class World {
             defeatedByPlayer.playerWinVisualUntil = now + 3000
             postStatsUpdate(defeatedByPlayer.id, { ner_kills: 1 })
         }
+        const connectedHumans = Array.from(this.players.values()).filter((candidate) => isPersistentHumanPlayer(candidate))
+        const connectedHumanCount = connectedHumans.length
+        if (connectedHumanCount > 0) {
+            connectedHumans.forEach((connectedPlayer) => {
+                postStatsUpdate(connectedPlayer.id, {}, { max_ner_party_size: connectedHumanCount })
+            })
+        }
         const remainingAliveNers = this.getAliveNerPlayers().filter((candidate) => candidate.id !== player.id)
         if (this.encounterStage === 0) {
             this.beginStageOneHouseEncounter(now)
@@ -1782,7 +2524,9 @@ class World {
             left: false,
             right: false,
             boost: false,
-            respawn: false
+            respawn: false,
+            moveX: 0,
+            moveY: 0
         }
         player.lastMoveX = 0
         player.lastMoveY = 0
@@ -1850,13 +2594,13 @@ class World {
         // 아니면 살아 있는 인간 유저 중 하나를 다시 뽑는다.
         if (player.npcTargetId) {
             const existingTarget = this.players.get(player.npcTargetId)
-            if (existingTarget && !existingTarget.isNpc && !existingTarget.isDummy && !this.isPlayerDead(existingTarget)) {
+            if (existingTarget && !existingTarget.isNpc && !existingTarget.isDummy && !existingTarget.isPumpkinNpc && !this.isPlayerDead(existingTarget)) {
                 return existingTarget
             }
         }
 
         const candidates = Array.from(this.players.values()).filter((candidate) => (
-            !candidate.isNpc && !candidate.isDummy && !this.isPlayerDead(candidate)
+            !candidate.isNpc && !candidate.isDummy && !candidate.isPumpkinNpc && !this.isPlayerDead(candidate)
         ))
 
         if (!candidates.length) {
@@ -1895,18 +2639,18 @@ class World {
 
         if (npcPhase >= 3) {
             return {
-                queuedExtraCharges: 2,
+                queuedExtraCharges: 1,
                 instantExtraCharge: true,
             }
         }
         if (npcPhase >= 2) {
             return {
                 queuedExtraCharges: 1,
-                instantExtraCharge: true,
+                instantExtraCharge: false,
             }
         }
         return {
-            queuedExtraCharges: 1,
+            queuedExtraCharges: 0,
             instantExtraCharge: false,
         }
     }
@@ -1955,8 +2699,13 @@ class World {
             return { dx: 0, dy: 0 }
         }
 
+        const previousPhase = Math.max(1, Number(player.npcPhase || 1))
         player.npcPhase = getNpcPhase(player)
         const npcPhase = player.npcPhase
+        if (npcPhase > previousPhase) {
+            this.lastTrackedNerCombatPhase = npcPhase
+            this.respawnNeutralPumpkinNpc()
+        }
 
         // 네르는 충돌 회복 중이면 rest 로 강제 전환한다.
         if (player.collisionRecoveryUntil > now) {
@@ -2334,6 +3083,78 @@ class World {
         return { pushA: 1 / 2, pushB: 1 / 2, totalScale: 1.5 }
     }
 
+    applyStandardCollisionBounce(playerA, playerB, now, normalX, normalY, overlap, playerAAttacking = false, playerBAttacking = false) {
+        const relativeMoveX = playerB.lastMoveX - playerA.lastMoveX
+        const relativeMoveY = playerB.lastMoveY - playerA.lastMoveY
+        const relativeImpactSpeed = Math.max(
+            0,
+            -(relativeMoveX * normalX + relativeMoveY * normalY)
+        )
+        const bounceDistance = Math.min(
+            COLLISION_MAX_BOUNCE_DISTANCE,
+            COLLISION_BOUNCE_DISTANCE + relativeImpactSpeed * COLLISION_SPEED_BOUNCE_MULTIPLIER
+        )
+        const separation = overlap / 2 + bounceDistance
+        const separationProfile = this.getCollisionSeparationProfile(playerA, playerB)
+        const scaledSeparation = separation * separationProfile.totalScale
+        const collisionVisualDuration = Math.min(
+            COLLISION_VISUAL_MAX_DURATION_MS,
+            COLLISION_VISUAL_BASE_DURATION_MS +
+                relativeImpactSpeed * COLLISION_VISUAL_SPEED_DURATION_MULTIPLIER_MS
+        )
+        const collisionVisualUntil = now + collisionVisualDuration
+        const collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+
+        playerA.collisionVisualUntil = collisionVisualUntil
+        playerB.collisionVisualUntil = collisionVisualUntil
+        playerA.collisionImpactUntil = collisionImpactUntil
+        playerB.collisionImpactUntil = collisionImpactUntil
+        playerA.collisionVisualType = "win"
+        playerB.collisionVisualType = "win"
+        playerA.npcDefeatDamageRatio = 0
+        playerB.npcDefeatDamageRatio = 0
+        playerA.collisionImpactX = -normalX
+        playerA.collisionImpactY = -normalY
+        playerB.collisionImpactX = normalX
+        playerB.collisionImpactY = normalY
+
+        this.applyCollisionSlow(playerA, now, collisionVisualUntil)
+        this.applyCollisionSlow(playerB, now, collisionVisualUntil)
+
+        let pushRatioA = separationProfile.pushA
+        let pushRatioB = separationProfile.pushB
+        if (playerA.isNpc && !playerAAttacking && !playerBAttacking) {
+            pushRatioA = 0
+            pushRatioB = 1
+        } else if (playerB.isNpc && !playerAAttacking && !playerBAttacking) {
+            pushRatioA = 1
+            pushRatioB = 0
+        }
+
+        this.applyCollisionPush(playerA, -normalX, -normalY, scaledSeparation * pushRatioA)
+        this.applyCollisionPush(playerB, normalX, normalY, scaledSeparation * pushRatioB)
+    }
+
+    isSplitDefeatProtected(player, attacker, now) {
+        if (!player || !attacker) {
+            return false
+        }
+        const attackerId = String(attacker.id || "")
+        if (!attackerId) {
+            return false
+        }
+        if (player.isDoubleSkin) {
+            return (
+                Number(player.doubleDefeatProtectedUntil || 0) > now &&
+                String(player.doubleDefeatProtectedById || "") === attackerId
+            )
+        }
+        return (
+            Number(player.splitDefeatProtectedUntil || 0) > now &&
+            String(player.splitDefeatProtectedById || "") === attackerId
+        )
+    }
+
     applyDoubleSkinDefeat(player, now, normalX, normalY, defeatedByPlayer = null, splitBounceMagnitude = null) {
         if (!player || !player.isDoubleSkin) {
             return false
@@ -2386,10 +3207,7 @@ class World {
             player.doubleSeparationPhase = "split"
             player.doubleMergeLockUntil = now + DOUBLE_REMERGE_LOCK_MS
             player.doubleSeparatedAt = now
-            player.doubleDefeatProtectedUntil = Math.max(
-                now + COLLISION_IMPACT_DURATION_MS,
-                Number(player.collisionRecoveryUntil || 0)
-            )
+            player.doubleDefeatProtectedUntil = now + SPLIT_DEFEAT_PROTECTION_MS
             player.doubleDefeatProtectedById = defeatedByPlayer ? String(defeatedByPlayer.id || "") : ""
             const angle = typeof player.facingAngle === "number" ? player.facingAngle : 0
             const sideX = -Math.sin(angle)
@@ -2521,6 +3339,26 @@ class World {
 
                 const overlap = collisionDistance - distance
 
+                if (playerA.isPumpkinNpc || playerB.isPumpkinNpc) {
+                    const pumpkinPlayer = playerA.isPumpkinNpc ? playerA : playerB
+                    const otherPlayer = playerA.isPumpkinNpc ? playerB : playerA
+                    if (this.isPumpkinNpcFading(pumpkinPlayer, now)) {
+                        continue
+                    }
+                    if (this.isPumpkinDashProtectedFromPlayer(pumpkinPlayer, otherPlayer, now)) {
+                        continue
+                    }
+                    if ((isClassicDefaultPlayer(otherPlayer) || isSingleDoublePlayer(otherPlayer)) &&
+                        this.claimPumpkinNpc(otherPlayer, pumpkinPlayer, now)) {
+                        continue
+                    }
+                    if (this.applyPumpkinNpcDefeat(pumpkinPlayer, otherPlayer, now)) {
+                        continue
+                    }
+                    this.applyStandardCollisionBounce(playerA, playerB, now, normalX, normalY, overlap)
+                    continue
+                }
+
                 if (playerA.isHouse || playerB.isHouse) {
                     const housePlayer = playerA.isHouse ? playerA : playerB
                     const moverPlayer = playerA.isHouse ? playerB : playerA
@@ -2537,6 +3375,9 @@ class World {
                     moverPlayer.collisionImpactX = hitNormalFromHouseX
                     moverPlayer.collisionImpactY = hitNormalFromHouseY
                     this.applyCollisionSlow(moverPlayer, now, moverPlayer.collisionVisualUntil)
+                    if (isPumpkinSkinPlayer(moverPlayer) && (moverPlayer.boostState === "charging" || moverPlayer.boostState === "cooldown")) {
+                        this.applyPumpkinSkinBoostSplit(moverPlayer, now, hitNormalFromHouseX, hitNormalFromHouseY, overlap + bounceDistance)
+                    }
 
                     if (isPersistentHumanPlayer(moverPlayer) && !moverPlayer.isDummy && !moverPlayer.isNpc) {
                         const damage = this.getUserDamageAgainstNpc(moverPlayer)
@@ -2582,19 +3423,29 @@ class World {
                 )
                 const collisionVisualUntil = now + collisionVisualDuration
                 const collisionImpactUntil = now + COLLISION_IMPACT_DURATION_MS
+                const playerAPumpkinBoostSplitting = isPumpkinSkinPlayer(playerA) &&
+                    !playerA.isNpc &&
+                    !playerA.isDummy &&
+                    !playerA.isHouse &&
+                    !playerA.isPumpkinNpc &&
+                    (playerA.boostState === "charging" || playerA.boostState === "cooldown")
+                const playerBPumpkinBoostSplitting = isPumpkinSkinPlayer(playerB) &&
+                    !playerB.isNpc &&
+                    !playerB.isDummy &&
+                    !playerB.isHouse &&
+                    !playerB.isPumpkinNpc &&
+                    (playerB.boostState === "charging" || playerB.boostState === "cooldown")
                 const playerAAttackDot = playerA.lastMoveX * normalX + playerA.lastMoveY * normalY
                 const playerBAttackDot = -(playerB.lastMoveX * normalX + playerB.lastMoveY * normalY)
                 // "가속한 채 진행 방향으로 박았는지"를 공격 판정으로 사용한다.
-        const playerAAttacking = (
-                    playerA.isNpc
-                        ? playerA.npcState === "charging"
-                        : playerA.currentSpeed > getBaseSpeedForPlayer(playerA)
+                const playerAAttacking = (
+                    isPlayerAttackingForCollision(playerA)
                 ) && playerAAttackDot > COLLISION_ATTACK_DIRECTION_THRESHOLD
                 const playerBAttacking = (
-                    playerB.isNpc
-                        ? playerB.npcState === "charging"
-                        : playerB.currentSpeed > getBaseSpeedForPlayer(playerB)
+                    isPlayerAttackingForCollision(playerB)
                 ) && playerBAttackDot > COLLISION_ATTACK_DIRECTION_THRESHOLD
+                const playerAProtectedFromB = this.isSplitDefeatProtected(playerA, playerB, now)
+                const playerBProtectedFromA = this.isSplitDefeatProtected(playerB, playerA, now)
 
                 playerA.collisionVisualUntil = collisionVisualUntil
                 playerB.collisionVisualUntil = collisionVisualUntil
@@ -2611,59 +3462,67 @@ class World {
 
                 // 공격/피격 결과에 따라 win/defeat 시각 상태와 통계를 기록한다.
                 if (playerAAttacking && playerBAttacking) {
-                    playerA.collisionVisualType = "defeat"
-                    playerB.collisionVisualType = "defeat"
-                    playerA.collisionImpactX = -normalX
-                    playerA.collisionImpactY = -normalY
-                    playerB.collisionImpactX = normalX
-                    playerB.collisionImpactY = normalY
-                    if (!playerA.isDoubleSkin) {
-                        playerA.defeatReceivedCount += 1
+                    if (!playerAProtectedFromB) {
+                        playerA.collisionVisualType = "defeat"
+                        playerA.collisionImpactX = -normalX
+                        playerA.collisionImpactY = -normalY
+                        if (!playerA.isDoubleSkin) {
+                            playerA.defeatReceivedCount += 1
+                        }
+                        playerB.defeatDealtCount += 1
+                        if (playerB.isNpc && isPersistentHumanPlayer(playerA)) {
+                            postStatsUpdate(playerA.id, { ner_hits: 1 })
+                        }
                     }
-                    if (!playerB.isDoubleSkin) {
-                        playerB.defeatReceivedCount += 1
-                    }
-                    playerA.defeatDealtCount += 1
-                    playerB.defeatDealtCount += 1
-                    if (playerA.isNpc && isPersistentHumanPlayer(playerB)) {
-                        postStatsUpdate(playerB.id, { ner_hits: 1 })
-                    }
-                    if (playerB.isNpc && isPersistentHumanPlayer(playerA)) {
-                        postStatsUpdate(playerA.id, { ner_hits: 1 })
+                    if (!playerBProtectedFromA) {
+                        playerB.collisionVisualType = "defeat"
+                        playerB.collisionImpactX = normalX
+                        playerB.collisionImpactY = normalY
+                        if (!playerB.isDoubleSkin) {
+                            playerB.defeatReceivedCount += 1
+                        }
+                        playerA.defeatDealtCount += 1
+                        if (playerA.isNpc && isPersistentHumanPlayer(playerB)) {
+                            postStatsUpdate(playerB.id, { ner_hits: 1 })
+                        }
                     }
                 } else if (playerAAttacking) {
-                    playerB.collisionVisualType = "defeat"
-                    playerB.collisionImpactX = normalX
-                    playerB.collisionImpactY = normalY
-                    playerA.defeatDealtCount += 1
-                    if (!playerB.isDoubleSkin) {
-                        playerB.defeatReceivedCount += 1
-                    }
-                    if (playerB.isNpc && isPersistentHumanPlayer(playerA)) {
-                        postStatsUpdate(playerA.id, { ner_hits: 1 })
-                    }
-                    if (playerA.isNpc && playerA.npcChargeTargetId === playerB.id) {
-                        playerA.npcChargeHitTarget = true
-                    }
-                    if (playerB.isDummy && !playerA.isNpc && !playerA.isDummy) {
-                        playerB.dummyRetaliationTargetId = playerA.id
+                    if (!playerBProtectedFromA) {
+                        playerB.collisionVisualType = "defeat"
+                        playerB.collisionImpactX = normalX
+                        playerB.collisionImpactY = normalY
+                        playerA.defeatDealtCount += 1
+                        if (!playerB.isDoubleSkin) {
+                            playerB.defeatReceivedCount += 1
+                        }
+                        if (playerB.isNpc && isPersistentHumanPlayer(playerA)) {
+                            postStatsUpdate(playerA.id, { ner_hits: 1 })
+                        }
+                        if (playerA.isNpc && playerA.npcChargeTargetId === playerB.id) {
+                            playerA.npcChargeHitTarget = true
+                        }
+                        if (playerB.isDummy && !playerA.isNpc && !playerA.isDummy) {
+                            playerB.dummyRetaliationTargetId = playerA.id
+                        }
                     }
                 } else if (playerBAttacking) {
-                    playerA.collisionVisualType = "defeat"
-                    playerA.collisionImpactX = -normalX
-                    playerA.collisionImpactY = -normalY
-                    playerB.defeatDealtCount += 1
-                    if (!playerA.isDoubleSkin) {
-                        playerA.defeatReceivedCount += 1
-                    }
-                    if (playerA.isNpc && isPersistentHumanPlayer(playerB)) {
-                        postStatsUpdate(playerB.id, { ner_hits: 1 })
-                    }
-                    if (playerB.isNpc && playerB.npcChargeTargetId === playerA.id) {
-                        playerB.npcChargeHitTarget = true
-                    }
-                    if (playerA.isDummy && !playerB.isNpc && !playerB.isDummy) {
-                        playerA.dummyRetaliationTargetId = playerB.id
+                    if (!playerAProtectedFromB) {
+                        playerA.collisionVisualType = "defeat"
+                        playerA.collisionImpactX = -normalX
+                        playerA.collisionImpactY = -normalY
+                        playerB.defeatDealtCount += 1
+                        if (!playerA.isDoubleSkin) {
+                            playerA.defeatReceivedCount += 1
+                        }
+                        if (playerA.isNpc && isPersistentHumanPlayer(playerB)) {
+                            postStatsUpdate(playerB.id, { ner_hits: 1 })
+                        }
+                        if (playerB.isNpc && playerB.npcChargeTargetId === playerA.id) {
+                            playerB.npcChargeHitTarget = true
+                        }
+                        if (playerA.isDummy && !playerB.isNpc && !playerB.isDummy) {
+                            playerA.dummyRetaliationTargetId = playerB.id
+                        }
                     }
                 }
 
@@ -2680,11 +3539,33 @@ class World {
 
                 let doubleAHandled = false
                 let doubleBHandled = false
+                let pumpkinASplitHandled = false
+                let pumpkinBSplitHandled = false
+                let pumpkinABoostSplitHandled = false
+                let pumpkinBBoostSplitHandled = false
                 if (playerA.collisionVisualType === "defeat" && playerA.isDoubleSkin) {
                     doubleAHandled = this.applyDoubleSkinDefeat(playerA, now, normalX, normalY, playerB, scaledSeparation)
                 }
                 if (playerB.collisionVisualType === "defeat" && playerB.isDoubleSkin) {
                     doubleBHandled = this.applyDoubleSkinDefeat(playerB, now, -normalX, -normalY, playerA, scaledSeparation)
+                }
+                if (playerA.collisionVisualType === "defeat" && isPumpkinSkinPlayer(playerA)) {
+                    pumpkinASplitHandled = Boolean(this.applyPumpkinSkinDefeatSplit(playerA, now, -normalX, -normalY, playerB, scaledSeparation))
+                }
+                if (playerB.collisionVisualType === "defeat" && isPumpkinSkinPlayer(playerB)) {
+                    pumpkinBSplitHandled = Boolean(this.applyPumpkinSkinDefeatSplit(playerB, now, normalX, normalY, playerA, scaledSeparation))
+                }
+                if (!pumpkinASplitHandled &&
+                    playerAPumpkinBoostSplitting &&
+                    playerA.collisionVisualType === "win" &&
+                    isPumpkinSkinPlayer(playerA)) {
+                    pumpkinABoostSplitHandled = Boolean(this.applyPumpkinSkinBoostSplit(playerA, now, -normalX, -normalY, scaledSeparation))
+                }
+                if (!pumpkinBSplitHandled &&
+                    playerBPumpkinBoostSplitting &&
+                    playerB.collisionVisualType === "win" &&
+                    isPumpkinSkinPlayer(playerB)) {
+                    pumpkinBBoostSplitHandled = Boolean(this.applyPumpkinSkinBoostSplit(playerB, now, normalX, normalY, scaledSeparation))
                 }
 
                 if (playerA.collisionVisualType === "defeat" &&
@@ -2728,6 +3609,12 @@ class World {
                     pushRatioB = 1
                 } else if (playerB.isNpc && !playerAAttacking && !playerBAttacking) {
                     pushRatioA = 1
+                    pushRatioB = 0
+                }
+                if (doubleAHandled || pumpkinASplitHandled || pumpkinABoostSplitHandled) {
+                    pushRatioA = 0
+                }
+                if (doubleBHandled || pumpkinBSplitHandled || pumpkinBBoostSplitHandled) {
                     pushRatioB = 0
                 }
 
@@ -2805,6 +3692,43 @@ class World {
                 continue
             }
 
+            if (player.isPumpkinNpc) {
+                if (Number(player.pumpkinFadeOutUntil || 0) > now) {
+                    player.currentSpeed = 0
+                    player.lastMoveX = 0
+                    player.lastMoveY = 0
+                    player.boostState = "idle"
+                    continue
+                }
+                if (Number(player.pumpkinFadeOutUntil || 0) !== 0 && Number(player.pumpkinFadeOutUntil || 0) <= now) {
+                    this.removePumpkinNpc(player)
+                    continue
+                }
+                if (Number(player.pumpkinDashUntil || 0) > now) {
+                    const dashDirectionX = Number(player.pumpkinDashDirectionX || 0)
+                    const dashDirectionY = Number(player.pumpkinDashDirectionY || 0)
+                    player.boostState = "charging"
+                    player.currentSpeed = PUMPKIN_NPC_DEFEAT_DASH_SPEED_PER_SECOND
+                    player.facingAngle = Math.atan2(dashDirectionY, dashDirectionX)
+                    player.lastMoveX = dashDirectionX * player.currentSpeed * TICK_DELTA_SECONDS
+                    player.lastMoveY = dashDirectionY * player.currentSpeed * TICK_DELTA_SECONDS
+                    player.x = this.clampToWorld(player.x + player.lastMoveX)
+                    player.y = this.clampToWorld(player.y + player.lastMoveY)
+                    continue
+                }
+                if (Number(player.pumpkinDashUntil || 0) !== 0) {
+                    player.pumpkinDashDirectionX = 0
+                    player.pumpkinDashDirectionY = 0
+                    player.pumpkinDashStartedAt = 0
+                    player.pumpkinDashUntil = 0
+                }
+                player.boostState = "idle"
+                player.currentSpeed = 0
+                player.lastMoveX = 0
+                player.lastMoveY = 0
+                continue
+            }
+
             let dx = 0
             let dy = 0
 
@@ -2818,10 +3742,22 @@ class World {
                 dx = dummyVector.dx
                 dy = dummyVector.dy
             } else {
-                if (player.input.left) dx -= 1
-                if (player.input.right) dx += 1
-                if (player.input.up) dy -= 1
-                if (player.input.down) dy += 1
+                const inputMoveX = Number(player.input && player.input.moveX !== undefined ? player.input.moveX : 0)
+                const inputMoveY = Number(player.input && player.input.moveY !== undefined ? player.input.moveY : 0)
+                const inputMagnitude = Math.hypot(inputMoveX, inputMoveY)
+                if (Number.isFinite(inputMagnitude) && inputMagnitude > 0.001) {
+                    dx = inputMoveX
+                    dy = inputMoveY
+                    if (inputMagnitude > 1) {
+                        dx /= inputMagnitude
+                        dy /= inputMagnitude
+                    }
+                } else {
+                    if (player.input.left) dx -= 1
+                    if (player.input.right) dx += 1
+                    if (player.input.up) dy -= 1
+                    if (player.input.down) dy += 1
+                }
             }
 
             const isMoving = dx !== 0 || dy !== 0

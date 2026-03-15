@@ -77,6 +77,10 @@
         connected: root.getAttribute('data-connected-label') || 'Connected',
         disconnected: root.getAttribute('data-disconnected-label') || 'Disconnected'
     };
+    const phaseOneBackgroundColor = { r: 251, g: 246, b: 237 };
+    const phaseThreeBackgroundColor = { r: 232, g: 139, b: 88 };
+    const SELF_PUMPKIN_NTR_VISUAL_DURATION_MS = 3000;
+    const PUMPKIN_NPC_HEALTH_SEGMENTS = 4;
     const deathTitleLabel = root.getAttribute('data-death-title-label') || 'You\'ve been Nered!';
     const deathGameOverTitleLabel = root.getAttribute('data-death-game-over-title-label') || 'Spiky tried hard......';
     const deathRespawnLabel = root.getAttribute('data-death-respawn-label') || 'Respawn';
@@ -193,6 +197,9 @@
     const inputSendIntervalMs = 66;
     const inputHeartbeatMs = 150;
     const input = { up: false, down: false, left: false, right: false, boost: false, respawn: false };
+    const keyboardDirectionInput = { up: false, down: false, left: false, right: false };
+    const joystickDirectionInput = { up: false, down: false, left: false, right: false };
+    const mouseDirectionInput = { up: false, down: false, left: false, right: false };
     const keyMap = {
         w: 'up',
         ArrowUp: 'up',
@@ -219,6 +226,12 @@
     let isFullscreenMode = false;
     let isCompactViewport = false;
     let joystickPointerId = null;
+    let mouseMoveActive = false;
+    let mouseLeftHeld = false;
+    let mouseBoostRequested = false;
+    let mouseScreenDX = 0;
+    let mouseScreenDY = 0;
+    let mouseBoostPulseTimer = null;
     let lastRenderTime = 0;
     let cameraX = worldSize / 2;
     let cameraY = worldSize / 2;
@@ -243,6 +256,7 @@
     let selfCollisionActive = false;
     let selfCollisionImpactActive = false;
     let selfCollisionVisualType = 'win';
+    let selfPumpkinNtrVisualUntil = 0;
     let encounterStage = 0;
     let encounterAnnouncementKey = '';
     let encounterCountdownSeconds = 0;
@@ -297,7 +311,10 @@
     let playerNpcDefeat2IconReady = false;
     let playerNpcDieIconReady = false;
     let selectedSkinName = 'default';
+    let activeSelfSkinName = 'default';
     let selectedSkinDetailName = '';
+    let selfPumpkinNtrTriggerCount = 0;
+    let selfServerAudioStateInitialized = false;
 
     animatedAssetDock.setAttribute('aria-hidden', 'true');
     animatedAssetDock.style.position = 'fixed';
@@ -385,8 +402,10 @@
                 defeat: Array.isArray(assets.defeat_sound_urls) ? assets.defeat_sound_urls.filter(Boolean) : [],
                 die: Array.isArray(assets.die_sound_urls) ? assets.die_sound_urls.filter(Boolean) : [],
                 respawn: Array.isArray(assets.respawn_sound_urls) ? assets.respawn_sound_urls.filter(Boolean) : [],
+                ntr: Array.isArray(assets.ntr_sound_urls) ? assets.ntr_sound_urls.filter(Boolean) : [],
             },
             previewIcon: createManagedImage(assets.preview_icon_url || assets.default_icon_url || ''),
+            pumpkinNpcIcon: createManagedImage(assets.pumpkin_npc_icon_url || ''),
             legacyIcon: createManagedImage(assets.default_icon_url || assets.preview_icon_url || ''),
             legacyBoostIcon: createManagedImage(assets.boost_icon_url || ''),
             legacyCollisionIcon: createManagedImage(assets.collision_icon_url || ''),
@@ -532,6 +551,7 @@
         });
     });
     selectedSkinName = resolveSelectedSkinName();
+    activeSelfSkinName = selectedSkinName;
 
     const clampToWorld = function (value) {
         return Math.max(0, Math.min(worldSize, value));
@@ -576,11 +596,109 @@
         return Math.max(scaledZoom, minWorldFitZoom);
     };
 
-    const buildInputSignature = function () {
-        return JSON.stringify(input);
+    const getControlledPlayerPosition = function () {
+        if (predictedSelf) {
+            return {
+                x: Number(predictedSelf.x || 0),
+                y: Number(predictedSelf.y || 0)
+            };
+        }
+        if (renderedSelf) {
+            return {
+                x: Number(renderedSelf.x || 0),
+                y: Number(renderedSelf.y || 0)
+            };
+        }
+        const selfPlayer = renderPlayers.find(function (player) {
+            return player.id === selfId;
+        });
+        if (!selfPlayer) {
+            return null;
+        }
+        return {
+            x: Number(selfPlayer.x || 0),
+            y: Number(selfPlayer.y || 0)
+        };
     };
 
-    const getInputVector = function () {
+    const updateMouseTarget = function (clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+            return;
+        }
+        const displayX = ((clientX - rect.left) / rect.width) * getCanvasDisplayWidth();
+        const displayY = ((clientY - rect.top) / rect.height) * getCanvasDisplayHeight();
+        const controlledPosition = getControlledPlayerPosition();
+        if (!controlledPosition) {
+            mouseScreenDX = displayX - (getCanvasDisplayWidth() / 2);
+            mouseScreenDY = displayY - (getCanvasDisplayHeight() / 2);
+            return;
+        }
+        const zoom = getEffectiveZoom();
+        const selfScreenX = (controlledPosition.x - cameraX) * zoom;
+        const selfScreenY = (controlledPosition.y - cameraY) * zoom;
+        mouseScreenDX = displayX - selfScreenX;
+        mouseScreenDY = displayY - selfScreenY;
+    };
+
+    const syncDirectionalInput = function () {
+        const keyboardActive = keyboardDirectionInput.up || keyboardDirectionInput.down || keyboardDirectionInput.left || keyboardDirectionInput.right;
+        const joystickActive = joystickDirectionInput.up || joystickDirectionInput.down || joystickDirectionInput.left || joystickDirectionInput.right;
+        const source = keyboardActive
+            ? keyboardDirectionInput
+            : (joystickActive ? joystickDirectionInput : mouseDirectionInput);
+        input.up = Boolean(source.up);
+        input.down = Boolean(source.down);
+        input.left = Boolean(source.left);
+        input.right = Boolean(source.right);
+    };
+
+    const updateMouseDirectionalInput = function () {
+        if (!mouseMoveActive || selfDeathActive) {
+            mouseDirectionInput.up = false;
+            mouseDirectionInput.down = false;
+            mouseDirectionInput.left = false;
+            mouseDirectionInput.right = false;
+            syncDirectionalInput();
+            return;
+        }
+        const deadZone = 18;
+        const distance = Math.hypot(mouseScreenDX, mouseScreenDY);
+        if (distance <= deadZone) {
+            mouseDirectionInput.up = false;
+            mouseDirectionInput.down = false;
+            mouseDirectionInput.left = false;
+            mouseDirectionInput.right = false;
+            syncDirectionalInput();
+            return;
+        }
+        mouseDirectionInput.left = false;
+        mouseDirectionInput.right = false;
+        mouseDirectionInput.up = false;
+        mouseDirectionInput.down = false;
+        syncDirectionalInput();
+    };
+
+    const refreshMouseMoveState = function () {
+        mouseMoveActive = mouseLeftHeld && !mouseBoostRequested && !selfDeathActive;
+        updateMouseDirectionalInput();
+    };
+
+    const getMouseVector = function (allowWhenInactive) {
+        if ((!mouseMoveActive && !allowWhenInactive) || selfDeathActive) {
+            return { dx: 0, dy: 0 };
+        }
+        const distance = Math.hypot(mouseScreenDX, mouseScreenDY);
+        if (distance <= 18) {
+            return { dx: 0, dy: 0 };
+        }
+        return {
+            dx: mouseScreenDX / distance,
+            dy: mouseScreenDY / distance
+        };
+    };
+
+    const getNetworkMoveVector = function () {
         let dx = 0;
         let dy = 0;
 
@@ -589,13 +707,38 @@
         if (input.up) dy -= 1;
         if (input.down) dy += 1;
 
-        if (dx !== 0 && dy !== 0) {
-            const normalize = Math.SQRT1_2;
-            dx *= normalize;
-            dy *= normalize;
+        if (dx !== 0 || dy !== 0) {
+            if (dx !== 0 && dy !== 0) {
+                const normalize = Math.SQRT1_2;
+                dx *= normalize;
+                dy *= normalize;
+            }
+            return { dx, dy };
         }
 
-        return { dx, dy };
+        return getMouseVector(mouseBoostRequested);
+    };
+
+    const buildInputPayload = function () {
+        const moveVector = getNetworkMoveVector();
+        return {
+            up: Boolean(input.up),
+            down: Boolean(input.down),
+            left: Boolean(input.left),
+            right: Boolean(input.right),
+            boost: Boolean(input.boost),
+            respawn: Boolean(input.respawn),
+            moveX: Number(moveVector.dx.toFixed(4)),
+            moveY: Number(moveVector.dy.toFixed(4))
+        };
+    };
+
+    const buildInputSignature = function () {
+        return JSON.stringify(buildInputPayload());
+    };
+
+    const getInputVector = function () {
+        return getNetworkMoveVector();
     };
 
     const setStatus = function (label, color) {
@@ -755,6 +898,7 @@
         }
         startCharacterImage.alt = skinRuntime.displayName;
         startCharacterImage.classList.toggle('is-evolution', skinRuntime.skinType === 'evolution');
+        startCharacterImage.classList.toggle('is-pumkin', skinRuntime.skinType === 'pumkin');
         if (startCharacterImage.complete && startCharacterImage.naturalWidth > 0) {
             startCharacterImage.classList.add('is-ready');
         }
@@ -780,6 +924,7 @@
         }
         if (!opened && skinDetailIconNode) {
             skinDetailIconNode.classList.remove('is-evolution');
+            skinDetailIconNode.classList.remove('is-pumkin');
         }
     };
 
@@ -809,6 +954,7 @@
             icon.src = getManagedImageSource(skinRuntime.previewIcon) || getManagedImageSource(skinRuntime.legacyIcon);
             icon.alt = skinRuntime.displayName;
             icon.classList.toggle('is-evolution', skinRuntime.skinType === 'evolution');
+            icon.classList.toggle('is-pumkin', skinRuntime.skinType === 'pumkin');
 
             const name = window.document.createElement('strong');
             name.className = 'multiplayer-skin-item-name';
@@ -832,6 +978,7 @@
                     skinDetailIconNode.src = icon.src;
                     skinDetailIconNode.alt = skinRuntime.displayName;
                     skinDetailIconNode.classList.toggle('is-evolution', skinRuntime.skinType === 'evolution');
+                    skinDetailIconNode.classList.toggle('is-pumkin', skinRuntime.skinType === 'pumkin');
                     skinDetailIconNode.classList.toggle('is-locked', !skinRuntime.unlocked);
                 }
                 if (skinDetailNameNode) {
@@ -868,6 +1015,7 @@
             return;
         }
         selectedSkinName = skinRuntime.name;
+        activeSelfSkinName = skinRuntime.name;
         if (boostState === 'idle') {
             currentMoveSpeed = getSelectedPlayerBaseSpeed();
             serverReportedMoveSpeed = getSelectedPlayerBaseSpeed();
@@ -887,6 +1035,7 @@
         lastSentInputAt = 0;
         predictedSelf = null;
         renderedSelf = null;
+        activeSelfSkinName = selectedSkinName;
         currentMoveSpeed = getSelectedPlayerBaseSpeed();
         serverReportedMoveSpeed = getSelectedPlayerBaseSpeed();
         collisionRecoveryActive = false;
@@ -900,6 +1049,30 @@
         manualStartAutoRespawnPending = false;
         selfCollisionActive = false;
         selfCollisionVisualType = 'win';
+        selfPumpkinNtrVisualUntil = 0;
+        mouseMoveActive = false;
+        mouseLeftHeld = false;
+        mouseBoostRequested = false;
+        mouseScreenDX = 0;
+        mouseScreenDY = 0;
+        if (mouseBoostPulseTimer) {
+            window.clearTimeout(mouseBoostPulseTimer);
+            mouseBoostPulseTimer = null;
+        }
+        keyboardDirectionInput.up = false;
+        keyboardDirectionInput.down = false;
+        keyboardDirectionInput.left = false;
+        keyboardDirectionInput.right = false;
+        joystickDirectionInput.up = false;
+        joystickDirectionInput.down = false;
+        joystickDirectionInput.left = false;
+        joystickDirectionInput.right = false;
+        mouseDirectionInput.up = false;
+        mouseDirectionInput.down = false;
+        mouseDirectionInput.left = false;
+        mouseDirectionInput.right = false;
+        syncDirectionalInput();
+        input.boost = false;
         encounterStage = 0;
         encounterAnnouncementKey = '';
         encounterCountdownSeconds = 0;
@@ -1132,8 +1305,17 @@
 
     const getSpectatablePlayers = function () {
         return renderPlayers.filter(function (player) {
-            return !player.isNpc && !player.isDummy && player.id !== selfId && !player.deathActive;
+            return !player.isNpc && !player.isDummy && !player.isPumpkinNpc && player.id !== selfId && !player.deathActive;
         });
+    };
+
+    const getServerDisplayName = function (serverPlayer) {
+        if (serverPlayer && serverPlayer.isPumpkinNpc) {
+            return '';
+        }
+        return (serverPlayer && typeof serverPlayer.displayName === 'string' && serverPlayer.displayName.length)
+            ? serverPlayer.displayName
+            : (serverPlayer && serverPlayer.id) || '';
     };
 
     const syncSpectateTarget = function () {
@@ -1283,10 +1465,11 @@
 
     const resetJoystick = function () {
         joystickPointerId = null;
-        input.up = false;
-        input.down = false;
-        input.left = false;
-        input.right = false;
+        joystickDirectionInput.up = false;
+        joystickDirectionInput.down = false;
+        joystickDirectionInput.left = false;
+        joystickDirectionInput.right = false;
+        syncDirectionalInput();
         if (joystickKnob) {
             joystickKnob.style.transform = 'translate(0, 0)';
         }
@@ -1314,10 +1497,11 @@
         const threshold = 0.34;
 
         joystickKnob.style.transform = 'translate(' + limitedX + 'px, ' + limitedY + 'px)';
-        input.left = normalizedX < -threshold;
-        input.right = normalizedX > threshold;
-        input.up = normalizedY < -threshold;
-        input.down = normalizedY > threshold;
+        joystickDirectionInput.left = normalizedX < -threshold;
+        joystickDirectionInput.right = normalizedX > threshold;
+        joystickDirectionInput.up = normalizedY < -threshold;
+        joystickDirectionInput.down = normalizedY > threshold;
+        syncDirectionalInput();
         sendInputNow();
     };
 
@@ -1613,6 +1797,10 @@
         playRandomSoundFromList(urls, 0.92, volume, playerId);
     };
 
+    const playRandomNtrSound = function (urls, volume, playerId) {
+        playRandomSoundFromList(urls, 0.95, volume, playerId);
+    };
+
     const processDoubleUnitSounds = function (player, listenerPlayer, isSelfPlayer) {
         if (!player || !player.doubleState || !Array.isArray(player.doubleState.units)) {
             return;
@@ -1696,7 +1884,8 @@
                 collisionActive: false,
                 collisionVisualType: 'win',
                 deathActive: false,
-                npcState: ''
+                npcState: '',
+                skinName: ''
             };
 
             if (player.id !== selfId && player.isHouse) {
@@ -1705,7 +1894,8 @@
                     collisionActive: false,
                     collisionVisualType: 'win',
                     deathActive: false,
-                    npcState: ''
+                    npcState: '',
+                    skinName: ''
                 });
                 return;
             }
@@ -1729,6 +1919,11 @@
                 const isMergedDouble = getPlayerSkinProfile(player.skinName || 'default').type === 'double'
                     && player.doubleState
                     && Boolean(player.doubleState.merged);
+                const enteredPumpkinForm = player.skinName === 'pumkin' && previousState.skinName && previousState.skinName !== 'pumkin';
+
+                if (enteredPumpkinForm) {
+                    playRandomRespawnSound(getSkinConfig('pumkin').sounds.respawn, volume, player.id + ':pumpkin-respawn');
+                }
 
                 if (player.boostState === 'charging' && previousState.boostState !== 'charging') {
                     if (isMergedDouble) {
@@ -1776,7 +1971,8 @@
                 npcState: player.npcState || '',
                 collisionActive: Boolean(player.collisionActive),
                 collisionVisualType: player.collisionVisualType || 'win',
-                deathActive: Boolean(player.deathActive)
+                deathActive: Boolean(player.deathActive),
+                skinName: player.skinName || 'default'
             });
         });
 
@@ -1835,7 +2031,12 @@
                 stopIconIndex: 0,
                 collisionVisualActive: false,
                 finaleActive: false,
-                finaleStuntPattern: 0
+                finaleStuntPattern: 0,
+                pumpkinNtrTriggerCount: 0,
+                pumpkinNtrVisualUntil: 0,
+                lastHouseHealth: null,
+                houseShakeStartedAt: 0,
+                houseShakeUntil: 0
             });
         }
         return playerVisuals.get(id);
@@ -2146,10 +2347,10 @@
             boostState = 'charging';
             boostDirectionX = inputVector.dx;
             boostDirectionY = inputVector.dy;
-            if (getPlayerSkinProfile(selectedSkinName).type === 'double' && selfDoubleMerged) {
-                playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.boost, 0.9, undefined, selfId || '__self__');
+            if (getPlayerSkinProfile(activeSelfSkinName || selectedSkinName).type === 'double' && selfDoubleMerged) {
+                playMergedDoubleSoundFromList(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.boost, 0.9, undefined, selfId || '__self__');
             } else {
-                playRandomBoostSound(getSkinConfig(selectedSkinName).sounds.boost, undefined, selfId || '__self__');
+                playRandomBoostSound(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.boost, undefined, selfId || '__self__');
             }
         }
 
@@ -2263,7 +2464,8 @@
             return;
         }
         const now = Date.now();
-        const nextSignature = buildInputSignature();
+        const nextPayload = buildInputPayload();
+        const nextSignature = JSON.stringify(nextPayload);
         if (!force && nextSignature === lastSentInputSignature && now - lastSentInputAt < inputHeartbeatMs) {
             return;
         }
@@ -2410,11 +2612,16 @@
                 processRemotePlayerSounds(payload, selfPlayer || predictedSelf);
                 if (selfPlayer) {
                     const wasSelfDeathActive = selfDeathActive;
-                    const selfSkinType = getPlayerSkinProfile(selfPlayer.skinName || selectedSkinName).type;
+                    const previousSelfSkinName = activeSelfSkinName || selectedSkinName || 'default';
+                    const nextSelfSkinName = selfPlayer.skinName
+                        ? (String(selfPlayer.skinName).trim().toLowerCase() || previousSelfSkinName)
+                        : previousSelfSkinName;
+                    const previousSelfPumpkinNtrTriggerCount = selfPumpkinNtrTriggerCount;
                     if (selfPlayer.skinName) {
-                        selectedSkinName = String(selfPlayer.skinName).trim().toLowerCase() || selectedSkinName;
-                        updateStartCharacterPreview();
+                        activeSelfSkinName = nextSelfSkinName;
                     }
+                    selfPumpkinNtrTriggerCount = Math.max(0, Number(selfPlayer.pumpkinNtrTriggerCount || 0));
+                    const selfSkinType = getPlayerSkinProfile(selfPlayer.skinName || activeSelfSkinName || selectedSkinName).type;
                     selfDoubleMerged = Boolean(
                         selfSkinType === 'double' &&
                         selfPlayer.doubleState &&
@@ -2449,32 +2656,45 @@
                     } else if (Boolean(selfPlayer.collisionActive) && !selfCollisionActive) {
                         if ((selfPlayer.collisionVisualType || 'win') === 'defeat') {
                             if (selfDoubleMerged) {
-                                playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.defeat, 0.95, undefined, selfId || '__self__');
+                                playMergedDoubleSoundFromList(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.defeat, 0.95, undefined, selfId || '__self__');
                             } else {
-                                playRandomDefeatSound(getSkinConfig(selectedSkinName).sounds.defeat, undefined, selfId || '__self__');
+                                playRandomDefeatSound(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.defeat, undefined, selfId || '__self__');
                             }
                         } else {
                             if (selfDoubleMerged) {
-                                playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.crash, 0.95, undefined, selfId || '__self__');
+                                playMergedDoubleSoundFromList(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.crash, 0.95, undefined, selfId || '__self__');
                             } else {
-                                playRandomCrashSound(getSkinConfig(selectedSkinName).sounds.crash, undefined, selfId || '__self__');
+                                playRandomCrashSound(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.crash, undefined, selfId || '__self__');
                             }
                         }
                     }
                     if (selfDeathActive && !wasSelfDeathActive) {
                         if (selfDoubleMerged) {
-                            playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.die, 0.98, undefined, selfId || '__self__');
+                            playMergedDoubleSoundFromList(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.die, 0.98, undefined, selfId || '__self__');
                         } else {
-                            playRandomDieSound(getSkinConfig(selectedSkinName).sounds.die, undefined, selfId || '__self__');
+                            playRandomDieSound(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.die, undefined, selfId || '__self__');
                         }
                     }
                     if (!selfDeathActive && wasSelfDeathActive) {
                         if (selfDoubleMerged) {
-                            playMergedDoubleSoundFromList(getSkinConfig(selectedSkinName).sounds.respawn, 0.92, undefined, selfId || '__self__');
+                            playMergedDoubleSoundFromList(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.respawn, 0.92, undefined, selfId || '__self__');
                         } else {
-                            playRandomRespawnSound(getSkinConfig(selectedSkinName).sounds.respawn, undefined, selfId || '__self__');
+                            playRandomRespawnSound(getSkinConfig(activeSelfSkinName || selectedSkinName).sounds.respawn, undefined, selfId || '__self__');
                         }
                     }
+                    if (selfServerAudioStateInitialized && previousSelfSkinName && previousSelfSkinName !== 'pumkin' && nextSelfSkinName === 'pumkin') {
+                        playRandomRespawnSound(getSkinConfig('pumkin').sounds.respawn, undefined, (selfId || '__self__') + ':pumpkin-respawn');
+                    }
+                    if (selfServerAudioStateInitialized && selfPumpkinNtrTriggerCount > previousSelfPumpkinNtrTriggerCount) {
+                        playRandomNtrSound(getSkinConfig('pumkin').sounds.ntr, undefined, (selfId || '__self__') + ':pumpkin-ntr');
+                        selfPumpkinNtrVisualUntil = window.performance.now() + SELF_PUMPKIN_NTR_VISUAL_DURATION_MS;
+                    }
+                    selfServerAudioStateInitialized = true;
+                    const selfVisual = getPlayerVisual(selfPlayer.id);
+                    if (selfPumpkinNtrTriggerCount > Number(selfVisual.pumpkinNtrTriggerCount || 0)) {
+                        selfVisual.pumpkinNtrVisualUntil = window.performance.now() + SELF_PUMPKIN_NTR_VISUAL_DURATION_MS;
+                    }
+                    selfVisual.pumpkinNtrTriggerCount = selfPumpkinNtrTriggerCount;
                     selfCollisionActive = Boolean(selfPlayer.collisionActive);
                     selfCollisionImpactActive = Boolean(selfPlayer.collisionImpactActive);
                     selfCollisionVisualType = selfPlayer.collisionVisualType || 'win';
@@ -2535,6 +2755,8 @@
             stopBackgroundMusic();
             stopPlayerSound(selfId || '__self__');
             playerAudioStates.clear();
+            selfPumpkinNtrTriggerCount = 0;
+            selfServerAudioStateInitialized = false;
             playerVisuals.clear();
             if (suppressNextCloseReconnect) {
                 suppressNextCloseReconnect = false;
@@ -2627,6 +2849,22 @@
         );
     };
 
+    const getPhaseBackgroundColor = function (players) {
+        let destroyedHouseCount = 0;
+        if (encounterFinaleActive) {
+            destroyedHouseCount = 3;
+        } else if (encounterStage >= 4) {
+            destroyedHouseCount = 2;
+        } else if (encounterStage >= 2) {
+            destroyedHouseCount = 1;
+        }
+        const phaseRatio = Math.max(0, Math.min(1, destroyedHouseCount / 3));
+        const red = Math.round(phaseOneBackgroundColor.r + (phaseThreeBackgroundColor.r - phaseOneBackgroundColor.r) * phaseRatio);
+        const green = Math.round(phaseOneBackgroundColor.g + (phaseThreeBackgroundColor.g - phaseOneBackgroundColor.g) * phaseRatio);
+        const blue = Math.round(phaseOneBackgroundColor.b + (phaseThreeBackgroundColor.b - phaseOneBackgroundColor.b) * phaseRatio);
+        return 'rgb(' + red + ', ' + green + ', ' + blue + ')';
+    };
+
     const getImageEntryState = function (entry) {
         return {
             activeIcon: entry && entry.image ? entry.image : null,
@@ -2640,32 +2878,44 @@
             return {
                 baseSpeed: basePlayerSpeedPerSecond * 0.8,
                 maxHealthSegments: 5,
-                type: 'evolution'
+                type: 'evolution',
+                movementType: 'evolution'
             };
         }
         if (normalizedName === 'double') {
             return {
                 baseSpeed: basePlayerSpeedPerSecond,
                 maxHealthSegments: 4,
-                type: 'double'
+                type: 'double',
+                movementType: 'classic'
+            };
+        }
+        if (normalizedName === 'pumkin') {
+            return {
+                baseSpeed: basePlayerSpeedPerSecond * 1.4,
+                maxHealthSegments: 3,
+                type: 'pumkin',
+                movementType: 'classic'
             };
         }
         if (normalizedName === 'many') {
             return {
                 baseSpeed: basePlayerSpeedPerSecond,
                 maxHealthSegments: 5,
-                type: 'many'
+                type: 'many',
+                movementType: 'classic'
             };
         }
         return {
             baseSpeed: basePlayerSpeedPerSecond,
             maxHealthSegments: 3,
-            type: 'classic'
+            type: 'classic',
+            movementType: 'classic'
         };
     };
 
     const getSelectedPlayerBaseSpeed = function () {
-        return getPlayerSkinProfile(selectedSkinName).baseSpeed;
+        return getPlayerSkinProfile(activeSelfSkinName || selectedSkinName).baseSpeed;
     };
 
     const getSelectedPlayerMaxBoostSpeed = function () {
@@ -2682,7 +2932,7 @@
         if (Boolean(player.isNpc)) {
             return true;
         }
-        return getPlayerSkinProfile(player.skinName || 'default').type === 'evolution';
+        return getPlayerSkinProfile(player.skinName || 'default').movementType === 'evolution';
     };
 
     const getPlayerHealthSegments = function (player) {
@@ -2693,16 +2943,23 @@
         const defeatReceivedCount = typeof player.defeatReceivedCount === 'number'
             ? Math.max(0, player.defeatReceivedCount)
             : 0;
-        const maxHealthSegments = skinProfile.maxHealthSegments;
+        const pumpkinBaseSkinName = String(player && player.pumpkinBaseSkinName || '').trim().toLowerCase();
+        const maxHealthSegments = Boolean(player && player.isPumpkinNpc)
+            ? PUMPKIN_NPC_HEALTH_SEGMENTS
+            : (pumpkinBaseSkinName === 'double_single' ? 2 : skinProfile.maxHealthSegments);
         const defeatsInCurrentLife = defeatReceivedCount % maxHealthSegments;
         return defeatsInCurrentLife === 0 ? maxHealthSegments : Math.max(0, maxHealthSegments - defeatsInCurrentLife);
     };
 
     const getPlayerSpriteState = function (player, isSelf, visual) {
         const isNpc = Boolean(player.isNpc);
+        const isPumpkinNpc = Boolean(player.isPumpkinNpc);
         const isDummy = Boolean(player.isDummy);
+        const nowMs = window.performance.now();
         const boostStateValue = isSelf ? boostState : (player.boostState || 'idle');
-        const skinName = !isNpc ? (isSelf ? selectedSkinName : (player.skinName || 'default')) : 'default';
+        const skinName = (!isNpc || isPumpkinNpc)
+            ? (isSelf ? (player.skinName || activeSelfSkinName || selectedSkinName) : (player.skinName || 'default'))
+            : 'default';
         const skinProfile = getPlayerSkinProfile(skinName);
         const npcState = player.npcState || '';
         const npcPhase = isNpc ? Math.max(1, Number(player.npcPhase || 1)) : 1;
@@ -2727,8 +2984,8 @@
         const isNpcDefeatIconActive = isNpc && isDefeatVisualActive && !isDeathVisualActive && npcDefeatDamageRatio >= 0.4;
         const spriteScale = isNpc
             ? (isNpcChargeVisualActive ? 2.0 : 2.8)
-            : 1;
-        const skinRuntime = !isNpc ? getSkinConfig(skinName) : null;
+            : ((skinProfile.type === 'pumkin' || isPumpkinNpc) ? 2 : 1);
+        const skinRuntime = (!isNpc || isPumpkinNpc) ? getSkinConfig(skinName) : null;
         let activeIcon = null;
         let activeIconReady = false;
 
@@ -2765,7 +3022,40 @@
         } else if (isNpc && isDefeatVisualActive && npcDefeatDamageRatio >= 0.4 && playerNpcDefeat1IconReady) {
             activeIcon = playerNpcDefeat1Icon;
             activeIconReady = playerNpcDefeat1IconReady;
-        } else if (!isNpc && skinRuntime) {
+        } else if ((!isNpc || isPumpkinNpc) && skinRuntime) {
+            if (isPumpkinNpc) {
+                const pumpkinState = getImageEntryState(
+                    skinRuntime.pumpkinNpcIcon.ready
+                        ? skinRuntime.pumpkinNpcIcon
+                        : (skinRuntime.previewIcon.ready ? skinRuntime.previewIcon : skinRuntime.legacyIcon)
+                );
+                activeIcon = pumpkinState.activeIcon;
+                activeIconReady = pumpkinState.activeIconReady;
+                return {
+                    isNpc,
+                    isPumpkinNpc,
+                    isDummy,
+                    npcPhase,
+                    npcDefeatDamageRatio,
+                    npcWinVisualActive,
+                    isCollisionVisualActive,
+                    isCollisionImpactActive,
+                    isDefeatVisualActive,
+                    isDeathVisualActive,
+                    npcChargeWindupProgress,
+                    npcBoostState,
+                    npcState,
+                    isNpcChargeVisualActive,
+                    isNpcDefeatIconActive,
+                    isBoostVisualActive,
+                    isPlayerWinVisualActive,
+                    isStopVisualActive,
+                    spriteScale,
+                    skinRuntime,
+                    activeIcon,
+                    activeIconReady
+                };
+            }
             const healthSegments = getPlayerHealthSegments(player);
             const defaultSet = skinRuntime.defaultIconSets.length
                 ? skinRuntime.defaultIconSets[visual.defaultIconSetIndex % skinRuntime.defaultIconSets.length]
@@ -2773,6 +3063,12 @@
             const collisionSet = skinRuntime.collisionIconSets.length
                 ? skinRuntime.collisionIconSets[visual.collisionIconSetIndex % skinRuntime.collisionIconSets.length]
                 : null;
+            const defaultSkinRuntime = getSkinConfig('default');
+            const forcedNtrCollisionSet = defaultSkinRuntime.collisionIconSets.length
+                ? defaultSkinRuntime.collisionIconSets[visual.collisionIconSetIndex % defaultSkinRuntime.collisionIconSets.length]
+                : null;
+            const isPumpkinNtrVisualActive = Number((visual && visual.pumpkinNtrVisualUntil) || 0) > nowMs
+                || (isSelf && Number(selfPumpkinNtrVisualUntil || 0) > nowMs);
             const movementSpeed = isSelf
                 ? Math.max(0, Number(currentMoveSpeed || 0))
                 : Math.max(0, Number(player.currentSpeed || 0));
@@ -2800,7 +3096,9 @@
                 ? (healthSegments >= 3 ? defaultSet.healthy : defaultSet.damaged)
                 : skinRuntime.legacyIcon;
 
-            if (skinRuntime.skinType === 'many') {
+            if (isPumpkinNtrVisualActive && forcedNtrCollisionSet && forcedNtrCollisionSet.impact) {
+                selectedEntry = forcedNtrCollisionSet.impact;
+            } else if (skinRuntime.skinType === 'many') {
                 const manyIconIndex = Math.max(0, Math.min((skinRuntime.defaultStateIcons.length || 1) - 1, healthSegments - 1));
                 if (skinRuntime.defaultStateIcons.length) {
                     selectedEntry = skinRuntime.defaultStateIcons[manyIconIndex] || selectedEntry;
@@ -2881,6 +3179,7 @@
 
         return {
             isNpc,
+            isPumpkinNpc,
             isDummy,
             npcPhase,
             npcDefeatDamageRatio,
@@ -3226,10 +3525,13 @@
                     ctx.restore();
                 });
 
-                ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
-                ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(player.displayName || player.id, x, y - spriteHeight / 2 - 5 * zoom);
+                const mergedLabel = typeof player.displayName === 'string' ? player.displayName.trim() : '';
+                if (mergedLabel) {
+                    ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
+                    ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(mergedLabel, x, y - spriteHeight / 2 - 5 * zoom);
+                }
             }
             return true;
         }
@@ -3475,22 +3777,28 @@
                 ctx.fillRect(barX, cooldownY, healthBarWidth * cooldownRatio, segmentHeight);
                 ctx.restore();
 
-                ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
-                ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(
-                    player.displayName || player.id,
-                    x,
-                    y - spriteHeight / 2 - 5 * zoom
-                );
+                const splitUnitLabel = typeof player.displayName === 'string' ? player.displayName.trim() : '';
+                if (splitUnitLabel) {
+                    ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
+                    ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(
+                        splitUnitLabel,
+                        x,
+                        y - spriteHeight / 2 - 5 * zoom
+                    );
+                }
             }
         });
 
         if (!player.deathActive && isMerged) {
-            ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
-            ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(player.displayName || player.id, (player.x - cameraX) * zoom, (player.y - cameraY) * zoom - (playerSpriteHeight * zoom) / 2 - 5 * zoom);
+            const mergedPlayerLabel = typeof player.displayName === 'string' ? player.displayName.trim() : '';
+            if (mergedPlayerLabel) {
+                ctx.fillStyle = 'rgba(17, 24, 39, 0.92)';
+                ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(mergedPlayerLabel, (player.x - cameraX) * zoom, (player.y - cameraY) * zoom - (playerSpriteHeight * zoom) / 2 - 5 * zoom);
+            }
         }
         return true;
     };
@@ -3617,7 +3925,26 @@
         if (!image) {
             return;
         }
-        const x = (player.x - cameraX) * zoom;
+        const visual = getPlayerVisual(player.id);
+        const nowMs = window.performance.now();
+        const health = Math.max(0, Number(player.houseHealth || 0));
+        if (typeof visual.lastHouseHealth !== 'number') {
+            visual.lastHouseHealth = health;
+        } else if (health < visual.lastHouseHealth) {
+            visual.houseShakeStartedAt = nowMs;
+            visual.houseShakeUntil = nowMs + 260;
+            visual.lastHouseHealth = health;
+        } else if (health !== visual.lastHouseHealth) {
+            visual.lastHouseHealth = health;
+        }
+        let houseShakeOffsetX = 0;
+        if (Number(visual.houseShakeUntil || 0) > nowMs) {
+            const shakeDuration = Math.max(1, Number(visual.houseShakeUntil || 0) - Number(visual.houseShakeStartedAt || 0));
+            const shakeProgress = Math.max(0, Math.min(1, (nowMs - Number(visual.houseShakeStartedAt || 0)) / shakeDuration));
+            const shakeStrength = (1 - shakeProgress) * Math.max(4, 12 * zoom);
+            houseShakeOffsetX = Math.sin(shakeProgress * Math.PI * 10) * shakeStrength;
+        }
+        const x = (player.x - cameraX) * zoom + houseShakeOffsetX;
         const y = (player.y - cameraY) * zoom;
         const naturalWidth = image.naturalWidth || 220;
         const naturalHeight = image.naturalHeight || 220;
@@ -3626,7 +3953,6 @@
         drawSpriteImage(ctx, image, x, y, targetWidth, targetHeight, 0, 1, 1);
 
         const maxHealth = Math.max(1, Number(player.houseMaxHealth || 1));
-        const health = Math.max(0, Number(player.houseHealth || 0));
         const healthRatio = Math.max(0, Math.min(1, health / maxHealth));
         const barWidth = targetWidth * 0.7;
         const barHeight = Math.max(8, 10 * zoom);
@@ -3738,10 +4064,13 @@
             }
             visual.stopVisualActive = Boolean(player.stopVisualActive);
             const isNpc = spriteState.isNpc;
+            const isPumpkinNpc = spriteState.isPumpkinNpc;
             const isCollisionVisualActive = spriteState.isCollisionVisualActive;
             const isDefeatVisualActive = spriteState.isDefeatVisualActive;
             const isDeathVisualActive = spriteState.isDeathVisualActive;
             const deathFadeProgress = typeof player.deathFadeProgress === 'number' ? player.deathFadeProgress : 0;
+            const pumpkinFadeOutProgress = typeof player.pumpkinFadeOutProgress === 'number' ? player.pumpkinFadeOutProgress : 0;
+            const pumpkinFadeAlpha = Boolean(player.pumpkinFadeOutActive) ? Math.max(0, 1 - pumpkinFadeOutProgress) : 1;
             const isNpcDeathAnimating = Boolean(player.npcDeathAnimating);
             const npcHealth = typeof player.npcHealth === 'number' ? player.npcHealth : npcMaxHealth;
             const playerNpcMaxHealth = typeof player.npcMaxHealth === 'number' ? player.npcMaxHealth : npcMaxHealth;
@@ -3777,7 +4106,7 @@
                 : 1;
             const playerSkinProfile = getPlayerSkinProfile(player.skinName || 'default');
 
-            if (!isNpc && playerSkinProfile.type === 'double' && drawDoublePlayer(player, visual, cameraX, cameraY, zoom, nowMs, isSelf, deltaSeconds)) {
+            if (!isNpc && !isPumpkinNpc && playerSkinProfile.type === 'double' && drawDoublePlayer(player, visual, cameraX, cameraY, zoom, nowMs, isSelf, deltaSeconds)) {
                 visual.previousX = player.x;
                 visual.previousY = player.y;
                 return;
@@ -3846,7 +4175,7 @@
                         const fadeRatio = trailPoint.expiresAt
                             ? Math.max(0, Math.min(1, (trailPoint.expiresAt - nowMs) / trailFadeDurationMs))
                             : 1;
-                        const alpha = 0.25 * ((index + 1) / visual.trailPoints.length) * fadeRatio;
+                        const alpha = 0.25 * ((index + 1) / visual.trailPoints.length) * fadeRatio * pumpkinFadeAlpha;
                         drawTrailSprite(
                             ctx,
                             trailPoint.icon || activeIcon,
@@ -3861,7 +4190,7 @@
                         );
                     });
                 }
-                const playerAlpha = isDeathVisualActive ? Math.max(0, 1 - deathFadeProgress) : 1;
+                const playerAlpha = (isDeathVisualActive ? Math.max(0, 1 - deathFadeProgress) : 1) * pumpkinFadeAlpha;
                 const finaleSpinRotation = getFinaleSpinRotation(player, visual, nowMs);
                 const dentAngle = Math.atan2(collisionImpactY, collisionImpactX) - visual.currentRotation;
                 const dentLocalX = collisionImpactX === 0 && collisionImpactY === 0
@@ -3944,6 +4273,8 @@
                 }
             } else {
                 hideSpriteOverlayNode(player.id);
+                ctx.save();
+                ctx.globalAlpha = pumpkinFadeAlpha;
                 if (isNpc) {
                     drawNpcFallbackCore(
                         ctx,
@@ -3964,20 +4295,29 @@
                         isSelf ? 'rgba(37, 99, 235, 0.92)' : 'rgba(245, 158, 11, 0.92)'
                     );
                 }
+                ctx.restore();
             }
 
             if (!isNpc) {
                 const skinProfile = getPlayerSkinProfile(player.skinName || 'default');
+                const pumpkinBaseSkinName = String(player.pumpkinBaseSkinName || '').trim().toLowerCase();
+                const playerMaxHealthSegments = isPumpkinNpc
+                    ? PUMPKIN_NPC_HEALTH_SEGMENTS
+                    : (pumpkinBaseSkinName === 'double_single'
+                    ? 2
+                    : skinProfile.maxHealthSegments);
                 const defeatReceivedCount = typeof player.defeatReceivedCount === 'number' ? Math.max(0, player.defeatReceivedCount) : 0;
                 const healthSegmentsFilled = isDeathVisualActive
                     ? 0
-                    : Math.max(0, skinProfile.maxHealthSegments - (defeatReceivedCount % skinProfile.maxHealthSegments || 0));
+                    : Math.max(0, playerMaxHealthSegments - (defeatReceivedCount % playerMaxHealthSegments || 0));
                 if (!isDeathVisualActive) {
                     const healthBarReferenceWidth = skinProfile.type === 'evolution'
                         ? (playerSpriteHeight * spriteScale * zoom * defaultPlayerAspectRatio)
-                        : spriteWidth;
+                        : ((skinProfile.type === 'pumkin' || isPumpkinNpc)
+                            ? (playerSpriteHeight * zoom * defaultPlayerAspectRatio)
+                            : spriteWidth);
                     const healthBarWidth = Math.max(24, healthBarReferenceWidth * 0.9);
-                    const totalSegments = Math.max(1, skinProfile.maxHealthSegments);
+                    const totalSegments = Math.max(1, isPumpkinNpc ? PUMPKIN_NPC_HEALTH_SEGMENTS : playerMaxHealthSegments);
                     const segmentGap = skinProfile.type === 'evolution'
                         ? Math.max(1, 1 * zoom)
                         : Math.max(2, 2 * zoom);
@@ -4003,6 +4343,7 @@
                     const segmentStartX = defaultSegmentStartX;
                     const segmentY = defaultSegmentY;
                     ctx.save();
+                    ctx.globalAlpha = pumpkinFadeAlpha;
                     for (let segmentIndex = 0; segmentIndex < totalSegments; segmentIndex += 1) {
                         const segmentX = segmentStartX + segmentIndex * (segmentWidth + segmentGap);
                         ctx.fillStyle = segmentIndex < healthSegmentsFilled
@@ -4022,16 +4363,19 @@
                         ctx.restore();
                     }
                 }
-                ctx.fillStyle = isDeathVisualActive
-                    ? 'rgba(17, 24, 39, ' + Math.max(0, 0.92 * (1 - deathFadeProgress)) + ')'
-                    : 'rgba(17, 24, 39, 0.92)';
-                ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(
-                    player.displayName || player.id,
-                    x,
-                    drawY - spriteHeight / 2 - (getPlayerSkinProfile(player.skinName || 'default').type === 'evolution' ? 9 * zoom : 5 * zoom)
-                );
+                const labelText = typeof player.displayName === 'string' ? player.displayName.trim() : '';
+                if (labelText) {
+                    ctx.fillStyle = isDeathVisualActive
+                        ? 'rgba(17, 24, 39, ' + Math.max(0, 0.92 * (1 - deathFadeProgress)) + ')'
+                        : 'rgba(17, 24, 39, 0.92)';
+                    ctx.font = '800 15px Inter, Noto Sans KR, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(
+                        labelText,
+                        x,
+                        drawY - spriteHeight / 2 - (getPlayerSkinProfile(player.skinName || 'default').type === 'evolution' ? 9 * zoom : 5 * zoom)
+                    );
+                }
             } else if (!isDeathVisualActive || isNpcDeathAnimating) {
                 const healthRatio = Math.max(0, Math.min(1, npcHealth / playerNpcMaxHealth));
                 const npcPhaseTwoRatio = typeof player.npcPhaseTwoRatio === 'number' ? player.npcPhaseTwoRatio : 0.6;
@@ -4050,14 +4394,12 @@
                 ctx.fillRect(barX, barY, barWidth * healthRatio, barHeight);
                 const phaseTwoMarkerX = barX + barWidth * npcPhaseTwoRatio;
                 const phaseThreeMarkerX = barX + barWidth * npcPhaseThreeRatio;
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.lineWidth = Math.max(1.2, 1.5 * zoom);
-                ctx.beginPath();
-                ctx.moveTo(phaseTwoMarkerX, barY);
-                ctx.lineTo(phaseTwoMarkerX, barY + barHeight);
-                ctx.moveTo(phaseThreeMarkerX, barY);
-                ctx.lineTo(phaseThreeMarkerX, barY + barHeight);
-                ctx.stroke();
+                const phaseMarkerWidth = Math.max(1.4, 1.6 * zoom);
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.fillRect(phaseTwoMarkerX - phaseMarkerWidth / 2, barY, phaseMarkerWidth, barHeight);
+                ctx.fillRect(phaseThreeMarkerX - phaseMarkerWidth / 2, barY, phaseMarkerWidth, barHeight);
+                ctx.restore();
             }
 
             visual.previousX = player.x;
@@ -4086,12 +4428,28 @@
 
         renderPlayers.forEach(function (player) {
             const isSelf = player.id === selfId;
-            if (!isSelf || player.deathActive) {
+            const isPumpkinNpc = Boolean(player.isPumpkinNpc);
+            if ((!isSelf && !isPumpkinNpc) || player.deathActive) {
                 return;
             }
             const x = padding + (player.x / worldSize) * drawableWidth;
             const y = padding + (player.y / worldSize) * drawableHeight;
             const visual = getPlayerVisual(player.id);
+            if (isPumpkinNpc) {
+                minimapCtx.save();
+                minimapCtx.fillStyle = 'rgba(249, 115, 22, 0.96)';
+                minimapCtx.beginPath();
+                minimapCtx.arc(x, y, 5.2, 0, Math.PI * 2);
+                minimapCtx.fill();
+                minimapCtx.fillStyle = 'rgba(120, 53, 15, 0.96)';
+                minimapCtx.fillRect(x - 1.1, y - 7.2, 2.2, 3.2);
+                minimapCtx.fillStyle = 'rgba(34, 197, 94, 0.96)';
+                minimapCtx.beginPath();
+                minimapCtx.ellipse(x + 2.7, y - 6.6, 2.4, 1.5, -0.6, 0, Math.PI * 2);
+                minimapCtx.fill();
+                minimapCtx.restore();
+                return;
+            }
             drawFallbackArrow(
                 minimapCtx,
                 x,
@@ -4115,15 +4473,14 @@
         resizeCanvas();
         const canvasWidth = getCanvasDisplayWidth();
         const canvasHeight = getCanvasDisplayHeight();
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-        ctx.fillStyle = '#fbf6ed';
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-        const effectiveZoom = getEffectiveZoom();
-
         const nextById = new Map();
         serverPlayers.forEach(function (player) {
             nextById.set(player.id, player);
         });
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctx.fillStyle = getPhaseBackgroundColor(serverPlayers);
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        const effectiveZoom = getEffectiveZoom();
 
         let inputVector = getInputVector();
         if (encounterFinaleActive || selfDeathActive) {
@@ -4219,14 +4576,23 @@
                 }
 
                 if (current) {
-                    current.displayName = serverPlayer.displayName || serverPlayer.id;
+                    const selfVisual = getPlayerVisual(current.id);
+                    const nextPumpkinNtrTriggerCount = Math.max(0, Number(serverPlayer.pumpkinNtrTriggerCount || 0));
+                    if (nextPumpkinNtrTriggerCount > Number(selfVisual.pumpkinNtrTriggerCount || 0)) {
+                        selfVisual.pumpkinNtrVisualUntil = window.performance.now() + SELF_PUMPKIN_NTR_VISUAL_DURATION_MS;
+                    }
+                    selfVisual.pumpkinNtrTriggerCount = nextPumpkinNtrTriggerCount;
+                    current.displayName = getServerDisplayName(serverPlayer);
                     current.skinName = serverPlayer.skinName || 'default';
+                    current.pumpkinBaseSkinName = serverPlayer.pumpkinBaseSkinName || '';
+                    current.pumpkinNtrTriggerCount = nextPumpkinNtrTriggerCount;
                     current.x = renderedSelf.x;
                     current.y = renderedSelf.y;
                     current.velocityX = typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0;
                     current.velocityY = typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0;
                     current.facingAngle = typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0;
                     current.isDummy = Boolean(serverPlayer.isDummy);
+                    current.isPumpkinNpc = Boolean(serverPlayer.isPumpkinNpc);
                     current.isHouse = Boolean(serverPlayer.isHouse);
                     current.houseStage = typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0;
                     current.houseHealth = typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null;
@@ -4260,6 +4626,8 @@
                     current.collisionRecoveryActive = Boolean(serverPlayer.collisionRecoveryActive);
                     current.collisionRecoveryRemainingMs = typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0;
                     current.collisionRecoveryDurationMs = typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0;
+                    current.pumpkinFadeOutActive = Boolean(serverPlayer.pumpkinFadeOutActive);
+                    current.pumpkinFadeOutProgress = typeof serverPlayer.pumpkinFadeOutProgress === 'number' ? serverPlayer.pumpkinFadeOutProgress : 0;
                     current.defeatReceivedCount = typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0;
                     current.boostLockRemainingMs = typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0;
                     current.boostLockDurationMs = typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0;
@@ -4267,16 +4635,22 @@
                         ? serverPlayer.npcChargeWindupProgress
                         : 0;
                 } else {
+                    const nextPumpkinNtrTriggerCount = Math.max(0, Number(serverPlayer.pumpkinNtrTriggerCount || 0));
+                    const selfVisual = getPlayerVisual(renderedSelf.id);
+                    selfVisual.pumpkinNtrTriggerCount = nextPumpkinNtrTriggerCount;
                     renderPlayers.push({
                         id: renderedSelf.id,
-                        displayName: serverPlayer.displayName || serverPlayer.id,
+                        displayName: getServerDisplayName(serverPlayer),
                         skinName: serverPlayer.skinName || 'default',
+                        pumpkinBaseSkinName: serverPlayer.pumpkinBaseSkinName || '',
+                        pumpkinNtrTriggerCount: nextPumpkinNtrTriggerCount,
                         x: renderedSelf.x,
                         y: renderedSelf.y,
                         velocityX: typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0,
                         velocityY: typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0,
                         facingAngle: typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0,
                         isDummy: Boolean(serverPlayer.isDummy),
+                        isPumpkinNpc: Boolean(serverPlayer.isPumpkinNpc),
                         isHouse: Boolean(serverPlayer.isHouse),
                         houseStage: typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0,
                         houseHealth: typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null,
@@ -4311,6 +4685,8 @@
                         collisionRecoveryActive: Boolean(serverPlayer.collisionRecoveryActive),
                         collisionRecoveryRemainingMs: typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0,
                         collisionRecoveryDurationMs: typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0,
+                        pumpkinFadeOutActive: Boolean(serverPlayer.pumpkinFadeOutActive),
+                        pumpkinFadeOutProgress: typeof serverPlayer.pumpkinFadeOutProgress === 'number' ? serverPlayer.pumpkinFadeOutProgress : 0,
                         defeatReceivedCount: typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0,
                         boostLockRemainingMs: typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0,
                         boostLockDurationMs: typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0,
@@ -4326,7 +4702,15 @@
                 0.12,
                 Math.max(0, (now - (serverPlayer.clientReceivedAt || now)) / 1000)
             );
-            const remoteProjectionSeconds = remoteRenderDelaySeconds + packetAgeSeconds;
+            const isPumpkinNpc = Boolean(serverPlayer.isPumpkinNpc);
+            const remoteCollisionActive = Boolean(serverPlayer.collisionActive);
+            const remoteCollisionRecoveryActive = Boolean(serverPlayer.collisionRecoveryActive);
+            const remoteDeathActive = Boolean(serverPlayer.deathActive);
+            const remoteProjectionSeconds = isPumpkinNpc
+                ? 0
+                : ((remoteCollisionActive || remoteCollisionRecoveryActive || remoteDeathActive)
+                    ? Math.min(0.025, packetAgeSeconds)
+                    : (remoteRenderDelaySeconds + packetAgeSeconds));
             const delayedTargetX = clampToWorld(
                 serverPlayer.x + ((typeof serverPlayer.velocityX === 'number' ? serverPlayer.velocityX : 0) * remoteProjectionSeconds)
             );
@@ -4338,9 +4722,17 @@
             const remoteVelocityY = typeof serverPlayer.velocityY === 'number' ? serverPlayer.velocityY : 0;
 
             if (current) {
+                const remoteVisual = getPlayerVisual(current.id);
+                const nextPumpkinNtrTriggerCount = Math.max(0, Number(serverPlayer.pumpkinNtrTriggerCount || 0));
+                if (nextPumpkinNtrTriggerCount > Number(remoteVisual.pumpkinNtrTriggerCount || 0)) {
+                    remoteVisual.pumpkinNtrVisualUntil = window.performance.now() + SELF_PUMPKIN_NTR_VISUAL_DURATION_MS;
+                }
+                remoteVisual.pumpkinNtrTriggerCount = nextPumpkinNtrTriggerCount;
                 const respawnTransition = Boolean(current.deathActive) && !Boolean(serverPlayer.deathActive);
-                current.displayName = serverPlayer.displayName || serverPlayer.id;
+                current.displayName = getServerDisplayName(serverPlayer);
                 current.skinName = serverPlayer.skinName || 'default';
+                current.pumpkinBaseSkinName = serverPlayer.pumpkinBaseSkinName || '';
+                current.pumpkinNtrTriggerCount = nextPumpkinNtrTriggerCount;
                 current.targetX = delayedTargetX;
                 current.targetY = delayedTargetY;
                 if (respawnTransition) {
@@ -4349,24 +4741,29 @@
                     const visual = getPlayerVisual(current.id);
                     visual.previousX = delayedTargetX;
                     visual.previousY = delayedTargetY;
+                } else if (isPumpkinNpc) {
+                    current.x += (delayedTargetX - current.x) * 0.7;
+                    current.y += (delayedTargetY - current.y) * 0.7;
                 } else {
-                    current.x = clampToWorld(current.x + remoteVelocityX * deltaSeconds);
-                    current.y = clampToWorld(current.y + remoteVelocityY * deltaSeconds);
                     const reconcileDiffX = current.targetX - current.x;
                     const reconcileDiffY = current.targetY - current.y;
                     const reconcileDistance = Math.hypot(reconcileDiffX, reconcileDiffY);
+                    const collisionSensitiveLerp = (remoteCollisionActive || remoteCollisionRecoveryActive || remoteDeathActive)
+                        ? Math.max(remoteLerp, 0.5)
+                        : remoteLerp;
                     if (reconcileDistance > 220) {
                         current.x = current.targetX;
                         current.y = current.targetY;
-                    } else if (reconcileDistance > 1.5) {
-                        current.x += reconcileDiffX * remoteLerp;
-                        current.y += reconcileDiffY * remoteLerp;
+                    } else if (reconcileDistance > 0.35) {
+                        current.x += reconcileDiffX * collisionSensitiveLerp;
+                        current.y += reconcileDiffY * collisionSensitiveLerp;
                     }
                 }
                 current.velocityX = remoteVelocityX;
                 current.velocityY = remoteVelocityY;
                 current.facingAngle = typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0;
                 current.isDummy = Boolean(serverPlayer.isDummy);
+                current.isPumpkinNpc = Boolean(serverPlayer.isPumpkinNpc);
                 current.isHouse = Boolean(serverPlayer.isHouse);
                 current.houseStage = typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0;
                 current.houseHealth = typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null;
@@ -4401,6 +4798,8 @@
                 current.collisionRecoveryActive = Boolean(serverPlayer.collisionRecoveryActive);
                 current.collisionRecoveryRemainingMs = typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0;
                 current.collisionRecoveryDurationMs = typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0;
+                current.pumpkinFadeOutActive = Boolean(serverPlayer.pumpkinFadeOutActive);
+                current.pumpkinFadeOutProgress = typeof serverPlayer.pumpkinFadeOutProgress === 'number' ? serverPlayer.pumpkinFadeOutProgress : 0;
                 current.defeatReceivedCount = typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0;
                 current.boostLockRemainingMs = typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0;
                 current.boostLockDurationMs = typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0;
@@ -4408,10 +4807,15 @@
                     ? serverPlayer.npcChargeWindupProgress
                     : 0;
             } else {
+                const nextPumpkinNtrTriggerCount = Math.max(0, Number(serverPlayer.pumpkinNtrTriggerCount || 0));
+                const remoteVisual = getPlayerVisual(serverPlayer.id);
+                remoteVisual.pumpkinNtrTriggerCount = nextPumpkinNtrTriggerCount;
                 renderPlayers.push({
                     id: serverPlayer.id,
-                    displayName: serverPlayer.displayName || serverPlayer.id,
+                    displayName: getServerDisplayName(serverPlayer),
                     skinName: serverPlayer.skinName || 'default',
+                    pumpkinBaseSkinName: serverPlayer.pumpkinBaseSkinName || '',
+                    pumpkinNtrTriggerCount: nextPumpkinNtrTriggerCount,
                     x: delayedTargetX,
                     y: delayedTargetY,
                     targetX: delayedTargetX,
@@ -4420,6 +4824,7 @@
                     velocityY: remoteVelocityY,
                     facingAngle: typeof serverPlayer.facingAngle === 'number' ? serverPlayer.facingAngle : 0,
                     isDummy: Boolean(serverPlayer.isDummy),
+                    isPumpkinNpc: Boolean(serverPlayer.isPumpkinNpc),
                     isHouse: Boolean(serverPlayer.isHouse),
                     houseStage: typeof serverPlayer.houseStage === 'number' ? serverPlayer.houseStage : 0,
                     houseHealth: typeof serverPlayer.houseHealth === 'number' ? serverPlayer.houseHealth : null,
@@ -4454,6 +4859,8 @@
                     collisionRecoveryActive: Boolean(serverPlayer.collisionRecoveryActive),
                     collisionRecoveryRemainingMs: typeof serverPlayer.collisionRecoveryRemainingMs === 'number' ? serverPlayer.collisionRecoveryRemainingMs : 0,
                     collisionRecoveryDurationMs: typeof serverPlayer.collisionRecoveryDurationMs === 'number' ? serverPlayer.collisionRecoveryDurationMs : 0,
+                    pumpkinFadeOutActive: Boolean(serverPlayer.pumpkinFadeOutActive),
+                    pumpkinFadeOutProgress: typeof serverPlayer.pumpkinFadeOutProgress === 'number' ? serverPlayer.pumpkinFadeOutProgress : 0,
                     defeatReceivedCount: typeof serverPlayer.defeatReceivedCount === 'number' ? serverPlayer.defeatReceivedCount : 0,
                     boostLockRemainingMs: typeof serverPlayer.boostLockRemainingMs === 'number' ? serverPlayer.boostLockRemainingMs : 0,
                     boostLockDurationMs: typeof serverPlayer.boostLockDurationMs === 'number' ? serverPlayer.boostLockDurationMs : 0,
@@ -4574,7 +4981,8 @@
                 return;
             }
             event.preventDefault();
-            input[mapped] = value;
+            keyboardDirectionInput[mapped] = value;
+            syncDirectionalInput();
             sendInputNow();
         };
     };
@@ -4740,6 +5148,71 @@
             });
         });
     }
+    canvas.addEventListener('contextmenu', function (event) {
+        event.preventDefault();
+    });
+    canvas.addEventListener('pointerdown', function (event) {
+        if (!gameStarted || selfDeathActive) {
+            return;
+        }
+        updateMouseTarget(event.clientX, event.clientY);
+        if (event.button === 0) {
+            event.preventDefault();
+            mouseLeftHeld = true;
+            refreshMouseMoveState();
+            sendInputNow();
+        } else if (event.button === 2) {
+            event.preventDefault();
+            if (mouseBoostPulseTimer) {
+                window.clearTimeout(mouseBoostPulseTimer);
+                mouseBoostPulseTimer = null;
+            }
+            if (boostLockedActive) {
+                mouseBoostRequested = false;
+                refreshMouseMoveState();
+                input.boost = false;
+                sendInputNow();
+                return;
+            }
+            mouseBoostRequested = true;
+            refreshMouseMoveState();
+            input.boost = true;
+            sendInputNow(true);
+            mouseBoostPulseTimer = window.setTimeout(function () {
+                mouseBoostRequested = false;
+                refreshMouseMoveState();
+                input.boost = false;
+                if (boostState === 'cooldown' && currentMoveSpeed <= getSelectedPlayerBaseSpeed()) {
+                    boostState = 'idle';
+                }
+                sendInputNow(true);
+                mouseBoostPulseTimer = null;
+            }, 90);
+        }
+    });
+    canvas.addEventListener('pointermove', function (event) {
+        if (!gameStarted) {
+            return;
+        }
+        updateMouseTarget(event.clientX, event.clientY);
+        if (mouseMoveActive) {
+            updateMouseDirectionalInput();
+            sendInputNow();
+        }
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (eventName) {
+        canvas.addEventListener(eventName, function (event) {
+            if (event.button === 0 || eventName !== 'pointerup') {
+                mouseLeftHeld = false;
+                refreshMouseMoveState();
+            }
+            if (event.button === 2) {
+                mouseBoostRequested = false;
+                refreshMouseMoveState();
+            }
+            sendInputNow();
+        });
+    });
     if (startButton) {
         startButton.addEventListener('click', function () {
             startGame();

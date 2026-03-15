@@ -191,7 +191,7 @@ class NavLink(models.Model):
     class Meta:
         ordering = ["order", "id"]
         permissions = [
-            ("can_edit_docs", "Can edit docs content"),
+            ("can_edit_docs", "Can edit HanDrive content"),
         ]
 
     def __str__(self):
@@ -205,7 +205,7 @@ class DocsAccessRule(models.Model):
         unique=True,
         blank=True,
         default="",
-        help_text="/docs 기준 상대 경로. 비우면 /docs 루트",
+        help_text="/handrive 기준 상대 경로. 비우면 /handrive 루트",
     )
     read_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -240,7 +240,7 @@ class DocsAccessRule(models.Model):
         verbose_name_plural = "문서 접근 규칙"
 
     def __str__(self):
-        return self.path or "/docs"
+        return self.path or "/handrive"
 
 
 class DocsSharedLink(models.Model):
@@ -248,7 +248,7 @@ class DocsSharedLink(models.Model):
         "문서 경로",
         max_length=1024,
         unique=True,
-        help_text="/docs 기준 상대 파일 경로",
+        help_text="/handrive 기준 상대 파일 경로",
     )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
