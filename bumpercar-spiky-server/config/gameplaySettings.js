@@ -66,12 +66,20 @@ const NPC_MAX_BOOST_SPEED_MULTIPLIER_KEY = "npc_max_boost_speed_multiplier"
 const SETTINGS_PATH = process.env.BUMPERCAR_SPIKY_SETTINGS_PATH ||
     path.resolve(__dirname, "../../config/bumpercar_spiky_settings.json")
 
+// 외부에서 읽어온 원시 설정 객체를 검증하고 기본값을 채워 정규화된 설정 객체를 반환한다.
+// rawSettings: JSON 파일에서 파싱한 원시 설정 객체
+// 반환값: 모든 필드가 유효한 숫자로 채워진 정규화된 설정 객체
 function normalizeSettings(rawSettings) {
     const normalized = { ...DEFAULT_SETTINGS }
     if (!rawSettings || typeof rawSettings !== "object") {
         return normalized
     }
 
+    // 기본 속도, 이동 거리, 지속 시간으로부터 부스트 물리 프로필을 계산한다.
+    // baseSpeed: 기본 이동 속도
+    // distance: 목표 부스트 이동 거리
+    // durationMs: 부스트 지속 시간(ms)
+    // 반환값: { distance, durationMs, maxSpeed, acceleration, cooldown } 객체
     const deriveBoostProfile = (baseSpeed, distance, durationMs) => {
         const safeDurationMs = Math.max(1, Math.round(durationMs))
         const durationSeconds = safeDurationMs / 1000
@@ -205,6 +213,9 @@ function normalizeSettings(rawSettings) {
     return normalized
 }
 
+// 설정 파일을 읽어 정규화된 게임플레이 설정 객체를 반환한다.
+// 파일 읽기 또는 파싱에 실패하면 DEFAULT_SETTINGS 의 복사본을 반환한다.
+// 반환값: 정규화된 게임플레이 설정 객체
 function getGameplaySettings() {
     try {
         // 서버는 시작 시 이 파일을 한 번 읽고 사용한다.

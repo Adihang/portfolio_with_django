@@ -3,277 +3,131 @@ const SpatialGrid = require("./spatialGrid")
 const { CELL_SIZE, TICK_RATE, WORLD_SIZE } = require("../config/config")
 const { getGameplaySettings } = require("../config/gameplaySettings")
 const { postStatsUpdate } = require("../services/accountStats")
+const {
+    PLAYER_COLLISION_HALF_HEIGHT,
+    PLAYER_COLLISION_HALF_WIDTH,
+    PUMPKIN_PLAYER_COLLISION_SCALE,
+    PUMPKIN_NPC_COLLISION_WIDTH_SCALE,
+    PUMPKIN_NPC_COLLISION_HEIGHT_SCALE,
+    NPC_COLLISION_HALF_HEIGHT,
+    NPC_COLLISION_HALF_WIDTH,
+    COLLISION_BOUNCE_DISTANCE,
+    COLLISION_SPEED_BOUNCE_MULTIPLIER,
+    COLLISION_MAX_BOUNCE_DISTANCE,
+    WALL_BOUNCE_DISTANCE,
+    WALL_BOUNCE_SPEED_BOUNCE_MULTIPLIER,
+    WALL_MAX_BOUNCE_DISTANCE,
+    COLLISION_VISUAL_BASE_DURATION_MS,
+    COLLISION_IMPACT_DURATION_MS,
+    COLLISION_VISUAL_SPEED_DURATION_MULTIPLIER_MS,
+    COLLISION_VISUAL_MAX_DURATION_MS,
+    COLLISION_RECOVERY_DURATION_MS,
+    COLLISION_BOOST_LOCK_DURATION_MS,
+    COLLISION_ATTACK_DIRECTION_THRESHOLD,
+    PLAYER_DEATH_TRIGGER_COUNT,
+    PLAYER_DEATH_DURATION_MS,
+    DUMMY_RESPAWN_DELAY_MS,
+    RESPAWN_EDGE_PADDING,
+    NPC_DEATH_ANIMATION_DURATION_MS,
+    NPC_PHASE_THREE_TRIGGER_DISTANCE_MULTIPLIER,
+    DUMMY_RETALIATION_DISTANCE_MULTIPLIER,
+    NPC_DEFEAT_BOUNCE_MULTIPLIER,
+    HOUSE_STAGE_ONE_ID,
+    HOUSE_STAGE_TWO_ID,
+    HOUSE_STAGE_THREE_ID,
+    HOUSE_STAGE_ONE_HEALTH,
+    HOUSE_STAGE_TWO_HEALTH,
+    HOUSE_STAGE_THREE_HEALTH,
+    HOUSE_COLLISION_HALF_WIDTH,
+    HOUSE_COLLISION_HALF_HEIGHT,
+    HOUSE_COLLISION_POLYGON,
+    ENCOUNTER_STAGE_ONE_COUNTDOWN_MS,
+    ENCOUNTER_STAGE_TWO_COUNTDOWN_MS,
+    ENCOUNTER_STAGE_THREE_COUNTDOWN_MS,
+    ENCOUNTER_FINALE_DURATION_MS,
+    ENCOUNTER_STAGE_ONE_LIVES,
+    ENCOUNTER_STAGE_TWO_LIVES,
+    ENCOUNTER_ANNOUNCEMENT_STAGE_ONE,
+    ENCOUNTER_ANNOUNCEMENT_STAGE_TWO,
+    ENCOUNTER_ANNOUNCEMENT_STAGE_THREE,
+    ENCOUNTER_ANNOUNCEMENT_FINALE,
+    INPUT_IDLE_RESET_MS,
+    PUMPKIN_SKIN_NAME,
+    DOUBLE_SKIN_NAME,
+    PUMPKIN_NPC_HEALTH_SEGMENTS,
+    PUMPKIN_NPC_DEFEAT_DASH_DURATION_MS,
+    PUMPKIN_NPC_DASH_PROTECTION_MS,
+    PUMPKIN_NPC_CLAIM_LOCK_MS,
+    PUMPKIN_NPC_DAMAGE_INVULNERABLE_MS,
+    PUMPKIN_NPC_FADE_OUT_DURATION_MS,
+    NEUTRAL_PUMPKIN_SPAWN_PADDING,
+    PUMPKIN_NPC_ID_PREFIX,
+    DOUBLE_UNIT_HEALTH,
+    DOUBLE_UNIT_COUNT,
+    DOUBLE_SEPARATION_ANGLE_RADIANS,
+    DOUBLE_MERGED_SIDE_OFFSET,
+    DOUBLE_SPLIT_PROBABILITY,
+    DOUBLE_REJOIN_EXTRA_DISTANCE,
+    DOUBLE_REMERGE_LOCK_MS,
+    DOUBLE_SPLIT_PROTECTION_MS,
+    SPLIT_DEFEAT_PROTECTION_MS,
+    DOUBLE_IDLE_REMERGE_DELAY_MS,
+    DOUBLE_STEER_MIN_RADIANS,
+    DOUBLE_STEER_MAX_RADIANS,
+    DOUBLE_STEER_DEADZONE_RADIANS,
+    DOUBLE_ALIGNMENT_DEADZONE_DISTANCE,
+    DOUBLE_INACTIVE_FADE_MS,
+    NPC_ID,
+    DUMMY_SPECS,
+} = require("../config/constants")
+const {
+    getNpcBaseSpeed,
+    getBaseSpeedForPlayer,
+    isDoubleSkinPlayer,
+    isPumpkinSkinPlayer,
+    isClassicDefaultPlayer,
+    isSingleDoublePlayer,
+    getSingleDoublePlayerHealth,
+    getPlayerAttackDamageScale,
+    isUserBoostAttacking,
+    isPlayerAttackingForCollision,
+    getDoubleAliveUnitIndices,
+    getMaxBoostedSpeedForPlayer,
+    getCollisionSlowSpeedForPlayer,
+    getPlayerDeathTriggerCount,
+    getNpcPhase,
+    getDummyPhase,
+    isPersistentHumanPlayer,
+} = require("./worldHelpers")
 
 const GAMEPLAY_SETTINGS = getGameplaySettings()
 const BASE_PLAYER_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_base_speed
 const DUMMY_BASE_SPEED_PER_SECOND = BASE_PLAYER_SPEED_PER_SECOND * 1.5
 const NPC_BASE_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_base_speed
 const MAX_BOOSTED_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.user_max_boost_speed
-const DEFAULT_PLAYER_BOOST_SPEED_MULTIPLIER = Math.max(1, MAX_BOOSTED_SPEED_PER_SECOND / Math.max(1, BASE_PLAYER_SPEED_PER_SECOND))
 const BOOST_ACCELERATION_PER_SECOND = GAMEPLAY_SETTINGS.user_boost_acceleration
 const BOOST_COOLDOWN_PER_SECOND = GAMEPLAY_SETTINGS.user_boost_cooldown
 const USER_POST_BOOST_COOLDOWN_MS = GAMEPLAY_SETTINGS.user_post_boost_cooldown_ms
 const TICK_DELTA_SECONDS = 1 / TICK_RATE
-// 유저 충돌 판정은 아이콘 비율에 맞춘 둥근 직사각형 기반으로 계산한다.
-const PLAYER_COLLISION_HALF_HEIGHT = 20
-const PLAYER_COLLISION_HALF_WIDTH = PLAYER_COLLISION_HALF_HEIGHT * (300 / 306)
-const PUMPKIN_PLAYER_COLLISION_SCALE = 1.5
-const PUMPKIN_NPC_COLLISION_WIDTH_SCALE = PUMPKIN_PLAYER_COLLISION_SCALE * 0.8
-const PUMPKIN_NPC_COLLISION_HEIGHT_SCALE = PUMPKIN_PLAYER_COLLISION_SCALE * 0.5
-const NPC_COLLISION_SCALE = 3.75
-const NPC_COLLISION_SIZE_MULTIPLIER = 0.6
-const NPC_COLLISION_HALF_HEIGHT = PLAYER_COLLISION_HALF_HEIGHT * NPC_COLLISION_SCALE * NPC_COLLISION_SIZE_MULTIPLIER
-const NPC_COLLISION_HALF_WIDTH = NPC_COLLISION_HALF_HEIGHT * 0.5
-// 아래 값들은 충돌 반발/시각효과/가속 잠금에 대한 공통 상수다.
-const COLLISION_BOUNCE_DISTANCE = 30
-const COLLISION_SPEED_BOUNCE_MULTIPLIER = 5.4
-const COLLISION_MAX_BOUNCE_DISTANCE = 78
-const WALL_BOUNCE_DISTANCE = 36
-const WALL_BOUNCE_SPEED_BOUNCE_MULTIPLIER = 5.4
-const WALL_MAX_BOUNCE_DISTANCE = 90
-const COLLISION_VISUAL_BASE_DURATION_MS = 1000
-const COLLISION_IMPACT_DURATION_MS = 360
-const COLLISION_VISUAL_SPEED_DURATION_MULTIPLIER_MS = 90
-const COLLISION_VISUAL_MAX_DURATION_MS = 3000
-const COLLISION_RECOVERY_DURATION_MS = 1600
-const COLLISION_BOOST_LOCK_DURATION_MS = 3000
-const COLLISION_ATTACK_DIRECTION_THRESHOLD = 0.001
-const PLAYER_DEATH_TRIGGER_COUNT = 3
 const PLAYER_STARTING_LIVES = GAMEPLAY_SETTINGS.user_lives
-const PLAYER_DEATH_DURATION_MS = 3000
-const DUMMY_RESPAWN_DELAY_MS = 3 * 60 * 1000
-const RESPAWN_EDGE_PADDING = 120
-const NPC_ID = "네르"
-const DUMMY_SPECS = [
-    { id: "dummy-1", quadrant: 1, displayName: "저는 네르에요" },
-    { id: "dummy-2", quadrant: 2, displayName: "제가 네르에요" },
-    { id: "dummy-3", quadrant: 3, displayName: "네르는 네르에요" },
-    { id: "dummy-4", quadrant: 4, displayName: "세계수 교단의 제사장, 네르입니다" },
-]
 const NPC_CHARGE_TRIGGER_DISTANCE = GAMEPLAY_SETTINGS.npc_charge_trigger_distance
 const NPC_CHARGE_DISTANCE_MULTIPLIER = GAMEPLAY_SETTINGS.npc_charge_distance_multiplier
 const NPC_EXTRA_CHARGE_DISTANCE_MULTIPLIER = GAMEPLAY_SETTINGS.npc_extra_charge_distance_multiplier
 const NPC_CHARGE_WINDUP_DURATION_MS = GAMEPLAY_SETTINGS.npc_charge_windup_ms
 const NPC_REST_DURATION_MS = GAMEPLAY_SETTINGS.npc_rest_ms
 const NPC_MAX_HEALTH = GAMEPLAY_SETTINGS.npc_max_health
-const NPC_DEATH_ANIMATION_DURATION_MS = 5000
 const NPC_MAX_BOOSTED_SPEED_PER_SECOND = GAMEPLAY_SETTINGS.npc_max_boost_speed
 const NPC_BOOST_ACCELERATION_PER_SECOND = GAMEPLAY_SETTINGS.npc_boost_acceleration
 const NPC_BOOST_COOLDOWN_PER_SECOND = GAMEPLAY_SETTINGS.npc_boost_cooldown
 const NPC_DAMAGE_MIN = GAMEPLAY_SETTINGS.npc_damage_min
 const NPC_DAMAGE_MAX = GAMEPLAY_SETTINGS.npc_damage_max
-const NPC_PHASE_TWO_HEALTH_RATIO = GAMEPLAY_SETTINGS.npc_phase_two_health_ratio
-const NPC_PHASE_THREE_HEALTH_RATIO = GAMEPLAY_SETTINGS.npc_phase_three_health_ratio
-const NPC_PHASE_THREE_TRIGGER_DISTANCE_MULTIPLIER = 1.5
-const DUMMY_RETALIATION_DISTANCE_MULTIPLIER = 1.2
-const HOUSE_STAGE_ONE_ID = "house-1"
-const HOUSE_STAGE_TWO_ID = "house-2"
-const HOUSE_STAGE_THREE_ID = "house-3"
-const HOUSE_STAGE_ONE_HEALTH = 30
-const HOUSE_STAGE_TWO_HEALTH = 30
-const HOUSE_STAGE_THREE_HEALTH = 30
-const HOUSE_COLLISION_SCALE = 0.5
-const HOUSE_COLLISION_HALF_WIDTH = 110 * HOUSE_COLLISION_SCALE
-const HOUSE_COLLISION_HALF_HEIGHT = HOUSE_COLLISION_HALF_WIDTH * (508 / 815)
-const HOUSE_COLLISION_POLYGON = [
-    { x: -0.291, y: -0.42 },
-    { x: 0.265, y: -0.42 },
-    { x: 0.308, y: -0.34 },
-    { x: 0.305, y: -0.22 },
-    { x: 0.369, y: -0.1 },
-    { x: 0.348, y: 0.06 },
-    { x: 0.399, y: 0.22 },
-    { x: 0.47, y: 0.38 },
-    { x: 0.217, y: 0.5 },
-    { x: -0.242, y: 0.5 },
-    { x: -0.473, y: 0.38 },
-    { x: -0.399, y: 0.22 },
-    { x: -0.407, y: 0.06 },
-    { x: -0.399, y: -0.1 },
-    { x: -0.354, y: -0.22 },
-    { x: -0.32, y: -0.34 },
-]
-const ENCOUNTER_STAGE_ONE_COUNTDOWN_MS = 3 * 60 * 1000
-const ENCOUNTER_STAGE_TWO_COUNTDOWN_MS = 2 * 60 * 1000
-const ENCOUNTER_STAGE_THREE_COUNTDOWN_MS = 60 * 1000
-const ENCOUNTER_FINALE_DURATION_MS = 20 * 1000
-const ENCOUNTER_STAGE_ONE_LIVES = 4
-const ENCOUNTER_STAGE_TWO_LIVES = 5
-const ENCOUNTER_ANNOUNCEMENT_STAGE_ONE = "ner_knocks_door"
-const ENCOUNTER_ANNOUNCEMENT_STAGE_TWO = "ner_breaks_door"
-const ENCOUNTER_ANNOUNCEMENT_STAGE_THREE = "ner_holds_deed"
-const ENCOUNTER_ANNOUNCEMENT_FINALE = "ner_true_finale"
-// 전체 인간 유저 입력이 이 시간 동안 없으면 진행 상태를 초기화한다.
-const INPUT_IDLE_RESET_MS = 10 * 60 * 1000
-const EVOLUTION_SKIN_NAME = "evolution"
-const DEFAULT_SKIN_NAME = "default"
-const MANY_SKIN_NAME = "many"
-const DOUBLE_SKIN_NAME = "double"
-const PUMPKIN_SKIN_NAME = "pumkin"
-const DEFAULT_PLAYER_SPEED_MULTIPLIER = 1
-const MANY_SPEED_MULTIPLIER = 1
-const DOUBLE_SPEED_MULTIPLIER = 1
-const EVOLUTION_SPEED_MULTIPLIER = 0.8
-const PUMPKIN_SPEED_MULTIPLIER = 1.4
-const PLAYER_SPEED_MULTIPLIERS = {
-    [DEFAULT_SKIN_NAME]: DEFAULT_PLAYER_SPEED_MULTIPLIER,
-    [MANY_SKIN_NAME]: MANY_SPEED_MULTIPLIER,
-    [DOUBLE_SKIN_NAME]: DOUBLE_SPEED_MULTIPLIER,
-    [EVOLUTION_SKIN_NAME]: EVOLUTION_SPEED_MULTIPLIER,
-    [PUMPKIN_SKIN_NAME]: PUMPKIN_SPEED_MULTIPLIER,
-}
-const EVOLUTION_HEALTH_SEGMENTS = 5
-const PUMPKIN_NPC_HEALTH_SEGMENTS = 4
-const PUMPKIN_NPC_DEFEAT_DASH_DURATION_MS = 420
-const PUMPKIN_NPC_DASH_PROTECTION_MS = 260
-const PUMPKIN_NPC_CLAIM_LOCK_MS = 500
-const PUMPKIN_NPC_DAMAGE_INVULNERABLE_MS = 1000
-const PUMPKIN_NPC_FADE_OUT_DURATION_MS = 520
 const PUMPKIN_NPC_DEFEAT_DASH_SPEED_PER_SECOND = Math.max(
     MAX_BOOSTED_SPEED_PER_SECOND * 1.1,
     BASE_PLAYER_SPEED_PER_SECOND * 2
 )
-const NEUTRAL_PUMPKIN_SPAWN_PADDING = 180
-const MANY_HEALTH_SEGMENTS = 5
-const DOUBLE_UNIT_HEALTH = 2
-const DOUBLE_UNIT_COUNT = 2
-const DOUBLE_SEPARATION_ANGLE_DEGREES = 7
-const DOUBLE_SEPARATION_ANGLE_RADIANS = DOUBLE_SEPARATION_ANGLE_DEGREES * (Math.PI / 180)
-const DOUBLE_MERGED_SIDE_OFFSET = PLAYER_COLLISION_HALF_WIDTH * 0.72
-const DOUBLE_SPLIT_PROBABILITY = 0.3
-const DOUBLE_REJOIN_EXTRA_DISTANCE = PLAYER_COLLISION_HALF_HEIGHT * 0.25
-const DOUBLE_REMERGE_LOCK_MS = 3000
-const DOUBLE_SPLIT_PROTECTION_MS = 1000
-const SPLIT_DEFEAT_PROTECTION_MS = 300
-const DOUBLE_IDLE_REMERGE_DELAY_MS = 2000
-const DOUBLE_STEER_MIN_RADIANS = 5 * (Math.PI / 180)
-const DOUBLE_STEER_MAX_RADIANS = 45 * (Math.PI / 180)
-const DOUBLE_STEER_DEADZONE_RADIANS = 3 * (Math.PI / 180)
-const DOUBLE_ALIGNMENT_DEADZONE_DISTANCE = DOUBLE_MERGED_SIDE_OFFSET * 0.35
-const DOUBLE_INACTIVE_FADE_MS = 200
-const NPC_DEFEAT_BOUNCE_MULTIPLIER = 1.5
-const PUMPKIN_NPC_ID_PREFIX = "pumpkin-"
 
-function getNpcBaseSpeed(player) {
-    const multiplier = Math.max(0.1, Number(player && player.npcSpeedMultiplier || 1))
-    return NPC_BASE_SPEED_PER_SECOND * multiplier
-}
-
-function getCharacterGameplaySettings(skinName) {
-    const normalizedSkinName = String(skinName || DEFAULT_SKIN_NAME).trim().toLowerCase() || DEFAULT_SKIN_NAME
-    const configuredSettings = GAMEPLAY_SETTINGS.character_settings && typeof GAMEPLAY_SETTINGS.character_settings === "object"
-        ? GAMEPLAY_SETTINGS.character_settings[normalizedSkinName]
-        : null
-    const fallbackSettings = {
-        base_speed_multiplier: PLAYER_SPEED_MULTIPLIERS[normalizedSkinName] || DEFAULT_PLAYER_SPEED_MULTIPLIER,
-        max_boost_speed_multiplier: DEFAULT_PLAYER_BOOST_SPEED_MULTIPLIER,
-        max_health_segments: normalizedSkinName === MANY_SKIN_NAME
-            ? MANY_HEALTH_SEGMENTS
-            : (normalizedSkinName === DOUBLE_SKIN_NAME
-                ? 4
-                : (normalizedSkinName === EVOLUTION_SKIN_NAME
-                    ? EVOLUTION_HEALTH_SEGMENTS
-                    : PLAYER_DEATH_TRIGGER_COUNT)),
-        movement_type: normalizedSkinName === EVOLUTION_SKIN_NAME ? "evolution" : "classic",
-    }
-    return {
-        base_speed_multiplier: Math.max(0.1, Number(configuredSettings && configuredSettings.base_speed_multiplier || fallbackSettings.base_speed_multiplier)),
-        max_boost_speed_multiplier: Math.max(0.1, Number(configuredSettings && configuredSettings.max_boost_speed_multiplier || fallbackSettings.max_boost_speed_multiplier)),
-        max_health_segments: Math.max(1, Math.round(Number(configuredSettings && configuredSettings.max_health_segments || fallbackSettings.max_health_segments))),
-        movement_type: String(configuredSettings && configuredSettings.movement_type || fallbackSettings.movement_type).trim().toLowerCase() === "evolution"
-            ? "evolution"
-            : "classic",
-    }
-}
-
-function getPlayerSpeedMultiplier(player) {
-    return getCharacterGameplaySettings(player && player.skinName).base_speed_multiplier
-}
-
-function getBaseSpeedForPlayer(player) {
-    if (player && player.isNpc) {
-        return getNpcBaseSpeed(player)
-    }
-    if (player && player.isDummy) {
-        return DUMMY_BASE_SPEED_PER_SECOND
-    }
-    return BASE_PLAYER_SPEED_PER_SECOND * getPlayerSpeedMultiplier(player)
-}
-
-function isDoubleSkinPlayer(player) {
-    return Boolean(player) && String(player.skinName || "").trim().toLowerCase() === DOUBLE_SKIN_NAME
-}
-
-function isPumpkinSkinPlayer(player) {
-    return Boolean(player) && String(player.skinName || "").trim().toLowerCase() === PUMPKIN_SKIN_NAME
-}
-
-function isClassicDefaultPlayer(player) {
-    return Boolean(player) &&
-        !player.isNpc &&
-        !player.isDummy &&
-        !player.isHouse &&
-        !player.isPumpkinNpc &&
-        String(player.skinName || "").trim().toLowerCase() === "default"
-}
-
-function isSingleDoublePlayer(player) {
-    return Boolean(player) &&
-        !player.isNpc &&
-        !player.isDummy &&
-        !player.isHouse &&
-        !player.isPumpkinNpc &&
-        isDoubleSkinPlayer(player) &&
-        getDoubleAliveUnitIndices(player).length === 1
-}
-
-function getSingleDoublePlayerHealth(player) {
-    const aliveIndices = getDoubleAliveUnitIndices(player)
-    if (!aliveIndices.length) {
-        return 0
-    }
-    const liveUnit = player.doubleUnits[aliveIndices[0]]
-    return Math.max(0, Math.min(DOUBLE_UNIT_HEALTH, Number(liveUnit && liveUnit.health || 0)))
-}
-
-function getPumpkinLifeSegments(player) {
-    if (player && String(player.pumpkinBaseSkinName || "").trim().toLowerCase() === "double_single") {
-        return DOUBLE_UNIT_HEALTH
-    }
-    return PLAYER_DEATH_TRIGGER_COUNT
-}
-
-function getPlayerAttackDamageScale(player) {
-    if (isDoubleSkinPlayer(player)) {
-        return 0.65
-    }
-    return 1
-}
-
-function isUserBoostAttacking(player) {
-    if (!player || player.isNpc || player.isDummy || player.isPumpkinNpc || player.isHouse) {
-        return false
-    }
-    return (
-        player.boostState === "charging" ||
-        player.boostState === "cooldown" ||
-        Number(player.currentSpeed || 0) > getBaseSpeedForPlayer(player)
-    )
-}
-
-function isPlayerAttackingForCollision(player) {
-    if (!player) {
-        return false
-    }
-    if (player.isNpc) {
-        return player.npcState === "charging"
-    }
-    if (player.isDummy) {
-        return player.dummyState === "charging"
-    }
-    return isUserBoostAttacking(player)
-}
-
+// double 스킨의 개별 유닛 초기 상태 객체를 생성해 반환한다.
+// 체력·위치·부스트·충돌 관련 모든 필드를 기본값으로 초기화한다.
 function createDoubleUnitState(now = Date.now()) {
     return {
         health: DOUBLE_UNIT_HEALTH,
@@ -300,86 +154,10 @@ function createDoubleUnitState(now = Date.now()) {
     }
 }
 
-function getDoubleAliveUnitIndices(player) {
-    if (!player || !Array.isArray(player.doubleUnits)) {
-        return []
-    }
-    const indices = []
-    player.doubleUnits.forEach((unit, index) => {
-        if (unit && Number(unit.health || 0) > 0) {
-            indices.push(index)
-        }
-    })
-    return indices
-}
-
-function getMaxBoostedSpeedForPlayer(player) {
-    if (player && player.isNpc) {
-        return NPC_MAX_BOOSTED_SPEED_PER_SECOND
-    }
-    return BASE_PLAYER_SPEED_PER_SECOND * getCharacterGameplaySettings(player && player.skinName).max_boost_speed_multiplier
-}
-
-function getCollisionSlowSpeedForPlayer(player) {
-    if (player && player.isNpc) {
-        return NPC_BASE_SPEED_PER_SECOND * 0.35
-    }
-    if (player && player.isDummy) {
-        return DUMMY_BASE_SPEED_PER_SECOND * 0.35
-    }
-    return getBaseSpeedForPlayer(player) * 0.35
-}
-
-function getPlayerDeathTriggerCount(player) {
-    if (!player || player.isNpc || player.isDummy) {
-        return PLAYER_DEATH_TRIGGER_COUNT
-    }
-    const skinName = String(player.skinName || "").trim().toLowerCase()
-    if (skinName === PUMPKIN_SKIN_NAME) {
-        return getPumpkinLifeSegments(player)
-    }
-    return getCharacterGameplaySettings(skinName).max_health_segments
-}
-
-function getNpcPhase(player) {
-    if (!player || !player.isNpc) {
-        return 1
-    }
-    const npcMaxHealth = Math.max(1, Number(player.npcMaxHealth || NPC_MAX_HEALTH))
-    const healthRatio = npcMaxHealth > 0
-        ? Math.max(0, Math.min(1, (player.npcHealth || 0) / npcMaxHealth))
-        : 1
-
-    if (healthRatio <= NPC_PHASE_THREE_HEALTH_RATIO) {
-        return 3
-    }
-    if (healthRatio <= NPC_PHASE_TWO_HEALTH_RATIO) {
-        return 2
-    }
-    return 1
-}
-
-function getDummyPhase(player) {
-    if (!player || !player.isDummy) {
-        return 1
-    }
-    const defeatsInCurrentLife = Number(player.defeatReceivedCount || 0) % PLAYER_DEATH_TRIGGER_COUNT
-    const remainingHealthSegments = Math.max(0, PLAYER_DEATH_TRIGGER_COUNT - defeatsInCurrentLife)
-
-    if (remainingHealthSegments <= 1) {
-        return 3
-    }
-    if (remainingHealthSegments <= 2) {
-        return 2
-    }
-    return 1
-}
-
-function isPersistentHumanPlayer(player) {
-    return Boolean(player) && !player.isNpc && !player.isDummy && !player.isPumpkinNpc && !player.isHouse
-}
-
 class World {
+    // World 인스턴스를 초기화한다.
+    // 플레이어 맵, 공용 목숨, 이벤트 타이머 등 초기 상태를 설정하고
+    // 더미·NPC·중립 펌킨 NPC를 스폰한다.
     constructor() {
         // players: 현재 월드에 존재하는 엔티티
         // playerProgress: 재접속 후 이어붙일 인간 유저 진행도
@@ -403,6 +181,8 @@ class World {
         this.spawnNeutralPumpkinNpc()
     }
 
+    // DUMMY_SPECS 에 정의된 더미 플레이어들을 월드에 추가한다.
+    // 이미 존재하는 더미는 건너뛴다.
     addDummyPlayers() {
         DUMMY_SPECS.forEach((dummySpec) => {
             if (this.players.has(dummySpec.id)) {
@@ -425,6 +205,7 @@ class World {
         })
     }
 
+    // 기본 위치에 네르 NPC 플레이어를 스폰한다.
     addNerNpcPlayer() {
         return this.spawnNerNpcPlayer(NPC_ID, {
             x: WORLD_SIZE / 2 + 180,
@@ -433,6 +214,9 @@ class World {
         })
     }
 
+    // 지정한 id로 네르 NPC를 생성해 월드에 추가하고 해당 플레이어 객체를 반환한다.
+    // 이미 같은 id가 존재하면 기존 플레이어를 그대로 반환한다.
+    // options: { x, y, speedMultiplier, encounterVariant }
     spawnNerNpcPlayer(id, options = {}) {
         if (this.players.has(id)) {
             return this.players.get(id)
@@ -457,6 +241,8 @@ class World {
         return player
     }
 
+    // 인카운터 스테이지에 해당하는 집(house) 오브젝트를 월드에 스폰한다.
+    // stage: 1·2·3 중 하나이며, 이미 존재하면 기존 객체를 반환한다.
     spawnHouse(stage) {
         const houseId = stage === 1 ? HOUSE_STAGE_ONE_ID : (stage === 2 ? HOUSE_STAGE_TWO_ID : HOUSE_STAGE_THREE_ID)
         const existing = this.players.get(houseId)
@@ -476,6 +262,7 @@ class World {
         return player
     }
 
+    // 월드에 있는 모든 집(isHouse) 엔티티를 제거한다.
     removeHousePlayers() {
         for (const player of Array.from(this.players.values())) {
             if (!player.isHouse) {
@@ -486,6 +273,7 @@ class World {
         }
     }
 
+    // 월드에 있는 모든 네르 NPC(isNpc) 엔티티를 제거한다.
     removeNerPlayers() {
         for (const player of Array.from(this.players.values())) {
             if (!player.isNpc) {

@@ -1,6 +1,10 @@
 const jwt = require("jsonwebtoken")
 const { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE } = require("../config/config")
 
+// JWT 토큰을 검증하고 결과를 반환한다.
+// JWT_SECRET 이 없는 개발 환경에서는 토큰 문자열 자체를 userId 로 사용한다.
+// token: 검증할 JWT 문자열
+// 반환값: { valid, userId, payload } 형태의 검증 결과 객체
 function verifyToken(token) {
     if (!token) {
         return {

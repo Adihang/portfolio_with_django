@@ -4,6 +4,10 @@ const { getGameplaySettings } = require("../config/gameplaySettings")
 const IDLE_TIMEOUT_MS = 180000
 const GAMEPLAY_SETTINGS = getGameplaySettings()
 
+// 게임 루프를 시작한다. 매 틱마다 월드를 업데이트하고, 유휴 연결을 정리한 뒤
+// 모든 연결된 클라이언트에 전체 엔티티 상태를 브로드캐스트한다.
+// world: 월드 시뮬레이션 인스턴스
+// wss: WebSocket 서버 인스턴스
 function startGameLoop(world, wss) {
     const intervalMs = Math.floor(1000 / TICK_RATE)
 
