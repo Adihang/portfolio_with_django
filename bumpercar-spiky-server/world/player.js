@@ -179,6 +179,8 @@ class Player {
         // facingAngle 은 회전된 충돌 판정과 클라이언트 아이콘 회전에 공통 사용한다.
         this.facingAngle = 0
         this.cell = null
+        this.cellX = 0
+        this.cellY = 0
 
         if (this.isNpc) {
             this.baseSpeed = NPC_BASE_SPEED_PER_SECOND
