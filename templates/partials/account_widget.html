@@ -1,5 +1,61 @@
 {% if user.is_authenticated %}
 <div class="ui-auth-account-floating" data-auth-account>
+    {% if docs_quota_used_bytes is not None %}
+    <div class="handrive-quota-bar" id="handrive-quota-bar" role="button" tabindex="0" aria-label="스토리지 사용량 상세보기" aria-expanded="false">
+        <div class="handrive-quota-bar-track">
+            <div class="handrive-quota-bar-fill" style="width: {{ docs_quota_percent }}%"></div>
+        </div>
+        <span class="handrive-quota-bar-label">{{ docs_quota_used_display }} / {{ docs_quota_total_display }}</span>
+        <div class="handrive-quota-popup" id="handrive-quota-popup" hidden>
+            <div class="handrive-quota-popup-header">
+                <span class="handrive-quota-popup-title">총 사용 용량</span>
+                <span class="handrive-quota-popup-used">{{ docs_quota_used_display }}</span>
+                <span class="handrive-quota-popup-sep"> / </span>
+                <span class="handrive-quota-popup-total">{{ docs_quota_total_display }}</span>
+            </div>
+            <div class="handrive-quota-popup-bar">
+                {% for item in docs_quota_breakdown %}{% if item.percent > 0 %}<div class="handrive-quota-popup-bar-seg" style="width:{{ item.percent }}%;background:{{ item.color }};" title="{{ item.label }}: {{ item.display }}"></div>{% endif %}{% endfor %}{% if docs_quota_free_percent > 0 %}<div class="handrive-quota-popup-bar-seg handrive-quota-popup-bar-free" style="width:{{ docs_quota_free_percent }}%;" title="여유 공간: {{ docs_quota_free_display }}"></div>{% endif %}
+            </div>
+            <div class="handrive-quota-popup-legend">
+                {% for item in docs_quota_breakdown %}
+                <div class="handrive-quota-popup-legend-item">
+                    <span class="handrive-quota-popup-legend-dot" style="background:{{ item.color }};"></span>
+                    <span class="handrive-quota-popup-legend-text">{{ item.label }} {{ item.count }} ({{ item.display }})</span>
+                </div>
+                {% endfor %}
+                <div class="handrive-quota-popup-legend-item">
+                    <span class="handrive-quota-popup-legend-dot handrive-quota-popup-legend-dot-free"></span>
+                    <span class="handrive-quota-popup-legend-text">여유 공간 ({{ docs_quota_free_display }})</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function(){
+        var bar = document.getElementById('handrive-quota-bar');
+        var popup = document.getElementById('handrive-quota-popup');
+        if (!bar || !popup) return;
+        function openPopup() {
+            popup.removeAttribute('hidden');
+            bar.setAttribute('aria-expanded', 'true');
+        }
+        function closePopup() {
+            popup.setAttribute('hidden', '');
+            bar.setAttribute('aria-expanded', 'false');
+        }
+        bar.addEventListener('click', function(e) {
+            popup.hasAttribute('hidden') ? openPopup() : closePopup();
+            e.stopPropagation();
+        });
+        bar.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bar.click(); }
+            if (e.key === 'Escape') closePopup();
+        });
+        popup.addEventListener('click', function(e) { e.stopPropagation(); });
+        document.addEventListener('click', closePopup);
+    })();
+    </script>
+    {% endif %}
     <button
         type="button"
         class="ui-auth-account-trigger"

@@ -10,15 +10,17 @@
                 <h1 class="handrive-title ui-title">{{ docs_text.list_title }}</h1>
                 <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
-            <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
-                {% for crumb in breadcrumbs %}
-                    {% if not forloop.first %}<span class="handrive-path-sep ui-path-sep">/</span>{% endif %}
-                    {% if crumb.is_current %}
-                        <span class="handrive-path-current ui-path-current" data-handrive-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</span>
-                    {% else %}
-                        <a class="handrive-path-link ui-path-link" href="{{ crumb.url }}" data-handrive-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</a>
-                    {% endif %}
-                {% endfor %}
+            <div class="handrive-subtitle-wrap">
+                <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
+                    {% for crumb in breadcrumbs %}
+                        {% if not forloop.first %}<span class="handrive-path-sep ui-path-sep">/</span>{% endif %}
+                        {% if crumb.is_current %}
+                            <span class="handrive-path-current ui-path-current" data-handrive-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</span>
+                        {% else %}
+                            <a class="handrive-path-link ui-path-link" href="{{ crumb.url }}" data-handrive-dir="{{ crumb.path|default:'' }}">{{ crumb.label }}</a>
+                        {% endif %}
+                    {% endfor %}
+                </div>{% if list_current_dir_size_display %}<span class="handrive-path-current-size">{{ list_current_dir_size_display }}</span>{% endif %}
             </div>
         </div>
         <div class="handrive-toolbar-right ui-toolbar-right">

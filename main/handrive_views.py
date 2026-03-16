@@ -1535,6 +1535,8 @@ def enforce_docs_scoped_quota(
     extra_bytes: int = 0,
     extra_entries: int = 0,
 ) -> None:
+    if getattr(request.user, "is_superuser", False):
+        return
     scoped_root = get_docs_scoped_quota_root(request, quota_path)
     if scoped_root is None:
         return
@@ -1547,6 +1549,79 @@ def enforce_docs_scoped_quota(
         raise ValueError("개인 폴더 용량이 1GB를 초과해 더 이상 업로드하거나 생성할 수 없습니다.")
     if projected_entries > DOCS_USER_SCOPED_ENTRY_LIMIT:
         raise ValueError("개인 폴더의 하위 폴더/파일 수가 100개를 초과해 더 이상 업로드하거나 생성할 수 없습니다.")
+
+
+def format_docs_bytes_display(byte_count: int) -> str:
+    GB = 1024**3
+    MB = 1024**2
+    KB = 1024
+    if byte_count >= GB:
+        return f"{byte_count / GB:g} GB" if byte_count % GB == 0 else f"{round(byte_count / GB, 1):g} GB"
+    elif byte_count >= MB:
+        return f"{byte_count / MB:g} MB" if byte_count % MB == 0 else f"{round(byte_count / MB, 1):g} MB"
+    elif byte_count >= KB:
+        return f"{byte_count / KB:g} KB" if byte_count % KB == 0 else f"{round(byte_count / KB, 1):g} KB"
+    return f"{byte_count} B"
+
+
+_DOCS_QUOTA_TYPE_EXTS: dict[str, frozenset[str]] = {
+    "photo": frozenset({
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif",
+        ".avif", ".heic", ".heif", ".ico", ".svg",
+    }),
+    "video": frozenset({
+        ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v",
+        ".3gp", ".m2ts", ".ts", ".mts",
+    }),
+    "document": frozenset({
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+        ".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm",
+        ".py", ".js", ".ts", ".css", ".rb", ".go", ".java", ".c", ".cpp",
+        ".h", ".rs", ".sh", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".log",
+    }),
+    "audio": frozenset({
+        ".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma", ".opus", ".aiff",
+    }),
+}
+
+_DOCS_QUOTA_TYPE_META: list[tuple[str, str, str]] = [
+    ("photo",    "사진",   "#f5b800"),
+    ("video",    "동영상", "#06d6a0"),
+    ("document", "문서",   "#ef476f"),
+    ("audio",    "오디오", "#4361ee"),
+    ("other",    "기타",   "#adb5bd"),
+]
+
+
+def _docs_quota_file_type(suffix: str) -> str:
+    s = suffix.lower()
+    for key, exts in _DOCS_QUOTA_TYPE_EXTS.items():
+        if s in exts:
+            return key
+    return "other"
+
+
+def calculate_docs_quota_breakdown(root_path: Path) -> tuple[int, int, dict[str, dict]]:
+    """Returns (total_bytes, total_entries, breakdown).
+    breakdown keys: photo, video, document, audio, other → {"bytes": int, "count": int}
+    """
+    type_keys = [k for k, _, _ in _DOCS_QUOTA_TYPE_META]
+    byte_map = {k: 0 for k in type_keys}
+    count_map = {k: 0 for k in type_keys}
+    total_entries = 0
+    if root_path.exists():
+        for path_obj in root_path.rglob("*"):
+            total_entries += 1
+            if path_obj.is_file():
+                tk = _docs_quota_file_type(path_obj.suffix)
+                count_map[tk] += 1
+                try:
+                    byte_map[tk] += path_obj.stat().st_size
+                except OSError:
+                    pass
+    total_bytes = sum(byte_map.values())
+    breakdown = {k: {"bytes": byte_map[k], "count": count_map[k]} for k in type_keys}
+    return total_bytes, total_entries, breakdown
 
 
 def build_docs_breadcrumbs(
@@ -1917,12 +1992,56 @@ def docs_common_context(request, ui_lang):
             )
         else:
             account_profile_upload_url = reverse("main:account_profile_image_upload")
+        _quota_home = get_scoped_docs_home_dir(request)
+        if _quota_home:
+            _quota_root, _ = resolve_path(_quota_home, must_exist=False)
+            _quota_used, _, _breakdown = calculate_docs_quota_breakdown(_quota_root)
+            docs_quota_used_bytes = _quota_used
+            docs_quota_total_bytes = DOCS_USER_SCOPED_QUOTA_BYTES
+            docs_quota_percent = min(100, round(_quota_used / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 1))
+            docs_quota_used_display = format_docs_bytes_display(_quota_used)
+            docs_quota_total_display = format_docs_bytes_display(DOCS_USER_SCOPED_QUOTA_BYTES)
+            _free_bytes = max(0, DOCS_USER_SCOPED_QUOTA_BYTES - _quota_used)
+            docs_quota_free_bytes = _free_bytes
+            docs_quota_free_display = format_docs_bytes_display(_free_bytes)
+            docs_quota_free_percent = round(_free_bytes / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2)
+            docs_quota_breakdown = [
+                {
+                    "key": key,
+                    "label": label,
+                    "color": color,
+                    "bytes": _breakdown[key]["bytes"],
+                    "count": _breakdown[key]["count"],
+                    "display": format_docs_bytes_display(_breakdown[key]["bytes"]),
+                    "percent": round(_breakdown[key]["bytes"] / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2),
+                }
+                for key, label, color in _DOCS_QUOTA_TYPE_META
+            ]
+        else:
+            docs_quota_used_bytes = None
+            docs_quota_total_bytes = None
+            docs_quota_percent = None
+            docs_quota_used_display = ""
+            docs_quota_total_display = ""
+            docs_quota_free_bytes = None
+            docs_quota_free_display = ""
+            docs_quota_free_percent = None
+            docs_quota_breakdown = []
     else:
         docs_my_portfolio_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
         account_profile_image_url = ""
         account_display_name = ""
         account_email = ""
         account_profile_upload_url = ""
+        docs_quota_used_bytes = None
+        docs_quota_total_bytes = None
+        docs_quota_percent = None
+        docs_quota_used_display = ""
+        docs_quota_total_display = ""
+        docs_quota_free_bytes = None
+        docs_quota_free_display = ""
+        docs_quota_free_percent = None
+        docs_quota_breakdown = []
 
     context.update(
         {
@@ -1968,6 +2087,15 @@ def docs_common_context(request, ui_lang):
             "docs_can_manage_acl": is_docs_acl_admin(request),
             "docs_file_extension_options": get_docs_save_extension_options(),
             "docs_text": docs_text,
+            "docs_quota_used_bytes": docs_quota_used_bytes,
+            "docs_quota_total_bytes": docs_quota_total_bytes,
+            "docs_quota_percent": docs_quota_percent,
+            "docs_quota_used_display": docs_quota_used_display,
+            "docs_quota_total_display": docs_quota_total_display,
+            "docs_quota_free_bytes": docs_quota_free_bytes,
+            "docs_quota_free_display": docs_quota_free_display,
+            "docs_quota_free_percent": docs_quota_free_percent,
+            "docs_quota_breakdown": docs_quota_breakdown,
         }
     )
     return context
@@ -2445,6 +2573,7 @@ def docs_list(request, folder_path="", ui_lang=None):
                 root_parent_label=get_handrive_root_label(request, ""),
             ),
             "initial_entries": list_directory_entries(directory, request=request),
+            "list_current_dir_size_display": format_docs_bytes_display(calculate_docs_quota_breakdown(directory)[0]) if directory.is_dir() else "",
             "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
         }
     )
@@ -2504,6 +2633,7 @@ def docs_view(request, doc_path, ui_lang=None):
                 root_parent_label=get_handrive_root_label(request, ""),
             ),
             "view_current_file_name": file_path.name,
+            "view_current_file_size_display": format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else "",
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
         }
     )
@@ -2560,6 +2690,7 @@ def docs_shared_view(request, owner_username, share_slug, ui_lang=None):
                 }
             ],
             "view_current_file_name": file_path.name,
+            "view_current_file_size_display": format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else "",
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
         }
     )
