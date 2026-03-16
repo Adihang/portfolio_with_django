@@ -194,11 +194,12 @@
     const flipDurationSeconds = 0.18;
     const doubleUnitDeathFadeMs = 3000;
     const soundHearingRadius = 560;
-    const inputSendIntervalMs = 66;
+    const inputSendIntervalMs = 33;
     const inputHeartbeatMs = 150;
     const input = { up: false, down: false, left: false, right: false, boost: false, respawn: false };
     const keyboardDirectionInput = { up: false, down: false, left: false, right: false };
     const joystickDirectionInput = { up: false, down: false, left: false, right: false };
+    const joystickAnalogInput = { x: 0, y: 0 };
     const mouseDirectionInput = { up: false, down: false, left: false, right: false };
     const keyMap = {
         w: 'up',
@@ -216,6 +217,8 @@
     let gameStarted = false;
     let selfId = '';
     let serverPlayers = [];
+    // delta 수신 시 플레이어별 최신 full state를 유지하는 Map
+    let serverPlayerMap = new Map();
     let renderPlayers = [];
     let sendTimer = null;
     let pingTimer = null;
@@ -226,6 +229,8 @@
     let isFullscreenMode = false;
     let isCompactViewport = false;
     let joystickPointerId = null;
+    let keyboardCurrentAngle = null;
+    let keyboardAngleLastUpdate = 0;
     let mouseMoveActive = false;
     let mouseLeftHeld = false;
     let mouseRightHeld = false;
@@ -741,24 +746,36 @@
     };
 
     const getNetworkMoveVector = function () {
-        let dx = 0;
-        let dy = 0;
+        const keyboardActive = keyboardDirectionInput.up || keyboardDirectionInput.down || keyboardDirectionInput.left || keyboardDirectionInput.right;
 
-        if (input.left) dx -= 1;
-        if (input.right) dx += 1;
-        if (input.up) dy -= 1;
-        if (input.down) dy += 1;
-
-        if (dx !== 0 || dy !== 0) {
-            if (dx !== 0 && dy !== 0) {
-                const normalize = Math.SQRT1_2;
-                dx *= normalize;
-                dy *= normalize;
+        if (!keyboardActive) {
+            keyboardCurrentAngle = null;
+            if (joystickPointerId !== null) {
+                return { dx: joystickAnalogInput.x, dy: joystickAnalogInput.y };
             }
-            return { dx, dy };
+            return getMouseVector(mouseBoostRequested);
         }
 
-        return getMouseVector(mouseBoostRequested);
+        let tdx = 0;
+        let tdy = 0;
+        if (keyboardDirectionInput.left) tdx -= 1;
+        if (keyboardDirectionInput.right) tdx += 1;
+        if (keyboardDirectionInput.up) tdy -= 1;
+        if (keyboardDirectionInput.down) tdy += 1;
+        const targetAngle = Math.atan2(tdy, tdx);
+        const now = Date.now();
+        if (keyboardCurrentAngle === null) {
+            keyboardCurrentAngle = targetAngle;
+        } else {
+            const elapsed = Math.min(now - keyboardAngleLastUpdate, 100);
+            const maxRotate = (4 * Math.PI / 1000) * elapsed;
+            let diff = targetAngle - keyboardCurrentAngle;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+            while (diff < -Math.PI) diff += 2 * Math.PI;
+            keyboardCurrentAngle += Math.abs(diff) <= maxRotate ? diff : Math.sign(diff) * maxRotate;
+        }
+        keyboardAngleLastUpdate = now;
+        return { dx: Math.cos(keyboardCurrentAngle), dy: Math.sin(keyboardCurrentAngle) };
     };
 
     const buildInputPayload = function () {
@@ -1072,6 +1089,7 @@
     const handleIdleTimeoutDisconnect = function () {
         idleReconnectBlocked = true;
         serverPlayers = [];
+        serverPlayerMap.clear();
         renderPlayers = [];
         lastSentInputSignature = '';
         lastSentInputAt = 0;
@@ -1512,6 +1530,8 @@
         joystickDirectionInput.down = false;
         joystickDirectionInput.left = false;
         joystickDirectionInput.right = false;
+        joystickAnalogInput.x = 0;
+        joystickAnalogInput.y = 0;
         syncDirectionalInput();
         if (joystickKnob) {
             joystickKnob.style.transform = 'translate(0, 0)';
@@ -1538,8 +1558,12 @@
         const normalizedX = maxRadius > 0 ? limitedX / maxRadius : 0;
         const normalizedY = maxRadius > 0 ? limitedY / maxRadius : 0;
         const threshold = 0.34;
+        const analogMagnitude = Math.hypot(normalizedX, normalizedY);
+        const analogActive = analogMagnitude > 0.1;
 
         joystickKnob.style.transform = 'translate(' + limitedX + 'px, ' + limitedY + 'px)';
+        joystickAnalogInput.x = analogActive ? normalizedX : 0;
+        joystickAnalogInput.y = analogActive ? normalizedY : 0;
         joystickDirectionInput.left = normalizedX < -threshold;
         joystickDirectionInput.right = normalizedX > threshold;
         joystickDirectionInput.up = normalizedY < -threshold;
@@ -2581,6 +2605,7 @@
         }
 
         socket = new window.WebSocket(getSocketUrl(token));
+        socket.binaryType = 'arraybuffer';
         const nextSocket = socket;
         activeSocket = nextSocket;
 
@@ -2606,7 +2631,11 @@
             }
             let payload = null;
             try {
-                payload = JSON.parse(event.data);
+                if (event.data instanceof ArrayBuffer) {
+                    payload = window.MessagePack.decode(new Uint8Array(event.data));
+                } else {
+                    payload = JSON.parse(event.data);
+                }
             } catch (error) {
                 return;
             }
@@ -2641,28 +2670,37 @@
                 return;
             }
 
-            if (Array.isArray(payload)) {
+            if (payload && Array.isArray(payload.d)) {
                 const receivedAt = window.performance.now();
-                serverPlayers = payload.map(function (player) {
-                    return Object.assign({}, player, {
-                        clientReceivedAt: receivedAt
-                    });
+                // 삭제된 플레이어 제거
+                if (Array.isArray(payload.r)) {
+                    payload.r.forEach(function (id) { serverPlayerMap.delete(id); });
+                }
+                // delta를 기존 state에 merge한다. __new 플래그가 있으면 신규 플레이어다.
+                payload.d.forEach(function (delta) {
+                    var existing = serverPlayerMap.get(delta.id);
+                    if (delta.__new || !existing) {
+                        var full = Object.assign({}, delta, { clientReceivedAt: receivedAt });
+                        delete full.__new;
+                        serverPlayerMap.set(full.id, full);
+                    } else {
+                        Object.assign(existing, delta, { clientReceivedAt: receivedAt });
+                    }
                 });
-                const selfPlayer = payload.find(function (player) {
-                    return player.id === selfId;
-                });
+                serverPlayers = Array.from(serverPlayerMap.values());
+                const selfPlayer = serverPlayerMap.get(selfId) || null;
                 updateEncounterStateFromPlayer(
                     selfPlayer ||
-                    payload.find(function (player) {
+                    serverPlayers.find(function (player) {
                         return !player.isHouse;
                     }) ||
-                    payload[0] ||
+                    serverPlayers[0] ||
                     null
                 );
                 if (playerCountNode) {
-                    playerCountNode.textContent = String(payload.length);
+                    playerCountNode.textContent = String(serverPlayers.length);
                 }
-                processRemotePlayerSounds(payload, selfPlayer || predictedSelf);
+                processRemotePlayerSounds(serverPlayers, selfPlayer || predictedSelf);
                 if (selfPlayer) {
                     const wasSelfDeathActive = selfDeathActive;
                     const previousSelfSkinName = activeSelfSkinName || selectedSkinName || 'default';
@@ -2811,6 +2849,7 @@
             selfPumpkinNtrTriggerCount = 0;
             selfServerAudioStateInitialized = false;
             playerVisuals.clear();
+            serverPlayerMap.clear();
             if (suppressNextCloseReconnect) {
                 suppressNextCloseReconnect = false;
                 return;

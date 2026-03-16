@@ -1,6 +1,7 @@
 const WebSocket = require("ws")
 const { PORT, JWT_SECRET } = require("../config/config")
 const { verifyToken } = require("../auth/jwt")
+const { encode } = require("@msgpack/msgpack")
 
 // 원시 IP 문자열을 정규화한다. IPv4-mapped IPv6 주소(::ffff: 접두사)를 IPv4 형식으로 변환한다.
 // rawIp: 정규화할 원시 IP 문자열
@@ -62,7 +63,13 @@ function getConnectionAuth(request, world) {
 // world: 월드 인스턴스 (플레이어 추가/제거 및 입력 처리에 사용)
 // 반환값: 생성된 WebSocket.Server 인스턴스
 function createServer(world) {
-    const wss = new WebSocket.Server({ port: PORT })
+    const wss = new WebSocket.Server({
+        port: PORT,
+        perMessageDeflate: {
+            zlibDeflateOptions: { level: 1 },
+            threshold: 512
+        }
+    })
 
     wss.on("connection", (ws, request) => {
         const auth = getConnectionAuth(request, world)
@@ -95,7 +102,10 @@ function createServer(world) {
         ws.isGuest = auth.isGuest
         ws.clientIp = clientIp
         ws.lastActiveInputAt = Date.now()
-        ws.send(JSON.stringify({
+        // 첫 틱에서 전체 state를 받도록 플래그를 세운다.
+        // delta 방식에서 mid-game 접속 시 누락 필드가 생기는 문제를 방지한다.
+        ws.needsFullState = true
+        ws.send(encode({
             type: "welcome",
             id: player.id,
             x: player.x,
@@ -113,7 +123,7 @@ function createServer(world) {
 
             if (parsed && parsed.type === "ping") {
                 // RTT 측정용 ping/pong 은 월드 입력 처리와 분리한다.
-                ws.send(JSON.stringify({
+                ws.send(encode({
                     type: "pong",
                     sentAt: parsed.sentAt || 0
                 }))

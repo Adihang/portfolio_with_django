@@ -1,8 +1,21 @@
 const { TICK_RATE } = require("../config/config")
 const { getGameplaySettings } = require("../config/gameplaySettings")
+const { encode } = require("@msgpack/msgpack")
 // 입력이 오래 없으면 연결을 정리해 유령 플레이어가 남지 않게 한다.
 const IDLE_TIMEOUT_MS = 180000
 const GAMEPLAY_SETTINGS = getGameplaySettings()
+
+// 이전 틱의 플레이어 state를 추적해 delta 계산에 사용한다.
+// key: player.id, value: 직전 틱의 state object
+const prevStateByPlayer = new Map()
+
+// 두 값이 같은지 비교한다. object/array는 JSON.stringify로 비교한다.
+function valueUnchanged(curr, prev) {
+    if (curr === prev) return true
+    if (curr === null || prev === null) return false
+    if (typeof curr === "object") return JSON.stringify(curr) === JSON.stringify(prev)
+    return false
+}
 
 // 게임 루프를 시작한다. 매 틱마다 월드를 업데이트하고, 유휴 연결을 정리한 뒤
 // 모든 연결된 클라이언트에 전체 엔티티 상태를 브로드캐스트한다.
@@ -149,23 +162,66 @@ function startGameLoop(world, wss) {
             }
         })
 
-        // 4. 직렬화도 한 번만 수행한다.
-        const serialized = JSON.stringify(state)
+        // 4. delta 계산: 이전 틱 대비 변경된 필드만 포함해 전송 크기를 줄인다.
+        const currentIds = new Set(state.map((p) => p.id))
+        const removed = []
+        for (const id of prevStateByPlayer.keys()) {
+            if (!currentIds.has(id)) removed.push(id)
+        }
+        const delta = state.map((player) => {
+            const prev = prevStateByPlayer.get(player.id)
+            if (!prev) {
+                // 새로 등장한 플레이어는 전체 state 전송 + __new 플래그
+                return Object.assign({ __new: true }, player)
+            }
+            // 변경된 필드만 포함. id는 항상 포함한다.
+            const diff = { id: player.id }
+            let changed = false
+            for (const key of Object.keys(player)) {
+                if (key === "id") continue
+                if (!valueUnchanged(player[key], prev[key])) {
+                    diff[key] = player[key]
+                    changed = true
+                }
+            }
+            return changed ? diff : { id: player.id }
+        })
+
+        // prevState를 현재 state로 교체한다.
+        for (const id of removed) prevStateByPlayer.delete(id)
+        for (const player of state) prevStateByPlayer.set(player.id, player)
+
+        // 5. msgpack binary로 한 번만 직렬화한다. { d: delta, r: removed }
+        const serialized = encode({ d: delta, r: removed })
+        // needsFullState 클라이언트용: 모든 플레이어를 __new로 포함한 full state.
+        // 실제로 필요한 클라이언트가 있을 때만 lazy하게 인코딩한다.
+        let fullStateSerialized = null
 
         for (const client of wss.clients) {
-            // 5. 오래 입력이 없는 연결은 종료
+            // 6. 오래 입력이 없는 연결은 종료
             if (client.player && now - (client.lastActiveInputAt || 0) >= IDLE_TIMEOUT_MS) {
                 if (client.readyState === 1) {
-                    client.send(JSON.stringify({ type: "idle_timeout" }))
+                    client.send(encode({ type: "idle_timeout" }))
                     client.close(4002, "idle_timeout")
                 }
                 continue
             }
 
             if (!client.player) continue
+            if (client.readyState !== 1) continue
 
-            if (client.readyState === 1) {
-                // 6. 모든 클라이언트에 동일한 직렬화 문자열을 전송한다.
+            if (client.needsFullState) {
+                // 7a. 첫 접속/재접속 클라이언트: 모든 플레이어의 전체 state 전송
+                if (!fullStateSerialized) {
+                    fullStateSerialized = encode({
+                        d: state.map((p) => Object.assign({ __new: true }, p)),
+                        r: []
+                    })
+                }
+                client.send(fullStateSerialized)
+                client.needsFullState = false
+            } else {
+                // 7b. 기존 클라이언트: delta만 전송
                 client.send(serialized)
             }
         }

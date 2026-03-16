@@ -89,9 +89,14 @@ module.exports = {
             return false
         }
 
-        const humanPlayers = Array.from(this.players.values()).filter((player) => (
-            isPersistentHumanPlayer(player)
-        ))
+        const allPlayers = Array.from(this.players.values())
+        const humanPlayers = allPlayers.filter((player) => isPersistentHumanPlayer(player))
+
+        // [DEBUG] 판정 근거 출력 — 확인 후 제거
+        const nonHuman = allPlayers.filter((p) => !isPersistentHumanPlayer(p))
+        console.log(`[areAllHumanPlayersOut] lives=${this.sharedLivesRemaining} humans=${humanPlayers.length} nonHuman=${nonHuman.map((p) => `${p.id}(npc=${p.isNpc},dummy=${p.isDummy},pumpkin=${p.isPumpkinNpc},house=${p.isHouse})`).join(",")}`)
+        humanPlayers.forEach((p) => console.log(`  human ${p.id}: dead=${this.isPlayerDead(p)} deathUntil=${p.deathUntil}`))
+
         if (!humanPlayers.length) {
             return false
         }
@@ -178,6 +183,7 @@ module.exports = {
      * @param {number} now - 현재 타임스탬프(ms)
      */
     resetRoundLives(now) {
+        console.log(`[resetRoundLives] 호출됨 now=${now}`)
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
         this.roundResetAnnouncementUntil = now + PLAYER_DEATH_DURATION_MS
         this.pendingRoundResetAt = 0

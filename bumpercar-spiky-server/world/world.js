@@ -310,11 +310,19 @@ class World {
     update() {
         const now = Date.now()
         this.maybeResetAfterInputIdle(now)
-        if (this.pendingRoundResetAt && now >= this.pendingRoundResetAt && this.areAllHumanPlayersOut()) {
-            if (this.encounterResetOnAllDead) {
-                this.resetEncounterToInitial(now)
+        if (this.pendingRoundResetAt) {
+            if (now < this.pendingRoundResetAt) {
+                // 아직 대기 중 — 매 틱 로그는 너무 많으니 생략
             } else {
-                this.resetRoundLives(now)
+                const allOut = this.areAllHumanPlayersOut()
+                console.log(`[world.update] pendingReset 도달 now=${now} pending=${this.pendingRoundResetAt} allOut=${allOut} encounterResetOnAllDead=${this.encounterResetOnAllDead}`)
+                if (allOut) {
+                    if (this.encounterResetOnAllDead) {
+                        this.resetEncounterToInitial(now)
+                    } else {
+                        this.resetRoundLives(now)
+                    }
+                }
             }
         }
         if (this.encounterStage > 0 && this.encounterCountdownUntil && now >= this.encounterCountdownUntil) {
