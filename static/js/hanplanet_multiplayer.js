@@ -231,6 +231,7 @@
     let joystickPointerId = null;
     let keyboardCurrentAngle = null;
     let keyboardAngleLastUpdate = 0;
+    const keyboardVelocity = { x: 0, y: 0 };
     let mouseMoveActive = false;
     let mouseLeftHeld = false;
     let mouseRightHeld = false;
@@ -750,32 +751,52 @@
 
         if (!keyboardActive) {
             keyboardCurrentAngle = null;
+            keyboardVelocity.x = 0;
+            keyboardVelocity.y = 0;
             if (joystickPointerId !== null) {
                 return { dx: joystickAnalogInput.x, dy: joystickAnalogInput.y };
             }
             return getMouseVector(mouseBoostRequested);
         }
 
-        let tdx = 0;
-        let tdy = 0;
-        if (keyboardDirectionInput.left) tdx -= 1;
-        if (keyboardDirectionInput.right) tdx += 1;
-        if (keyboardDirectionInput.up) tdy -= 1;
-        if (keyboardDirectionInput.down) tdy += 1;
-        const targetAngle = Math.atan2(tdy, tdx);
+        // velocity 가속 모델: UP/DOWN/LEFT/RIGHT는 직관대로 북/남/서/동
+        // 방향 전환 시 x/y 속도 벡터가 목표로 서서히 가속 → 전환 경로가 곡선을 그려 진짜 중간 각도를 지남
         const now = Date.now();
-        if (keyboardCurrentAngle === null) {
-            keyboardCurrentAngle = targetAngle;
-        } else {
-            const elapsed = Math.min(now - keyboardAngleLastUpdate, 100);
-            const maxRotate = (4 * Math.PI / 1000) * elapsed;
-            let diff = targetAngle - keyboardCurrentAngle;
-            while (diff > Math.PI) diff -= 2 * Math.PI;
-            while (diff < -Math.PI) diff += 2 * Math.PI;
-            keyboardCurrentAngle += Math.abs(diff) <= maxRotate ? diff : Math.sign(diff) * maxRotate;
-        }
+        const elapsed = Math.min(now - keyboardAngleLastUpdate, 100);
         keyboardAngleLastUpdate = now;
-        return { dx: Math.cos(keyboardCurrentAngle), dy: Math.sin(keyboardCurrentAngle) };
+
+        let targetX = 0;
+        let targetY = 0;
+        if (keyboardDirectionInput.left)  targetX -= 1;
+        if (keyboardDirectionInput.right) targetX += 1;
+        if (keyboardDirectionInput.up)    targetY -= 1;
+        if (keyboardDirectionInput.down)  targetY += 1;
+        const targetMag = Math.hypot(targetX, targetY);
+        if (targetMag > 0) {
+            targetX /= targetMag;
+            targetY /= targetMag;
+        }
+
+        // 목표 벡터 방향으로 가속 (약 120ms 만에 최고속 도달)
+        const step = (8 / 1000) * elapsed;
+        const diffX = targetX - keyboardVelocity.x;
+        const diffY = targetY - keyboardVelocity.y;
+        const diffMag = Math.hypot(diffX, diffY);
+        if (diffMag <= step) {
+            keyboardVelocity.x = targetX;
+            keyboardVelocity.y = targetY;
+        } else {
+            keyboardVelocity.x += (diffX / diffMag) * step;
+            keyboardVelocity.y += (diffY / diffMag) * step;
+        }
+
+        const velMag = Math.hypot(keyboardVelocity.x, keyboardVelocity.y);
+        if (velMag > 1) {
+            keyboardVelocity.x /= velMag;
+            keyboardVelocity.y /= velMag;
+        }
+
+        return { dx: keyboardVelocity.x, dy: keyboardVelocity.y };
     };
 
     const buildInputPayload = function () {
