@@ -35,8 +35,7 @@ module.exports = {
             return
         }
 
-        // 유저 사망은 공용 목숨을 깎고, 입력과 이동을 모두 멈춘다.
-        this.sharedLivesRemaining = Math.max(0, Number(this.sharedLivesRemaining || 0) - 1)
+        // 유저 사망은 입력과 이동을 모두 멈춘다. 공용 목숨은 리스폰 시 차감한다.
         player.livesRemaining = this.sharedLivesRemaining
         player.deathStartedAt = now
         player.deathUntil = now + PLAYER_DEATH_DURATION_MS
@@ -231,6 +230,12 @@ module.exports = {
             player.input.respawn = false
             this.updateStoredPlayerProgress(player)
             return false
+        }
+
+        // 인간 유저 리스폰 시 공용 목숨을 1 소모한다.
+        if (!player.isNpc && !player.isDummy) {
+            this.sharedLivesRemaining = Math.max(0, Number(this.sharedLivesRemaining || 0) - 1)
+            player.livesRemaining = this.sharedLivesRemaining
         }
 
         // 더미는 고유 사분면, 인간 유저는 네르와 다른 사분면 가장자리에서 리스폰한다.

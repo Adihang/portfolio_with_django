@@ -7,12 +7,11 @@
 
 const { WORLD_SIZE } = require("../config/config")
 const {
-    PLAYER_STARTING_LIVES,
     PLAYER_DEATH_DURATION_MS,
     INPUT_IDLE_RESET_MS,
 } = require("../config/constants")
 const { getNpcBaseSpeed, getNpcPhase, isPersistentHumanPlayer } = require("./worldHelpers")
-const { NPC_MAX_HEALTH } = require("./worldSettings")
+const { NPC_MAX_HEALTH, PLAYER_STARTING_LIVES } = require("./worldSettings")
 
 module.exports = {
     /**
