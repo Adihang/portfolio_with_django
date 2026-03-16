@@ -1864,23 +1864,26 @@
                     y: Number(unit.y || player.y || 0)
                 }, 0.95);
 
-            if (unit.boostState === 'charging' && previousState.boostState !== 'charging') {
-                playRandomBoostSound(skinRuntime.sounds.boost, listenerVolume, audioId);
-            }
+            const unitInactive = Boolean(unit.inactive);
+            if (!unitInactive) {
+                if (unit.boostState === 'charging' && previousState.boostState !== 'charging') {
+                    playRandomBoostSound(skinRuntime.sounds.boost, listenerVolume, audioId);
+                }
 
-            if (unit.collisionActive && !previousState.collisionActive) {
-                if ((unit.collisionVisualType || 'win') === 'defeat') {
-                    playRandomDefeatSound(skinRuntime.sounds.defeat, listenerVolume, audioId);
-                } else {
-                    playRandomCrashSound(skinRuntime.sounds.crash, listenerVolume, audioId);
+                if (unit.collisionActive && !previousState.collisionActive) {
+                    if ((unit.collisionVisualType || 'win') === 'defeat') {
+                        playRandomDefeatSound(skinRuntime.sounds.defeat, listenerVolume, audioId);
+                    } else {
+                        playRandomCrashSound(skinRuntime.sounds.crash, listenerVolume, audioId);
+                    }
                 }
             }
 
-            if (Boolean(unit.inactive) && !previousState.inactive) {
+            if (unitInactive && !previousState.inactive) {
                 playRandomDieSound(skinRuntime.sounds.die, listenerVolume, audioId);
             }
 
-            if (!Boolean(unit.inactive) && previousState.inactive) {
+            if (!unitInactive && previousState.inactive) {
                 playRandomRespawnSound(skinRuntime.sounds.respawn, listenerVolume, audioId);
             }
 
@@ -2948,7 +2951,7 @@
             },
             pumkin: {
                 baseSpeedMultiplier: 1.4,
-                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
+                maxBoostSpeedMultiplier: 1.137,
                 maxHealthSegments: 3,
                 type: 'pumkin',
                 movementType: 'classic'
@@ -4177,10 +4180,16 @@
                 spriteWidth = classicReferenceWidth;
                 spriteHeight = spriteWidth / Math.max(0.1, fallbackAspectRatio);
             }
+            const isPumkinSkinType = !isNpc && spriteState.skinRuntime && spriteState.skinRuntime.skinType === 'pumkin';
+            if (isBoostVisualActive && isPumkinSkinType && activeIconReady) {
+                visual.boostVisualGraceUntil = nowMs + 700;
+                visual.lastBoostIcon = activeIcon;
+            }
+            const isPumkinBoostGraceActive = isPumkinSkinType && Number(visual.boostVisualGraceUntil || 0) > nowMs;
             const trailActive = activeIconReady && !isDeathVisualActive && (
                 isNpc
                     ? (player.npcState === 'charging')
-                    : isBoostVisualActive
+                    : (isBoostVisualActive || isPumkinBoostGraceActive)
             );
             const trailFadeDurationMs = 280;
             const npcPhase = isNpc
@@ -4218,12 +4227,13 @@
 
             if (trailActive) {
                 if (!visual.lastTrailAt || nowMs - visual.lastTrailAt >= 140) {
+                    const trailIcon = (isPumkinBoostGraceActive && !isBoostVisualActive && visual.lastBoostIcon) ? visual.lastBoostIcon : activeIcon;
                     visual.trailPoints.push({
                         x: player.x,
                         y: player.y,
                         rotation: visual.currentRotation,
                         flipX: visual.currentFlipX,
-                        icon: activeIcon,
+                        icon: trailIcon,
                         width: spriteWidth,
                         height: spriteHeight,
                         createdAt: nowMs,
