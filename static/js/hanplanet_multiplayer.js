@@ -3164,10 +3164,12 @@
                     (movementSpeed - playerBaseSpeed) / Math.max(1, playerMaxBoostedSpeed - playerBaseSpeed)
                 )
             );
-            const boostStageIndex = Math.min(
-                Math.max(0, skinRuntime.boostStages.length - 1),
-                Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
-            );
+            const boostStageIndex = boostStateValue === 'cooldown'
+                ? Math.max(0, skinRuntime.boostStages.length - 1)
+                : Math.min(
+                    Math.max(0, skinRuntime.boostStages.length - 1),
+                    Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
+                );
             const collisionRecoveryActive = Boolean(player.collisionRecoveryActive);
             const collisionRecoveryRemainingMs = Math.max(0, Number(player.collisionRecoveryRemainingMs || 0));
             const collisionRecoveryDurationMs = Math.max(1, Number(player.collisionRecoveryDurationMs || 1));
@@ -3398,10 +3400,12 @@
                 0,
                 Math.min(0.999, (movementSpeed - playerBaseSpeed) / Math.max(1, playerMaxBoostedSpeed - playerBaseSpeed))
             );
-            const boostStageIndex = Math.min(
-                Math.max(0, skinRuntime.boostStages.length - 1),
-                Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
-            );
+            const boostStageIndex = (unit.boostState || 'idle') === 'cooldown'
+                ? Math.max(0, skinRuntime.boostStages.length - 1)
+                : Math.min(
+                    Math.max(0, skinRuntime.boostStages.length - 1),
+                    Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
+                );
             if (skinRuntime.boostStages.length) {
                 selectedEntry = skinRuntime.boostStages[boostStageIndex];
             }
@@ -3430,10 +3434,12 @@
                 (movementSpeed - playerBaseSpeed) / Math.max(1, playerMaxBoostedSpeed - playerBaseSpeed)
             )
         );
-        const boostStageIndex = Math.min(
-            Math.max(0, skinRuntime.boostStages.length - 1),
-            Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
-        );
+        const boostStageIndex = (isSelf ? boostState : (player.boostState || 'idle')) === 'cooldown'
+            ? Math.max(0, skinRuntime.boostStages.length - 1)
+            : Math.min(
+                Math.max(0, skinRuntime.boostStages.length - 1),
+                Math.floor(boostRatio * Math.max(1, skinRuntime.boostStages.length))
+            );
         const totalHealthSegments = (player.doubleState && Array.isArray(player.doubleState.units) ? player.doubleState.units : []).reduce(function (sum, unit) {
             return sum + Math.max(0, Math.min(2, Number(unit.health || 0)));
         }, 0);
@@ -4180,16 +4186,10 @@
                 spriteWidth = classicReferenceWidth;
                 spriteHeight = spriteWidth / Math.max(0.1, fallbackAspectRatio);
             }
-            const isPumkinSkinType = !isNpc && spriteState.skinRuntime && spriteState.skinRuntime.skinType === 'pumkin';
-            if (isBoostVisualActive && isPumkinSkinType && activeIconReady) {
-                visual.boostVisualGraceUntil = nowMs + 700;
-                visual.lastBoostIcon = activeIcon;
-            }
-            const isPumkinBoostGraceActive = isPumkinSkinType && Number(visual.boostVisualGraceUntil || 0) > nowMs;
             const trailActive = activeIconReady && !isDeathVisualActive && (
                 isNpc
                     ? (player.npcState === 'charging')
-                    : (isBoostVisualActive || isPumkinBoostGraceActive)
+                    : isBoostVisualActive
             );
             const trailFadeDurationMs = 280;
             const npcPhase = isNpc
@@ -4227,13 +4227,12 @@
 
             if (trailActive) {
                 if (!visual.lastTrailAt || nowMs - visual.lastTrailAt >= 140) {
-                    const trailIcon = (isPumkinBoostGraceActive && !isBoostVisualActive && visual.lastBoostIcon) ? visual.lastBoostIcon : activeIcon;
                     visual.trailPoints.push({
                         x: player.x,
                         y: player.y,
                         rotation: visual.currentRotation,
                         flipX: visual.currentFlipX,
-                        icon: trailIcon,
+                        icon: activeIcon,
                         width: spriteWidth,
                         height: spriteHeight,
                         createdAt: nowMs,
