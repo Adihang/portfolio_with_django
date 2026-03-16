@@ -2671,12 +2671,12 @@
                 return;
             }
             previewContent.innerHTML = safeHtml;
-            state.previewImageZoom = getPreviewImageMinZoom();
+            state.previewImageZoom = 1;
             applyDocsCodeHighlighting(previewContent, normalizedRenderClass || "handrive-markdown");
             hydrateMediaAudioElements(previewContent);
             setPreviewActionTargets(entry);
             window.requestAnimationFrame(function () {
-                setPreviewImageZoom(getPreviewImageMinZoom());
+                syncPreviewImageZoom();
             });
             scheduleSyncCurrentDirRowHeightWithSideHead();
         }
@@ -2697,6 +2697,10 @@
             setPreviewVisibility(true);
 
             const pathValue = normalizePath(entry.path, true);
+            if (state.activePreviewPath === pathValue && !previewPanel.hidden) {
+                setPreviewActionTargets(entry);
+                return;
+            }
             state.activePreviewPath = pathValue;
             if (previewTitle) {
                 previewTitle.textContent = entry.name || t("list_preview_title", "파일 미리보기");
