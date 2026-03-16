@@ -31,6 +31,8 @@ const {
     getCollisionSlowSpeedForPlayer,
     isPumpkinSkinPlayer,
     getMaxBoostedSpeedForPlayer,
+    getBoostAccelerationForPlayer,
+    getBoostCooldownForPlayer,
     getNpcBaseSpeed,
     getNpcPhase,
     isPersistentHumanPlayer,
@@ -506,7 +508,7 @@ class World {
                         dy = player.boostDirectionY
                     }
                     const maxBoostedSpeed = player.isNpc ? NPC_MAX_BOOSTED_SPEED_PER_SECOND : getMaxBoostedSpeedForPlayer(player)
-                    const boostAcceleration = player.isNpc ? NPC_BOOST_ACCELERATION_PER_SECOND : BOOST_ACCELERATION_PER_SECOND
+                    const boostAcceleration = player.isNpc ? NPC_BOOST_ACCELERATION_PER_SECOND : getBoostAccelerationForPlayer(player)
                     player.currentSpeed = Math.min(
                         maxBoostedSpeed,
                         player.currentSpeed + boostAcceleration * TICK_DELTA_SECONDS
@@ -522,7 +524,7 @@ class World {
                         dx = player.boostDirectionX
                         dy = player.boostDirectionY
                     }
-                    const boostCooldown = player.isNpc ? NPC_BOOST_COOLDOWN_PER_SECOND : BOOST_COOLDOWN_PER_SECOND
+                    const boostCooldown = player.isNpc ? NPC_BOOST_COOLDOWN_PER_SECOND : getBoostCooldownForPlayer(player)
                     const baseSpeed = getBaseSpeedForPlayer(player)
                     player.currentSpeed = Math.max(
                         baseSpeed,

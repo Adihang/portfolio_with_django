@@ -193,6 +193,30 @@ function getMaxBoostedSpeedForPlayer(player) {
     return getBaseSpeedForPlayer(player) * getCharacterGameplaySettings(player && player.skinName).max_boost_speed_multiplier
 }
 
+// 플레이어의 스킨별 부스트 acceleration 을 반환한다.
+// deltaSpeed 와 user_boost_duration_ms 로부터 유도해 모든 스킨이 동일한 부스트 시간을 갖도록 한다.
+// NPC·더미·펌킨NPC 는 fallback(전역 설정값)을 반환한다.
+const USER_BOOST_DURATION_SECONDS = Math.max(0.001, GAMEPLAY_SETTINGS.user_boost_duration_ms / 1000)
+const FALLBACK_BOOST_ACCELERATION = GAMEPLAY_SETTINGS.user_boost_acceleration
+function getBoostAccelerationForPlayer(player) {
+    if (!player || player.isNpc || player.isDummy || player.isPumpkinNpc || player.isHouse) {
+        return FALLBACK_BOOST_ACCELERATION
+    }
+    const baseSpd = getBaseSpeedForPlayer(player)
+    const maxBoostedSpd = getMaxBoostedSpeedForPlayer(player)
+    const deltaSpd = Math.max(0, maxBoostedSpd - baseSpd)
+    if (deltaSpd <= 0) {
+        return FALLBACK_BOOST_ACCELERATION
+    }
+    return (3 * deltaSpd) / (2 * USER_BOOST_DURATION_SECONDS)
+}
+
+// 플레이어의 스킨별 부스트 cooldown 을 반환한다.
+// getBoostAccelerationForPlayer 의 2배로, charging 과 cooldown 시간 비율이 1:2 를 유지한다.
+function getBoostCooldownForPlayer(player) {
+    return getBoostAccelerationForPlayer(player) * 2
+}
+
 // 충돌 직후 적용되는 감속 속도를 반환한다.
 // 기본 속도의 35% 값이며, NPC·더미·일반 유저 각각 기준 속도가 다르다.
 function getCollisionSlowSpeedForPlayer(player) {
@@ -278,6 +302,8 @@ module.exports = {
     isPlayerAttackingForCollision,
     getDoubleAliveUnitIndices,
     getMaxBoostedSpeedForPlayer,
+    getBoostAccelerationForPlayer,
+    getBoostCooldownForPlayer,
     getCollisionSlowSpeedForPlayer,
     getPlayerDeathTriggerCount,
     getNpcPhase,

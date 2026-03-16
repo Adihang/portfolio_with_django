@@ -165,6 +165,7 @@
     const npcBaseSpeedPerSecond = Number(gameplaySettings.npc_base_speed || 281.25);
     const boostAccelerationPerSecond = Number(gameplaySettings.user_boost_acceleration || 360);
     const boostCooldownPerSecond = Number(gameplaySettings.user_boost_cooldown || 280);
+    const boostDurationMs = Number(gameplaySettings.user_boost_duration_ms || 1238);
     const npcMaxHealth = Number(gameplaySettings.npc_max_health || 20);
     const cameraFollow = 0.18;
     const remoteLerpPerFrame = 0.24;
@@ -2399,10 +2400,17 @@
             }
         }
 
+        const selectedDeltaSpeed = Math.max(0, selectedMaxBoostSpeed - selectedBaseSpeed);
+        const boostDurationSeconds = boostDurationMs / 1000;
+        const skinBoostAcceleration = selectedDeltaSpeed > 0
+            ? (3 * selectedDeltaSpeed) / (2 * boostDurationSeconds)
+            : boostAccelerationPerSecond;
+        const skinBoostCooldown = skinBoostAcceleration * 2;
+
         if (boostState === 'charging') {
             currentMoveSpeed = Math.min(
                 selectedMaxBoostSpeed,
-                currentMoveSpeed + boostAccelerationPerSecond * deltaSeconds
+                currentMoveSpeed + skinBoostAcceleration * deltaSeconds
             );
             if (currentMoveSpeed >= selectedMaxBoostSpeed) {
                 boostState = 'cooldown';
@@ -2413,7 +2421,7 @@
         if (boostState === 'cooldown') {
             currentMoveSpeed = Math.max(
                 selectedBaseSpeed,
-                currentMoveSpeed - boostCooldownPerSecond * deltaSeconds
+                currentMoveSpeed - skinBoostCooldown * deltaSeconds
             );
             if (currentMoveSpeed <= selectedBaseSpeed) {
                 currentMoveSpeed = selectedBaseSpeed;
@@ -2429,7 +2437,7 @@
         if (!isMoving) {
             currentMoveSpeed = Math.max(
                 selectedBaseSpeed,
-                currentMoveSpeed - boostCooldownPerSecond * deltaSeconds
+                currentMoveSpeed - skinBoostCooldown * deltaSeconds
             );
         } else {
             currentMoveSpeed = selectedBaseSpeed;
