@@ -1421,8 +1421,12 @@
         const gitRepoStatusDiv = document.getElementById("handrive-git-repo-status");
         const gitRepoStatusMsg = document.getElementById("handrive-git-repo-status-msg");
         const gitRepoCloneInfo = document.getElementById("handrive-git-repo-clone-info");
+        const gitRepoCloneUrlInput = document.getElementById("handrive-git-repo-clone-url-input");
+        const gitRepoCopyButton = document.getElementById("handrive-git-repo-copy-btn");
+        const gitRepoOpenButton = document.getElementById("handrive-git-repo-open-btn");
         const gitRepoCloseButton = document.getElementById("handrive-git-repo-close-btn");
         const gitRepoRetryButton = document.getElementById("handrive-git-repo-retry-btn");
+        const gitRepoTitle = document.getElementById("handrive-git-repo-title");
         const permissionModal = document.getElementById("handrive-permission-modal");
         const permissionModalBackdrop = document.getElementById("handrive-permission-modal-backdrop");
         const permissionTarget = document.getElementById("handrive-permission-target");
@@ -5387,6 +5391,9 @@
             if (gitRepoTarget) {
                 gitRepoTarget.textContent = entry ? entry.path : "";
             }
+            if (gitRepoTitle) {
+                gitRepoTitle.textContent = isManageMode ? "Git 리포지토리 관리" : "Git 리포지토리 생성";
+            }
             gitRepoModal._targetEntry = entry || null;
             gitRepoModal.hidden = false;
             syncModalBodyState();
@@ -5399,6 +5406,7 @@
                 ).then(function (data) {
                     if (!data || !data.repo) {
                         // 조회 결과 없음 → 신규 생성 폼으로 전환
+                        if (gitRepoTitle) gitRepoTitle.textContent = "Git 리포지토리 생성";
                         if (gitRepoForm) gitRepoForm.hidden = false;
                         if (gitRepoNameInput) gitRepoNameInput.focus();
                         return;
@@ -5406,27 +5414,33 @@
                     var repo = data.repo;
                     _gitRepoCurrentId = repo.id;
                     if (repo.status === "active") {
-                        _showGitRepoStatus("리포지토리 생성 완료!", false, repo.forgejo_clone_http_authed || repo.forgejo_clone_http || "");
+                        _showGitRepoStatus(
+                            "연결된 리포지토리",
+                            false,
+                            repo.forgejo_clone_http_authed || repo.forgejo_clone_http || "",
+                            repo.gitea_web_url || ""
+                        );
                     } else if (repo.status === "failed") {
                         _showGitRepoStatus(
                             "생성 실패: " + (repo.error_message || "알 수 없는 오류"),
                             true,
+                            null,
                             null
                         );
                     } else {
                         // pending_create / pending_import
-                        _showGitRepoStatus("생성 중...", false, null);
+                        _showGitRepoStatus("생성 중...", false, null, null);
                         _gitRepoPollingTimer = setInterval(function () {
                             _pollGitRepoStatus(_gitRepoCurrentId).catch(function () {
                                 _gitRepoStopPolling();
-                                _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+                                _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null, null);
                             });
                         }, 2000);
                     }
                 }).catch(function () {
                     if (isManageMode) {
                         // 관리 모드에서 조회 실패 → 오류 표시 (생성 폼 아님)
-                        _showGitRepoStatus("저장소 정보를 불러올 수 없습니다. 페이지를 새로고침해주세요.", true, null);
+                        _showGitRepoStatus("저장소 정보를 불러올 수 없습니다. 페이지를 새로고침해주세요.", true, null, null);
                     } else {
                         // 신규 생성 모드에서 by-path 없음 → 생성 폼 유지
                         if (gitRepoForm) gitRepoForm.hidden = false;
@@ -5449,7 +5463,7 @@
             syncModalBodyState();
         }
 
-        function _showGitRepoStatus(msg, showRetry, cloneUrl) {
+        function _showGitRepoStatus(msg, showRetry, cloneUrl, webUrl) {
             if (gitRepoForm) {
                 gitRepoForm.hidden = true;
             }
@@ -5462,12 +5476,23 @@
             if (gitRepoRetryButton) {
                 gitRepoRetryButton.hidden = !showRetry;
             }
+            // clone URL 입력 필드
             if (gitRepoCloneInfo) {
                 if (cloneUrl) {
-                    gitRepoCloneInfo.textContent = "Clone URL: " + cloneUrl;
+                    if (gitRepoCloneUrlInput) gitRepoCloneUrlInput.value = cloneUrl;
                     gitRepoCloneInfo.hidden = false;
                 } else {
                     gitRepoCloneInfo.hidden = true;
+                }
+            }
+            // Gitea에서 열기 버튼
+            if (gitRepoOpenButton) {
+                if (webUrl) {
+                    gitRepoOpenButton.hidden = false;
+                    gitRepoOpenButton.onclick = function () { window.open(webUrl, "_blank"); };
+                } else {
+                    gitRepoOpenButton.hidden = true;
+                    gitRepoOpenButton.onclick = null;
                 }
             }
         }
@@ -5480,7 +5505,13 @@
                 );
                 if (data.status === "active") {
                     _gitRepoStopPolling();
-                    _showGitRepoStatus("리포지토리 생성 완료!", false, data.clone_http_url_authed || data.clone_http_url || "");
+                    if (gitRepoTitle) gitRepoTitle.textContent = "Git 리포지토리 관리";
+                    _showGitRepoStatus(
+                        "연결된 리포지토리",
+                        false,
+                        data.clone_http_url_authed || data.clone_http_url || "",
+                        data.gitea_web_url || ""
+                    );
                     // entry 데이터 갱신 — 우클릭 메뉴 버튼 상태를 즉시 업데이트
                     if (gitRepoModal && gitRepoModal._targetEntry) {
                         gitRepoModal._targetEntry.git_repo = { id: repoId, status: "active" };
@@ -5491,13 +5522,14 @@
                     _showGitRepoStatus(
                         "생성 실패: " + (data.error_message || "알 수 없는 오류"),
                         true,
+                        null,
                         null
                     );
                 }
                 // pending 상태면 계속 폴링
             } catch (e) {
                 _gitRepoStopPolling();
-                _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+                _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null, null);
             }
         }
 
@@ -5548,13 +5580,14 @@
                 _gitRepoPollingTimer = setInterval(function () {
                     _pollGitRepoStatus(_gitRepoCurrentId).catch(function () {
                         _gitRepoStopPolling();
-                        _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+                        _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null, null);
                     });
                 }, 2000);
             } catch (e) {
                 _showGitRepoStatus(
                     "재시도 실패: " + (e && e.message ? e.message : "알 수 없는 오류"),
                     true,
+                    null,
                     null
                 );
             }
@@ -5568,6 +5601,21 @@
         }
         if (gitRepoCloseButton) {
             gitRepoCloseButton.addEventListener("click", closeGitRepoModal);
+        }
+        if (gitRepoCopyButton) {
+            gitRepoCopyButton.addEventListener("click", function () {
+                var url = gitRepoCloneUrlInput ? gitRepoCloneUrlInput.value : "";
+                if (!url) return;
+                navigator.clipboard.writeText(url).then(function () {
+                    gitRepoCopyButton.textContent = "복사됨!";
+                    setTimeout(function () { gitRepoCopyButton.textContent = "복사"; }, 1500);
+                }).catch(function () {
+                    if (gitRepoCloneUrlInput) {
+                        gitRepoCloneUrlInput.select();
+                        document.execCommand("copy");
+                    }
+                });
+            });
         }
         if (gitRepoConfirmButton) {
             gitRepoConfirmButton.addEventListener("click", function () {

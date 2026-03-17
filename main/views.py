@@ -3726,6 +3726,7 @@ def git_repo_status(request, repo_id: int):
         "error_message":             repo.error_message,
         "clone_http_url":            _build_public_clone_url(repo.forgejo_clone_http_url),
         "clone_http_url_authed":     _build_user_authed_clone_url(repo, request.user),
+        "gitea_web_url":             _build_gitea_web_url(repo.forgejo_clone_http_url),
     })
 
 
@@ -3794,6 +3795,14 @@ def _build_user_authed_clone_url(repo: "GitRepository", user) -> str:
         return public_url
 
 
+def _build_gitea_web_url(forgejo_clone_http_url: str) -> str:
+    """clone URL (.git) → Gitea 웹 페이지 URL"""
+    public = _build_public_clone_url(forgejo_clone_http_url)
+    if not public:
+        return ""
+    return public.removesuffix(".git")
+
+
 def _git_repo_dict(repo: GitRepository, request) -> dict:
     public_http = _build_public_clone_url(repo.forgejo_clone_http_url)
     authed_http = _build_user_authed_clone_url(repo, request.user)
@@ -3806,6 +3815,7 @@ def _git_repo_dict(repo: GitRepository, request) -> dict:
         "forgejo_clone_http":        public_http,
         "forgejo_clone_http_authed": authed_http,
         "forgejo_clone_ssh":         repo.forgejo_clone_ssh_url,
+        "gitea_web_url":             _build_gitea_web_url(repo.forgejo_clone_http_url),
         "created_at":                repo.created_at.isoformat() if repo.created_at else None,
         "updated_at":                repo.updated_at.isoformat() if repo.updated_at else None,
     }
