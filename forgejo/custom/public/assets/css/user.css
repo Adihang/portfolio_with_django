@@ -1,0 +1,885 @@
+/* ================================================================
+   Hanplanet Git — Custom Theme
+   Navbar · Footer: www.hanplanet.com 디자인과 동일
+   ================================================================ */
+
+/* ── 1. 디자인 변수 ────────────────────────────────────────── */
+:root {
+  /* 네비바 (라이트 frosted glass — 기본 www.hanplanet.com과 동일) */
+  --hp-color-nav-bg-start: rgba(255,255,255,0.8);
+  --hp-color-nav-bg-end:   rgba(243,243,243,0.8);
+  --hp-shadow-medium:      0 8px 18px rgba(0,0,0,0.16);
+  --hp-theme-ink:          #111111;
+  --hp-theme-subtle:       #2f2f2f;
+  --hp-theme-accent-strong:#000000;
+  --hp-color-hover-bg:     rgba(0,0,0,0.06);
+  --hp-color-hover-border: rgba(0,0,0,0.24);
+  --hp-motion-fast:        0.2s ease;
+  --hp-nav-height:         58px;
+  --hp-site-z-nav:         3200;
+
+  /* 콘텐츠 영역 (다크) */
+  --hp-font: "Inter","KakaoBigFont","Noto Sans KR","Helvetica Neue",Helvetica,Arial,"맑은 고딕","malgun gothic","돋움",Dotum,sans-serif,"Apple Color Emoji","Noto Color Emoji";
+  --hp-bg:           #171717;
+  --hp-bg-end:       #232323;
+  --hp-surface:      rgba(30,30,30,0.92);
+  --hp-surface-alt:  rgba(36,36,36,0.96);
+  --hp-surface-high: rgba(42,42,42,0.97);
+  --hp-text:         #f2f2f2;
+  --hp-text-muted:   #c0c0c0;
+  --hp-text-faint:   #888;
+  --hp-border:       rgba(255,255,255,0.12);
+  --hp-border-mid:   rgba(255,255,255,0.18);
+  --hp-hover:        rgba(255,255,255,0.07);
+  --hp-hover-mid:    rgba(255,255,255,0.11);
+  --hp-accent:       #ffffff;
+  --hp-btn-bg:       rgba(95,95,95,0.9);
+  --hp-btn-hover:    rgba(124,124,124,0.95);
+  --hp-btn-primary-bg:   rgba(230,230,230,0.95);
+  --hp-btn-primary-text: #111111;
+  --hp-btn-primary-hover:#ffffff;
+  --hp-radius:    8px;
+  --hp-radius-sm: 6px;
+  --hp-radius-lg: 12px;
+  --hp-shadow:    0 8px 18px rgba(0,0,0,0.4);
+  --hp-shadow-lg: 0 16px 34px rgba(0,0,0,0.5);
+  --hp-link:      #d2d2d2;
+  --hp-link-hover:#f5f5f5;
+  --hp-green:  #3fb950;
+  --hp-red:    #f85149;
+  --hp-blue:   #58a6ff;
+  --hp-yellow: #d29922;
+}
+
+/* 다크 모드: 네비바 색상만 오버라이드 (콘텐츠는 이미 다크) */
+[data-theme="gitea-dark"] {
+  --hp-color-nav-bg-start: rgba(34,34,34,0.84);
+  --hp-color-nav-bg-end:   rgba(26,26,26,0.84);
+  --hp-shadow-medium:      0 8px 18px rgba(0,0,0,0.48);
+  --hp-theme-ink:          #f2f2f2;
+  --hp-theme-subtle:       #d6d6d6;
+  --hp-theme-accent-strong:#ffffff;
+  --hp-color-hover-bg:     rgba(255,255,255,0.1);
+  --hp-color-hover-border: rgba(255,255,255,0.28);
+}
+
+/* ── 라이트 테마 전체 오버라이드 ────────────────────────── */
+html[data-theme="gitea-light"],
+html[data-theme="gitea-light"] body {
+  background: linear-gradient(180deg,#f5f5f5 0%,#ebebeb 50%,#f5f5f5 100%) !important;
+  color: #111111 !important;
+}
+
+html[data-theme="gitea-light"] {
+  /* HP 변수 */
+  --hp-bg:           #f5f5f5;
+  --hp-bg-end:       #ebebeb;
+  --hp-surface:      rgba(255,255,255,0.97);
+  --hp-surface-alt:  rgba(248,248,248,0.98);
+  --hp-surface-high: rgba(255,255,255,1);
+  --hp-text:         #111111;
+  --hp-text-muted:   #3a3a3a;
+  --hp-text-faint:   #666666;
+  --hp-border:       rgba(0,0,0,0.11);
+  --hp-border-mid:   rgba(0,0,0,0.20);
+  --hp-hover:        rgba(0,0,0,0.05);
+  --hp-hover-mid:    rgba(0,0,0,0.09);
+  --hp-accent:       #000000;
+  --hp-btn-bg:       rgba(225,225,225,0.9);
+  --hp-btn-hover:    rgba(205,205,205,0.95);
+  --hp-btn-primary-bg:   rgba(25,25,25,0.95);
+  --hp-btn-primary-text: #ffffff;
+  --hp-btn-primary-hover:#000000;
+  --hp-link:         #1a1a1a;
+  --hp-link-hover:   #000000;
+  --hp-shadow:    0 8px 18px rgba(0,0,0,0.10);
+  --hp-shadow-lg: 0 16px 34px rgba(0,0,0,0.15);
+  --hp-green:  #1a7f37;
+  --hp-red:    #cf222e;
+  --hp-blue:   #0969da;
+  --hp-yellow: #9a6700;
+
+  /* 네비바 라이트 */
+  --hp-color-nav-bg-start: rgba(255,255,255,0.85);
+  --hp-color-nav-bg-end:   rgba(243,243,243,0.85);
+  --hp-shadow-medium:      0 8px 18px rgba(0,0,0,0.12);
+  --hp-theme-ink:          #111111;
+  --hp-theme-subtle:       #2f2f2f;
+  --hp-theme-accent-strong:#000000;
+  --hp-color-hover-bg:     rgba(0,0,0,0.06);
+  --hp-color-hover-border: rgba(0,0,0,0.20);
+
+  /* Gitea 내장 변수 */
+  --color-body:              #f5f5f5 !important;
+  --color-box-body:          rgba(255,255,255,0.97) !important;
+  --color-text:              #111111 !important;
+  --color-text-dark:         #1a1a1a !important;
+  --color-text-light:        #555555 !important;
+  --color-secondary-text:    #666666 !important;
+  --color-placeholder-text:  #aaaaaa !important;
+  --color-border:            rgba(0,0,0,0.11) !important;
+  --color-secondary-border:  rgba(0,0,0,0.07) !important;
+  --color-inner-border:      rgba(0,0,0,0.07) !important;
+  --color-input-text:        #111111 !important;
+  --color-input-background:  #ffffff !important;
+  --color-input-border:      rgba(0,0,0,0.18) !important;
+  --color-button-background: rgba(238,238,238,0.96) !important;
+  --color-card-bg:           rgba(255,255,255,0.97) !important;
+  --color-primary:           #333333 !important;
+  --color-primary-dark-1:    #222222 !important;
+  --color-primary-dark-2:    #111111 !important;
+  --color-primary-alpha-10:  rgba(0,0,0,0.08) !important;
+  --color-primary-alpha-20:  rgba(0,0,0,0.16) !important;
+  --color-sidebar-bg:        rgba(248,248,248,0.97) !important;
+  --color-code-bg:           rgba(240,240,240,0.95) !important;
+  --color-menu-item-selected-bg: rgba(0,0,0,0.07) !important;
+  --color-diff-removed-row-bg:   rgba(207,34,46,0.06) !important;
+  --color-diff-added-row-bg:     rgba(26,127,55,0.06) !important;
+  --color-diff-removed-word-bg:  rgba(207,34,46,0.18) !important;
+  --color-diff-added-word-bg:    rgba(26,127,55,0.18) !important;
+}
+
+/* 라이트 테마: 코드 블록 */
+html[data-theme="gitea-light"] pre,
+html[data-theme="gitea-light"] code {
+  background: rgba(240,240,240,0.9) !important;
+  color: #1a1a1a !important;
+}
+
+/* 라이트 테마: 모달 */
+html[data-theme="gitea-light"] .ui.modal {
+  background: rgba(255,255,255,0.99) !important;
+  color: #111 !important;
+}
+
+/* 라이트 테마: 스크롤바 */
+html[data-theme="gitea-light"] ::-webkit-scrollbar-thumb {
+  background: rgba(90,90,95,0.28) !important;
+}
+html[data-theme="gitea-light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(90,90,95,0.44) !important;
+}
+
+/* 라이트 테마: 기타 label 색상 */
+html[data-theme="gitea-light"] .ui.basic.label,
+html[data-theme="gitea-light"] .counter {
+  background: rgba(220,220,220,0.8) !important;
+  color: #333 !important;
+}
+
+/* ── 2. 폰트 & body ──────────────────────────────────────── */
+html {
+  font-family: var(--hp-font) !important;
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  font-optical-sizing: auto !important;
+  background: linear-gradient(180deg, var(--hp-bg) 0%, var(--hp-bg-end) 50%, var(--hp-bg) 100%) !important;
+  background-attachment: fixed !important;
+  color: var(--hp-text) !important;
+  min-height: 100vh;
+}
+
+body {
+  font-family: var(--hp-font) !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  background: transparent !important;
+  color: var(--hp-text) !important;
+  min-height: 100vh;
+}
+
+/* Gitea 내장 변수 덮어쓰기 */
+:root, html {
+  --color-body:              #171717 !important;
+  --color-box-body:          rgba(30,30,30,0.92) !important;
+  --color-text:              #f2f2f2 !important;
+  --color-text-dark:         #e8e8e8 !important;
+  --color-text-light:        #aaa !important;
+  --color-secondary-text:    #bbb !important;
+  --color-placeholder-text:  #666 !important;
+  --color-border:            rgba(255,255,255,0.13) !important;
+  --color-secondary-border:  rgba(255,255,255,0.08) !important;
+  --color-inner-border:      rgba(255,255,255,0.08) !important;
+  --color-input-text:        #f2f2f2 !important;
+  --color-input-background:  rgba(36,36,36,0.96) !important;
+  --color-input-border:      rgba(255,255,255,0.18) !important;
+  --color-button-background: rgba(42,42,42,0.96) !important;
+  --color-card-bg:           rgba(30,30,30,0.92) !important;
+  --color-primary:           #d4d4d4 !important;
+  --color-primary-dark-1:    #e8e8e8 !important;
+  --color-primary-dark-2:    #f0f0f0 !important;
+  --color-primary-alpha-10:  rgba(212,212,212,0.1) !important;
+  --color-primary-alpha-20:  rgba(212,212,212,0.2) !important;
+  --color-sidebar-bg:        rgba(26,26,26,0.95) !important;
+  --color-code-bg:           rgba(26,26,26,0.9) !important;
+  --color-menu-item-selected-bg: rgba(255,255,255,0.08) !important;
+  --color-diff-removed-row-bg:  rgba(248,81,73,0.08) !important;
+  --color-diff-added-row-bg:    rgba(63,185,80,0.08) !important;
+  --color-diff-removed-word-bg: rgba(248,81,73,0.22) !important;
+  --color-diff-added-word-bg:   rgba(63,185,80,0.22) !important;
+}
+
+/* ── 3. HP 네비바 (www.hanplanet.com ui-nav와 동일) ────────── */
+#navbar.hp-nav {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: var(--hp-site-z-nav) !important;
+  min-height: var(--hp-nav-height) !important;
+  padding: 8px 18px !important;
+  background: linear-gradient(90deg, var(--hp-color-nav-bg-start), var(--hp-color-nav-bg-end)) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: var(--hp-shadow-medium) !important;
+  border-bottom: none !important;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1) !important;
+}
+
+.hp-nav-inner {
+  max-width: 1300px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-height: var(--hp-nav-height);
+  gap: 0;
+}
+
+/* ── 좌측: 컨트롤 스택 ─── */
+.hp-controls-stack {
+  order: 1;
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.hp-control-toggle {
+  display: grid;
+  grid-template-columns: 2.8ch 1ch 2.8ch;
+  align-items: center;
+  column-gap: 4px;
+  width: 100%;
+}
+
+/* www .ui-control-link / .ui-lang-link — 직접 포팅 */
+.hp-control-link,
+.hp-lang-link {
+  display: inline-block;
+  text-decoration: none !important;
+  /* a { !important } 오버라이드: !important 필수 */
+  color: var(--hp-theme-subtle) !important;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  padding: 4px 2px;
+  border-bottom: 1.5px solid transparent;
+  opacity: 0.8;
+  transition: color var(--hp-motion-fast), border-color var(--hp-motion-fast), opacity var(--hp-motion-fast);
+  cursor: pointer;
+}
+
+.hp-control-toggle .hp-control-link {
+  width: 2.8ch;
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.hp-control-toggle .hp-control-link:first-of-type {
+  justify-self: end;
+  text-align: right;
+}
+
+.hp-control-toggle .hp-control-link:last-of-type {
+  justify-self: start;
+  text-align: left;
+}
+
+.hp-control-link:hover,
+.hp-control-link:focus-visible,
+.hp-control-link:active,
+.hp-lang-link:hover,
+.hp-lang-link:focus-visible,
+.hp-lang-link:active {
+  color: var(--hp-theme-accent-strong) !important;
+  opacity: 1;
+  text-decoration: none !important;
+}
+
+.hp-control-link:visited,
+.hp-lang-link:visited {
+  color: var(--hp-theme-subtle) !important;
+}
+
+/* is-active: www .ui-control-link.is-active 그대로 */
+.hp-control-link.is-active,
+.hp-lang-link.is-active {
+  color: var(--hp-theme-ink) !important;
+  border-bottom-color: currentColor !important;
+  opacity: 1 !important;
+}
+
+.hp-lang-divider {
+  color: var(--hp-theme-subtle) !important;
+  opacity: 0.6;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  width: 1ch;
+  justify-content: center;
+}
+
+.hp-theme-toggle {
+  padding-top: 2px;
+}
+
+/* ── 중앙: 네비 링크 ─── */
+.hp-nav-links {
+  order: 2;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 0;
+  border: none !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+
+.hp-nav-item {
+  list-style: none;
+}
+
+.hp-nav-link {
+  display: block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--hp-theme-subtle) !important;
+  font-size: 20px;
+  font-weight: 600;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: color var(--hp-motion-fast), background-color var(--hp-motion-fast),
+    border-color var(--hp-motion-fast), transform var(--hp-motion-fast);
+}
+
+.hp-nav-link:hover,
+.hp-nav-link:focus-visible,
+.hp-nav-link.hp-active {
+  color: var(--hp-theme-accent-strong) !important;
+  background-color: var(--hp-color-hover-bg);
+  border-color: var(--hp-color-hover-border);
+  transform: translateY(-1px);
+  text-decoration: none !important;
+}
+
+.hp-nav-link.hp-active {
+  font-weight: 700 !important;
+}
+
+/* ── 우측: 브랜드 ─── */
+.hp-brand-group {
+  order: 3;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.hp-brand {
+  display: flex;
+  align-items: center;
+  color: var(--hp-theme-ink) !important;
+  font-weight: 750;
+  letter-spacing: -0.2px;
+  text-decoration: none !important;
+}
+
+.hp-brand:hover,
+.hp-brand:visited,
+.hp-brand:focus-visible {
+  color: var(--hp-theme-ink) !important;
+  text-decoration: none !important;
+}
+
+.hp-brand-text {
+  font-size: 28px;
+  display: inline-block;
+  text-align: right;
+  transition: transform 0.2s ease;
+}
+
+.hp-brand:hover .hp-brand-text,
+.hp-brand:focus-visible .hp-brand-text {
+  transform: scale(1.06);
+}
+
+/* ── 4. HP 네비바 — 토글러 & Collapse ───────────────────── */
+
+/* 토글러 (기본: 숨김 — 데스크톱) */
+.hp-nav-toggler {
+  display: none;
+  order: 2;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  margin-left: auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--hp-radius-sm);
+  cursor: pointer;
+  color: var(--hp-theme-ink);
+  transition: background var(--hp-motion-fast), border-color var(--hp-motion-fast);
+  align-items: center;
+  justify-content: center;
+}
+
+.hp-nav-toggler:hover {
+  background: var(--hp-color-hover-bg);
+  border-color: var(--hp-color-hover-border);
+}
+
+.hp-toggler-icon {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  position: relative;
+  transition: background var(--hp-motion-fast);
+}
+
+.hp-toggler-icon::before,
+.hp-toggler-icon::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  position: absolute;
+  left: 0;
+  transition: transform 0.22s ease, top 0.22s ease, opacity 0.22s ease;
+}
+
+.hp-toggler-icon::before { top: -6px; }
+.hp-toggler-icon::after  { top:  6px; }
+
+/* 열린 상태 → X 모양 */
+.hp-nav-toggler[aria-expanded="true"] .hp-toggler-icon { background: transparent; }
+.hp-nav-toggler[aria-expanded="true"] .hp-toggler-icon::before { top: 0; transform: rotate(45deg); }
+.hp-nav-toggler[aria-expanded="true"] .hp-toggler-icon::after  { top: 0; transform: rotate(-45deg); }
+
+/* Collapse 래퍼 (데스크톱: 일반 flex row) */
+.hp-nav-collapse {
+  order: 1;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  overflow: visible;
+}
+
+/* 모바일 collapse 상태: 높이 0, 숨김 */
+.hp-nav-collapse.hp-collapse-closed {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+.hp-nav-collapse.hp-collapse-open {
+  max-height: 600px;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── hp-auto-collapsed: 모바일/축소 모드 ─── */
+.hp-nav.hp-auto-collapsed .hp-nav-inner {
+  flex-wrap: wrap;
+}
+
+.hp-nav.hp-auto-collapsed .hp-nav-toggler {
+  display: inline-flex;
+}
+
+.hp-nav.hp-auto-collapsed .hp-nav-collapse {
+  flex: 0 0 100%;
+  order: 10;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 10px;
+}
+
+.hp-nav.hp-auto-collapsed .hp-nav-links {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  order: 1;
+}
+
+.hp-nav.hp-auto-collapsed .hp-controls-stack {
+  order: 2;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Gitea 기본 navbar 흔적 제거 ─────────────────────── */
+/* head_navbar.tmpl을 완전히 교체했으므로 예전 스타일 무효화 */
+.navbar-left, .navbar-right, .navbar-mobile-right,
+#navbar-logo, #navbar-expand-toggle {
+  display: none !important;
+}
+
+/* ── 루트 페이지 page grid 제거 ──────────────────────── */
+/* display:contents → 래퍼만 제거, 자식 요소는 유지 */
+.ui.stackable.middle.very.relaxed.page.grid {
+  display: contents !important;
+}
+
+/* ── 5. HP Footer ────────────────────────────────────────── */
+/* Gitea 기본 footer 숨기기 */
+.page-footer {
+  display: none !important;
+}
+
+/* Hanplanet site-footer-links 스타일 */
+.hp-site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px 22px;
+  font-size: 14px;
+  color: #6b7280;
+  flex: 0 0 auto;
+}
+
+.hp-site-footer-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.hp-site-footer-link:hover,
+.hp-site-footer-link:focus-visible {
+  color: #374151 !important;
+  text-decoration: underline;
+}
+
+.hp-site-footer-sep {
+  color: #9ca3af;
+}
+
+[data-theme="gitea-dark"] .hp-site-footer {
+  color: rgba(255,255,255,0.72);
+}
+
+[data-theme="gitea-dark"] .hp-site-footer-link:hover,
+[data-theme="gitea-dark"] .hp-site-footer-link:focus-visible {
+  color: #f5f5f5 !important;
+}
+
+[data-theme="gitea-dark"] .hp-site-footer-sep {
+  color: rgba(255,255,255,0.32);
+}
+
+/* ── 6. 카드 / 세그먼트 ──────────────────────────────────── */
+.ui.segment, .ui.segments {
+  background: var(--hp-surface) !important;
+  border: 1px solid var(--hp-border) !important;
+  border-radius: var(--hp-radius) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  color: var(--hp-text) !important;
+}
+
+.ui.segments > .segment {
+  border-top: 1px solid var(--hp-border) !important;
+}
+
+.ui.card, .ui.cards > .card {
+  background: var(--hp-surface) !important;
+  border: 1px solid var(--hp-border) !important;
+  border-radius: var(--hp-radius-lg) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
+  color: var(--hp-text) !important;
+}
+
+/* ── 7. 버튼 ─────────────────────────────────────────────── */
+.ui.button {
+  font-family: var(--hp-font) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border-radius: var(--hp-radius-sm) !important;
+  padding: 8px 16px !important;
+  background: var(--hp-btn-bg) !important;
+  color: var(--hp-text) !important;
+  border: 1px solid var(--hp-border) !important;
+  box-shadow: none !important;
+  transition: all 0.18s ease !important;
+}
+
+.ui.button:hover {
+  background: var(--hp-btn-hover) !important;
+  border-color: var(--hp-border-mid) !important;
+  color: var(--hp-text) !important;
+}
+
+.ui.primary.button, .ui.buttons .primary.button {
+  background: var(--hp-btn-primary-bg) !important;
+  color: var(--hp-btn-primary-text) !important;
+  border-color: transparent !important;
+  font-weight: 600 !important;
+}
+
+.ui.primary.button:hover {
+  background: var(--hp-btn-primary-hover) !important;
+  color: #000 !important;
+}
+
+.ui.green.button {
+  background: rgba(63,185,80,0.15) !important;
+  color: #3fb950 !important;
+  border-color: rgba(63,185,80,0.3) !important;
+}
+
+.ui.red.button {
+  background: rgba(248,81,73,0.12) !important;
+  color: #f85149 !important;
+  border-color: rgba(248,81,73,0.25) !important;
+}
+
+/* ── 8. 폼 / 인풋 ────────────────────────────────────────── */
+.ui.form label, .ui.form .field > label {
+  color: var(--hp-text-muted) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.ui.form input[type="text"],
+.ui.form input[type="password"],
+.ui.form input[type="email"],
+.ui.form textarea,
+.ui.input > input,
+input[type="text"],
+input[type="password"],
+input[type="email"],
+textarea, select {
+  background: var(--hp-surface-alt) !important;
+  border: 1px solid var(--hp-border) !important;
+  border-radius: var(--hp-radius-sm) !important;
+  color: var(--hp-text) !important;
+  font-family: var(--hp-font) !important;
+  font-size: 14px !important;
+  padding: 9px 13px !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
+}
+
+.ui.form input:focus, .ui.input > input:focus, input:focus, textarea:focus {
+  border-color: var(--hp-border-mid) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.07) !important;
+  outline: none !important;
+  background: var(--hp-surface-high) !important;
+}
+
+.ui.form .error.message, .ui.negative.message {
+  background: rgba(248,81,73,0.1) !important;
+  border-color: rgba(248,81,73,0.25) !important;
+  color: #f85149 !important;
+  border-radius: var(--hp-radius-sm) !important;
+}
+
+/* ── 9. 메뉴 / 탭 ────────────────────────────────────────── */
+.ui.menu {
+  background: var(--hp-surface) !important;
+  border: 1px solid var(--hp-border) !important;
+  border-radius: var(--hp-radius) !important;
+  box-shadow: none !important;
+  font-family: var(--hp-font) !important;
+}
+
+.ui.menu .item {
+  color: var(--hp-text-muted) !important;
+  font-size: 13.5px !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
+}
+
+.ui.menu .item:hover { background: var(--hp-hover) !important; color: var(--hp-text) !important; }
+
+.ui.menu .item.active, .ui.menu .active.item {
+  background: var(--hp-hover-mid) !important;
+  color: var(--hp-text) !important;
+  font-weight: 600 !important;
+  border-color: var(--hp-border-mid) !important;
+}
+
+.ui.tabular.menu {
+  border-bottom: 1px solid var(--hp-border) !important;
+  background: transparent !important;
+  border-top: none !important; border-left: none !important; border-right: none !important;
+}
+
+.ui.tabular.menu .item {
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 10px 16px !important;
+  color: var(--hp-text-faint) !important;
+}
+
+.ui.tabular.menu .item.active {
+  background: transparent !important;
+  border-bottom: 2px solid var(--hp-text) !important;
+  color: var(--hp-text) !important;
+  font-weight: 600 !important;
+  margin-bottom: -1px !important;
+}
+
+/* ── 10. 드롭다운 ────────────────────────────────────────── */
+.ui.dropdown .menu {
+  background: rgba(28,28,28,0.97) !important;
+  border: 1px solid var(--hp-border) !important;
+  border-radius: var(--hp-radius) !important;
+  box-shadow: var(--hp-shadow) !important;
+  padding: 6px !important;
+}
+
+.ui.dropdown .menu > .item {
+  color: var(--hp-text-muted) !important;
+  border-radius: var(--hp-radius-sm) !important;
+  font-family: var(--hp-font) !important;
+  font-size: 14px !important;
+  padding: 8px 12px !important;
+}
+
+.ui.dropdown .menu > .item:hover,
+.ui.dropdown .menu > .item.selected {
+  background: var(--hp-hover-mid) !important;
+  color: var(--hp-text) !important;
+}
+
+/* ── 11. 코드 뷰 ─────────────────────────────────────────── */
+pre, code {
+  font-family: "JetBrains Mono","Fira Code","SFMono-Regular","Consolas",monospace !important;
+  font-size: 13.5px !important;
+  background: rgba(20,20,20,0.8) !important;
+  color: #e6e6e6 !important;
+  border-radius: var(--hp-radius-sm) !important;
+}
+
+.code-view .added-code  { background: rgba(63,185,80,0.08) !important; color: #adf8b5 !important; }
+.code-view .removed-code{ background: rgba(248,81,73,0.08) !important; color: #ffa9a5 !important; }
+
+.code-view td.blob-num {
+  background: rgba(20,20,20,0.5) !important;
+  color: #555 !important;
+  border-right: 1px solid var(--hp-border) !important;
+  user-select: none !important;
+}
+
+/* ── 12. 테이블 ─────────────────────────────────────────── */
+.ui.table {
+  background: var(--hp-surface) !important;
+  border: 1px solid var(--hp-border) !important;
+  border-radius: var(--hp-radius) !important;
+  color: var(--hp-text) !important;
+  font-family: var(--hp-font) !important;
+}
+
+.ui.table th {
+  background: var(--hp-surface-alt) !important;
+  color: var(--hp-text-muted) !important;
+  border-bottom: 1px solid var(--hp-border) !important;
+  font-size: 13px !important; font-weight: 600 !important;
+}
+
+.ui.table td { border-bottom: 1px solid rgba(255,255,255,0.06) !important; color: var(--hp-text) !important; }
+.ui.table tr:hover td { background: var(--hp-hover) !important; }
+
+/* ── 13. 공통 텍스트 / 링크 ────────────────────────────── */
+/* 헤딩 — www.hanplanet.com 타이포그래피와 동일 */
+h1 {
+  font-family: var(--hp-font) !important; color: var(--hp-text) !important;
+  font-size: 1.85rem !important; font-weight: 750 !important;
+  line-height: 1.2 !important; letter-spacing: -0.015em !important;
+}
+h2 {
+  font-family: var(--hp-font) !important; color: var(--hp-text) !important;
+  font-size: 1.45rem !important; font-weight: 700 !important;
+  line-height: 1.25 !important; letter-spacing: -0.01em !important;
+}
+h3 {
+  font-family: var(--hp-font) !important; color: var(--hp-text) !important;
+  font-size: 1.2rem !important; font-weight: 650 !important; line-height: 1.3 !important;
+}
+h4 {
+  font-family: var(--hp-font) !important; color: var(--hp-text) !important;
+  font-size: 1.05rem !important; font-weight: 600 !important; line-height: 1.35 !important;
+}
+h5, h6 {
+  font-family: var(--hp-font) !important; color: var(--hp-text) !important;
+  font-size: 0.95rem !important; font-weight: 600 !important; line-height: 1.4 !important;
+}
+
+p, li {
+  font-family: var(--hp-font) !important;
+  line-height: 1.55 !important;
+}
+
+span, div { font-family: var(--hp-font) !important; }
+td, th    { font-family: var(--hp-font) !important; }
+
+a { color: var(--hp-link) !important; transition: color 0.15s ease !important; }
+a:hover { color: var(--hp-link-hover) !important; }
+
+a.name,.repository a.name,h3 a,h4 a,.header a {
+  color: var(--hp-text) !important; font-weight: 600 !important;
+}
+
+/* ── 14. 모달 ───────────────────────────────────────────── */
+.ui.modal {
+  background: rgba(28,28,28,0.97) !important;
+  border: 1px solid var(--hp-border-mid) !important;
+  border-radius: var(--hp-radius-lg) !important;
+  box-shadow: var(--hp-shadow-lg) !important;
+  color: var(--hp-text) !important;
+  font-family: var(--hp-font) !important;
+}
+
+.ui.modal > .header { background: transparent !important; border-bottom: 1px solid var(--hp-border) !important; color: var(--hp-text) !important; }
+.ui.modal > .content { background: transparent !important; color: var(--hp-text) !important; }
+.ui.modal > .actions { background: var(--hp-surface-alt) !important; border-top: 1px solid var(--hp-border) !important; }
+.ui.dimmer { background: rgba(0,0,0,0.55) !important; backdrop-filter: blur(2px) !important; }
+
+/* ── 15. 스크롤바 ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px !important; height: 6px !important; }
+::-webkit-scrollbar-track { background: transparent !important; }
+::-webkit-scrollbar-thumb { background: rgba(200,200,205,0.28) !important; border-radius: 3px !important; }
+::-webkit-scrollbar-thumb:hover { background: rgba(200,200,205,0.44) !important; }
+
+/* ── 16. 기타 UI ─────────────────────────────────────────── */
+.ui.label,.ui.labels .label { font-family: var(--hp-font) !important; border-radius: 20px !important; }
+.ui.label.topic { background: rgba(88,166,255,0.12) !important; color: var(--hp-blue) !important; border-color: rgba(88,166,255,0.25) !important; }
+.ui.basic.label,.counter { background: rgba(40,40,40,0.8) !important; border: 1px solid var(--hp-border) !important; color: var(--hp-text-muted) !important; border-radius: 12px !important; }
+
+.ui.message { font-family: var(--hp-font) !important; border-radius: var(--hp-radius) !important; border: 1px solid var(--hp-border) !important; background: var(--hp-surface-alt) !important; color: var(--hp-text) !important; box-shadow: none !important; }
+.ui.positive.message,.ui.success.message { background: rgba(63,185,80,0.1) !important; border-color: rgba(63,185,80,0.25) !important; color: #3fb950 !important; }
+
+.ui.divider, hr { border-color: var(--hp-border) !important; }
+
+/* 페이지네이션 */
+.ui.pagination.menu { background: transparent !important; border: none !important; gap: 4px !important; }
+.ui.pagination.menu .item { border: 1px solid var(--hp-border) !important; border-radius: var(--hp-radius-sm) !important; color: var(--hp-text-muted) !important; }
+.ui.pagination.menu .item.active { background: var(--hp-text) !important; color: var(--hp-bg) !important; border-color: transparent !important; font-weight: 700 !important; }

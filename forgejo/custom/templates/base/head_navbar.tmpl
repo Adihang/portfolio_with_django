@@ -1,0 +1,45 @@
+<nav id="navbar" class="hp-nav" aria-label="Navigation Bar">
+	<div class="hp-nav-inner">
+
+		{{/* 우측: 브랜드 */}}
+		<div class="hp-brand-group">
+			<a class="hp-brand" href="https://www.hanplanet.com">
+				<span class="hp-brand-text">Hanplanet</span>
+			</a>
+		</div>
+
+		{{/* 토글러: 모바일 축소 시 표시 */}}
+		<button class="hp-nav-toggler collapsed" id="hp-nav-toggler-btn" type="button"
+			aria-label="메뉴 열기/닫기" aria-expanded="false" aria-controls="hp-nav-collapse">
+			<span class="hp-toggler-icon"></span>
+		</button>
+
+		{{/* 축소 영역: 링크 + 컨트롤 (모바일에서 collapse) */}}
+		<div class="hp-nav-collapse" id="hp-nav-collapse">
+
+			{{/* 중앙: 네비게이션 링크 */}}
+			<ul class="hp-nav-links">
+				<li class="hp-nav-item"><a class="hp-nav-link" href="{{.AppSubURL}}/explore/repos">탐색</a></li>
+				<li class="hp-nav-item"><a class="hp-nav-link" href="https://www.hanplanet.com/handrive/list">HanDrive</a></li>
+				<li class="hp-nav-item"><a class="hp-nav-link" href="https://git.hanplanet.com">Git</a></li>
+			</ul>
+
+			{{/* 좌측: 언어 + 테마 컨트롤 */}}
+			<div class="hp-controls-stack">
+				<div class="hp-control-toggle hp-lang-toggle">
+					<a class="hp-control-link hp-lang-link" id="hp-lang-ko" href="#" data-hp-lang="ko-KR">KO</a>
+					<span class="hp-lang-divider">|</span>
+					<a class="hp-control-link hp-lang-link" id="hp-lang-en" href="#" data-hp-lang="en-US">EN</a>
+				</div>
+				<div class="hp-control-toggle hp-theme-toggle">
+					<a class="hp-control-link hp-lang-link" id="hp-theme-lt" href="#" data-hp-theme="gitea-light">LT</a>
+					<span class="hp-lang-divider">|</span>
+					<a class="hp-control-link hp-lang-link" id="hp-theme-dk" href="#" data-hp-theme="gitea-dark">DK</a>
+				</div>
+			</div>
+
+		</div>
+
+	</div>
+</nav>
+

@@ -1,0 +1,200 @@
+{{/* ── Hanplanet HP Footer ──────────────────────────────────── */}}
+<footer class="hp-site-footer" aria-label="Footer links">
+  <a class="hp-site-footer-link" href="https://www.hanplanet.com/ko/privacy" target="_blank" rel="noopener">Privacy Policy</a>
+  <span class="hp-site-footer-sep">/</span>
+  <a class="hp-site-footer-link" href="https://www.hanplanet.com/ko/terms" target="_blank" rel="noopener">Terms of Service</a>
+</footer>
+
+<script>
+(function () {
+  /* ── Hanplanet SSO 복귀 ─────────────────────────────────── */
+  var match = document.cookie.match(/(?:^|;\s*)hp_sso_return=([^;]+)/);
+  if (match) {
+    var returnUrl = decodeURIComponent(match[1]);
+    document.cookie = 'hp_sso_return=; expires=Thu, 01 Jan 1970 00:00:00 UTC; domain=.hanplanet.com; path=/; secure; samesite=lax';
+    if (/^\//.test(returnUrl) || /^https?:\/\/(www\.)?hanplanet\.com(\/|$)/.test(returnUrl)) {
+      window.location.replace(returnUrl);
+      return;
+    }
+  }
+
+  /* ── 언어 · 테마 컨트롤 — www syncThemeToggleState 패턴 적용 ── */
+  (function initControls() {
+    /* ── www syncThemeToggleState와 동일: 버튼 data 속성값과 현재값 직접 비교 ── */
+    function syncLang(currentLang) {
+      document.querySelectorAll('[data-hp-lang]').forEach(function (btn) {
+        var match = currentLang.toLowerCase().startsWith(
+          btn.getAttribute('data-hp-lang').split('-')[0].toLowerCase()
+        );
+        btn.classList.toggle('is-active', match);
+        btn.setAttribute('aria-pressed', match ? 'true' : 'false');
+      });
+    }
+
+    function syncTheme(currentTheme) {
+      document.querySelectorAll('[data-hp-theme]').forEach(function (btn) {
+        var match = btn.getAttribute('data-hp-theme') === currentTheme;
+        btn.classList.toggle('is-active', match);
+        btn.setAttribute('aria-pressed', match ? 'true' : 'false');
+      });
+    }
+
+    /* ── 초기 상태 ── */
+    var langCookie = document.cookie.match(/(?:^|;\s*)lang=([^;]+)/);
+    var currentLang = langCookie ? decodeURIComponent(langCookie[1]) : 'ko-KR';
+    syncLang(currentLang);
+
+    var currentTheme = localStorage.getItem('theme') ||
+      document.documentElement.getAttribute('data-theme') || 'gitea-light';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    syncTheme(currentTheme);
+
+    /* ── 언어 버튼 이벤트 ── */
+    document.querySelectorAll('[data-hp-lang]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var lang = btn.getAttribute('data-hp-lang');
+        document.cookie = 'lang=' + lang + '; path=/; max-age=31536000; SameSite=Lax';
+        location.reload();
+      });
+    });
+
+    /* ── 테마 버튼 이벤트 — www applyThemeMode 패턴 ── */
+    document.querySelectorAll('[data-hp-theme]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var theme = btn.getAttribute('data-hp-theme');
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        document.cookie = 'theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+        syncTheme(theme);
+      });
+    });
+  })();
+
+  /* ── 로그인 페이지 → Hanplanet SSO 자동 리다이렉트 ─────── */
+  (function redirectLoginToSSO() {
+    var path = window.location.pathname;
+    if (path === '/user/login' || path === '/user/login/') {
+      var params = new URLSearchParams(window.location.search);
+      var redirectTo = params.get('redirect_to') || '';
+      var target = '/user/oauth2/hanplanet';
+      if (redirectTo) target += '?redirect_to=' + encodeURIComponent(redirectTo);
+      window.location.replace(target);
+    }
+  })();
+
+  /* ── 현재 페이지 네비 링크 active 표시 ──────────────────── */
+  (function markActiveNavLink() {
+    var curPath = window.location.pathname;
+    var curHost = window.location.hostname;
+    document.querySelectorAll('.hp-nav-link').forEach(function (link) {
+      var href = link.getAttribute('href');
+      if (!href || href === '#') return;
+      try {
+        var url = new URL(href, window.location.origin);
+        if (url.hostname === curHost && curPath.startsWith(url.pathname) && url.pathname !== '/') {
+          link.classList.add('hp-active');
+        }
+      } catch (e) {}
+    });
+  })();
+
+  /* ── 반응형 네비바 (www site_nav_responsive_manager 적용) ── */
+  (function initHpNavResponsive() {
+    var nav         = document.querySelector('#navbar.hp-nav');
+    var navInner    = nav && nav.querySelector('.hp-nav-inner');
+    var brandGroup  = nav && nav.querySelector('.hp-brand-group');
+    var navLinks    = nav && nav.querySelector('.hp-nav-links');
+    var navCollapse = nav && nav.querySelector('.hp-nav-collapse');
+    var navControls = navCollapse && navCollapse.querySelector('.hp-controls-stack');
+    var toggler     = nav && nav.querySelector('.hp-nav-toggler');
+
+    if (!nav || !navInner || !brandGroup || !navLinks || !navCollapse || !toggler) return;
+
+    var rafId = null;
+    var isCollapsed = false;
+
+    function measureInlineWidth(node, styleOverrides) {
+      if (!node) return 0;
+      var clone = node.cloneNode(true);
+      Object.assign(clone.style, {
+        position: 'fixed', left: '-99999px', top: '-99999px',
+        visibility: 'hidden', pointerEvents: 'none',
+        width: 'auto', maxWidth: 'none', margin: '0', padding: '0'
+      }, styleOverrides || {});
+      document.body.appendChild(clone);
+      var w = Math.ceil(clone.getBoundingClientRect().width);
+      clone.remove();
+      return w;
+    }
+
+    function getNavItemsWidth() {
+      var lw = measureInlineWidth(navLinks, {
+        display: 'inline-flex', flexDirection: 'row',
+        flexWrap: 'nowrap', alignItems: 'center', listStyle: 'none', gap: '0'
+      });
+      var cw = navControls ? measureInlineWidth(navControls, {
+        display: 'inline-flex', flexDirection: 'column',
+        alignItems: 'flex-end', gap: '0'
+      }) : 0;
+      return lw + cw;
+    }
+
+    function closeMenu() {
+      navCollapse.classList.remove('hp-collapse-open');
+      navCollapse.classList.add('hp-collapse-closed');
+      toggler.classList.add('collapsed');
+      toggler.setAttribute('aria-expanded', 'false');
+    }
+
+    function updateNavMode() {
+      rafId = null;
+      nav.classList.remove('hp-auto-collapsed');
+      navCollapse.classList.remove('hp-collapse-closed', 'hp-collapse-open');
+
+      var available  = navInner.getBoundingClientRect().width;
+      var brandWidth = brandGroup.getBoundingClientRect().width;
+      var itemsWidth = getNavItemsWidth();
+      var required   = brandWidth + itemsWidth + 22;
+
+      if (required > available) {
+        nav.classList.add('hp-auto-collapsed');
+        closeMenu();
+        isCollapsed = true;
+      } else {
+        isCollapsed = false;
+        toggler.classList.add('collapsed');
+        toggler.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function scheduleUpdate() {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(updateNavMode);
+    }
+
+    toggler.addEventListener('click', function () {
+      if (!isCollapsed) return;
+      var isOpen = toggler.getAttribute('aria-expanded') === 'true';
+      if (isOpen) {
+        closeMenu();
+      } else {
+        navCollapse.classList.remove('hp-collapse-closed');
+        navCollapse.classList.add('hp-collapse-open');
+        toggler.classList.remove('collapsed');
+        toggler.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    window.addEventListener('orientationchange', scheduleUpdate, { passive: true });
+
+    scheduleUpdate();
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(scheduleUpdate).catch(function () {});
+    }
+  })();
+})();
+</script>
