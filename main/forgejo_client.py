@@ -5,6 +5,7 @@ Forgejo API 클라이언트
   settings.FORGEJO_BASE_URL    — Forgejo 서버 내부 URL (예: http://localhost:3000)
   settings.FORGEJO_ADMIN_TOKEN — Forgejo 관리자 API 토큰
 """
+import secrets
 import requests
 from urllib.parse import urlparse, urlunparse
 from django.conf import settings
@@ -30,27 +31,51 @@ class ForgejoClient:
         authed = parsed._replace(netloc=f"admin:{self._token}@{parsed.hostname}:{parsed.port or 3000}")
         return urlunparse(authed)
 
-    @property
-    def _admin_username(self) -> str:
-        """Gitea 관리자 계정명 조회 (토큰 기반)"""
+    # ──────────────────────────────────────────
+    # User
+    # ──────────────────────────────────────────
+
+    def ensure_user(self, username: str, email: str = "") -> dict:
+        """Django 유저에 대응하는 Gitea 계정이 없으면 admin API로 자동 생성.
+        유저가 Gitea에 별도 가입 없이도 Django 계정 기준으로 repo 소유권을 가짐.
+        """
         resp = requests.get(
-            f"{self._base_url}/api/v1/user",
+            f"{self._base_url}/api/v1/users/{username}",
             headers=self._headers,
             timeout=15,
         )
+        if resp.status_code == 200:
+            return resp.json()
+
+        if not email:
+            email = f"{username}@hanplanet.local"
+        resp = requests.post(
+            f"{self._base_url}/api/v1/admin/users",
+            headers=self._headers,
+            json={
+                "username":             username,
+                "email":                email,
+                "password":             secrets.token_urlsafe(24),
+                "must_change_password": False,
+                "source_id":            0,
+                "login_name":           username,
+                "send_notify":          False,
+            },
+            timeout=15,
+        )
         resp.raise_for_status()
-        return resp.json()["login"]
+        return resp.json()
 
     # ──────────────────────────────────────────
     # Repository
     # ──────────────────────────────────────────
 
     def create_repo(self, username: str, repo_name: str) -> dict:
-        """Forgejo admin 계정 아래에 private 저장소 생성.
-        계정 관리는 Django가 담당 — Gitea에 개별 유저 계정을 생성하지 않음.
-        username은 Django 유저 식별용으로만 사용하지 않음 (admin 계정 사용).
+        """Django 유저 소유의 private 저장소 생성.
+        Gitea 계정이 없으면 자동 생성 후 해당 유저 계정 아래에 repo 생성.
         """
-        url = f"{self._base_url}/api/v1/user/repos"
+        self.ensure_user(username)
+        url = f"{self._base_url}/api/v1/admin/users/{username}/repos"
         resp = requests.post(
             url,
             headers=self._headers,
@@ -64,10 +89,9 @@ class ForgejoClient:
         resp.raise_for_status()
         return resp.json()
 
-    def get_repo(self, repo_name: str) -> dict:
-        """admin 계정 아래 저장소 조회 — create 실패 시 fallback"""
-        admin = self._admin_username
-        url = f"{self._base_url}/api/v1/repos/{admin}/{repo_name}"
+    def get_repo(self, owner: str, repo_name: str) -> dict:
+        """저장소 조회 — create 실패 시 fallback"""
+        url = f"{self._base_url}/api/v1/repos/{owner}/{repo_name}"
         resp = requests.get(url, headers=self._headers, timeout=15)
         resp.raise_for_status()
         return resp.json()

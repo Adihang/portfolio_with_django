@@ -72,7 +72,7 @@ def create_repo_task(repo_id: int) -> None:
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
         except Exception:
-            forgejo_repo = client.get_repo(repo.repo_name)
+            forgejo_repo = client.get_repo(repo.owner.username, repo.repo_name)
 
         # clone URL 즉시 저장 (push 전에 미리 보존)
         repo.forgejo_repo_id        = forgejo_repo["id"]
@@ -155,7 +155,7 @@ def import_repo_task(repo_id: int) -> None:
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
         except Exception:
-            forgejo_repo = client.get_repo(repo.repo_name)
+            forgejo_repo = client.get_repo(repo.owner.username, repo.repo_name)
 
         repo.forgejo_repo_id        = forgejo_repo["id"]
         repo.forgejo_owner          = forgejo_repo["owner"]["login"]
