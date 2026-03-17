@@ -344,9 +344,10 @@ DOCS_TEXT = {
         "permission_read_groups": "읽기 그룹",
         "permission_write_users": "쓰기 사용자",
         "permission_write_groups": "쓰기 그룹",
-        "url_share_button": "url공유",
+        "url_share_button": "공유",
         "url_unshare_button": "url공유해제",
-        "url_share_title": "URL 공유",
+        "url_share_title": "공유",
+        "url_share_enabled_label": "URL 공유",
         "url_share_label": "URL",
         "url_share_copy_button": "복사",
         "url_share_copied": "복사됨",
@@ -529,9 +530,10 @@ DOCS_TEXT = {
         "permission_read_groups": "Read Groups",
         "permission_write_users": "Write Users",
         "permission_write_groups": "Write Groups",
-        "url_share_button": "Share URL",
+        "url_share_button": "Share",
         "url_unshare_button": "Unshare URL",
-        "url_share_title": "Share URL",
+        "url_share_title": "Share",
+        "url_share_enabled_label": "Share via URL",
         "url_share_label": "URL",
         "url_share_copy_button": "Copy",
         "url_share_copied": "Copied",
@@ -815,13 +817,16 @@ def render_plain_text_safely(text: str) -> str:
     return mark_safe(f"<pre><code>{escaped_text}</code></pre>")
 
 
-def build_docs_download_url(relative_path: str) -> str:
+def build_docs_download_url(relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
     encoded_path = quote(relative_path or "")
-    return f"{reverse('main:docs_api_download')}?path={encoded_path}"
+    url = f"{reverse('main:docs_api_download')}?path={encoded_path}"
+    if share_owner and share_slug:
+        url += f"&share_owner={quote(share_owner)}&share_slug={quote(share_slug)}"
+    return url
 
 
-def render_docs_media_safely(source_path: Path, relative_path: str) -> str:
-    source_url = escape(build_docs_download_url(relative_path))
+def render_docs_media_safely(source_path: Path, relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
+    source_url = escape(build_docs_download_url(relative_path, share_owner=share_owner, share_slug=share_slug))
     extension = source_path.suffix.lower()
     if extension in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".avif"}:
         return mark_safe(
@@ -981,6 +986,8 @@ def render_docs_content(
     source_path: Path | None = None,
     relative_path: str = "",
     request=None,
+    share_owner: str = "",
+    share_slug: str = "",
 ) -> tuple[str, dict[str, str]]:
     profile = resolve_docs_render_profile(file_extension)
     if profile["css_class"] == "handrive-html":
@@ -1000,7 +1007,7 @@ def render_docs_content(
         DOCS_RENDER_MODE_MEDIA_VIDEO,
         DOCS_RENDER_MODE_MEDIA_AUDIO,
     } and source_path is not None:
-        rendered = render_docs_media_safely(source_path, relative_path)
+        rendered = render_docs_media_safely(source_path, relative_path, share_owner=share_owner, share_slug=share_slug)
     else:
         rendered = render_plain_text_safely(content)
     return str(rendered), profile
@@ -1438,8 +1445,43 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                 entry["is_public_write"] = is_docs_public_write_enabled(request, entry["path"])
                 entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
+                entry["share_url"] = ""
+                if entry["is_url_only"]:
+                    _link = DocsSharedLink.objects.select_related("owner").filter(path=entry["path"]).first()
+                    if _link:
+                        _ui_lang = resolve_ui_lang(request, getattr(getattr(request, "resolver_match", None), "kwargs", {}).get("ui_lang"))
+                        entry["share_url"] = request.build_absolute_uri(
+                            build_docs_shared_view_url(_ui_lang, _link.owner.username, _link.share_slug)
+                        )
             entries.append(entry)
+
+    # 디렉토리 엔트리에 git repo 정보 일괄 추가 (단일 쿼리)
+    if request is not None and hasattr(request, "user") and request.user.is_authenticated:
+        from .models import GitRepository
+        dir_paths = [e["path"] for e in entries if e.get("type") == "dir"]
+        if dir_paths:
+            repos = GitRepository.objects.filter(
+                handrive_path__in=dir_paths,
+                owner=request.user,
+            ).values("handrive_path", "id", "status")
+            repo_map = {r["handrive_path"]: r for r in repos}
+            for entry in entries:
+                if entry.get("type") == "dir" and entry["path"] in repo_map:
+                    r = repo_map[entry["path"]]
+                    entry["git_repo"] = {"id": r["id"], "status": r["status"]}
+
     return entries
+
+
+def _get_current_dir_git_repo(request, current_dir: str):
+    """현재 디렉토리 자체의 GitRepository 정보를 반환 (없으면 None)."""
+    if not current_dir or request is None or not hasattr(request, "user") or not request.user.is_authenticated:
+        return None
+    from .models import GitRepository
+    repo = GitRepository.objects.filter(handrive_path=current_dir, owner=request.user).values("id", "status").first()
+    if repo:
+        return {"id": repo["id"], "status": repo["status"]}
+    return None
 
 
 def list_all_directories(request=None) -> list[str]:
@@ -2342,6 +2384,60 @@ class DocsSignupForm(UserCreationForm):
         return password
 
 
+def _trigger_gitea_password_sync(user, raw_password: str) -> None:
+    """로그인/회원가입 성공 후 Gitea 비밀번호를 비동기로 동기화.
+    GitUserMapping이 없는 유저(아직 git을 안 쓴 유저)는 조용히 스킵.
+    """
+    if not raw_password:
+        return
+    try:
+        from .git_tasks import sync_gitea_password
+        sync_gitea_password.delay(user.pk, raw_password)
+    except Exception:
+        pass  # Celery 없어도 로그인 막으면 안 됨
+
+
+def _make_gitea_sso_url(post_login_url: str) -> str:
+    """로그인 성공 후 Gitea SSO 릴레이 URL로 감쌉니다."""
+    from urllib.parse import urlencode
+    public_git = getattr(settings, "PUBLIC_GIT_BASE_URL", "").rstrip("/")
+    if not public_git:
+        return post_login_url
+    return "/sso/gitea?" + urlencode({"next": post_login_url})
+
+
+@require_http_methods(["GET"])
+def docs_gitea_sso_relay(request):
+    """Hanplanet 로그인 후 Gitea OAuth2 로그인을 자동으로 시작합니다.
+
+    1. hp_sso_return 쿠키를 .hanplanet.com 도메인으로 설정 (Gitea 측에서 읽어 복귀)
+    2. Gitea OAuth2 엔드포인트로 리다이렉트 (이미 로그인된 상태이므로 즉시 승인됨)
+    """
+    if not request.user.is_authenticated:
+        return redirect("/ko/login")
+
+    next_url = request.GET.get("next", "/")
+    public_git = getattr(settings, "PUBLIC_GIT_BASE_URL", "").rstrip("/")
+    if not public_git:
+        return redirect(next_url)
+
+    gitea_oauth_url = public_git + "/user/oauth2/hanplanet"
+
+    response = redirect(gitea_oauth_url)
+    # .hanplanet.com 서브도메인 전체에서 읽을 수 있도록 도메인 설정
+    response.set_cookie(
+        "hp_sso_return",
+        next_url,
+        max_age=120,
+        domain=".hanplanet.com",
+        path="/",
+        secure=True,
+        httponly=False,   # Gitea 측 JS에서 읽어야 함
+        samesite="Lax",
+    )
+    return response
+
+
 @require_http_methods(["GET", "POST"])
 @with_request_docs_root
 def docs_login(request, ui_lang=None):
@@ -2396,7 +2492,9 @@ def docs_login(request, ui_lang=None):
                 _reset_docs_login_guard(authed_user)
                 _clear_docs_login_captcha(request)
                 auth_login(request, authed_user)
-                return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user))
+                _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
+                post_login = _resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user)
+                return redirect(_make_gitea_sso_url(post_login))
             else:
                 login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
                 captcha_question = _build_docs_login_captcha(request, refresh=True)
@@ -2408,7 +2506,9 @@ def docs_login(request, ui_lang=None):
             _reset_docs_login_guard(authed_user)
             _clear_docs_login_captcha(request)
             auth_login(request, authed_user)
-            return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user))
+            _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
+            post_login = _resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user)
+            return redirect(_make_gitea_sso_url(post_login))
         else:
             login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
             if target_user is not None:
@@ -2487,6 +2587,7 @@ def docs_signup(request, ui_lang=None):
             if authed_user is None:
                 authed_user = user
             auth_login(request, authed_user)
+            _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password1", ""))
             return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, user))
         signup_error_message = docs_text.get("auth_signup_error", "회원가입 정보를 확인해주세요.")
 
@@ -2595,6 +2696,7 @@ def docs_list(request, folder_path="", ui_lang=None):
                 root_parent_label=get_handrive_root_label(request, ""),
             ),
             "initial_entries": list_directory_entries(directory, request=request),
+            "current_dir_git_repo": _get_current_dir_git_repo(request, current_dir),
             "list_current_dir_size_display": format_docs_bytes_display(calculate_docs_quota_breakdown(directory)[0]) if directory.is_dir() else "",
             "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
         }
@@ -2632,6 +2734,15 @@ def docs_view(request, doc_path, ui_lang=None):
     if parent_dir == ".":
         parent_dir = ""
 
+    doc_is_url_only = is_docs_url_only_enabled(request, relative_file_path)
+    doc_share_url = ""
+    if doc_is_url_only:
+        _shared_link = DocsSharedLink.objects.select_related("owner").filter(path=relative_file_path).first()
+        if _shared_link:
+            doc_share_url = request.build_absolute_uri(
+                build_docs_shared_view_url(resolved_lang, _shared_link.owner.username, _shared_link.share_slug)
+            )
+
     context.update(
         {
             "doc_title": file_path.name,
@@ -2641,7 +2752,8 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_can_edit": has_docs_write_access(request, relative_file_path),
             "doc_can_show_edit": has_docs_write_access(request, relative_file_path)
             and not is_docs_non_editable_media_extension(file_path.suffix.lower()),
-            "doc_is_url_only": is_docs_url_only_enabled(request, relative_file_path),
+            "doc_is_url_only": doc_is_url_only,
+            "doc_share_url": doc_share_url,
             "doc_content_html": rendered_content_html,
             "doc_content_mode": render_profile["mode"],
             "doc_content_class": render_profile["css_class"],
@@ -2690,6 +2802,8 @@ def docs_shared_view(request, owner_username, share_slug, ui_lang=None):
         source_path=file_path,
         relative_path=relative_file_path,
         request=request,
+        share_owner=owner_username,
+        share_slug=share_slug,
     )
 
     context.update(
@@ -3682,7 +3796,18 @@ def docs_api_download(request):
         file_path, rel_path = normalize_docs_relative_path(request.GET.get("path"), must_exist=True)
     except (ValueError, FileNotFoundError):
         raise Http404("다운로드할 파일을 찾을 수 없습니다.")
-    if not has_docs_read_access(request, rel_path):
+
+    share_owner = request.GET.get("share_owner", "").strip()
+    share_slug = request.GET.get("share_slug", "").strip()
+    if share_owner and share_slug:
+        shared_link = DocsSharedLink.objects.select_related("owner").filter(
+            owner__username=share_owner,
+            share_slug=share_slug,
+            path=rel_path,
+        ).first()
+        if shared_link is None:
+            raise PermissionDenied("파일을 볼 권한이 없습니다.")
+    elif not has_docs_read_access(request, rel_path):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     return FileResponse(file_path.open("rb"), as_attachment=True, filename=file_path.name)

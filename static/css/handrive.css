@@ -745,6 +745,11 @@ img.ui-auth-account-avatar {
     box-sizing: border-box;
 }
 
+.handrive-toolbar-actions .handrive-icon-btn {
+    width: 32px;
+    height: 32px;
+}
+
 .handrive-help-icon-link {
     width: 20px;
     height: 20px;
@@ -1325,7 +1330,7 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 4px;
     flex: 0 0 auto;
     margin-left: auto;
 }
@@ -2180,6 +2185,44 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
+}
+
+.handrive-url-share-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    user-select: none;
+}
+
+.handrive-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    flex: 0 0 auto;
+    background: transparent;
+    border: none;
+    border-radius: var(--handrive-radius-sm);
+    color: var(--handrive-text-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    box-sizing: border-box;
+    transition: background 0.1s, color 0.1s;
+}
+.handrive-icon-btn:hover {
+    background: var(--handrive-hover-soft);
+    color: var(--handrive-text-primary);
+}
+.handrive-icon-btn:active {
+    background: var(--handrive-hover-mid);
+}
+.handrive-icon-btn svg {
+    display: block;
+    flex: 0 0 auto;
 }
 
 .handrive-permission-modal-dialog {

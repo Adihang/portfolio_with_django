@@ -16,6 +16,8 @@ import uuid
 from celery import shared_task
 from django.db import transaction
 
+from django.conf import settings
+
 from .forgejo_client import ForgejoClient
 from .models import GitRepository, GitUserMapping
 
@@ -23,6 +25,19 @@ logger = logging.getLogger(__name__)
 
 # launchd 환경에서 PATH 의존 제거 — 절대 경로 사용
 GIT_BIN = "/usr/bin/git"
+
+
+def _abs_handrive_path(owner, relative_path: str) -> str:
+    """handrive_path (docs_root 기준 상대 경로) → 절대 파일시스템 경로.
+    슈퍼유저: docs_root = BASE_DIR
+    일반 유저: docs_root = MEDIA_ROOT/HanDrive
+    """
+    from pathlib import Path
+    if owner.is_superuser:
+        root = Path(settings.BASE_DIR).resolve()
+    else:
+        root = (Path(settings.MEDIA_ROOT) / "HanDrive").resolve()
+    return str((root / relative_path).resolve())
 
 
 def _ensure_gitea_user_token(client: ForgejoClient, user) -> "GitUserMapping":
@@ -95,7 +110,10 @@ def create_repo_task(repo_id: int) -> None:
         client = ForgejoClient()
 
         # Gitea 유저 준비 + PAT 발급 (없는 경우만)
-        gitea_user, user_token = _ensure_gitea_user_token(client, repo.owner)
+        _ensure_gitea_user_token(client, repo.owner)
+
+        # handrive_path → 절대 경로 변환
+        abs_path = _abs_handrive_path(repo.owner, repo.handrive_path)
 
         # Forgejo repo 생성 (이미 존재하면 get fallback)
         try:
@@ -114,16 +132,18 @@ def create_repo_task(repo_id: int) -> None:
             "forgejo_clone_http_url", "forgejo_clone_ssh_url", "updated_at",
         ])
 
-        # shallow clone — 토큰 인증 포함 (private repo)
-        authed_url = client.authed_clone_url(forgejo_repo["clone_url"])
-        _run([GIT_BIN, "clone", "--depth=1", authed_url, tmp])
+        # shallow clone — 내부 URL 사용 (공개 도메인은 Celery에서 접근 불가)
+        internal_url = client.internal_authed_clone_url(
+            forgejo_repo["owner"]["login"], forgejo_repo["name"]
+        )
+        _run([GIT_BIN, "clone", "--depth=1", internal_url, tmp])
 
         # git user 설정 (launchd 환경에 전역 git config 없을 수 있음)
         _run([GIT_BIN, "-C", tmp, "config", "user.name", "hanplanet"], timeout=10)
         _run([GIT_BIN, "-C", tmp, "config", "user.email", "system@hanplanet"], timeout=10)
 
         # rsync로 파일 복사 (.git 폴더 제외)
-        _run(["rsync", "-a", "--exclude=.git", repo.handrive_path + "/", tmp + "/"], timeout=60)
+        _run(["rsync", "-a", "--exclude=.git", abs_path + "/", tmp + "/"], timeout=60)
 
         # 변경 사항이 있을 때만 commit (빈 폴더 방어)
         status_result = subprocess.run(
@@ -134,7 +154,7 @@ def create_repo_task(repo_id: int) -> None:
             _run([GIT_BIN, "-C", tmp, "add", "."], timeout=30)
             _run([GIT_BIN, "-C", tmp, "commit", "-m", "Initial commit"], timeout=30)
 
-        _run([GIT_BIN, "-C", tmp, "push", authed_url])
+        _run([GIT_BIN, "-C", tmp, "push", internal_url])
 
         repo.status = "active"
         repo.error_message = None
@@ -184,6 +204,9 @@ def import_repo_task(repo_id: int) -> None:
         # Gitea 유저 준비 + PAT 발급 (없는 경우만)
         _ensure_gitea_user_token(client, repo.owner)
 
+        # handrive_path → 절대 경로 변환
+        abs_path = _abs_handrive_path(repo.owner, repo.handrive_path)
+
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
         except Exception:
@@ -201,17 +224,19 @@ def import_repo_task(repo_id: int) -> None:
 
         # remote 중복 방지: 먼저 제거 시도 (없어도 무시)
         subprocess.run(
-            [GIT_BIN, "-C", repo.handrive_path, "remote", "remove", "forgejo"],
+            [GIT_BIN, "-C", abs_path, "remote", "remove", "forgejo"],
             capture_output=True, timeout=10,
         )
-        authed_url = client.authed_clone_url(forgejo_repo["clone_url"])
+        internal_url = client.internal_authed_clone_url(
+            forgejo_repo["owner"]["login"], forgejo_repo["name"]
+        )
         _run(
-            [GIT_BIN, "-C", repo.handrive_path, "remote", "add", "forgejo", authed_url],
+            [GIT_BIN, "-C", abs_path, "remote", "add", "forgejo", internal_url],
             timeout=10,
         )
         # 대용량 repo 대응 — timeout 넉넉하게
         _run(
-            [GIT_BIN, "-C", repo.handrive_path, "push", "--mirror", "forgejo"],
+            [GIT_BIN, "-C", abs_path, "push", "--mirror", "forgejo"],
             timeout=600,
         )
 
@@ -235,3 +260,21 @@ def import_repo_task(repo_id: int) -> None:
                 repo.save(update_fields=["status", "error_message", "updated_at"])
             except Exception:
                 pass
+
+
+@shared_task(bind=True, max_retries=2, ignore_result=True)
+def sync_gitea_password(self, user_id: int, raw_password: str):
+    """Django 로그인/회원가입 시 Gitea 비밀번호를 Django 비밀번호와 동기화.
+    GitUserMapping(= Gitea 계정)이 없으면 조용히 종료.
+    """
+    try:
+        mapping = GitUserMapping.objects.select_related("user").get(user_id=user_id)
+    except GitUserMapping.DoesNotExist:
+        return
+
+    try:
+        client = ForgejoClient()
+        client._set_user_password(mapping.forgejo_username, raw_password)
+    except Exception as exc:
+        logger.warning("sync_gitea_password failed for user_id=%s: %s", user_id, exc)
+        raise self.retry(exc=exc, countdown=10)

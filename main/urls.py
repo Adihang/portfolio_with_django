@@ -167,4 +167,6 @@ urlpatterns = [
     path('api/git/auth/approve/', views.git_auth_approve, name='git_auth_approve'),
     path('git-auth/',             views.git_auth_page,    name='git_auth_page'),
     path('git-auth/credential-helper/', views.git_credential_helper_download, name='git_credential_helper_download'),
+    # Gitea SSO 릴레이: 로그인 후 Gitea 자동 로그인
+    path('sso/gitea', handrive_views.docs_gitea_sso_relay, name='gitea_sso_relay'),
 ]

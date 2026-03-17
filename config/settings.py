@@ -183,6 +183,7 @@ INSTALLED_APPS = [
     'main',
     'corsheaders',
     'django_celery_results',
+    'oauth2_provider',
 ]
 
 MIDDLEWARE = [
@@ -366,3 +367,24 @@ CSRF_TRUSTED_ORIGINS = env_list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     "https://hanplanet.com,https://www.hanplanet.com",
 )
+
+# ── OAuth2 Provider (Gitea SSO) ──────────────────────────────
+OAUTH2_PROVIDER = {
+    'SCOPES': {
+        'openid': 'OpenID Connect',
+        'profile': '프로필 정보',
+        'email': '이메일 주소',
+    },
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,
+    'REFRESH_TOKEN_EXPIRE_SECONDS': 86400 * 30,
+    'ROTATE_REFRESH_TOKEN': True,
+    'OIDC_ENABLED': True,
+    'OIDC_RSA_PRIVATE_KEY': load_optional_secret('OIDC_RSA_PRIVATE_KEY', ''),
+}
+AUTHENTICATION_BACKENDS = [
+    'oauth2_provider.backends.OAuth2Backend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# OAuth2 인증 시 리디렉션할 로그인 URL
+LOGIN_URL = '/ko/login'

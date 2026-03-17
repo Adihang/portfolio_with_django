@@ -1475,6 +1475,7 @@
         const docsRootLabel = (root.dataset.handriveRootLabel || breadcrumbRootLabel || "HanDrive").trim() || "HanDrive";
         const effectiveRootLabel = (isSuperuser && scopedHomeDir) ? "Hanplanet" : docsRootLabel;
         const initialEntries = getJsonScriptData("handrive-initial-entries", []);
+        let currentDirGitRepo = getJsonScriptData("handrive-current-dir-git-repo", null);
 
         function getPathFileExtension(pathValue) {
             const normalized = normalizePath(pathValue, true);
@@ -4427,7 +4428,8 @@
                 type: "dir",
                 isCurrentFolder: true,
                 can_edit: currentDirCanEdit,
-                can_write_children: currentDirCanWriteChildren
+                can_write_children: currentDirCanWriteChildren,
+                git_repo: currentDirGitRepo || null
             };
 
             const item = document.createElement("li");
@@ -5515,6 +5517,10 @@
                     // entry 데이터 갱신 — 우클릭 메뉴 버튼 상태를 즉시 업데이트
                     if (gitRepoModal && gitRepoModal._targetEntry) {
                         gitRepoModal._targetEntry.git_repo = { id: repoId, status: "active" };
+                        // 현재 디렉토리 자체가 대상인 경우 currentDirGitRepo도 갱신
+                        if (gitRepoModal._targetEntry.path === currentDir) {
+                            currentDirGitRepo = { id: repoId, status: "active" };
+                        }
                     }
                     refreshCurrentDirectory().catch(function () {});
                 } else if (data.status === "failed") {
