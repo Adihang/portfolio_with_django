@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="max-width:480px;margin:80px auto;padding:0 16px;font-family:inherit;">
+
+{% if error %}
+    <div style="border:1px solid #e55;border-radius:8px;padding:24px;text-align:center;">
+        <h2 style="margin:0 0 12px;font-size:1.2rem;">인증 오류</h2>
+        <p style="color:#c33;margin:0 0 20px;">{{ error }}</p>
+        <p style="font-size:0.9em;color:#888;">터미널에서 git 명령을 다시 실행해주세요.</p>
+    </div>
+
+{% elif approved %}
+    <div style="border:1px solid #3a3;border-radius:8px;padding:24px;text-align:center;">
+        <h2 style="margin:0 0 12px;font-size:1.2rem;">인증 완료</h2>
+        <p style="color:#363;margin:0 0 8px;">Git 접근이 승인되었습니다.</p>
+        <p style="font-size:0.9em;color:#888;">터미널로 돌아가시면 자동으로 진행됩니다.</p>
+    </div>
+
+{% elif denied %}
+    <div style="border:1px solid #888;border-radius:8px;padding:24px;text-align:center;">
+        <h2 style="margin:0 0 12px;font-size:1.2rem;">인증 거절</h2>
+        <p style="margin:0 0 8px;">Git 접근 요청을 거절했습니다.</p>
+        <p style="font-size:0.9em;color:#888;">터미널에서 git 명령이 취소됩니다.</p>
+    </div>
+
+{% else %}
+    <div style="border:1px solid #ddd;border-radius:8px;padding:24px;">
+        <h2 style="margin:0 0 4px;font-size:1.2rem;">HanDrive Git 접근 요청</h2>
+        <p style="color:#888;font-size:0.9em;margin:0 0 20px;">
+            터미널의 git 명령이 HanDrive Git 서버 접근을 요청합니다.
+        </p>
+
+        <div style="background:#f5f5f5;border-radius:6px;padding:16px;text-align:center;margin-bottom:20px;">
+            <p style="margin:0 0 6px;font-size:0.85em;color:#666;">인증 코드</p>
+            <span style="font-size:2rem;font-weight:700;letter-spacing:0.15em;font-family:monospace;">
+                {{ user_code }}
+            </span>
+            <p style="margin:8px 0 0;font-size:0.8em;color:#999;">
+                터미널에 표시된 코드와 일치하는지 확인하세요.
+            </p>
+        </div>
+
+        <p style="font-size:0.85em;color:#666;margin:0 0 20px;">
+            로그인 계정: <strong>{{ request.user.username }}</strong>
+        </p>
+
+        <div style="display:flex;gap:12px;">
+            <button id="deny-btn" type="button"
+                style="flex:1;padding:10px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:1rem;">
+                거절
+            </button>
+            <button id="approve-btn" type="button"
+                style="flex:2;padding:10px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:1rem;font-weight:600;">
+                승인
+            </button>
+        </div>
+
+        <div id="status-msg" style="margin-top:16px;text-align:center;color:#888;font-size:0.9em;display:none;"></div>
+    </div>
+
+    <script>
+    (function () {
+        const approveBtn = document.getElementById("approve-btn");
+        const denyBtn    = document.getElementById("deny-btn");
+        const statusMsg  = document.getElementById("status-msg");
+
+        function setStatus(msg) {
+            statusMsg.textContent = msg;
+            statusMsg.style.display = "block";
+        }
+
+        function disableButtons() {
+            approveBtn.disabled = true;
+            denyBtn.disabled    = true;
+        }
+
+        approveBtn.addEventListener("click", function () {
+            disableButtons();
+            setStatus("처리 중...");
+            fetch("/api/git/auth/approve/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify({ user_code: "{{ user_code }}" }),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    document.querySelector("[style*='border:1px']").innerHTML =
+                        '<div style="text-align:center;padding:8px;">' +
+                        '<h2 style="margin:0 0 12px;font-size:1.2rem;">인증 완료</h2>' +
+                        '<p style="color:#363;margin:0 0 8px;">Git 접근이 승인되었습니다.</p>' +
+                        '<p style="font-size:0.9em;color:#888;">터미널로 돌아가시면 자동으로 진행됩니다.</p>' +
+                        '</div>';
+                } else {
+                    setStatus("오류: " + (data.error || "알 수 없는 오류"));
+                    approveBtn.disabled = false;
+                    denyBtn.disabled    = false;
+                }
+            })
+            .catch(function () {
+                setStatus("요청 실패. 다시 시도해주세요.");
+                approveBtn.disabled = false;
+                denyBtn.disabled    = false;
+            });
+        });
+
+        denyBtn.addEventListener("click", function () {
+            disableButtons();
+            document.querySelector("[style*='border:1px']").innerHTML =
+                '<div style="text-align:center;padding:8px;">' +
+                '<h2 style="margin:0 0 12px;font-size:1.2rem;">인증 거절</h2>' +
+                '<p style="margin:0 0 8px;">Git 접근 요청을 거절했습니다.</p>' +
+                '<p style="font-size:0.9em;color:#888;">터미널에서 git 명령이 취소됩니다.</p>' +
+                '</div>';
+        });
+
+        function getCookie(name) {
+            const v = document.cookie.match("(^|;) ?" + name + "=([^;]*)(;|$)");
+            return v ? v[2] : "";
+        }
+    })();
+    </script>
+{% endif %}
+
+</div>
+{% endblock %}

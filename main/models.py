@@ -707,3 +707,21 @@ class GitCollaborator(models.Model):
 
     def __str__(self):
         return f"{self.user.username} → {self.repository} [{self.permission}]"
+
+
+class GitDeviceCode(models.Model):
+    """OAuth2 Device Flow — 터미널 git 인증을 위한 일회성 코드.
+    device_code: 스크립트가 폴링에 사용 (노출 최소화)
+    user_code:   브라우저 URL에 포함, 사람이 터미널 코드와 대조
+    """
+    device_code = models.CharField(max_length=64, unique=True)
+    user_code   = models.CharField(max_length=16, unique=True)
+    user        = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    expires_at  = models.DateTimeField()
+    approved    = models.BooleanField(default=False)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"GitDeviceCode({self.user_code}, approved={self.approved})"

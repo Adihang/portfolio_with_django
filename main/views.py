@@ -3569,7 +3569,7 @@ def chat_with_ai(request, ui_lang=None):
 
 from urllib.parse import urlparse as _urlparse
 
-from .models import GitRepository, GitCollaborator
+from .models import GitRepository, GitCollaborator, GitUserMapping, GitDeviceCode
 from .git_service import GitRepositoryService
 from .forgejo_client import ForgejoClient
 
@@ -3809,3 +3809,172 @@ def _git_repo_dict(repo: GitRepository, request) -> dict:
         "created_at":                repo.created_at.isoformat() if repo.created_at else None,
         "updated_at":                repo.updated_at.isoformat() if repo.updated_at else None,
     }
+
+
+# ──────────────────────────────────────────────────────
+# Git Device Flow 인증 (터미널 git login → 브라우저 승인)
+# ──────────────────────────────────────────────────────
+
+import secrets as _secrets
+import uuid as _uuid
+from datetime import timedelta
+from django.utils import timezone as _tz
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def git_auth_device(request):
+    """POST /api/git/auth/device/
+    device code 발급 — 인증 불필요, CSRF exempt (셸 스크립트 호출)
+    """
+    device_code = _uuid.uuid4().hex + _uuid.uuid4().hex  # 64자
+    user_code   = _secrets.token_hex(4).upper()           # 8자 대문자
+    expires_at  = _tz.now() + timedelta(minutes=5)
+
+    GitDeviceCode.objects.create(
+        device_code=device_code,
+        user_code=user_code,
+        expires_at=expires_at,
+    )
+
+    from django.conf import settings as _s
+    base = str(getattr(_s, "PUBLIC_BASE_URL", "https://www.hanplanet.com")).rstrip("/")
+    verify_url = f"{base}/git-auth/?code={user_code}"
+
+    return JsonResponse({
+        "device_code":      device_code,
+        "user_code":        user_code,
+        "verification_uri": verify_url,
+        "expires_in":       300,
+    })
+
+
+@login_required
+def git_auth_page(request):
+    """GET /git-auth/?code=XXXX
+    승인 페이지 — 로그인 필요
+    """
+    code = (request.GET.get("code") or "").strip().upper()
+    if not code:
+        return render(request, "git_auth_approve.html", {"error": "코드가 없습니다."})
+
+    try:
+        device = GitDeviceCode.objects.get(user_code=code, approved=False)
+    except GitDeviceCode.DoesNotExist:
+        return render(request, "git_auth_approve.html", {"error": "유효하지 않거나 이미 사용된 코드입니다."})
+
+    if _tz.now() > device.expires_at:
+        return render(request, "git_auth_approve.html", {"error": "인증 코드가 만료되었습니다."})
+
+    return render(request, "git_auth_approve.html", {
+        "user_code":  device.user_code,
+        "expires_at": device.expires_at,
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
+def git_auth_approve(request):
+    """POST /api/git/auth/approve/
+    body: {"user_code": "ABCD1234"}
+    """
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _git_json_error("invalid JSON")
+
+    code = (body.get("user_code") or "").strip().upper()
+    if not code:
+        return _git_json_error("user_code is required")
+
+    try:
+        device = GitDeviceCode.objects.get(user_code=code, approved=False)
+    except GitDeviceCode.DoesNotExist:
+        return _git_json_error("유효하지 않거나 이미 사용된 코드입니다.", status=404)
+
+    if _tz.now() > device.expires_at:
+        return _git_json_error("인증 코드가 만료되었습니다.", status=410)
+
+    device.user     = request.user
+    device.approved = True
+    device.save(update_fields=["user", "approved"])
+
+    return JsonResponse({"ok": True})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def git_auth_token(request):
+    """POST /api/git/auth/token/
+    body: {"device_code": "..."}
+    승인되면 Gitea PAT 반환 후 device code 삭제 (일회성)
+    """
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _git_json_error("invalid JSON")
+
+    dc = (body.get("device_code") or "").strip()
+    if not dc:
+        return _git_json_error("device_code is required")
+
+    try:
+        device = GitDeviceCode.objects.get(device_code=dc)
+    except GitDeviceCode.DoesNotExist:
+        return JsonResponse({"status": "expired"})
+
+    if _tz.now() > device.expires_at:
+        device.delete()
+        return JsonResponse({"status": "expired"})
+
+    if not device.approved or not device.user:
+        return JsonResponse({"status": "pending"})
+
+    user = device.user
+
+    # Gitea PAT 조회 (없으면 발급)
+    try:
+        mapping = GitUserMapping.objects.get(user=user)
+        token = mapping.forgejo_token
+        if not token:
+            raise GitUserMapping.DoesNotExist
+    except GitUserMapping.DoesNotExist:
+        gitea_user, token = ForgejoClient().ensure_user_with_token(
+            user.username, getattr(user, "email", "") or ""
+        )
+        GitUserMapping.objects.update_or_create(
+            user=user,
+            defaults={
+                "forgejo_user_id":  gitea_user["id"],
+                "forgejo_username": gitea_user["login"],
+                "forgejo_token":    token,
+            },
+        )
+
+    device.delete()  # 일회성
+
+    return JsonResponse({
+        "status":   "ok",
+        "username": user.username,
+        "token":    token,
+    })
+
+
+def git_credential_helper_download(request):
+    """GET /git-auth/credential-helper/
+    git-credential-hanplanet 셸 스크립트 다운로드
+    """
+    import os as _os
+    script_path = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+        "deploy", "scripts", "git-credential-hanplanet",
+    )
+    try:
+        with open(script_path, "rb") as f:
+            content = f.read()
+    except FileNotFoundError:
+        return HttpResponse("스크립트를 찾을 수 없습니다.", status=404)
+
+    resp = HttpResponse(content, content_type="text/x-shellscript")
+    resp["Content-Disposition"] = 'attachment; filename="git-credential-hanplanet"'
+    return resp

@@ -161,4 +161,10 @@ urlpatterns = [
     path('api/git/repos/<int:repo_id>/clone/', views.git_repo_clone_url, name='git_repo_clone_url'),
     path('api/git/repos/<int:repo_id>/status/', views.git_repo_status, name='git_repo_status'),
     path('api/git/repos/<int:repo_id>/retry/', views.git_repo_retry, name='git_repo_retry'),
+    # Git Device Flow 인증
+    path('api/git/auth/device/',  views.git_auth_device,  name='git_auth_device'),
+    path('api/git/auth/token/',   views.git_auth_token,   name='git_auth_token'),
+    path('api/git/auth/approve/', views.git_auth_approve, name='git_auth_approve'),
+    path('git-auth/',             views.git_auth_page,    name='git_auth_page'),
+    path('git-auth/credential-helper/', views.git_credential_helper_download, name='git_credential_helper_download'),
 ]
