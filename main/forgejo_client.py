@@ -36,9 +36,7 @@ class ForgejoClient:
     # ──────────────────────────────────────────
 
     def ensure_user(self, username: str, email: str = "") -> dict:
-        """Django 유저에 대응하는 Gitea 계정이 없으면 admin API로 자동 생성.
-        유저가 Gitea에 별도 가입 없이도 Django 계정 기준으로 repo 소유권을 가짐.
-        """
+        """Gitea 계정이 없으면 admin API로 자동 생성, 있으면 그대로 반환."""
         resp = requests.get(
             f"{self._base_url}/api/v1/users/{username}",
             headers=self._headers,
@@ -66,15 +64,56 @@ class ForgejoClient:
         resp.raise_for_status()
         return resp.json()
 
+    def ensure_user_with_token(self, username: str, email: str = "") -> tuple:
+        """Gitea 계정 생성(없을 때만) + 개인 액세스 토큰 발급.
+        Django 유저가 git CLI에서 username:token 으로 인증할 수 있게 함.
+        기존 'hanplanet' 토큰은 삭제 후 재발급 (토큰 값은 생성 시에만 반환됨).
+
+        Returns:
+            (gitea_user_dict, token_str)
+        """
+        gitea_user = self.ensure_user(username, email)
+
+        tokens_url = f"{self._base_url}/api/v1/users/{username}/tokens"
+
+        # 기존 'hanplanet' 토큰 삭제
+        resp = requests.get(tokens_url, headers=self._headers, timeout=15)
+        if resp.status_code == 200:
+            for tok in resp.json():
+                if tok.get("name") == "hanplanet":
+                    requests.delete(
+                        f"{tokens_url}/{tok['id']}",
+                        headers=self._headers,
+                        timeout=15,
+                    )
+
+        # 새 토큰 발급
+        resp = requests.post(
+            tokens_url,
+            headers=self._headers,
+            json={"name": "hanplanet"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        token_value = resp.json().get("sha1") or resp.json().get("token", "")
+        return gitea_user, token_value
+
+    def user_authed_clone_url(self, clone_url: str, username: str, token: str) -> str:
+        """clone_url에 유저 토큰을 삽입 — 유저가 git CLI에서 사용할 URL"""
+        parsed = urlparse(clone_url)
+        authed = parsed._replace(
+            netloc=f"{username}:{token}@{parsed.hostname}:{parsed.port or 3000}"
+        )
+        return urlunparse(authed)
+
     # ──────────────────────────────────────────
     # Repository
     # ──────────────────────────────────────────
 
     def create_repo(self, username: str, repo_name: str) -> dict:
         """Django 유저 소유의 private 저장소 생성.
-        Gitea 계정이 없으면 자동 생성 후 해당 유저 계정 아래에 repo 생성.
+        유저 계정 준비는 호출 전에 ensure_user / ensure_user_with_token 으로 처리.
         """
-        self.ensure_user(username)
         url = f"{self._base_url}/api/v1/admin/users/{username}/repos"
         resp = requests.post(
             url,

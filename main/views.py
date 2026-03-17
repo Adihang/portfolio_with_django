@@ -3721,10 +3721,11 @@ def git_repo_status(request, repo_id: int):
         return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
 
     return JsonResponse({
-        "ok":              True,
-        "status":          repo.status,
-        "error_message":   repo.error_message,
-        "clone_http_url":  _build_public_clone_url(repo.forgejo_clone_http_url),
+        "ok":                        True,
+        "status":                    repo.status,
+        "error_message":             repo.error_message,
+        "clone_http_url":            _build_public_clone_url(repo.forgejo_clone_http_url),
+        "clone_http_url_authed":     _build_user_authed_clone_url(repo, request.user),
     })
 
 
@@ -3773,15 +3774,38 @@ def _build_public_clone_url(forgejo_url: str) -> str:
     return f"{base}{parsed.path}"
 
 
+def _build_user_authed_clone_url(repo: "GitRepository", user) -> str:
+    """유저 PAT을 포함한 clone URL 반환 — git CLI에서 바로 사용 가능.
+    GitUserMapping.forgejo_token 이 없으면 인증 없는 public URL 반환.
+    """
+    from .models import GitUserMapping
+    public_url = _build_public_clone_url(repo.forgejo_clone_http_url)
+    if not public_url:
+        return ""
+    try:
+        mapping = GitUserMapping.objects.get(user=user)
+        if not mapping.forgejo_token:
+            return public_url
+        from .forgejo_client import ForgejoClient
+        return ForgejoClient().user_authed_clone_url(
+            public_url, mapping.forgejo_username, mapping.forgejo_token
+        )
+    except GitUserMapping.DoesNotExist:
+        return public_url
+
+
 def _git_repo_dict(repo: GitRepository, request) -> dict:
+    public_http = _build_public_clone_url(repo.forgejo_clone_http_url)
+    authed_http = _build_user_authed_clone_url(repo, request.user)
     return {
-        "id":                   repo.id,
-        "repo_name":            repo.repo_name,
-        "handrive_path":        repo.handrive_path,
-        "status":               repo.status,
-        "error_message":        repo.error_message,
-        "forgejo_clone_http":   _build_public_clone_url(repo.forgejo_clone_http_url),
-        "forgejo_clone_ssh":    repo.forgejo_clone_ssh_url,
-        "created_at":           repo.created_at.isoformat() if repo.created_at else None,
-        "updated_at":           repo.updated_at.isoformat() if repo.updated_at else None,
+        "id":                        repo.id,
+        "repo_name":                 repo.repo_name,
+        "handrive_path":             repo.handrive_path,
+        "status":                    repo.status,
+        "error_message":             repo.error_message,
+        "forgejo_clone_http":        public_http,
+        "forgejo_clone_http_authed": authed_http,
+        "forgejo_clone_ssh":         repo.forgejo_clone_ssh_url,
+        "created_at":                repo.created_at.isoformat() if repo.created_at else None,
+        "updated_at":                repo.updated_at.isoformat() if repo.updated_at else None,
     }

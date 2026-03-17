@@ -651,10 +651,13 @@ class Disciple_icon(models.Model):
 # ──────────────────────────────────────────────
 
 class GitUserMapping(models.Model):
-    """Django User ↔ Forgejo 계정 매핑"""
+    """Django User ↔ Forgejo 계정 매핑.
+    forgejo_token: 해당 유저의 Gitea PAT — git clone/push 인증에 사용
+    """
     user             = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     forgejo_user_id  = models.BigIntegerField()
     forgejo_username = models.CharField(max_length=255)
+    forgejo_token    = models.CharField(max_length=512, blank=True, default="")
 
     def __str__(self):
         return f"{self.user.username} → forgejo:{self.forgejo_username}"

@@ -5391,7 +5391,7 @@
                     var repo = data.repo;
                     _gitRepoCurrentId = repo.id;
                     if (repo.status === "active") {
-                        _showGitRepoStatus("리포지토리 생성 완료!", false, repo.forgejo_clone_http || "");
+                        _showGitRepoStatus("리포지토리 생성 완료!", false, repo.forgejo_clone_http_authed || repo.forgejo_clone_http || "");
                     } else if (repo.status === "failed") {
                         _showGitRepoStatus(
                             "생성 실패: " + (repo.error_message || "알 수 없는 오류"),
@@ -5461,7 +5461,7 @@
                 );
                 if (data.status === "active") {
                     _gitRepoStopPolling();
-                    _showGitRepoStatus("리포지토리 생성 완료!", false, data.clone_http_url || "");
+                    _showGitRepoStatus("리포지토리 생성 완료!", false, data.clone_http_url_authed || data.clone_http_url || "");
                 } else if (data.status === "failed") {
                     _gitRepoStopPolling();
                     _showGitRepoStatus(

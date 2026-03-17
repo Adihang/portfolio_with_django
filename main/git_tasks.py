@@ -17,12 +17,39 @@ from celery import shared_task
 from django.db import transaction
 
 from .forgejo_client import ForgejoClient
-from .models import GitRepository
+from .models import GitRepository, GitUserMapping
 
 logger = logging.getLogger(__name__)
 
 # launchd 환경에서 PATH 의존 제거 — 절대 경로 사용
 GIT_BIN = "/usr/bin/git"
+
+
+def _ensure_gitea_user_token(client: ForgejoClient, user) -> "GitUserMapping":
+    """Gitea 계정 + PAT 준비 후 GitUserMapping 저장/갱신.
+    이미 매핑과 토큰이 있으면 API 호출 없이 기존 레코드 반환.
+    """
+    try:
+        mapping = GitUserMapping.objects.get(user=user)
+        if mapping.forgejo_token:
+            return mapping
+    except GitUserMapping.DoesNotExist:
+        mapping = None
+
+    # 토큰이 없거나 매핑이 없는 경우 — Gitea 유저 생성 + PAT 발급
+    gitea_user, token = client.ensure_user_with_token(
+        user.username,
+        getattr(user, "email", "") or "",
+    )
+    mapping, _ = GitUserMapping.objects.update_or_create(
+        user=user,
+        defaults={
+            "forgejo_user_id":  gitea_user["id"],
+            "forgejo_username": gitea_user["login"],
+            "forgejo_token":    token,
+        },
+    )
+    return mapping
 
 
 def _run(cmd: list, timeout: int = 60, **kwargs):
@@ -67,8 +94,10 @@ def create_repo_task(repo_id: int) -> None:
 
         client = ForgejoClient()
 
+        # Gitea 유저 준비 + PAT 발급 (없는 경우만)
+        gitea_user, user_token = _ensure_gitea_user_token(client, repo.owner)
+
         # Forgejo repo 생성 (이미 존재하면 get fallback)
-        # 계정 관리는 Django 담당 — Gitea는 admin 단일 계정으로 운영
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
         except Exception:
@@ -151,6 +180,9 @@ def import_repo_task(repo_id: int) -> None:
             return
 
         client = ForgejoClient()
+
+        # Gitea 유저 준비 + PAT 발급 (없는 경우만)
+        _ensure_gitea_user_token(client, repo.owner)
 
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
