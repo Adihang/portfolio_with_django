@@ -1,79 +1,93 @@
-# Repository Guidelines
+# Repository Guidelines — bumpercar-spiky-server
 
 ## Current Status
-- This folder was created from `Multiplayer_Game_Server_Template.md`.
-- A runnable Node.js WebSocket server skeleton is in place.
-- `npm install` has been completed.
-- `npm start` was verified to boot and print startup logs.
-- `8080` is currently occupied in the local machine, so `PORT=8081 npm start` or `npm run dev` is the safer local default.
-- `npm run dev` was verified successfully on port `8081`.
-- Hanplanet Django now has a browser game page at `/ko/fun/bumpercar-spiky/` that connects to this server for local play testing.
-- End-to-end local verification reached the browser login-and-play stage.
-- Real signed JWT verification is now active in the game server for local integration testing.
-- A dedicated shared game JWT secret is now configured separately from Django `SECRET_KEY`.
+
+- Node.js WebSocket 게임 서버 운영 중
+- launchd(`com.hanplanet.bumpercar-spiky-server`)로 자동 실행
+- 로컬/운영 포트: `8081` (8080은 자주 점유됨)
+- Django에서 JWT 발급 → 게임 서버에서 검증하는 실서명 인증 흐름 적용됨
+- `game.hanplanet.com` → Cloudflare Tunnel → `http://localhost:8081` 연결 확인됨
+- 브라우저에서 `/ko/fun/bumpercar-spiky/` 접속 → 로그인 → 게임 이동 확인됨
 
 ## Project Structure
-- `server.js`: Entry point that creates the world, WebSocket server, and game loop.
-- `config/config.js`: Shared server constants such as world size, AOI cell size, and tick rate.
-- `network/websocket.js`: WebSocket server setup and per-client connection handling.
-- `world/player.js`: Player state object.
-- `world/world.js`: World state, movement handling, input handling, and AOI updates.
-- `world/spatialGrid.js`: AOI spatial grid for nearby-player queries.
-- `game/gameLoop.js`: Main simulation loop and state broadcast loop.
-- `auth/jwt.js`: JWT verification helper wired to the WebSocket handshake.
-- `package.json`: Node package manifest with `ws` and `jsonwebtoken`.
-- `server.js`: Now loads `.env` automatically and handles graceful shutdown signals.
-- `.env.example`: Example runtime configuration values.
-- `.gitignore`: Local dependency and env ignore rules.
-- `deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist`: launchd template for keeping the game server alive on macOS.
+
+- `server.js` — 진입점 (World 생성, WebSocket 서버, 게임 루프)
+- `config/config.js` — 서버 상수 (world 크기, AOI 셀 크기, tick rate)
+- `config/gameplaySettings.json` — 게임 수치 설정 (Django와 공용, 변경 시 서버 재시작 필요)
+- `network/websocket.js` — WebSocket 서버 설정, 클라이언트 연결 처리
+- `game/gameLoop.js` — 메인 시뮬레이션 루프, 상태 브로드캐스트
+- `world/player.js` — 플레이어 상태 객체
+- `world/world.js` — World 상태, 이동/입력 처리, AOI 업데이트
+- `world/spatialGrid.js` — AOI 공간 그리드 (근접 플레이어 쿼리 최적화)
+- `auth/jwt.js` — JWT 검증 헬퍼 (WebSocket 핸드셰이크에 연결)
+- `package.json` — Node 패키지 매니페스트 (`ws`, `jsonwebtoken`, `dotenv`)
+- `.env` — 런타임 환경변수 (git-ignored, `.env.example` 참고)
+- `deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist` — macOS launchd 등록 파일
 
 ## Commands
-- Install dependencies: `npm install`
-- Start server: `npm start`
-- Start local dev server on a safer alternate port: `npm run dev`
 
-## Implemented Work
-- Created the full folder structure from the template document.
-- Added `package.json` so the project can run as a standalone Node server.
-- Installed the `ws` dependency.
-- Added `jsonwebtoken` for future Django-compatible token verification.
-- Added `dotenv` so `.env` is loaded automatically on boot.
-- Switched movement/world logic to use shared config values.
-- Added simple input normalization to reduce malformed input issues.
-- Added world boundary clamping so players stay within the configured map.
-- Added safe WebSocket send checks before broadcasting state.
-- Added environment-variable based config for port and world settings.
-- Added optional token parsing during the WebSocket handshake.
-- Added issuer/audience-aware JWT verification for Django-issued game tokens.
-- Added graceful shutdown handling in `server.js`.
-- Expanded `README.md` with initial setup, local boot checklist, and message format docs.
-- Documented the local browser-play test flow with the Hanplanet Django app.
-- Updated the auth contract to a real signed JWT flow between Django and the game server.
-- Verified local browser login, game connection, and movement by checking the in-page coordinate display after keyboard input.
-- Added `game.hanplanet.com` nginx proxy config on the Django repo side and syntax-checked the autorun nginx config.
-- Verified nginx WebSocket upgrade flow with a real JWT request and received `101 Switching Protocols`.
-- Added a launchd template for local macOS autorun of the game server.
-- Documented Cloudflare Tunnel ingress requirements for `game.hanplanet.com`.
-- Documented that Django `GAME_JWT_*` values and game server `JWT_*` values must remain identical.
+```bash
+# 의존성 설치
+npm install
+
+# 운영 실행
+npm start
+
+# 로컬 개발 (포트 8081)
+npm run dev
+```
+
+## Production Deployment
+
+**변경 후 운영 적용:**
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+tail -f /tmp/bumpercar-spiky-server.log
+```
+
+launchd 등록 (최초 1회):
+
+```bash
+cp deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist \
+  ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) \
+  ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+```
+
+상태 확인:
+
+```bash
+launchctl print gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+tail -f /tmp/bumpercar-spiky-server.log
+tail -f /tmp/bumpercar-spiky-server-error.log
+```
+
+## JWT 연동
+
+Django와 게임 서버의 아래 값은 **반드시 동일**해야 합니다.
+
+| Django `secrets.json` | 게임 서버 `.env` |
+|----------------------|----------------|
+| `GAME_JWT_SECRET` | `JWT_SECRET` |
+| `GAME_JWT_ISSUER` | `JWT_ISSUER` |
+| `GAME_JWT_AUDIENCE` | `JWT_AUDIENCE` |
+
+## Environment Variables (.env)
+
+```
+PORT=8081
+JWT_SECRET=...
+JWT_ISSUER=...
+JWT_AUDIENCE=...
+WORLD_SIZE=...
+CELL_SIZE=...
+TICK_RATE=...
+```
 
 ## Not Yet Implemented
-- Persistent player/account data storage.
-- Fully applied and runtime-verified `game.hanplanet.com` deployment config.
-- Binary protocol, client prediction, and reconciliation.
-- Any actual gameplay beyond the movement template.
 
-## Recent Session Notes
-- The first runtime verification succeeded, then a later retry showed `EADDRINUSE` because port `8080` was already bound on the machine.
-- A subsequent `npm run dev` verification on `8081` succeeded after ensuring `dotenv` was installed locally.
-- Django-side browser integration work is now in progress/completed enough for local login-and-play verification.
-- Playwright-based verification confirmed a logged-in browser could reach `/ko/fun/bumpercar-spiky/`, connect successfully, and move in-game.
-- After switching to real JWT auth, Playwright verification still succeeded and movement changed from `46, 1218` to `1856, 1218`.
-- `nginx -t` passed for `/Users/imhanbyeol/Development/Hanplanet/nginx/nginx.autorun.conf`, but local port `80` was not listening at verification time, so the proxy path was config-verified rather than full end-to-end runtime-verified.
-- A later verification confirmed local port `80` was listening again, and a `Host: game.hanplanet.com` WebSocket upgrade request with a real Django-issued JWT returned `101 Switching Protocols`.
-- Cloudflare Tunnel config was updated to include `game.hanplanet.com -> http://localhost:8081`, and public upgrade verification succeeded through Cloudflare as well.
-- Keep documenting each material change in this file as the server grows, especially around auth, deployment, and protocol changes.
-
-## Notes For Future Work
-- This server now lives inside the Django repository under `Hanplanet/bumpercar-spiky-server`.
-- If Django auth is added, expand `auth/jwt.js` first and wire it into the WebSocket handshake.
-- If more game modes are added, preserve the current folder split instead of growing `server.js`.
+- 플레이어/계정 영구 데이터 저장
+- 바이너리 프로토콜, 클라이언트 예측, 리컨실리에이션
+- 실제 게임플레이 (이동 템플릿 수준)

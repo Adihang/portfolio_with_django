@@ -1,15 +1,20 @@
-# Django 운영/배포 가이드 (Gunicorn + Cloudflare Tunnel + Ollama)
+# 운영/배포 가이드 (macOS launchd — Docker 미사용)
 
-이 문서는 현재 프로젝트 코드(`config/settings.py`) 기준의 운영 배포 방법을 정리합니다.
+이 문서는 현재 프로젝트의 운영 배포 방법을 정리합니다.
 
-현재 기본 구성은 아래와 같습니다.
+> **Docker는 현재 사용하지 않습니다.** 모든 서비스는 macOS launchd 네이티브 데몬으로 실행합니다.
 
-- Django 앱: `config.wsgi:application`
-- Gunicorn 바인드: `127.0.0.1:8000`
-- Ollama API: `http://127.0.0.1:11434`
-- Cloudflare Tunnel ingress: `hanplanet.com`, `www.hanplanet.com` -> `http://localhost:8000`
-- SSH ingress(권장 분리): `ssh.hanplanet.com` -> `ssh://localhost:22` (Docker cloudflared는 `ssh://host.docker.internal:22`)
-- 정적/미디어: `DEBUG=False`에서도 `DJANGO_SERVE_FILES=True`일 때 Django가 직접 서빙
+현재 기본 구성:
+
+- Django: `config.wsgi:application`, Gunicorn 바인드 `127.0.0.1:8000`
+- Nginx: 리버스 프록시 + static/media 서빙
+- Cloudflare Tunnel: `hanplanet.com`, `www.hanplanet.com` → `http://localhost:8000`
+- Gitea: `http://localhost:3000` (HanDrive Git 기능)
+- Redis: `127.0.0.1:6379` (Celery 브로커)
+- Celery Worker: git 비동기 태스크 처리
+- Ollama: `http://127.0.0.1:11434`
+
+---
 
 ## 1. 필수 준비
 
@@ -23,35 +28,33 @@ source .venv/bin/activate
 # 의존성 설치
 pip install -r requirements.txt
 
-# 정적 파일 수집 (권장)
+# DB 마이그레이션
+python manage.py migrate
+
+# 정적 파일 수집
 python manage.py collectstatic --noinput
 ```
 
-## 2. 시크릿/환경변수 설정 (중요)
+---
 
-현재 코드에서는 `DEBUG=False`일 때 `SECRET_KEY`가 반드시 필요합니다.
-우선순위는 아래 순서입니다.
+## 2. 시크릿/환경변수 설정
 
-1. 환경변수 `DJANGO_SECRET_KEY`
-2. `config/secrets.json`의 `SECRET_KEY`
-
-### 2-1. `config/secrets.json` 방식 (권장)
-
-`config/secrets.json`은 `.gitignore` 대상입니다.
+`config/secrets.json` (`.gitignore` 대상):
 
 ```json
 {
-  "SECRET_KEY": "여기에_충분히_긴_랜덤_키"
+  "SECRET_KEY": "여기에_충분히_긴_랜덤_키",
+  "FORGEJO_BASE_URL": "http://localhost:3000",
+  "FORGEJO_ADMIN_TOKEN": "gitea-admin-api-token",
+  "PUBLIC_GIT_BASE_URL": "https://hanplanet.com/git"
 }
 ```
-
-권한 권장:
 
 ```bash
 chmod 600 config/secrets.json
 ```
 
-### 2-2. 주요 환경변수
+주요 환경변수:
 
 - `DJANGO_DEBUG` (기본: `false`)
 - `DJANGO_SECRET_KEY`
@@ -61,62 +64,43 @@ chmod 600 config/secrets.json
 - `DJANGO_SERVE_FILES` (기본: `true`)
 - `OLLAMA_BASE_URL` (기본: `http://localhost:11434`)
 - `OLLAMA_MODEL` (기본: `llama3.2:latest`)
+- `GAME_JWT_SECRET`, `GAME_JWT_ISSUER`, `GAME_JWT_AUDIENCE`
+- `FORGEJO_BASE_URL`, `FORGEJO_ADMIN_TOKEN`, `PUBLIC_GIT_BASE_URL`
 
-보안 관련(필요시 오버라이드):
+---
 
-- `DJANGO_SECURE_SSL_REDIRECT`
-- `DJANGO_SESSION_COOKIE_SECURE`
-- `DJANGO_CSRF_COOKIE_SECURE`
-- `DJANGO_SECURE_HSTS_SECONDS`
-- `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`
-- `DJANGO_SECURE_HSTS_PRELOAD`
+## 3. 서비스 목록 (launchd)
 
-## 3. Gunicorn 서비스 등록
+| 서비스 | 라벨 | plist 위치 |
+|--------|------|-----------|
+| Django (gunicorn) | `com.hanplanet.gunicorn` | `~/Library/LaunchAgents/` |
+| Nginx | `com.hanplanet.nginx` | `~/Library/LaunchAgents/` |
+| Git 서버 (Gitea) | `com.hanplanet.gitea` | `deploy/launchd/com.hanplanet.gitea.plist` |
+| Celery Worker | `com.hanplanet.celery` | `deploy/launchd/com.hanplanet.celery.plist` |
+| 게임 서버 | `com.hanplanet.bumpercar-spiky-server` | `bumpercar-spiky-server/deploy/launchd/` |
 
-### 3-1. Linux systemd 예시
-
-`/etc/systemd/system/portfolio-gunicorn.service`
-
-```ini
-[Unit]
-Description=Portfolio Django Gunicorn
-After=network.target
-
-[Service]
-User=ubuntu
-Group=www-data
-WorkingDirectory=/Users/imhanbyeol/Development/Hanplanet
-ExecStart=/Users/imhanbyeol/Development/Hanplanet/.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir /Users/imhanbyeol/Development/Hanplanet
-Restart=always
-RestartSec=3
-
-# 환경변수로 운영 시크릿을 줄 경우
-# Environment="DJANGO_SECRET_KEY=..."
-
-[Install]
-WantedBy=multi-user.target
-```
-
-적용:
+공통 명령 패턴:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now portfolio-gunicorn
-sudo systemctl status portfolio-gunicorn
+# 재시작
+launchctl kickstart -k gui/$(id -u)/<라벨>
+
+# 상태 확인
+launchctl print gui/$(id -u)/<라벨>
+
+# 목록 확인
+launchctl list | grep hanplanet
 ```
 
-### 3-2. macOS launchd (현재 로컬 운영 방식)
+---
 
-현재 구성:
-
-- LaunchAgent: `~/Library/LaunchAgents/com.hanplanet.gunicorn.plist`
-- 실행 명령: `.venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8000 --chdir ...`
+## 4. Django (Gunicorn)
 
 상태 확인:
 
 ```bash
 launchctl print gui/$(id -u)/com.hanplanet.gunicorn
-launchctl list | rg com.hanplanet.gunicorn
+lsof -nP -iTCP:8000 -sTCP:LISTEN
 ```
 
 재시작:
@@ -125,59 +109,91 @@ launchctl list | rg com.hanplanet.gunicorn
 launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn
 ```
 
-## 3-3. 범퍼카 스핔이 게임 서버 (Node WebSocket)
+**변경 후 운영 적용 순서:**
 
-현재 게임 서버 코드는 Django 프로젝트 내부 경로에 함께 둡니다.
+```bash
+.venv/bin/python manage.py collectstatic --noinput
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn
+```
 
-- 위치: `/Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server`
-- 실행 파일: `server.js`
-- 기본 운영 포트: `8081`
-- launchd 라벨: `com.hanplanet.bumpercar-spiky-server`
+---
+
+## 5. Git 서버 (Gitea + Celery)
+
+### 5-1. Gitea 초기 설정 (최초 1회)
+
+```bash
+brew install gitea
+brew services start redis
+
+cd /Users/imhanbyeol/Development/Hanplanet/forgejo
+bash setup.sh
+# 출력된 토큰을 config/secrets.json의 FORGEJO_ADMIN_TOKEN에 저장
+```
+
+설정 파일: `forgejo/custom/conf/app.ini`
+
+### 5-2. launchd 등록
+
+```bash
+# Gitea
+cp deploy/launchd/com.hanplanet.gitea.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.gitea.plist
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.gitea
+
+# Celery
+cp deploy/launchd/com.hanplanet.celery.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.celery.plist
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.celery
+```
+
+### 5-3. 상태 확인
+
+```bash
+launchctl print gui/$(id -u)/com.hanplanet.gitea
+launchctl print gui/$(id -u)/com.hanplanet.celery
+tail -f /Users/imhanbyeol/Development/Hanplanet/log/celery.stdout.log
+```
+
+### 5-4. Celery 변경 후 운영 적용
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.celery
+```
+
+---
+
+## 6. 게임 서버 (bumpercar-spiky)
+
+위치: `bumpercar-spiky-server/`
 
 초기 설치:
 
 ```bash
-cd /Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server
+cd bumpercar-spiky-server
 cp .env.example .env
 npm install
 ```
 
-로컬 단독 실행:
+launchd 등록:
 
 ```bash
-cd /Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server
-PORT=8081 npm start
-```
-
-게임 수치 설정 파일:
-
-- Django/게임 서버 공용 설정: `/Users/imhanbyeol/Development/Hanplanet/config/bumpercar_spiky_settings.json`
-- 게임 서버는 시작 시 이 JSON 을 읽으므로, 값 변경 후에는 게임 서버 재시작이 필요합니다.
-
-JWT 연동 값:
-
-- Django `GAME_JWT_SECRET`, `GAME_JWT_ISSUER`, `GAME_JWT_AUDIENCE`
-- 게임 서버 `.env`의 `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`
-
-위 두 쌍은 반드시 동일해야 합니다.
-
-### macOS launchd 등록
-
-템플릿 파일:
-
-- `/Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server/deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist`
-
-설치:
-
-```bash
-cp /Users/imhanbyeol/Development/Hanplanet/bumpercar-spiky-server/deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist \
+cp bumpercar-spiky-server/deploy/launchd/com.hanplanet.bumpercar-spiky-server.plist \
+  ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) \
   ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
-
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
 launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
 ```
 
-상태 확인:
+**변경 후 운영 적용:**
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+# 확인
+tail -f /tmp/bumpercar-spiky-server.log
+```
+
+상태/로그:
 
 ```bash
 launchctl print gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
@@ -185,30 +201,27 @@ tail -f /tmp/bumpercar-spiky-server.log
 tail -f /tmp/bumpercar-spiky-server-error.log
 ```
 
-재시작:
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
-```
-
 삭제:
 
 ```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
+launchctl bootout gui/$(id -u) \
+  ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
 rm -f ~/Library/LaunchAgents/com.hanplanet.bumpercar-spiky-server.plist
 ```
 
-## 4. Ollama 서비스
+JWT 연동 (Django ↔ 게임 서버 값 반드시 동일):
+
+- Django `secrets.json`: `GAME_JWT_SECRET`, `GAME_JWT_ISSUER`, `GAME_JWT_AUDIENCE`
+- 게임 서버 `.env`: `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`
+
+---
+
+## 7. Ollama 서비스
 
 설치:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-```
-
-모델 준비:
-
-```bash
 ollama pull llama3.2:latest
 ```
 
@@ -218,7 +231,9 @@ ollama pull llama3.2:latest
 curl http://127.0.0.1:11434/api/tags
 ```
 
-## 5. Cloudflare Tunnel
+---
+
+## 8. Cloudflare Tunnel
 
 `~/.cloudflared/config.yml` 예시:
 
@@ -240,37 +255,15 @@ ingress:
 
 ```bash
 cloudflared tunnel ingress validate
-cloudflared tunnel route dns <TUNNEL_NAME> ssh.hanplanet.com
 cloudflared tunnel run <TUNNEL_NAME>
 ```
 
-자동실행 사용 시 LaunchAgent/systemd에 동일 명령을 등록합니다.
+SSH 보안 권장:
 
-### 5-1. 보안 필수 설정 (SSH)
+- Cloudflare Access에서 `ssh.hanplanet.com` 애플리케이션 생성, MFA 필수
+- 서버 22 포트는 인터넷 직접 노출 금지, Cloudflare 경유만 허용
 
-1. Cloudflare Access에서 `ssh.hanplanet.com` 애플리케이션 생성
-2. 허용 대상을 최소화(본인 계정/그룹만)하고 MFA를 필수로 설정
-3. 서버 방화벽/보안그룹에서 22 포트를 인터넷에 직접 노출하지 않음
-4. SSH 서버는 키 기반 인증만 허용
-
-`/etc/ssh/sshd_config` 권장:
-
-```text
-PasswordAuthentication no
-PubkeyAuthentication yes
-PermitRootLogin no
-```
-
-변경 후:
-
-```bash
-sudo sshd -t
-sudo systemctl restart sshd  # Linux
-```
-
-### 5-2. 클라이언트 SSH 설정
-
-`~/.ssh/config`:
+클라이언트 `~/.ssh/config`:
 
 ```sshconfig
 Host ssh.hanplanet.com
@@ -278,235 +271,130 @@ Host ssh.hanplanet.com
   ProxyCommand /opt/homebrew/bin/cloudflared access ssh --hostname %h
 ```
 
-접속:
+---
 
-```bash
-ssh <SSH_USER>@ssh.hanplanet.com
-```
+## 9. 정적/미디어 서빙 정책
 
-### 5-3. 충돌 방지 원칙
-
-- 웹과 SSH는 반드시 서로 다른 hostname 사용 (`hanplanet.com` 계열과 `ssh.hanplanet.com` 분리)
-- `cloudflared` 프로세스를 중복 실행하지 않고 하나의 터널 ingress만 확장
-- ingress는 위에서 아래 순서대로 평가되므로 마지막 `http_status:404` 규칙 유지
-
-## 6. 정적/미디어 서빙 정책
-
-현재 코드는 아래 정책입니다.
-
-- `DEBUG=True`: Django 개발용 static/media 서빙
+- `DEBUG=True`: Django 개발용 서빙
 - `DEBUG=False` + `DJANGO_SERVE_FILES=true`: Django가 `/static/`, `/media/` 직접 서빙
-- `DEBUG=False` + `DJANGO_SERVE_FILES=false`: Django가 static/media 미서빙 (Nginx/CDN 필요)
+- `DEBUG=False` + `DJANGO_SERVE_FILES=false`: Nginx alias 서빙 (권장)
 
-Nginx 앞단으로 운영한다면:
+---
 
-1. Nginx에서 `/static/`, `/media/`를 alias로 직접 서빙
-2. 앱 환경변수 `DJANGO_SERVE_FILES=false` 권장
-
-## 7. 배포 검증 체크리스트
+## 10. 배포 검증 체크리스트
 
 ```bash
-# Django 기본 점검
 .venv/bin/python manage.py check
-
-# 배포 점검 (SECRET_KEY 필요)
 DJANGO_SECRET_KEY='<YOUR_SECRET>' .venv/bin/python manage.py check --deploy
 
-# 로컬 앱 응답
 curl -I http://127.0.0.1:8000
-
-# HTTPS 오프로딩 환경 가정 응답 점검
 curl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/portfolio/
-curl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/static/css/style.css
-curl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/media/profile.jpg
-
-# 외부 도메인 확인
 curl -I https://hanplanet.com
+
+launchctl list | grep hanplanet
 ```
 
-## 8. 트러블슈팅
+---
 
-### 8-1. Gunicorn 부팅 실패 (`ImproperlyConfigured: DJANGO_SECRET_KEY ... required`)
+## 11. 트러블슈팅
+
+### Gunicorn 부팅 실패 (`ImproperlyConfigured: DJANGO_SECRET_KEY ... required`)
 
 - `config/secrets.json` 존재 여부 확인
 - 또는 서비스에 `DJANGO_SECRET_KEY` 환경변수 주입
 
-### 8-2. CSS/이미지 404
+### CSS/이미지 404
 
-- `DJANGO_SERVE_FILES` 값 확인 (`true` 필요)
-- `config/urls.py`에 `/static/`, `/media/` 라우트 반영 여부 확인
+- `DJANGO_SERVE_FILES=true` 확인
 - `collectstatic` 재실행
+- gunicorn 재시작
 
-### 8-3. 루트 URL 301 리다이렉트
+### Celery 태스크 미등록 (`Task not found`)
 
-- `SECURE_SSL_REDIRECT=True` 정책으로 정상 동작
-- 프록시/터널 환경에서는 `X-Forwarded-Proto: https` 전달 필요
+- Celery worker 재시작: `launchctl kickstart -k gui/$(id -u)/com.hanplanet.celery`
+- `config/celery.py`에 `autodiscover_tasks(related_name="git_tasks")` 확인
 
-## 9. 자주 쓰는 명령
+### Gitea 연결 실패
+
+- Gitea 프로세스 확인: `launchctl print gui/$(id -u)/com.hanplanet.gitea`
+- 로그 확인: `tail -f forgejo/log/gitea.stdout.log`
+- `FORGEJO_ADMIN_TOKEN` 값 확인
+
+---
+
+## 12. 자주 쓰는 명령
 
 ```bash
+# 전체 서비스 상태
+launchctl list | grep hanplanet
+
 # Gunicorn 프로세스 확인
 lsof -nP -iTCP:8000 -sTCP:LISTEN
-ps aux | rg 'gunicorn config.wsgi' | rg -v rg
 
-# launchd 로그
-tail -f ~/Library/Logs/gunicorn.err.log
-tail -f ~/Library/Logs/gunicorn.out.log
+# Celery 로그
+tail -f log/celery.stdout.log
+
+# Gitea 로그
+tail -f forgejo/log/gitea.stdout.log
+
+# Nginx 재적용
+/opt/homebrew/opt/nginx/bin/nginx -t -c /Users/imhanbyeol/Development/Hanplanet/nginx/nginx.autorun.conf
+launchctl kickstart -k gui/$(id -u)/homebrew.mxcl.nginx
 
 # cloudflared 상태
-ps aux | rg cloudflared | rg -v rg
+ps aux | grep cloudflared | grep -v grep
 curl -I https://hanplanet.com
 ```
 
-## 10. Docker Compose 운영 (Cloudflare Tunnel + Nginx + Gunicorn + Django)
+---
 
-현재 로컬/운영 구조를 컨테이너로 동일하게 구성할 수 있습니다.
-
-- Django + Gunicorn: `Dockerfile`, `docker/entrypoint.sh`
-- Nginx: `docker/nginx/default.conf`
-- Cloudflare Tunnel: `docker/cloudflared/config.yml`
-- 오케스트레이션: `docker-compose.yml`
-
-### 10-1. 준비
-
-```bash
-cd /Users/imhanbyeol/Development/Hanplanet
-
-cp .env.docker.example .env.docker
-cp docker/cloudflared/config.yml.example docker/cloudflared/config.yml
-touch db.sqlite3
-```
-
-`docker/cloudflared/config.yml`의 `<TUNNEL_ID>`를 실제 값으로 바꾼 뒤,
-같은 이름의 credentials 파일을 배치합니다.
-
-```bash
-cp ~/.cloudflared/<TUNNEL_ID>.json docker/cloudflared/<TUNNEL_ID>.json
-
-# SSH도 열 경우 DNS 라우트 추가
-cloudflared tunnel route dns <TUNNEL_NAME> ssh.hanplanet.com
-```
-
-`docker/cloudflared/config.yml`에서 SSH ingress는 아래 값을 사용합니다.
-
-```yaml
-- hostname: ssh.hanplanet.com
-  service: ssh://host.docker.internal:22
-```
-
-### 10-2. 실행
-
-```bash
-docker compose up -d --build
-docker compose ps
-```
-
-### 10-3. 동작 확인
-
-```bash
-# nginx(80) -> django(gunicorn) 확인
-curl -I http://127.0.0.1/portfolio/
-
-# 컨테이너 로그 확인
-docker compose logs -f django nginx cloudflared
-```
-
-### 10-4. 중지/재시작
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-## 11. 접속 로그 30일 보관 (Nginx JSON Access Log)
-
-현재 저장소에는 접속 로그를 JSON 형태로 남기고 30일 보관하는 설정이 포함되어 있습니다.
+## 13. 접속 로그 30일 보관 (Nginx JSON Access Log)
 
 - Nginx 로그 포맷: `nginx/nginx.autorun.conf` (`access_json`)
 - 로그 파일: `/opt/homebrew/var/log/nginx/access_json.log`
 - 회전/정리 스크립트: `scripts/rotate-nginx-access-json.sh`
-- macOS launchd 에이전트 템플릿: `deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist`
-- 로그 조회 URL: `/admin/main/accesslog/` (파일 직접 조회)
+- macOS launchd 에이전트: `deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist`
+- 로그 조회: `/admin/main/accesslog/` (파일 직접 조회, DB 미적재)
 - 일일 요약 명령어: `python manage.py summarize_access_logs --date YYYY-MM-DD`
 - 요약 파일: `/opt/homebrew/var/log/nginx/summaries/access_summary_YYYY-MM-DD.(json|md)`
-- 요약 조회 URL: `/admin/main/accesslog-summary/`
-- 기본 자동 요약: Django 서버 내부 스케줄러(매일 00:05, 전날 날짜)
-- (옵션) OS 스케줄러 템플릿: `deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist`
+- 요약 조회: `/admin/main/accesslog-summary/`
+- 자동 스케줄: Django 서버 내부 스케줄러 (매일 00:05, 전날 날짜)
 
-### 11-1. Nginx 재적용
+### Nginx 재적용
 
 ```bash
 /opt/homebrew/opt/nginx/bin/nginx -t -c /Users/imhanbyeol/Development/Hanplanet/nginx/nginx.autorun.conf
 launchctl kickstart -k gui/$(id -u)/homebrew.mxcl.nginx
 ```
 
-### 11-2. 수동 회전 테스트
+### 수동 회전 테스트
 
 ```bash
-cd /Users/imhanbyeol/Development/Hanplanet
 ./scripts/rotate-nginx-access-json.sh
 ls -lh /opt/homebrew/var/log/nginx/access_json*
 ```
 
-### 11-3. 매일 자동 실행(00:05) 등록
+### 자동 회전 등록 (00:05)
 
 ```bash
-cp /Users/imhanbyeol/Development/Hanplanet/deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist \
+cp deploy/launchd/com.hanplanet.nginx-accesslog-rotate.plist \
+  ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) \
   ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
-
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
 launchctl kickstart -k gui/$(id -u)/com.hanplanet.nginx-accesslog-rotate
-launchctl print gui/$(id -u)/com.hanplanet.nginx-accesslog-rotate
 ```
 
-삭제하려면:
+### 일일 요약 수동 생성
 
 ```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
-rm -f ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-rotate.plist
-```
-
-### 11-4. Django Admin에서 조회
-
-관리자 페이지는 DB 적재 없이 Nginx 로그 파일을 직접 읽어 보여줍니다.
-
-- URL: `/admin/main/accesslog/`
-- 관리자 메인(`/admin/`)의 `운영 로그` 섹션 링크로 이동 가능
-- 접속할 때마다 파일을 다시 읽어 최신 로그를 표시
-- 조회 대상: `access_json.log`, `access_json_*.log`, `access_json_*.log.gz`
-- 조회 화면은 커스텀 URL/템플릿 기반이며 DB 모델을 사용하지 않음
-
-### 11-5. 데이터 적재 관련 현재 상태
-
-- `AccessLog` 모델/테이블은 삭제됨 (DB에 로그 미적재 정책)
-- `import_access_logs` 관리 명령어는 제거됨
-- 보관 정책은 파일 회전 + 30일 삭제로만 관리
-
-### 11-6. 일일 요약 생성(수동)
-
-```bash
-cd /Users/imhanbyeol/Development/Hanplanet
 .venv/bin/python manage.py summarize_access_logs --date "$(date -v-1d '+%Y-%m-%d')"
-ls -lh /opt/homebrew/var/log/nginx/summaries/access_summary_*
 ```
 
-### 11-7. 매일 00:05 자동 요약 등록 (전날 날짜)
+---
 
-기본 권장 방식은 **Django 내부 스케줄러** 사용입니다.  
-아래 launchd 등록은 서버 프로세스 외부에서 별도로 돌리고 싶을 때만 사용하세요.
+## 14. Docker (미사용 — 참고용)
 
-```bash
-cp /Users/imhanbyeol/Development/Hanplanet/deploy/launchd/com.hanplanet.nginx-accesslog-summary.plist \
-  ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
+> Docker는 현재 사용하지 않습니다. 아래는 이전 설계 참고용 정보입니다.
 
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
-launchctl kickstart -k gui/$(id -u)/com.hanplanet.nginx-accesslog-summary
-launchctl print gui/$(id -u)/com.hanplanet.nginx-accesslog-summary
-```
-
-삭제하려면:
-
-```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
-rm -f ~/Library/LaunchAgents/com.hanplanet.nginx-accesslog-summary.plist
-```
+관련 파일: `docker-compose.yml`, `Dockerfile`, `docker/entrypoint.sh`,
+`docker/nginx/default.conf`, `docker/cloudflared/config.yml.example`, `.env.docker.example`
