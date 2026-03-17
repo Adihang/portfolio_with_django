@@ -128,7 +128,6 @@ class World {
             const savedPumpkinBaseDoubleHealth = Number(savedProgress.pumpkinBaseDoubleHealth || 0)
             const shouldHonorRequestedSkinDirectly = Boolean(
                 requestedNormalizedSkinName &&
-                requestedNormalizedSkinName !== "default" &&
                 requestedNormalizedSkinName !== PUMPKIN_SKIN_NAME
             )
             const canSwitchToRequestedPumpkin =

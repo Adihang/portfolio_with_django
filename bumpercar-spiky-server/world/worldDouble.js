@@ -549,12 +549,20 @@ module.exports = {
             player.y = centerY
             if (player.doubleMerged) {
                 player.doubleSeparationPhase = "merged"
+                const leadUnit = player.doubleUnits[aliveIndices[0]]
+                if (leadUnit && (Math.abs(leadUnit.lastMoveX) > 0.001 || Math.abs(leadUnit.lastMoveY) > 0.001)) {
+                    player.facingAngle = Math.atan2(leadUnit.lastMoveY, leadUnit.lastMoveX)
+                }
                 this.ensureDoubleUnitLayout(player, now)
             } else if (distance <= this.getDoubleMergeThreshold(player) && now >= Number(player.doubleMergeLockUntil || 0)) {
                 player.doubleMerged = true
                 player.doubleSeparationPhase = "merged"
                 player.doubleMergeLockUntil = 0
                 player.doubleSeparatedAt = 0
+                const leadUnit = player.doubleUnits[aliveIndices[0]]
+                if (leadUnit && (Math.abs(leadUnit.lastMoveX) > 0.001 || Math.abs(leadUnit.lastMoveY) > 0.001)) {
+                    player.facingAngle = Math.atan2(leadUnit.lastMoveY, leadUnit.lastMoveX)
+                }
                 this.ensureDoubleUnitLayout(player, now)
             } else {
                 player.doubleMerged = false
