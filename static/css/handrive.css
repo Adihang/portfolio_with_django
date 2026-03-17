@@ -1447,39 +1447,38 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     min-height: 0;
 }
 
-.handrive-list-preview-zoom {
+/* ── 줌 버튼 레이어 1: 프로스트 글라스 배경 (mix-blend-mode 밖에 위치) ── */
+.handrive-list-preview-zoom-bg,
+.handrive-view-zoom-bg {
     position: absolute;
     top: 10px;
     right: 10px;
-    z-index: 3;
-    display: inline-flex;
+    z-index: 2;
+    display: none;
     align-items: center;
     gap: 6px;
+    pointer-events: none;
 }
-
-.handrive-list-preview-zoom-btn {
+#handrive-list-preview-zoom:not([hidden]) ~ .handrive-list-preview-zoom-bg {
+    display: inline-flex;
+}
+#handrive-view-zoom:not([hidden]) ~ .handrive-view-zoom-bg {
+    display: inline-flex;
+}
+.handrive-list-preview-zoom-bg > span,
+.handrive-view-zoom-bg > span {
     width: 50px;
     height: 50px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    border: none;
-    font-size: 15px;
-    line-height: 1;
-    background: transparent;
-    mix-blend-mode: difference;
-    color: white;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: block;
 }
 
-.handrive-list-preview-zoom-btn:hover,
-.handrive-list-preview-zoom-btn:focus-visible {
-    background: transparent;
-    border: none;
-    color: white;
-}
-
+/* ── 줌 버튼 레이어 2: difference 블렌드 래퍼 — 아이콘이 뒤 이미지 반전색으로 표시됨 ── */
+.handrive-list-preview-zoom,
 .handrive-view-zoom {
     position: absolute;
     top: 10px;
@@ -1488,29 +1487,39 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    mix-blend-mode: difference;
 }
 
+.handrive-list-preview-zoom-btn,
 .handrive-view-zoom-btn {
+    /* handrive-btn 클래스를 사용하지 않으므로 모든 스타일을 여기에 명시 */
+    appearance: none;
     width: 50px;
     height: 50px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: 10px;
+    background: transparent;
     border: none;
+    outline: none;
     font-size: 15px;
     line-height: 1;
-    background: transparent;
-    mix-blend-mode: difference;
     color: white;
+    cursor: pointer;
+    /* transform/transition 제거 — GPU 레이어 분리로 mix-blend-mode 충돌 방지 */
+    transform: none;
+    transition: none;
 }
 
+.handrive-list-preview-zoom-btn:hover,
+.handrive-list-preview-zoom-btn:focus-visible,
 .handrive-view-zoom-btn:hover,
 .handrive-view-zoom-btn:focus-visible {
     background: transparent;
-    border: none;
     color: white;
+    outline: none;
 }
 
 .handrive-list-layout.is-portrait .handrive-list-preview-content {

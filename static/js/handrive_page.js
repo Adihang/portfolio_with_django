@@ -1302,6 +1302,8 @@
         const urlShareApiUrl = root.dataset.urlShareApiUrl;
         const writeUrl = root.dataset.writeUrl || "/handrive/write";
         const pathBreadcrumbs = document.querySelector(".handrive-path-breadcrumbs");
+        const pathCurrentSizeEl = document.querySelector(".handrive-path-current-size");
+        const originalDirSizeText = pathCurrentSizeEl ? (pathCurrentSizeEl.textContent || "") : "";
         const listLayout = document.getElementById("handrive-list-layout");
         const listPane = root.querySelector(".handrive-list-pane");
         const listContainer = document.getElementById("handrive-list");
@@ -2678,6 +2680,20 @@
             window.requestAnimationFrame(function () {
                 syncPreviewImageZoom();
             });
+            var _imgEl = getPreviewImageElement();
+            if (_imgEl && !_imgEl.complete) {
+                _imgEl.addEventListener("load", function () {
+                    var _wrap = previewContent
+                        ? previewContent.querySelector(".handrive-media-image-wrap")
+                        : null;
+                    if (_wrap) {
+                        _wrap.style.transform = "scale(" + String(state.previewImageZoom) + ")";
+                    }
+                    if (previewZoomWrap) {
+                        previewZoomWrap.hidden = false;
+                    }
+                }, { once: true });
+            }
             scheduleSyncCurrentDirRowHeightWithSideHead();
         }
 
@@ -2869,10 +2885,26 @@
             }
 
             if (settings.render === false) {
+                updatePathCurrentSize();
                 return;
             }
             renderPathBreadcrumbs(state.selectedPath || currentDir);
             renderList();
+            updatePathCurrentSize();
+        }
+
+        function updatePathCurrentSize() {
+            if (!pathCurrentSizeEl) {
+                return;
+            }
+            if (state.selectedPaths.size === 1) {
+                const entry = state.entryByPath.get(state.selectedPath);
+                if (entry && entry.size_display) {
+                    pathCurrentSizeEl.textContent = entry.size_display;
+                    return;
+                }
+            }
+            pathCurrentSizeEl.textContent = originalDirSizeText;
         }
 
         function getSelectionRangeTo(entryPath) {

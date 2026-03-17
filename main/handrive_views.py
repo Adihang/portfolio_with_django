@@ -826,7 +826,7 @@ def render_docs_media_safely(source_path: Path, relative_path: str) -> str:
     if extension in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".avif"}:
         return mark_safe(
             '<div class="handrive-media-wrap handrive-media-image-wrap">'
-            f'<img class="handrive-media-element handrive-media-image-element" src="{source_url}" alt="{escape(source_path.name)}" loading="lazy">'
+            f'<img class="handrive-media-element handrive-media-image-element" src="{source_url}" alt="{escape(source_path.name)}" loading="eager">'
             "</div>"
         )
     if extension in {".mp4", ".webm", ".mov", ".m4v", ".ogv"}:
@@ -1035,8 +1035,21 @@ def build_entry(path_obj: Path) -> dict:
             data["has_children"] = any(path_obj.iterdir())
         except OSError:
             data["has_children"] = False
+        try:
+            total_bytes = sum(
+                child.stat().st_size
+                for child in path_obj.rglob("*")
+                if child.is_file()
+            )
+            data["size_display"] = format_docs_bytes_display(total_bytes)
+        except OSError:
+            data["size_display"] = ""
     else:
         data["slug_path"] = markdown_slug_from_relative(rel_path)
+        try:
+            data["size_display"] = format_docs_bytes_display(path_obj.stat().st_size)
+        except OSError:
+            data["size_display"] = ""
 
     return data
 
@@ -1460,6 +1473,9 @@ def get_scoped_docs_home_dir(request) -> str:
     if not username:
         return ""
     try:
+        # 어드민(superuser)의 root는 BASE_DIR이므로 media/HanDrive/users/{username} 경로를 사용
+        if user.is_superuser:
+            return normalize_relative_path(f"media/HanDrive/users/{username}", allow_empty=False)
         return normalize_relative_path(f"users/{username}", allow_empty=False)
     except ValueError:
         return ""
@@ -1472,7 +1488,8 @@ def get_docs_initial_landing_dir(request) -> str:
     username = str(user.get_username() or "").strip()
     if user.is_superuser and username:
         try:
-            return normalize_relative_path(f"users/{username}", allow_empty=False)
+            # 어드민(superuser)의 root는 BASE_DIR이므로 media/HanDrive/users/{username} 경로를 사용
+            return normalize_relative_path(f"media/HanDrive/users/{username}", allow_empty=False)
         except ValueError:
             return ""
     return get_scoped_docs_home_dir(request)

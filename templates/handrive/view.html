@@ -72,15 +72,15 @@
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
     <div class="handrive-view-zoom" id="handrive-view-zoom" hidden>
-        <button class="handrive-btn handrive-view-zoom-btn" type="button" id="handrive-view-zoom-out" aria-label="{{ docs_text.zoom_out_button|default:'축소' }}">
-            <svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true">
+        <button class="handrive-view-zoom-btn" type="button" id="handrive-view-zoom-out" aria-label="{{ docs_text.zoom_out_button|default:'축소' }}">
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
                 <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
                 <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
                 <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
             </svg>
         </button>
-        <button class="handrive-btn handrive-view-zoom-btn" type="button" id="handrive-view-zoom-in" aria-label="{{ docs_text.zoom_in_button|default:'확대' }}">
-            <svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true">
+        <button class="handrive-view-zoom-btn" type="button" id="handrive-view-zoom-in" aria-label="{{ docs_text.zoom_in_button|default:'확대' }}">
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
                 <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
                 <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
                 <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
@@ -88,6 +88,7 @@
             </svg>
         </button>
     </div>
+    <div class="handrive-view-zoom-bg" aria-hidden="true"><span></span><span></span></div>
     <article class="{{ doc_content_class }}">{{ doc_content_html }}</article>
 </main>
 {% include "partials/site_footer_links.html" %}
