@@ -5,6 +5,7 @@ Forgejo API 클라이언트
   settings.FORGEJO_BASE_URL    — Forgejo 서버 내부 URL (예: http://localhost:3000)
   settings.FORGEJO_ADMIN_TOKEN — Forgejo 관리자 API 토큰
 """
+import base64
 import secrets
 import requests
 from urllib.parse import urlparse, urlunparse
@@ -64,33 +65,61 @@ class ForgejoClient:
         resp.raise_for_status()
         return resp.json()
 
+    def _basic_auth_headers(self, username: str, password: str) -> dict:
+        cred = base64.b64encode(f"{username}:{password}".encode()).decode()
+        return {"Authorization": f"Basic {cred}"}
+
+    def _set_user_password(self, username: str, password: str) -> None:
+        """admin API로 유저 비밀번호 변경 — 토큰 발급을 위한 임시 BasicAuth 준비"""
+        resp = requests.patch(
+            f"{self._base_url}/api/v1/admin/users/{username}",
+            headers=self._headers,
+            json={
+                "source_id":            0,
+                "login_name":           username,
+                "password":             password,
+                "must_change_password": False,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+
     def ensure_user_with_token(self, username: str, email: str = "") -> tuple:
         """Gitea 계정 생성(없을 때만) + 개인 액세스 토큰 발급.
         Django 유저가 git CLI에서 username:token 으로 인증할 수 있게 함.
-        기존 'hanplanet' 토큰은 삭제 후 재발급 (토큰 값은 생성 시에만 반환됨).
+
+        /api/v1/users/{username}/tokens 는 BasicAuth 전용이므로:
+        1. admin API로 유저 비밀번호를 임시 랜덤값으로 설정
+        2. BasicAuth로 토큰 발급
+        (유저는 Gitea에 직접 로그인하지 않고 토큰으로만 git 인증)
 
         Returns:
             (gitea_user_dict, token_str)
         """
         gitea_user = self.ensure_user(username, email)
 
+        # 임시 비밀번호 설정 → BasicAuth 사용 가능하게
+        temp_pw = secrets.token_urlsafe(24)
+        self._set_user_password(username, temp_pw)
+
+        basic = self._basic_auth_headers(username, temp_pw)
         tokens_url = f"{self._base_url}/api/v1/users/{username}/tokens"
 
         # 기존 'hanplanet' 토큰 삭제
-        resp = requests.get(tokens_url, headers=self._headers, timeout=15)
+        resp = requests.get(tokens_url, headers=basic, timeout=15)
         if resp.status_code == 200:
             for tok in resp.json():
                 if tok.get("name") == "hanplanet":
                     requests.delete(
                         f"{tokens_url}/{tok['id']}",
-                        headers=self._headers,
+                        headers=basic,
                         timeout=15,
                     )
 
         # 새 토큰 발급
         resp = requests.post(
             tokens_url,
-            headers=self._headers,
+            headers=basic,
             json={"name": "hanplanet"},
             timeout=15,
         )
