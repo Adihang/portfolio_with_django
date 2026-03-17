@@ -4,7 +4,7 @@
         <h3 id="handrive-git-repo-title" class="handrive-rename-title">Git 리포지토리 생성</h3>
         <div class="handrive-rename-target" id="handrive-git-repo-target"></div>
 
-        {{/* 생성 폼 */}}
+        {# 생성 폼 #}
         <div id="handrive-git-repo-form">
             <label class="handrive-field handrive-field-full">
                 <span>리포지토리 이름</span>
@@ -16,11 +16,11 @@
             </div>
         </div>
 
-        {{/* 상태 / 관리 영역 */}}
+        {# 상태 / 관리 영역 #}
         <div id="handrive-git-repo-status" hidden>
             <p id="handrive-git-repo-status-msg" style="margin:0 0 12px;"></p>
 
-            {{/* Clone URL 영역 */}}
+            {# Clone URL 영역 #}
             <div id="handrive-git-repo-clone-info" hidden style="margin-bottom:12px;">
                 <div style="font-size:0.8em;color:var(--handrive-text-secondary);margin-bottom:4px;">Clone URL</div>
                 <div style="display:flex;gap:6px;align-items:center;">
@@ -33,7 +33,7 @@
 
             <div class="handrive-rename-actions" style="margin-top:4px;">
                 <button type="button" class="handrive-btn" id="handrive-git-repo-close-btn">닫기</button>
-                <button type="button" class="handrive-btn" id="handrive-git-repo-open-btn" hidden target="_blank">Gitea에서 열기</button>
+                <button type="button" class="handrive-btn" id="handrive-git-repo-open-btn" hidden>Gitea에서 열기</button>
                 <button type="button" class="handrive-btn handrive-btn-primary" id="handrive-git-repo-retry-btn" hidden>재시도</button>
             </div>
         </div>
