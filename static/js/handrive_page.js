@@ -1398,6 +1398,7 @@
         const contextNewDocButton = contextMenu ? contextMenu.querySelector('button[data-action="new-doc"]') : null;
         const contextPermissionsButton = contextMenu ? contextMenu.querySelector('button[data-action="permissions"]') : null;
         const contextGitCreateRepoButton = contextMenu ? contextMenu.querySelector('button[data-action="git-create-repo"]') : null;
+        const contextGitManageRepoButton = contextMenu ? contextMenu.querySelector('button[data-action="git-manage-repo"]') : null;
         const renameModal = document.getElementById("handrive-rename-modal");
         const renameModalBackdrop = document.getElementById("handrive-rename-modal-backdrop");
         const renameInput = document.getElementById("handrive-rename-input");
@@ -2874,10 +2875,12 @@
                 setContextButtonVisible(contextNewDocButton, false);
                 setContextButtonVisible(contextPermissionsButton, true);
                 setContextButtonVisible(contextGitCreateRepoButton, false);
+                setContextButtonVisible(contextGitManageRepoButton, false);
                 syncContextMenuDividers();
                 return;
             }
 
+            var hasGitRepo = !!(targetEntry && targetEntry.git_repo);
             setContextButtonVisible(contextOpenButton, !isCurrentFolder);
             setContextButtonVisible(contextDownloadButton, !isCurrentFolder && !isDirectory);
             setContextButtonVisible(contextUploadButton, isDirectory && canWriteChildren);
@@ -2887,7 +2890,8 @@
             setContextButtonVisible(contextNewFolderButton, isDirectory && canWriteChildren);
             setContextButtonVisible(contextNewDocButton, isDirectory && canWriteChildren);
             setContextButtonVisible(contextPermissionsButton, true);
-            setContextButtonVisible(contextGitCreateRepoButton, isDirectory && canWriteChildren);
+            setContextButtonVisible(contextGitCreateRepoButton, isDirectory && canWriteChildren && !hasGitRepo);
+            setContextButtonVisible(contextGitManageRepoButton, isDirectory && hasGitRepo);
             syncContextMenuDividers();
         }
 
@@ -5276,6 +5280,9 @@
                 if (action === "git-create-repo") {
                     openGitRepoModal(entry);
                 }
+                if (action === "git-manage-repo") {
+                    openGitRepoModal(entry);
+                }
             });
         }
 
@@ -5462,6 +5469,11 @@
                 if (data.status === "active") {
                     _gitRepoStopPolling();
                     _showGitRepoStatus("리포지토리 생성 완료!", false, data.clone_http_url_authed || data.clone_http_url || "");
+                    // entry 데이터 갱신 — 우클릭 메뉴 버튼 상태를 즉시 업데이트
+                    if (gitRepoModal && gitRepoModal._targetEntry) {
+                        gitRepoModal._targetEntry.git_repo = { id: repoId, status: "active" };
+                    }
+                    refreshCurrentDirectory().catch(function () {});
                 } else if (data.status === "failed") {
                     _gitRepoStopPolling();
                     _showGitRepoStatus(

@@ -26,12 +26,6 @@ class ForgejoClient:
     def _headers(self) -> dict:
         return {"Authorization": f"token {self._token}"}
 
-    def authed_clone_url(self, clone_url: str) -> str:
-        """clone_url에 admin 토큰을 삽입 — private repo clone/push용"""
-        parsed = urlparse(clone_url)
-        authed = parsed._replace(netloc=f"admin:{self._token}@{parsed.hostname}:{parsed.port or 3000}")
-        return urlunparse(authed)
-
     # ──────────────────────────────────────────
     # User
     # ──────────────────────────────────────────
@@ -116,24 +110,37 @@ class ForgejoClient:
                         timeout=15,
                     )
 
-        # 새 토큰 발급
+        # 새 토큰 발급 (Gitea 1.19+ 는 scopes 필수)
         resp = requests.post(
             tokens_url,
-            headers=basic,
-            json={"name": "hanplanet"},
+            headers={**basic, "Content-Type": "application/json"},
+            json={
+                "name":   "hanplanet",
+                "scopes": ["write:repository", "read:repository", "read:user"],
+            },
             timeout=15,
         )
         resp.raise_for_status()
         token_value = resp.json().get("sha1") or resp.json().get("token", "")
         return gitea_user, token_value
 
+    def internal_authed_clone_url(self, owner: str, repo_name: str) -> str:
+        """서버 내부 git 작업용 인증 URL — FORGEJO_BASE_URL(localhost) 기반.
+        Gitea API clone_url은 공개 도메인을 반환하므로 내부 작업에 사용 불가.
+        """
+        parsed = urlparse(self._base_url)
+        netloc = f"admin:{self._token}@{parsed.hostname}"
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        return urlunparse(parsed._replace(netloc=netloc, path=f"/{owner}/{repo_name}.git"))
+
     def user_authed_clone_url(self, clone_url: str, username: str, token: str) -> str:
-        """clone_url에 유저 토큰을 삽입 — 유저가 git CLI에서 사용할 URL"""
+        """공개 clone_url에 유저 토큰을 삽입 — 유저가 git CLI에서 사용할 URL"""
         parsed = urlparse(clone_url)
-        authed = parsed._replace(
-            netloc=f"{username}:{token}@{parsed.hostname}:{parsed.port or 3000}"
-        )
-        return urlunparse(authed)
+        netloc = f"{username}:{token}@{parsed.hostname}"
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        return urlunparse(parsed._replace(netloc=netloc))
 
     # ──────────────────────────────────────────
     # Repository
