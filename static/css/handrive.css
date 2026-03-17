@@ -19,7 +19,7 @@ body.ui-page {
     --handrive-hover: var(--site-hover);
     --handrive-hover-strong: var(--site-hover-strong);
     --handrive-hover-button: var(--site-hover-button);
-    --handrive-surface-toolbar: #eeeeee;
+    --handrive-surface-toolbar: transparent;
     --handrive-surface-muted: var(--site-surface-muted);
     --handrive-surface-muted-strong: var(--site-surface-muted-strong);
     --handrive-backdrop: var(--site-backdrop);
@@ -99,7 +99,7 @@ body.ui-page.theme-dark {
     --handrive-hover: rgba(255, 255, 255, 0.13);
     --handrive-hover-strong: rgba(255, 255, 255, 0.19);
     --handrive-hover-button: rgba(255, 255, 255, 0.13);
-    --handrive-surface-toolbar: #222222;
+    --handrive-surface-toolbar: transparent;
     --handrive-surface-muted: rgba(40, 40, 40, 0.94);
     --handrive-surface-muted-strong: rgba(46, 46, 46, 0.96);
     --handrive-link: #d2d2d2;
