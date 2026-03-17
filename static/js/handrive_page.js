@@ -2713,7 +2713,7 @@
             setPreviewVisibility(true);
 
             const pathValue = normalizePath(entry.path, true);
-            if (state.activePreviewPath === pathValue && !previewPanel.hidden) {
+            if (state.activePreviewPath === pathValue && !previewPanel.hidden && state.previewCache.has(pathValue)) {
                 setPreviewActionTargets(entry);
                 return;
             }

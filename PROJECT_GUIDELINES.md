@@ -6,15 +6,15 @@ Shared reference for all AI coding agents (Claude Code, Codex, etc.) working in 
 
 ```bash
 # Development
-python manage.py runserver          # Start local dev server
-python manage.py migrate            # Apply DB migrations
-python manage.py makemigrations     # Generate migrations after model changes
-python manage.py collectstatic      # Collect static assets into staticfiles/
-python manage.py createsuperuser    # Create admin account for /admin/
+.venv/bin/python manage.py runserver          # Start local dev server
+.venv/bin/python manage.py migrate            # Apply DB migrations
+.venv/bin/python manage.py makemigrations     # Generate migrations after model changes
+.venv/bin/python manage.py collectstatic      # Collect static assets into staticfiles/
+.venv/bin/python manage.py createsuperuser    # Create admin account for /admin/
 
 # Tests
-python manage.py test               # Run all tests (main/tests.py)
-python manage.py test main.tests.TestClassName  # Run a specific test class
+.venv/bin/python manage.py test               # Run all tests (main/tests.py)
+.venv/bin/python manage.py test main.tests.TestClassName  # Run a specific test class
 
 # Access log summary
 .venv/bin/python manage.py summarize_access_logs --date YYYY-MM-DD

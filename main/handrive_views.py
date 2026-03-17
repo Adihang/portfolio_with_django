@@ -1817,9 +1817,14 @@ def is_docs_share_auth_entry(request, fallback_url: str) -> bool:
     return False
 
 
+def get_global_help_root() -> Path:
+    """헬프 파일은 사용자별이 아닌 전역 콘텐츠 — 슈퍼유저 여부와 무관하게 고정 경로 사용."""
+    return (Path(settings.MEDIA_ROOT) / "HanDrive" / MARKDOWN_HELP_DIRECTORY).resolve()
+
+
 def get_markdown_help_candidates(ui_lang: str | None) -> list[Path]:
+    help_root = get_global_help_root()
     docs_root = docs_root_dir()
-    help_root = docs_root / MARKDOWN_HELP_DIRECTORY
     markdown_help_candidates: list[Path] = []
     if ui_lang == "en":
         markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_EN)
@@ -1856,7 +1861,7 @@ def resolve_markdown_help_file(ui_lang: str | None) -> Path | None:
 
 
 def get_page_help_candidates(ui_lang: str | None, page_type: str) -> list[Path]:
-    help_root = docs_root_dir() / MARKDOWN_HELP_DIRECTORY
+    help_root = get_global_help_root()
     base_name = PAGE_HELP_FILE_BASENAMES.get(page_type)
     if not base_name:
         return []
