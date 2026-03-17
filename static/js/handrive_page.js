@@ -910,11 +910,13 @@
     function createDocsUrlShareModal() {
         const shareModal = document.getElementById("handrive-url-share-modal");
         const shareBackdrop = document.getElementById("handrive-url-share-modal-backdrop");
+        const shareCheckbox = document.getElementById("handrive-url-share-enabled-checkbox");
+        const shareUrlRow = document.getElementById("handrive-url-share-url-row");
         const shareInput = document.getElementById("handrive-url-share-input");
         const shareCloseButton = document.getElementById("handrive-url-share-close-btn");
         const shareCopyButton = document.getElementById("handrive-url-share-copy-btn");
 
-        if (!shareModal || !shareBackdrop || !shareInput || !shareCloseButton || !shareCopyButton) {
+        if (!shareModal || !shareBackdrop || !shareCheckbox || !shareInput || !shareCloseButton || !shareCopyButton) {
             return {
                 open: function () {},
                 close: function () {},
@@ -922,12 +924,27 @@
         }
 
         let lastFocusedElement = null;
+        let currentOnToggle = null;
+        let isToggling = false;
+
+        function setUrlRowVisible(visible, url) {
+            shareUrlRow.hidden = !visible;
+            shareCopyButton.hidden = !visible;
+            if (visible) {
+                shareInput.value = url || "";
+            } else {
+                shareInput.value = "";
+                shareCopyButton.textContent = t("url_share_copy_button", "복사");
+            }
+        }
 
         function close() {
             if (shareModal.hidden) {
                 return;
             }
             shareModal.hidden = true;
+            currentOnToggle = null;
+            isToggling = false;
             shareCopyButton.textContent = t("url_share_copy_button", "복사");
             if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
                 lastFocusedElement.focus();
@@ -956,17 +973,41 @@
             }
         }
 
-        function open(url) {
-            shareInput.value = url || "";
+        // options: { isUrlOnly: bool, shareUrl: string, onToggle: async (enabled) => { shareUrl, isUrlOnly } }
+        function open(options) {
+            const isUrlOnly = Boolean(options && options.isUrlOnly);
+            const shareUrl = (options && options.shareUrl) || "";
+            currentOnToggle = (options && typeof options.onToggle === "function") ? options.onToggle : null;
+
+            shareCheckbox.checked = isUrlOnly;
+            setUrlRowVisible(isUrlOnly, shareUrl);
             shareCopyButton.textContent = t("url_share_copy_button", "복사");
             shareModal.hidden = false;
             lastFocusedElement = document.activeElement;
             syncDocsModalBodyState();
             window.requestAnimationFrame(function () {
-                shareInput.focus();
-                shareInput.select();
+                shareCheckbox.focus();
             });
         }
+
+        shareCheckbox.addEventListener("change", function () {
+            if (isToggling || !currentOnToggle) {
+                return;
+            }
+            const enabled = shareCheckbox.checked;
+            isToggling = true;
+            shareCheckbox.disabled = true;
+            currentOnToggle(enabled).then(function (result) {
+                shareCheckbox.checked = Boolean(result && result.isUrlOnly);
+                setUrlRowVisible(shareCheckbox.checked, (result && result.shareUrl) || "");
+            }).catch(function (error) {
+                shareCheckbox.checked = !enabled;
+                alertError(error);
+            }).finally(function () {
+                shareCheckbox.disabled = false;
+                isToggling = false;
+            });
+        });
 
         shareBackdrop.addEventListener("click", close);
         shareCloseButton.addEventListener("click", close);
@@ -2279,9 +2320,6 @@
 
             if (previewUrlShareButton) {
                 previewUrlShareButton.hidden = !(isFileEntry && canEdit && urlShareApiUrl);
-                previewUrlShareButton.textContent = isUrlOnly
-                    ? t("url_unshare_button", "url공유해제")
-                    : t("url_share_button", "url공유");
             }
         }
 
@@ -5340,8 +5378,46 @@
             gitRepoModal._targetEntry = entry || null;
             gitRepoModal.hidden = false;
             syncModalBodyState();
-            if (gitRepoNameInput) {
-                gitRepoNameInput.focus();
+
+            // 이미 레코드가 있는지 먼저 확인
+            if (entry && entry.path) {
+                requestJson(
+                    "/api/git/repos/by-path/?path=" + encodeURIComponent(entry.path),
+                    { method: "GET" }
+                ).then(function (data) {
+                    if (!data || !data.repo) {
+                        return;
+                    }
+                    var repo = data.repo;
+                    _gitRepoCurrentId = repo.id;
+                    if (repo.status === "active") {
+                        _showGitRepoStatus("리포지토리 생성 완료!", false, repo.forgejo_clone_http || "");
+                    } else if (repo.status === "failed") {
+                        _showGitRepoStatus(
+                            "생성 실패: " + (repo.error_message || "알 수 없는 오류"),
+                            true,
+                            null
+                        );
+                    } else {
+                        // pending_create / pending_import
+                        _showGitRepoStatus("생성 중...", false, null);
+                        _gitRepoPollingTimer = setInterval(function () {
+                            _pollGitRepoStatus(_gitRepoCurrentId).catch(function () {
+                                _gitRepoStopPolling();
+                                _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+                            });
+                        }, 2000);
+                    }
+                }).catch(function () {
+                    // 404 또는 오류 → 신규 생성 폼 유지
+                    if (gitRepoNameInput) {
+                        gitRepoNameInput.focus();
+                    }
+                });
+            } else {
+                if (gitRepoNameInput) {
+                    gitRepoNameInput.focus();
+                }
             }
         }
 
@@ -5419,7 +5495,7 @@
                     "/api/git/repos/",
                     buildPostOptions({ path: entry.path, repo_name: repoName })
                 );
-                _gitRepoCurrentId = data.id;
+                _gitRepoCurrentId = data.repo ? data.repo.id : data.id;
                 _gitRepoPollingTimer = setInterval(function () {
                     _pollGitRepoStatus(_gitRepoCurrentId).catch(function () {
                         _gitRepoStopPolling();
@@ -5548,21 +5624,24 @@
                 if (!isPreviewableFileEntry(selectedEntry) || !selectedEntry.can_edit) {
                     return;
                 }
-                toggleUrlShare(selectedEntry).then(function (result) {
-                    const refreshedEntry = result ? result.entry : null;
-                    const responseData = result ? result.data : null;
-                    if (refreshedEntry) {
-                        const previewPromise = loadPreviewForEntry(refreshedEntry);
-                        if (responseData && responseData.is_url_only && responseData.share_url) {
-                            return previewPromise.then(function () {
-                                urlShareModal.open(responseData.share_url);
-                            });
+                urlShareModal.open({
+                    isUrlOnly: Boolean(selectedEntry.is_url_only),
+                    shareUrl: selectedEntry.share_url || "",
+                    onToggle: async function (enabled) {
+                        const data = await requestJson(
+                            urlShareApiUrl,
+                            buildPostOptions({ path: selectedEntry.path, enabled: enabled })
+                        );
+                        await refreshCurrentDirectory();
+                        const refreshedEntry = state.entryByPath.get(selectedEntry.path);
+                        if (refreshedEntry) {
+                            await loadPreviewForEntry(refreshedEntry);
+                        } else {
+                            clearPreviewPane();
                         }
-                        return previewPromise;
-                    }
-                    clearPreviewPane();
-                    return null;
-                }).catch(alertError);
+                        return { isUrlOnly: Boolean(data.is_url_only), shareUrl: data.share_url || "" };
+                    },
+                });
             });
         }
 
@@ -5860,7 +5939,7 @@
 
         hydrateMediaAudioElements(contentArticle);
 
-        viewImageZoom = getViewImageMinZoom();
+        viewImageZoom = 1;
         syncViewImageZoom();
 
         if (viewZoomOutButton) {
@@ -5876,27 +5955,22 @@
         }
 
         if (urlShareButton && urlShareApiUrl && docPath) {
-            urlShareButton.textContent = docIsUrlOnly
-                ? t("url_unshare_button", "url공유해제")
-                : t("url_share_button", "url공유");
-            urlShareButton.addEventListener("click", async function () {
-                try {
-                    const data = await requestJson(
-                        urlShareApiUrl,
-                        buildPostOptions({
-                            path: docPath,
-                            enabled: !docIsUrlOnly,
-                        })
-                    );
-                    if (data && data.is_url_only) {
-                        const shareUrl = data.share_url || (window.location.origin + buildViewUrl(ideBaseUrl, docSlugPath));
-                        urlShareModal.open(shareUrl);
-                        return;
-                    }
-                    window.location.reload();
-                } catch (error) {
-                    alertError(error);
-                }
+            urlShareButton.addEventListener("click", function () {
+                const initialShareUrl = root.dataset.docShareUrl || "";
+                urlShareModal.open({
+                    isUrlOnly: docIsUrlOnly,
+                    shareUrl: initialShareUrl,
+                    onToggle: async function (enabled) {
+                        const data = await requestJson(
+                            urlShareApiUrl,
+                            buildPostOptions({ path: docPath, enabled: enabled })
+                        );
+                        if (!enabled) {
+                            window.location.reload();
+                        }
+                        return { isUrlOnly: Boolean(data.is_url_only), shareUrl: data.share_url || "" };
+                    },
+                });
             });
         }
 

@@ -3721,9 +3721,10 @@ def git_repo_status(request, repo_id: int):
         return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
 
     return JsonResponse({
-        "ok":            True,
-        "status":        repo.status,
-        "error_message": repo.error_message,
+        "ok":              True,
+        "status":          repo.status,
+        "error_message":   repo.error_message,
+        "clone_http_url":  _build_public_clone_url(repo.forgejo_clone_http_url),
     })
 
 
