@@ -5,6 +5,7 @@ Forgejo API 클라이언트
   settings.FORGEJO_BASE_URL    — Forgejo 서버 내부 URL (예: http://localhost:3000)
   settings.FORGEJO_ADMIN_TOKEN — Forgejo 관리자 API 토큰
 """
+import secrets
 import requests
 from urllib.parse import urlparse, urlunparse
 from django.conf import settings
@@ -31,12 +32,46 @@ class ForgejoClient:
         return urlunparse(authed)
 
     # ──────────────────────────────────────────
+    # User
+    # ──────────────────────────────────────────
+
+    def ensure_user(self, username: str, email: str = "") -> dict:
+        """Gitea 유저가 없으면 생성, 있으면 그대로 반환"""
+        get_url = f"{self._base_url}/api/v1/users/{username}"
+        resp = requests.get(get_url, headers=self._headers, timeout=15)
+        if resp.status_code == 200:
+            return resp.json()
+
+        # 없으면 admin API로 생성
+        create_url = f"{self._base_url}/api/v1/admin/users"
+        if not email:
+            email = f"{username}@hanplanet.local"
+        resp = requests.post(
+            create_url,
+            headers=self._headers,
+            json={
+                "username":              username,
+                "email":                 email,
+                "password":              secrets.token_urlsafe(24),
+                "must_change_password":  False,
+                "source_id":             0,
+                "login_name":            username,
+                "send_notify":           False,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    # ──────────────────────────────────────────
     # Repository
     # ──────────────────────────────────────────
 
     def create_repo(self, username: str, repo_name: str) -> dict:
-        """Forgejo에 private 저장소 생성 (auto_init=False)"""
-        url = f"{self._base_url}/api/v1/user/repos"
+        """Forgejo에 private 저장소 생성 (해당 유저 계정 아래)"""
+        # 유저가 없으면 먼저 생성
+        self.ensure_user(username)
+        url = f"{self._base_url}/api/v1/admin/users/{username}/repos"
         resp = requests.post(
             url,
             headers=self._headers,
