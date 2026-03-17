@@ -3344,31 +3344,35 @@
 
         function summarizeUploadQueue(items) {
             const normalizedItems = Array.isArray(items) ? items : [];
-            const queuedCount = normalizedItems.filter(function (item) {
-                return item.status === "queued";
-            }).length;
-            const uploadingCount = normalizedItems.filter(function (item) {
-                return item.status === "uploading";
-            }).length;
-            const doneCount = normalizedItems.filter(function (item) {
-                return item.status === "done";
-            }).length;
-            const failedCount = normalizedItems.filter(function (item) {
-                return item.status === "failed";
-            }).length;
+            var uploadingCount = 0, movingCount = 0, deletingCount = 0;
+            var uploadDoneCount = 0, moveDoneCount = 0, deleteDoneCount = 0;
+            var queuedCount = 0, failedCount = 0;
+            normalizedItems.forEach(function (item) {
+                const isOp = item.kind === "operation";
+                const opType = item.operationType;
+                if (item.status === "uploading") {
+                    if (isOp && opType === "move") { movingCount++; }
+                    else if (isOp && opType === "delete") { deletingCount++; }
+                    else { uploadingCount++; }
+                } else if (item.status === "queued") {
+                    queuedCount++;
+                } else if (item.status === "done") {
+                    if (isOp && opType === "move") { moveDoneCount++; }
+                    else if (isOp && opType === "delete") { deleteDoneCount++; }
+                    else { uploadDoneCount++; }
+                } else if (item.status === "failed") {
+                    failedCount++;
+                }
+            });
             const parts = [];
-            if (uploadingCount > 0) {
-                parts.push(t("queue_status_active", "처리 중") + " " + uploadingCount);
-            }
-            if (queuedCount > 0) {
-                parts.push(t("queue_status_pending", "대기 중") + " " + queuedCount);
-            }
-            if (doneCount > 0) {
-                parts.push(t("job_status_done", "완료") + " " + doneCount);
-            }
-            if (failedCount > 0) {
-                parts.push(t("job_status_failed", "실패") + " " + failedCount);
-            }
+            if (uploadingCount > 0) { parts.push(t("job_status_uploading", "업로드 중") + " " + uploadingCount); }
+            if (movingCount > 0) { parts.push(t("queue_status_moving", "이동 중") + " " + movingCount); }
+            if (deletingCount > 0) { parts.push(t("queue_status_deleting", "삭제 중") + " " + deletingCount); }
+            if (queuedCount > 0) { parts.push(t("queue_status_pending", "대기") + " " + queuedCount); }
+            if (uploadDoneCount > 0) { parts.push(t("job_status_done", "업로드 완료") + " " + uploadDoneCount); }
+            if (moveDoneCount > 0) { parts.push(t("queue_status_move_done", "이동 완료") + " " + moveDoneCount); }
+            if (deleteDoneCount > 0) { parts.push(t("queue_status_delete_done", "삭제 완료") + " " + deleteDoneCount); }
+            if (failedCount > 0) { parts.push(t("job_status_failed", "실패") + " " + failedCount); }
             return parts.join(" · ");
         }
 
