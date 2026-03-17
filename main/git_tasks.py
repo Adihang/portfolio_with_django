@@ -68,10 +68,11 @@ def create_repo_task(repo_id: int) -> None:
         client = ForgejoClient()
 
         # Forgejo repo 생성 (이미 존재하면 get fallback)
+        # 계정 관리는 Django 담당 — Gitea는 admin 단일 계정으로 운영
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
         except Exception:
-            forgejo_repo = client.get_repo(repo.owner.username, repo.repo_name)
+            forgejo_repo = client.get_repo(repo.repo_name)
 
         # clone URL 즉시 저장 (push 전에 미리 보존)
         repo.forgejo_repo_id        = forgejo_repo["id"]
@@ -154,7 +155,7 @@ def import_repo_task(repo_id: int) -> None:
         try:
             forgejo_repo = client.create_repo(repo.owner.username, repo.repo_name)
         except Exception:
-            forgejo_repo = client.get_repo(repo.owner.username, repo.repo_name)
+            forgejo_repo = client.get_repo(repo.repo_name)
 
         repo.forgejo_repo_id        = forgejo_repo["id"]
         repo.forgejo_owner          = forgejo_repo["owner"]["login"]
