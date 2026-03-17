@@ -5364,14 +5364,19 @@
             }
         }
 
-        function openGitRepoModal(entry) {
+        // manageMode=true: 기존 repo 조회 목적 (생성 폼 표시 안 함)
+        function openGitRepoModal(entry, manageMode) {
             if (!gitRepoModal) {
                 return;
             }
             _gitRepoStopPolling();
             _gitRepoCurrentId = null;
+            var hasExistingRepo = !!(entry && entry.git_repo);
+            var isManageMode = manageMode || hasExistingRepo;
+
             if (gitRepoForm) {
-                gitRepoForm.hidden = false;
+                // 관리 모드일 때는 기존 repo 조회 결과가 올 때까지 폼을 숨김
+                gitRepoForm.hidden = isManageMode;
             }
             if (gitRepoStatusDiv) {
                 gitRepoStatusDiv.hidden = true;
@@ -5386,13 +5391,16 @@
             gitRepoModal.hidden = false;
             syncModalBodyState();
 
-            // 이미 레코드가 있는지 먼저 확인
+            // 기존 레코드 조회
             if (entry && entry.path) {
                 requestJson(
                     "/api/git/repos/by-path/?path=" + encodeURIComponent(entry.path),
                     { method: "GET" }
                 ).then(function (data) {
                     if (!data || !data.repo) {
+                        // 조회 결과 없음 → 신규 생성 폼으로 전환
+                        if (gitRepoForm) gitRepoForm.hidden = false;
+                        if (gitRepoNameInput) gitRepoNameInput.focus();
                         return;
                     }
                     var repo = data.repo;
@@ -5416,13 +5424,17 @@
                         }, 2000);
                     }
                 }).catch(function () {
-                    // 404 또는 오류 → 신규 생성 폼 유지
-                    if (gitRepoNameInput) {
-                        gitRepoNameInput.focus();
+                    if (isManageMode) {
+                        // 관리 모드에서 조회 실패 → 오류 표시 (생성 폼 아님)
+                        _showGitRepoStatus("저장소 정보를 불러올 수 없습니다. 페이지를 새로고침해주세요.", true, null);
+                    } else {
+                        // 신규 생성 모드에서 by-path 없음 → 생성 폼 유지
+                        if (gitRepoForm) gitRepoForm.hidden = false;
+                        if (gitRepoNameInput) gitRepoNameInput.focus();
                     }
                 });
             } else {
-                if (gitRepoNameInput) {
+                if (!isManageMode && gitRepoNameInput) {
                     gitRepoNameInput.focus();
                 }
             }
