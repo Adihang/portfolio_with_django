@@ -2098,6 +2098,12 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     background: var(--handrive-hover);
 }
 
+.handrive-context-menu hr {
+    border: 0;
+    border-top: 1px solid var(--handrive-divider-weak);
+    margin: 2px 0;
+}
+
 .handrive-markdown-context-menu {
     min-width: 220px;
 }

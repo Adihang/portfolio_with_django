@@ -1356,6 +1356,7 @@
         const contextNewFolderButton = contextMenu ? contextMenu.querySelector('button[data-action="new-folder"]') : null;
         const contextNewDocButton = contextMenu ? contextMenu.querySelector('button[data-action="new-doc"]') : null;
         const contextPermissionsButton = contextMenu ? contextMenu.querySelector('button[data-action="permissions"]') : null;
+        const contextGitCreateRepoButton = contextMenu ? contextMenu.querySelector('button[data-action="git-create-repo"]') : null;
         const renameModal = document.getElementById("handrive-rename-modal");
         const renameModalBackdrop = document.getElementById("handrive-rename-modal-backdrop");
         const renameInput = document.getElementById("handrive-rename-input");
@@ -1368,6 +1369,18 @@
         const folderCreateInput = document.getElementById("handrive-folder-create-input");
         const folderCreateCancelButton = document.getElementById("handrive-folder-create-cancel-btn");
         const folderCreateConfirmButton = document.getElementById("handrive-folder-create-confirm-btn");
+        const gitRepoModal = document.getElementById("handrive-git-repo-modal");
+        const gitRepoModalBackdrop = document.getElementById("handrive-git-repo-modal-backdrop");
+        const gitRepoTarget = document.getElementById("handrive-git-repo-target");
+        const gitRepoNameInput = document.getElementById("handrive-git-repo-name-input");
+        const gitRepoCancelButton = document.getElementById("handrive-git-repo-cancel-btn");
+        const gitRepoConfirmButton = document.getElementById("handrive-git-repo-confirm-btn");
+        const gitRepoForm = document.getElementById("handrive-git-repo-form");
+        const gitRepoStatusDiv = document.getElementById("handrive-git-repo-status");
+        const gitRepoStatusMsg = document.getElementById("handrive-git-repo-status-msg");
+        const gitRepoCloneInfo = document.getElementById("handrive-git-repo-clone-info");
+        const gitRepoCloseButton = document.getElementById("handrive-git-repo-close-btn");
+        const gitRepoRetryButton = document.getElementById("handrive-git-repo-retry-btn");
         const permissionModal = document.getElementById("handrive-permission-modal");
         const permissionModalBackdrop = document.getElementById("handrive-permission-modal-backdrop");
         const permissionTarget = document.getElementById("handrive-permission-target");
@@ -2822,6 +2835,8 @@
                 setContextButtonVisible(contextNewFolderButton, false);
                 setContextButtonVisible(contextNewDocButton, false);
                 setContextButtonVisible(contextPermissionsButton, true);
+                setContextButtonVisible(contextGitCreateRepoButton, false);
+                syncContextMenuDividers();
                 return;
             }
 
@@ -2834,6 +2849,40 @@
             setContextButtonVisible(contextNewFolderButton, isDirectory && canWriteChildren);
             setContextButtonVisible(contextNewDocButton, isDirectory && canWriteChildren);
             setContextButtonVisible(contextPermissionsButton, true);
+            setContextButtonVisible(contextGitCreateRepoButton, isDirectory && canWriteChildren);
+            syncContextMenuDividers();
+        }
+
+        function syncContextMenuDividers() {
+            if (!contextMenu) {
+                return;
+            }
+            var children = Array.from(contextMenu.children);
+            // 앞/뒤가 모두 hidden이거나 메뉴 끝에 있는 hr 숨기기
+            children.forEach(function (el) {
+                if (el.tagName !== "HR") {
+                    return;
+                }
+                var prevVisible = false;
+                var nextVisible = false;
+                var prev = el.previousElementSibling;
+                while (prev) {
+                    if (prev.tagName !== "HR" && prev.style.display !== "none") {
+                        prevVisible = true;
+                        break;
+                    }
+                    prev = prev.previousElementSibling;
+                }
+                var next = el.nextElementSibling;
+                while (next) {
+                    if (next.tagName !== "HR" && next.style.display !== "none") {
+                        nextVisible = true;
+                        break;
+                    }
+                    next = next.nextElementSibling;
+                }
+                el.style.display = (!prevVisible || !nextVisible) ? "none" : "";
+            });
         }
 
         function resolveContextEntries(entry) {
@@ -5186,6 +5235,9 @@
                 if (action === "delete") {
                     deleteEntries(entries.length > 1 ? entries : entry).catch(alertError);
                 }
+                if (action === "git-create-repo") {
+                    openGitRepoModal(entry);
+                }
             });
         }
 
@@ -5255,6 +5307,187 @@
                 }
             });
         }
+
+        // ── Git 리포지토리 생성 모달 ──────────────────────────────────────
+        var _gitRepoPollingTimer = null;
+        var _gitRepoCurrentId = null;
+
+        function _gitRepoStopPolling() {
+            if (_gitRepoPollingTimer !== null) {
+                clearInterval(_gitRepoPollingTimer);
+                _gitRepoPollingTimer = null;
+            }
+        }
+
+        function openGitRepoModal(entry) {
+            if (!gitRepoModal) {
+                return;
+            }
+            _gitRepoStopPolling();
+            _gitRepoCurrentId = null;
+            if (gitRepoForm) {
+                gitRepoForm.hidden = false;
+            }
+            if (gitRepoStatusDiv) {
+                gitRepoStatusDiv.hidden = true;
+            }
+            if (gitRepoNameInput) {
+                gitRepoNameInput.value = "";
+            }
+            if (gitRepoTarget) {
+                gitRepoTarget.textContent = entry ? entry.path : "";
+            }
+            gitRepoModal._targetEntry = entry || null;
+            gitRepoModal.hidden = false;
+            syncModalBodyState();
+            if (gitRepoNameInput) {
+                gitRepoNameInput.focus();
+            }
+        }
+
+        function closeGitRepoModal() {
+            _gitRepoStopPolling();
+            if (gitRepoModal) {
+                gitRepoModal.hidden = true;
+                gitRepoModal._targetEntry = null;
+            }
+            syncModalBodyState();
+        }
+
+        function _showGitRepoStatus(msg, showRetry, cloneUrl) {
+            if (gitRepoForm) {
+                gitRepoForm.hidden = true;
+            }
+            if (gitRepoStatusDiv) {
+                gitRepoStatusDiv.hidden = false;
+            }
+            if (gitRepoStatusMsg) {
+                gitRepoStatusMsg.textContent = msg;
+            }
+            if (gitRepoRetryButton) {
+                gitRepoRetryButton.hidden = !showRetry;
+            }
+            if (gitRepoCloneInfo) {
+                if (cloneUrl) {
+                    gitRepoCloneInfo.textContent = "Clone URL: " + cloneUrl;
+                    gitRepoCloneInfo.hidden = false;
+                } else {
+                    gitRepoCloneInfo.hidden = true;
+                }
+            }
+        }
+
+        async function _pollGitRepoStatus(repoId) {
+            try {
+                var data = await requestJson(
+                    "/api/git/repos/" + repoId + "/status/",
+                    { method: "GET" }
+                );
+                if (data.status === "active") {
+                    _gitRepoStopPolling();
+                    _showGitRepoStatus("리포지토리 생성 완료!", false, data.clone_http_url || "");
+                } else if (data.status === "failed") {
+                    _gitRepoStopPolling();
+                    _showGitRepoStatus(
+                        "생성 실패: " + (data.error_message || "알 수 없는 오류"),
+                        true,
+                        null
+                    );
+                }
+                // pending 상태면 계속 폴링
+            } catch (e) {
+                _gitRepoStopPolling();
+                _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+            }
+        }
+
+        async function submitGitRepoCreate() {
+            const entry = gitRepoModal ? gitRepoModal._targetEntry : null;
+            if (!entry) {
+                return;
+            }
+            const repoName = String(gitRepoNameInput ? gitRepoNameInput.value : "").trim();
+            if (!repoName) {
+                window.alert("리포지토리 이름을 입력해주세요.");
+                return;
+            }
+
+            _showGitRepoStatus("생성 중...", false, null);
+
+            try {
+                var data = await requestJson(
+                    "/api/git/repos/",
+                    buildPostOptions({ path: entry.path, repo_name: repoName })
+                );
+                _gitRepoCurrentId = data.id;
+                _gitRepoPollingTimer = setInterval(function () {
+                    _pollGitRepoStatus(_gitRepoCurrentId).catch(function () {
+                        _gitRepoStopPolling();
+                        _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+                    });
+                }, 2000);
+            } catch (e) {
+                _showGitRepoStatus(
+                    "요청 실패: " + (e && e.message ? e.message : "알 수 없는 오류"),
+                    false,
+                    null
+                );
+            }
+        }
+
+        async function retryGitRepo() {
+            if (!_gitRepoCurrentId) {
+                return;
+            }
+            _showGitRepoStatus("재시도 중...", false, null);
+            try {
+                await requestJson(
+                    "/api/git/repos/" + _gitRepoCurrentId + "/retry/",
+                    buildPostOptions({})
+                );
+                _gitRepoPollingTimer = setInterval(function () {
+                    _pollGitRepoStatus(_gitRepoCurrentId).catch(function () {
+                        _gitRepoStopPolling();
+                        _showGitRepoStatus("상태 조회 중 오류가 발생했습니다.", true, null);
+                    });
+                }, 2000);
+            } catch (e) {
+                _showGitRepoStatus(
+                    "재시도 실패: " + (e && e.message ? e.message : "알 수 없는 오류"),
+                    true,
+                    null
+                );
+            }
+        }
+
+        if (gitRepoModalBackdrop) {
+            gitRepoModalBackdrop.addEventListener("click", closeGitRepoModal);
+        }
+        if (gitRepoCancelButton) {
+            gitRepoCancelButton.addEventListener("click", closeGitRepoModal);
+        }
+        if (gitRepoCloseButton) {
+            gitRepoCloseButton.addEventListener("click", closeGitRepoModal);
+        }
+        if (gitRepoConfirmButton) {
+            gitRepoConfirmButton.addEventListener("click", function () {
+                submitGitRepoCreate().catch(alertError);
+            });
+        }
+        if (gitRepoNameInput) {
+            gitRepoNameInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitGitRepoCreate().catch(alertError);
+                }
+            });
+        }
+        if (gitRepoRetryButton) {
+            gitRepoRetryButton.addEventListener("click", function () {
+                retryGitRepo().catch(alertError);
+            });
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         if (permissionModalBackdrop) {
             permissionModalBackdrop.addEventListener("click", function () {

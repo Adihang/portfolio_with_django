@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hanplanet.celery</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/imhanbyeol/Development/Hanplanet/.venv/bin/python</string>
+        <string>-m</string>
+        <string>celery</string>
+        <string>-A</string>
+        <string>config</string>
+        <string>worker</string>
+        <string>-l</string>
+        <string>info</string>
+        <string>--concurrency=2</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/imhanbyeol/Development/Hanplanet</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DJANGO_SETTINGS_MODULE</key>
+        <string>config.settings</string>
+    </dict>
+
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/imhanbyeol/Development/Hanplanet/log/celery.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/imhanbyeol/Development/Hanplanet/log/celery.stderr.log</string>
+</dict>
+</plist>

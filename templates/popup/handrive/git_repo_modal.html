@@ -1,0 +1,25 @@
+<div id="handrive-git-repo-modal" class="handrive-rename-modal" hidden>
+    <div class="handrive-rename-modal-backdrop" id="handrive-git-repo-modal-backdrop"></div>
+    <div class="handrive-rename-modal-dialog" data-popup-fit-bottom role="dialog" aria-modal="true" aria-labelledby="handrive-git-repo-title">
+        <h3 id="handrive-git-repo-title" class="handrive-rename-title">Git 리포지토리 생성</h3>
+        <div class="handrive-rename-target" id="handrive-git-repo-target"></div>
+        <div id="handrive-git-repo-form">
+            <label class="handrive-field handrive-field-full">
+                <span>리포지토리 이름</span>
+                <input type="text" id="handrive-git-repo-name-input" placeholder="my-repo (영문자, 숫자, ., -, _)">
+            </label>
+            <div class="handrive-rename-actions">
+                <button type="button" class="handrive-btn" id="handrive-git-repo-cancel-btn">취소</button>
+                <button type="button" class="handrive-btn handrive-btn-primary" id="handrive-git-repo-confirm-btn">생성</button>
+            </div>
+        </div>
+        <div id="handrive-git-repo-status" hidden>
+            <p id="handrive-git-repo-status-msg" style="margin:0 0 12px;"></p>
+            <div id="handrive-git-repo-clone-info" hidden style="font-size:0.85em;word-break:break-all;"></div>
+            <div class="handrive-rename-actions" style="margin-top:12px;">
+                <button type="button" class="handrive-btn" id="handrive-git-repo-close-btn">닫기</button>
+                <button type="button" class="handrive-btn handrive-btn-primary" id="handrive-git-repo-retry-btn" hidden>재시도</button>
+            </div>
+        </div>
+    </div>
+</div>

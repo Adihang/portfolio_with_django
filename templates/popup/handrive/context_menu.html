@@ -4,9 +4,13 @@
     {% if docs_can_manage_acl %}
     <button type="button" data-action="permissions">{{ docs_text.menu_permissions }}</button>
     {% endif %}
+    <hr>
     <button type="button" data-action="upload">{{ docs_text.menu_upload }}</button>
     <button type="button" data-action="new-folder">{{ docs_text.menu_new_folder }}</button>
     <button type="button" data-action="new-doc">{{ docs_text.menu_new_document }}</button>
+    <hr>
+    <button type="button" data-action="git-create-repo">Git 리포지토리 생성</button>
+    <hr>
     <button type="button" data-action="edit">{{ docs_text.menu_edit }}</button>
     <button type="button" data-action="rename">{{ docs_text.menu_rename }}</button>
     <button type="button" data-action="delete">{{ docs_text.menu_delete }}</button>

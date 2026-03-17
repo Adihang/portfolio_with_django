@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from .forms import PortfolioActionButtonForm, PortfolioCareerForm, PortfolioProfileForm, PortfolioProjectForm
 from .models import (
     Career,
@@ -3560,3 +3561,226 @@ def chat_with_ai(request, ui_lang=None):
         return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 
 # Create your views here.
+
+
+# ──────────────────────────────────────────────────────
+# Git Integration API Views
+# ──────────────────────────────────────────────────────
+
+from urllib.parse import urlparse as _urlparse
+
+from .models import GitRepository, GitCollaborator
+from .git_service import GitRepositoryService
+from .forgejo_client import ForgejoClient
+
+
+def _git_json_error(msg: str, status: int = 400) -> JsonResponse:
+    return JsonResponse({"ok": False, "error": msg}, status=status)
+
+
+@require_http_methods(["POST"])
+@login_required
+def git_repo_create(request):
+    """
+    POST /api/git/repos/
+    body: {"path": "/...", "repo_name": "my-repo"}
+    생성 작업을 Celery에 위임하고 즉시 repo 정보 반환
+    """
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _git_json_error("invalid JSON")
+
+    path = (body.get("path") or "").strip()
+    repo_name = (body.get("repo_name") or "").strip()
+
+    if not path:
+        return _git_json_error("path is required")
+    if not repo_name:
+        return _git_json_error("repo_name is required")
+
+    svc = GitRepositoryService()
+    if svc.exists(path):
+        return _git_json_error("이미 Git 저장소가 연결된 경로입니다.", status=409)
+
+    try:
+        repo = svc.create_repo(request.user, path, repo_name)
+    except ValueError as exc:
+        return _git_json_error(str(exc))
+
+    return JsonResponse({
+        "ok": True,
+        "repo": {
+            "id":     repo.id,
+            "status": repo.status,
+        },
+    }, status=201)
+
+
+@login_required
+def git_repo_by_path(request):
+    """
+    GET /api/git/repos/by-path/?path=/...
+    handrive_path 기준으로 저장소 조회
+    """
+    path = (request.GET.get("path") or "").strip()
+    if not path:
+        return _git_json_error("path is required")
+
+    try:
+        repo = GitRepository.objects.get(handrive_path=path, owner=request.user)
+    except GitRepository.DoesNotExist:
+        return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
+
+    return JsonResponse({
+        "ok":   True,
+        "repo": _git_repo_dict(repo, request),
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
+def git_repo_collaborator(request, repo_id: int):
+    """
+    POST /api/git/repos/<id>/collaborators/
+    body: {"username": "...", "permission": "read|write|admin"}
+    """
+    try:
+        repo = GitRepository.objects.get(id=repo_id, owner=request.user)
+    except GitRepository.DoesNotExist:
+        return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _git_json_error("invalid JSON")
+
+    username = (body.get("username") or "").strip()
+    permission = (body.get("permission") or "read").strip()
+
+    if not username:
+        return _git_json_error("username is required")
+    if permission not in ("read", "write", "admin"):
+        return _git_json_error("permission은 read/write/admin 중 하나여야 합니다.")
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    try:
+        target_user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return _git_json_error("사용자를 찾을 수 없습니다.", status=404)
+
+    # Forgejo 권한 동기화
+    if repo.forgejo_owner and repo.forgejo_repo_name:
+        try:
+            ForgejoClient().add_collaborator(
+                repo.forgejo_owner, repo.forgejo_repo_name, username, permission
+            )
+        except Exception as exc:
+            return _git_json_error(f"Forgejo 협업자 추가 실패: {exc}", status=502)
+
+    GitCollaborator.objects.update_or_create(
+        repository=repo, user=target_user,
+        defaults={"permission": permission},
+    )
+
+    return JsonResponse({"ok": True, "username": username, "permission": permission})
+
+
+@login_required
+def git_repo_clone_url(request, repo_id: int):
+    """
+    GET /api/git/repos/<id>/clone/
+    PUBLIC_GIT_BASE_URL 기준 clone URL 반환
+    """
+    try:
+        repo = GitRepository.objects.get(id=repo_id, owner=request.user)
+    except GitRepository.DoesNotExist:
+        return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
+
+    http_url = _build_public_clone_url(repo.forgejo_clone_http_url)
+    ssh_url  = repo.forgejo_clone_ssh_url
+
+    return JsonResponse({
+        "ok":      True,
+        "http":    http_url,
+        "ssh":     ssh_url,
+    })
+
+
+@login_required
+def git_repo_status(request, repo_id: int):
+    """
+    GET /api/git/repos/<id>/status/
+    현재 status + error_message 반환 (UI 폴링용)
+    """
+    try:
+        repo = GitRepository.objects.get(id=repo_id, owner=request.user)
+    except GitRepository.DoesNotExist:
+        return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
+
+    return JsonResponse({
+        "ok":            True,
+        "status":        repo.status,
+        "error_message": repo.error_message,
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
+def git_repo_retry(request, repo_id: int):
+    """
+    POST /api/git/repos/<id>/retry/
+    status == "failed" 일 때만 허용 — 상태 초기화 후 태스크 재실행
+    """
+    try:
+        repo = GitRepository.objects.get(id=repo_id, owner=request.user)
+    except GitRepository.DoesNotExist:
+        return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
+
+    if repo.status != "failed":
+        return _git_json_error("retry는 failed 상태에서만 가능합니다.", status=409)
+
+    from .git_tasks import create_repo_task, import_repo_task
+
+    # 이전 status에 따라 적절한 태스크 선택
+    was_import = "import" in (repo.status or "")
+    repo.status = "pending_import" if was_import else "pending_create"
+    repo.error_message = None
+    repo.save(update_fields=["status", "error_message", "updated_at"])
+
+    if was_import:
+        import_repo_task.delay(repo.id)
+    else:
+        create_repo_task.delay(repo.id)
+
+    return JsonResponse({"ok": True, "status": repo.status})
+
+
+# ──────────────────────────────────────────────────────
+# Git API 헬퍼
+# ──────────────────────────────────────────────────────
+
+def _build_public_clone_url(forgejo_url: str) -> str:
+    """내부 Forgejo URL → PUBLIC_GIT_BASE_URL 기준으로 재조합"""
+    if not forgejo_url:
+        return ""
+    from django.conf import settings as _settings
+    parsed = _urlparse(forgejo_url)
+    base   = str(getattr(_settings, "PUBLIC_GIT_BASE_URL", "http://localhost:3000")).rstrip("/")
+    return f"{base}{parsed.path}"
+
+
+def _git_repo_dict(repo: GitRepository, request) -> dict:
+    return {
+        "id":                   repo.id,
+        "repo_name":            repo.repo_name,
+        "handrive_path":        repo.handrive_path,
+        "status":               repo.status,
+        "error_message":        repo.error_message,
+        "forgejo_clone_http":   _build_public_clone_url(repo.forgejo_clone_http_url),
+        "forgejo_clone_ssh":    repo.forgejo_clone_ssh_url,
+        "created_at":           repo.created_at.isoformat() if repo.created_at else None,
+        "updated_at":           repo.updated_at.isoformat() if repo.updated_at else None,
+    }

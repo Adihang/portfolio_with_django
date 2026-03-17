@@ -155,6 +155,22 @@ GAME_JWT_SECRET = load_optional_secret("GAME_JWT_SECRET", SECRET_KEY)
 GAME_JWT_ISSUER = load_optional_secret("GAME_JWT_ISSUER", PUBLIC_BASE_URL).rstrip("/")
 GAME_JWT_AUDIENCE = load_optional_secret("GAME_JWT_AUDIENCE", "hanplanet-game")
 GAME_JWT_EXP_SECONDS = max(30, load_optional_int_secret("GAME_JWT_EXP_SECONDS", 300))
+
+# Celery 설정 (Redis 브로커, Django DB 결과 백엔드)
+CELERY_BROKER_URL                         = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND                     = "django-db"
+CELERY_CACHE_BACKEND                      = "default"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_ACKS_LATE                     = True
+CELERY_WORKER_PREFETCH_MULTIPLIER         = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD         = 50
+CELERY_BROKER_TRANSPORT_OPTIONS           = {"visibility_timeout": 3600}
+
+# Forgejo 설정
+FORGEJO_BASE_URL    = load_optional_secret("FORGEJO_BASE_URL", "http://localhost:3000")
+FORGEJO_ADMIN_TOKEN = load_optional_secret("FORGEJO_ADMIN_TOKEN", "")
+PUBLIC_GIT_BASE_URL = load_optional_secret("PUBLIC_GIT_BASE_URL", "http://localhost:3000")
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -166,6 +182,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'main',
     'corsheaders',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [

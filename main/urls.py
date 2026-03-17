@@ -154,5 +154,11 @@ urlpatterns = [
     path('api/game-auth-token/', views.game_auth_token, name='game_auth_token'),
     path('api/internal/bumpercar-spiky/stats/', views.bumpercar_spiky_stats_record, name='bumpercar_spiky_stats_record'),
     path('account/profile-image/', views.account_profile_image_upload, name='account_profile_image_upload'),
-    path('api/chat/', views.chat_with_ai, name='chat_with_ai')
+    path('api/chat/', views.chat_with_ai, name='chat_with_ai'),
+    path('api/git/repos/', views.git_repo_create, name='git_repo_create'),
+    path('api/git/repos/by-path/', views.git_repo_by_path, name='git_repo_by_path'),
+    path('api/git/repos/<int:repo_id>/collaborators/', views.git_repo_collaborator, name='git_repo_collaborator'),
+    path('api/git/repos/<int:repo_id>/clone/', views.git_repo_clone_url, name='git_repo_clone_url'),
+    path('api/git/repos/<int:repo_id>/status/', views.git_repo_status, name='git_repo_status'),
+    path('api/git/repos/<int:repo_id>/retry/', views.git_repo_retry, name='git_repo_retry'),
 ]

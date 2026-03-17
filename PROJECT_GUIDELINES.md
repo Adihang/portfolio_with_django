@@ -19,18 +19,45 @@ Shared reference for all AI coding agents (Claude Code, Codex, etc.) working in 
 # Access log summary
 .venv/bin/python manage.py summarize_access_logs --date YYYY-MM-DD
 
-# Game server (bumpercar-spiky-server/)
-node server.js            # Production
+# Game server (bumpercar-spiky-server/) — local dev only
+node server.js            # Production mode
 PORT=8081 node server.js  # Dev (port 8080 is often occupied locally)
-
-# Docker stack
-docker compose up -d --build
-docker compose logs -f django nginx cloudflared
 ```
 
 **Static asset rollout rule:** After any change to `static/css/*`, `static/js/*`, or templates that reference them, always run `collectstatic` then restart gunicorn — never restart without collecting first.
 
-Local gunicorn restart: `/bin/zsh -lc "launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn"`
+### Production Deployment (launchd — no Docker)
+
+> Docker is **not in use**. All services run as native macOS launchd daemons.
+
+| Service | launchd label | Restart command |
+|---------|--------------|-----------------|
+| Django (gunicorn) | `com.hanplanet.gunicorn` | `launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn` |
+| Game server | `com.hanplanet.bumpercar-spiky-server` | `launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server` |
+| Git server (Gitea) | `com.hanplanet.gitea` | `launchctl kickstart -k gui/$(id -u)/com.hanplanet.gitea` |
+| Celery worker | `com.hanplanet.celery` | `launchctl kickstart -k gui/$(id -u)/com.hanplanet.celery` |
+| Nginx | `com.hanplanet.nginx` | `launchctl kickstart -k gui/$(id -u)/com.hanplanet.nginx` |
+
+Plist files: `deploy/launchd/` (Django, Gitea, Celery, Nginx) and `bumpercar-spiky-server/deploy/launchd/` (game server).
+
+**Django 변경 후 운영 적용:**
+```bash
+.venv/bin/python manage.py collectstatic --noinput
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.gunicorn
+```
+
+**Game server 변경 후 운영 적용:**
+```bash
+# bumpercar-spiky-server/ 에서 작업
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server
+# 확인: tail -f /tmp/bumpercar-spiky-server.log
+```
+
+**Celery worker 변경 후 운영 적용:**
+```bash
+launchctl kickstart -k gui/$(id -u)/com.hanplanet.celery
+# 확인: tail -f log/celery.stdout.log
+```
 
 ## Project Structure
 
@@ -67,7 +94,9 @@ This is a Django 5.0.1 portfolio + content management + multiplayer game platfor
 
 **AI chatbot:** Ollama at `http://localhost:11434` (default model: `llama3.2:latest`), accessed via `/api/chat/`
 
-**Infrastructure:** Gunicorn → Cloudflare Tunnel → hanplanet.com. Docker stack: `cloudflared → nginx → gunicorn(django)`.
+**Infrastructure:** Gunicorn → Nginx → Cloudflare Tunnel → hanplanet.com. 모두 launchd 네이티브 데몬으로 실행 (Docker 미사용).
+
+**Git 서버:** Gitea (Homebrew, `/opt/homebrew/bin/gitea`, 포트 3000) + Celery Worker (Redis 브로커) — HanDrive 폴더를 Git 저장소로 변환하는 비동기 작업 처리.
 
 ## Configuration
 
@@ -76,6 +105,9 @@ Secrets go in `config/secrets.json` (git-ignored). Key env vars:
 - `OLLAMA_BASE_URL`, `OLLAMA_MODEL`
 - `GAME_JWT_SECRET`, `GAME_WS_PUBLIC_URL`
 - `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (Cloudflare CAPTCHA)
+- `FORGEJO_BASE_URL` — Gitea 서버 주소 (기본: `http://localhost:3000`)
+- `FORGEJO_ADMIN_TOKEN` — Gitea 관리자 API 토큰 (repo 생성/collaborator 관리용)
+- `PUBLIC_GIT_BASE_URL` — 외부 노출 Git URL (운영: `https://hanplanet.com/git`)
 
 Do not commit API keys or secrets. Production uses `DEBUG = False`.
 
@@ -109,20 +141,46 @@ Do not commit API keys or secrets. Production uses `DEBUG = False`.
 - PRs should include: a brief summary, key files/paths touched, and screenshots for UI changes (templates/static).
 - Link related issues or deployment notes when relevant (e.g., migrations or `collectstatic`).
 
-## Docker Runtime Stack
+## Git 서버 (Gitea + Celery)
+
+> Docker 미사용. 모두 launchd로 관리.
+
+**구성:**
+- **Gitea** — Homebrew 설치 (`brew install gitea`), 포트 3000, SQLite DB
+  - 바이너리: `/opt/homebrew/bin/gitea`
+  - 설정: `forgejo/custom/conf/app.ini`
+  - work-path: `forgejo/` (data, log, custom 하위 디렉토리)
+  - launchd: `com.hanplanet.gitea`
+- **Redis** — Celery 브로커 (`redis://127.0.0.1:6379/0`), `brew services start redis`
+- **Celery Worker** — `django-celery-results` 백엔드, concurrency=2
+  - launchd: `com.hanplanet.celery`
+  - 로그: `log/celery.stdout.log`, `log/celery.stderr.log`
+
+**Django 모델:** `GitRepository`, `GitUserMapping`, `GitCollaborator` (`main/models.py`)
+
+**Celery 태스크** (`main/git_tasks.py`):
+- `create_repo_task(repo_id)` — 일반 폴더 → Gitea repo 생성 + 파일 push
+- `import_repo_task(repo_id)` — 기존 `.git` 폴더 → Gitea mirror push 후 `.git` 삭제
+
+**API 엔드포인트:**
+- `POST /api/git/repos/` — repo 생성 요청
+- `GET /api/git/repos/by-path/` — 경로로 repo 조회
+- `GET /api/git/repos/<id>/status/` — 상태 폴링 (pending/active/failed)
+- `POST /api/git/repos/<id>/retry/` — 실패 시 재시도
+- `GET /api/git/repos/<id>/clone/` — clone URL 반환
+- `POST /api/git/repos/<id>/collaborators/` — collaborator 추가
+
+**Gitea 초기 설정:** `forgejo/setup.sh` 실행 → 출력된 토큰을 `config/secrets.json`의 `FORGEJO_ADMIN_TOKEN`에 저장.
+
+**Git 서버 관련 gitignore 항목:** `forgejo/bin/`, `forgejo/data/`, `forgejo/log/`
+
+## Docker (미사용 — 참고용)
+
+> 현재 운영에서 Docker는 사용하지 않는다. 아래는 이전 설계 참고용.
 
 Container chain: `cloudflared → nginx → gunicorn(django)`.
 
 Key files: `docker-compose.yml`, `Dockerfile`, `docker/entrypoint.sh`, `docker/nginx/default.conf`, `docker/cloudflared/config.yml.example`, `.env.docker.example`.
-
-**Docker Test Quickstart:**
-1. `cp .env.docker.example .env.docker` and `cp docker/cloudflared/config.yml.example docker/cloudflared/config.yml`
-2. Replace `<TUNNEL_ID>` in `docker/cloudflared/config.yml`
-3. `cp ~/.cloudflared/<TUNNEL_ID>.json docker/cloudflared/<TUNNEL_ID>.json`
-4. `touch db.sqlite3`
-5. `docker compose up -d --build`
-6. `docker compose ps` and `docker compose logs -f django nginx cloudflared`
-7. Smoke test: `curl -I http://127.0.0.1/portfolio/`
 
 ## Access Logs
 

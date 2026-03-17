@@ -21,6 +21,9 @@ from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_mar
 from .models import (
     Career,
     DocsAccessRule,
+    GitCollaborator,
+    GitRepository,
+    GitUserMapping,
     Hobby,
     NavLink,
     PortfolioActionButton,
@@ -250,6 +253,29 @@ class StratagemAdmin(admin.ModelAdmin):
 @admin.register(Stratagem_Hero_Score)
 class Stratagem_Hero_ScoreAdmin(admin.ModelAdmin):
     list_display = ['name']
+
+
+@admin.register(GitUserMapping)
+class GitUserMappingAdmin(admin.ModelAdmin):
+    list_display = ["user", "forgejo_username", "forgejo_user_id"]
+    search_fields = ["user__username", "forgejo_username"]
+
+
+@admin.register(GitRepository)
+class GitRepositoryAdmin(admin.ModelAdmin):
+    list_display = ["owner", "repo_name", "status", "handrive_path", "created_at", "updated_at"]
+    list_filter = ["status"]
+    search_fields = ["owner__username", "repo_name", "handrive_path"]
+    readonly_fields = ["forgejo_repo_id", "forgejo_clone_http_url", "forgejo_clone_ssh_url", "created_at", "updated_at"]
+    ordering = ["-created_at"]
+
+
+@admin.register(GitCollaborator)
+class GitCollaboratorAdmin(admin.ModelAdmin):
+    list_display = ["repository", "user", "permission"]
+    list_filter = ["permission"]
+    search_fields = ["repository__repo_name", "user__username"]
+
 
 LOG_DAYS_DEFAULT = 30
 LOG_PER_PAGE_DEFAULT = 100

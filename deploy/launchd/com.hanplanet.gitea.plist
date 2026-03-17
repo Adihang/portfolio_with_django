@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hanplanet.gitea</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/gitea</string>
+        <string>web</string>
+        <string>--work-path</string>
+        <string>/Users/imhanbyeol/Development/Hanplanet/forgejo</string>
+        <string>--config</string>
+        <string>/Users/imhanbyeol/Development/Hanplanet/forgejo/custom/conf/app.ini</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/imhanbyeol/Development/Hanplanet/forgejo</string>
+
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/imhanbyeol/Development/Hanplanet/forgejo/log/gitea.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/imhanbyeol/Development/Hanplanet/forgejo/log/gitea.stderr.log</string>
+</dict>
+</plist>

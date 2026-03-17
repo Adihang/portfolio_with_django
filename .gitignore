@@ -57,3 +57,11 @@ docker/cloudflared/*.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Forgejo (Git server)
+forgejo/bin/
+forgejo/data/
+forgejo/log/
+
+# Celery / application logs
+log/
