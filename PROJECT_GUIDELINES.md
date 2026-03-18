@@ -174,6 +174,18 @@ Do not commit API keys or secrets. Production uses `DEBUG = False`.
 
 **Git 서버 관련 gitignore 항목:** `forgejo/bin/`, `forgejo/data/`, `forgejo/log/`
 
+### Forgejo 커스텀 테마 구조
+
+커스텀 파일 위치:
+- 템플릿: `forgejo/custom/templates/` (Gitea 내장 템플릿 오버라이드)
+- 에셋: `forgejo/custom/public/assets/` — **www.hanplanet.com과 공유하는 공통 에셋**
+
+> ⚠️ **에셋 우선 원칙 — 반드시 준수:**
+> `forgejo/custom/public/assets/css/`, `js/` 의 파일들은 www와 공유하는 공통 파일이다.
+> - **Forgejo 전용 CSS 오버라이드 파일을 따로 만들지 않는다.** Gitea 기본 디자인을 별도 파일로 덮어쓰지 않는다.
+> - **www 디자인(style.css 등 공통 파일)을 그대로 사용한다.** `header.tmpl`에서 공통 CSS를 로드할 때 이 파일들을 사용한다.
+> - www 사이드에서 `static/css/style.css`를 수정하면 반드시 `forgejo/custom/public/assets/css/style.css`에도 동기화한다.
+
 ## Docker (미사용 — 참고용)
 
 > 현재 운영에서 Docker는 사용하지 않는다. 아래는 이전 설계 참고용.
