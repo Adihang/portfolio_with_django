@@ -5,10 +5,33 @@
   <a class="site-footer-link" href="https://www.hanplanet.com/ko/terms">Terms of Service</a>
 </footer>
 
+{{/* 공통 JS — www.hanplanet.com과 동일한 순서 */}}
+<script src="/assets/js/popup_common.js"></script>
 <script src="/assets/js/bootstrap.min.js"></script>
 <script src="/assets/js/site_nav_responsive_manager.js"></script>
+<script src="/assets/js/script.js"></script>
+
 <script>
 (function () {
+  /* ── body.page + body.theme-dark — www base.html 공통 클래스 ── */
+  document.body.classList.add('page');
+  document.body.classList.add('theme-preinit');
+  document.body.dataset.authenticated = '{{if .IsSigned}}1{{else}}0{{end}}';
+  (function () {
+    try {
+      var stored = window.localStorage.getItem('portfolio_theme_mode');
+      var prefersDark;
+      if (stored === 'dark') {
+        prefersDark = true;
+      } else if (stored === 'light') {
+        prefersDark = false;
+      } else {
+        prefersDark = Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      }
+      document.body.classList.toggle('theme-dark', prefersDark);
+    } catch (e) {}
+  })();
+
   /* ── Hanplanet SSO 복귀 ─────────────────────────────────── */
   var match = document.cookie.match(/(?:^|;\s*)hp_sso_return=([^;]+)/);
   if (match) {
@@ -19,72 +42,6 @@
       return;
     }
   }
-
-  /* ── 언어 · 테마 컨트롤 — www syncThemeToggleState 패턴 적용 ── */
-  (function initControls() {
-    /* ── www syncThemeToggleState와 동일: 버튼 data 속성값과 현재값 직접 비교 ── */
-    function syncLang(currentLang) {
-      document.querySelectorAll('[data-hp-lang]').forEach(function (btn) {
-        var match = currentLang.toLowerCase().startsWith(
-          btn.getAttribute('data-hp-lang').split('-')[0].toLowerCase()
-        );
-        btn.classList.toggle('is-active', match);
-        btn.setAttribute('aria-pressed', match ? 'true' : 'false');
-      });
-    }
-
-    function syncTheme(currentTheme) {
-      document.querySelectorAll('[data-hp-theme]').forEach(function (btn) {
-        var match = btn.getAttribute('data-hp-theme') === currentTheme;
-        btn.classList.toggle('is-active', match);
-        btn.setAttribute('aria-pressed', match ? 'true' : 'false');
-      });
-    }
-
-    /* ── 초기 상태 ── */
-    var langCookie = document.cookie.match(/(?:^|;\s*)lang=([^;]+)/);
-    var currentLang = langCookie ? decodeURIComponent(langCookie[1]) : 'ko-KR';
-    syncLang(currentLang);
-
-    /* ── 테마: localStorage → prefers-color-scheme → 라이트 기본 ── */
-    var storedTheme = localStorage.getItem('theme');
-    var currentTheme;
-    if (storedTheme) {
-      currentTheme = storedTheme;
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      currentTheme = 'gitea-dark';
-    } else {
-      currentTheme = 'gitea-light';
-    }
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    syncTheme(currentTheme);
-
-    /* ── body.page + body.theme-dark — www base.html 공통 클래스 동기화 ── */
-    document.body.classList.add('page');
-    document.body.classList.toggle('theme-dark', currentTheme === 'gitea-dark');
-
-    /* ── 언어 버튼 이벤트 ── */
-    document.querySelectorAll('[data-hp-lang]').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        var lang = btn.getAttribute('data-hp-lang');
-        document.cookie = 'lang=' + lang + '; path=/; max-age=31536000; SameSite=Lax';
-        location.reload();
-      });
-    });
-
-    /* ── 테마 버튼 이벤트 — www applyThemeMode 패턴 ── */
-    document.querySelectorAll('[data-hp-theme]').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        var theme = btn.getAttribute('data-hp-theme');
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        document.cookie = 'theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
-        syncTheme(theme);
-      });
-    });
-  })();
 
   /* ── 로그인 페이지 → Hanplanet SSO 자동 리다이렉트 ─────── */
   (function redirectLoginToSSO() {
@@ -114,7 +71,7 @@
     });
   })();
 
-  /* ── 반응형 네비바 (www site_nav_responsive_manager 적용) ── */
+  /* ── 반응형 네비바 ── */
   if (typeof window.__initSiteNavResponsiveManager === 'function') {
     window.__initSiteNavResponsiveManager();
   }

@@ -31,20 +31,20 @@
 				{{else}}
 					<a class="nav-link ui-nav-link" href="https://git.hanplanet.com">Git</a>
 				{{end}}
-			</li>
+				</li>
 			</ul>
 
-			{{/* 언어 + 테마 컨트롤 */}}
+			{{/* 언어 + 테마 컨트롤 — www ui_controls_stack.html 동일 구조 */}}
 			<div class="ui-controls-stack">
-				<div class="ui-control-toggle ui-lang-toggle">
-					<a class="ui-control-link ui-lang-link" id="ui-lang-ko" href="#" data-hp-lang="ko-KR">KO</a>
+				<div class="ui-lang-toggle ui-control-toggle ui-lang-toggle-inline" aria-label="Language Toggle">
+					<a class="ui-lang-link ui-control-link" href="#" data-hp-lang="ko-KR">KO</a>
 					<span class="ui-lang-divider">|</span>
-					<a class="ui-control-link ui-lang-link" id="ui-lang-en" href="#" data-hp-lang="en-US">EN</a>
+					<a class="ui-lang-link ui-control-link" href="#" data-hp-lang="en-US">EN</a>
 				</div>
-				<div class="ui-control-toggle ui-theme-toggle">
-					<a class="ui-control-link ui-lang-link" id="ui-theme-lt" href="#" data-hp-theme="gitea-light">LT</a>
+				<div class="ui-lang-toggle ui-control-toggle ui-theme-toggle" aria-label="Theme Toggle">
+					<a href="#" role="button" class="ui-lang-link ui-control-link" data-theme-mode="light">LT</a>
 					<span class="ui-lang-divider">|</span>
-					<a class="ui-control-link ui-lang-link" id="ui-theme-dk" href="#" data-hp-theme="gitea-dark">DK</a>
+					<a href="#" role="button" class="ui-lang-link ui-control-link" data-theme-mode="dark">DK</a>
 				</div>
 			</div>
 
