@@ -1,1 +1,9 @@
 /* Gitea default CSS disabled — www 공통 CSS 사용 (style.css 등) */
+
+/* Gitea 래퍼 div.full.height — body(flex-column)를 꽉 채워 footer margin-top:auto 동작하게 */
+div.full.height {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
