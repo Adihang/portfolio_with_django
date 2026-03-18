@@ -39,6 +39,11 @@ body.page {
     background-image: none;
 }
 
+body.theme-dark.page {
+    background: var(--site-bg);
+    background-image: none;
+}
+
 body.bubble-page {
     background: #bfbfbf;
     background-image: none;
