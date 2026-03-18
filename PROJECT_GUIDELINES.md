@@ -120,6 +120,7 @@ Do not commit API keys or secrets. Production uses `DEBUG = False`.
 
 ## UI Rules
 
+- **Never use `!important` in CSS.** Use correct selector specificity or CSS load order instead. `gitea_ui.css` is the last loaded stylesheet on Forgejo pages — rules there win without `!important`.
 - Do not change visual design, responsive breakpoints, or animations unless explicitly requested.
 - Do not break responsive mode-switch timing or breakpoint behavior when viewport size changes.
 - Keep existing transition/animation behavior intact unless explicitly requested.

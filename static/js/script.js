@@ -286,11 +286,6 @@
         currentSurfaceMode = useDarkTheme;
         document.body.classList.toggle('theme-dark', useDarkTheme);
 
-        if (!isLightBackgroundPage) {
-            return;
-        }
-
-        const surfaceColor = useDarkTheme ? SURFACE_COLOR.dark : SURFACE_COLOR.light;
         if (useDarkTheme) {
             document.documentElement.classList.remove('preload-light-bg');
             document.documentElement.classList.add('preload-dark-bg');
@@ -298,6 +293,12 @@
             document.documentElement.classList.remove('preload-dark-bg');
             document.documentElement.classList.add('preload-light-bg');
         }
+
+        if (!isLightBackgroundPage) {
+            return;
+        }
+
+        const surfaceColor = useDarkTheme ? SURFACE_COLOR.dark : SURFACE_COLOR.light;
         setLightSurfaceStylesEnabled(!useDarkTheme);
         setSurfaceBackground(document.documentElement, surfaceColor);
         setSurfaceBackground(document.body, surfaceColor);

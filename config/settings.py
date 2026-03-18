@@ -147,7 +147,7 @@ ALLOWED_HOSTS = env_list(
     "hanplanet.com,www.hanplanet.com,localhost,127.0.0.1,52.79.71.20,112.187.212.49,112.187.212.140",
 )
 
-PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://hanplanet.com").rstrip("/")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://www.hanplanet.com").rstrip("/")
 DJANGO_SERVE_FILES = env_bool("DJANGO_SERVE_FILES", default=True)
 GAME_WS_PUBLIC_URL = os.environ.get("GAME_WS_PUBLIC_URL", "wss://game.hanplanet.com").rstrip("/")
 GAME_WS_LOCAL_URL = os.environ.get("GAME_WS_LOCAL_URL", "ws://127.0.0.1:8081").rstrip("/")
@@ -380,6 +380,8 @@ OAUTH2_PROVIDER = {
     'ROTATE_REFRESH_TOKEN': True,
     'OIDC_ENABLED': True,
     'OIDC_RSA_PRIVATE_KEY': load_optional_secret('OIDC_RSA_PRIVATE_KEY', ''),
+    'PKCE_REQUIRED': False,  # Forgejo OAuth2 클라이언트(confidential)가 PKCE 미지원
+    'OAUTH2_VALIDATOR_CLASS': 'main.oauth2_validators.HanplanetOAuth2Validator',
 }
 AUTHENTICATION_BACKENDS = [
     'oauth2_provider.backends.OAuth2Backend',

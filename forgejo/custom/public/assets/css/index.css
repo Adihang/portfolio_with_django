@@ -2,15 +2,8 @@
 /* 색상 스타일은 gitea_ui.css에서 관리 (버전 태그로 캐시 무효화) */
 
 /* ─────────────────────────────────────────────────────────
-   Gitea 래퍼 div.full.height
-   body(flex-column)를 꽉 채워 footer margin-top:auto 동작
+   Gitea 래퍼 div.full.height — gitea_ui.css에서 display:contents 로 처리
 ───────────────────────────────────────────────────────── */
-div.full.height {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
 
 /* ─────────────────────────────────────────────────────────
    Tailwind 유틸리티 (Gitea 내장 index.js가 의존)

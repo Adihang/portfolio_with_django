@@ -7,6 +7,19 @@
 ══════════════════════════════════════════════════════════════════ */
 
 /* ──────────────────────────────────────────────────────────────
+   0. Sticky footer 레이아웃
+   div.full.height 는 base/head.tmpl 오버라이드로 제거됨
+────────────────────────────────────────────────────────────── */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+.page-content {
+    flex-grow: 1;
+}
+
+/* ──────────────────────────────────────────────────────────────
    0. 전체 페이지 배경
 ────────────────────────────────────────────────────────────── */
 body.page {
@@ -16,6 +29,16 @@ body.page {
 body.theme-dark.page {
     background: var(--site-bg, #222222);
     background-image: none;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   0-1. 네비바 다크 모드 그림자
+   gitea_ui.css 가 마지막 로드 → Forgejo 내장 CSS 덮어쓰기 보장
+────────────────────────────────────────────────────────────── */
+body.theme-dark .ui-nav {
+    background: rgba(34, 34, 34, 0.84);
+    background-image: none;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -38,11 +61,17 @@ a:hover {
     color: var(--theme-ink);
     text-decoration: underline;
 }
-a.muted, .muted {
-    color: var(--site-text-muted) !important;
+/* Forgejo 버튼 요소 호버 시 밑줄 제거 */
+.ui.button:hover,
+.ui.buttons .button:hover,
+a.ui.button:hover {
     text-decoration: none;
 }
-a.muted:hover { color: var(--theme-ink) !important; }
+a.muted, .muted {
+    color: var(--site-text-muted);
+    text-decoration: none;
+}
+a.muted:hover { color: var(--theme-ink); }
 
 h1, h2, h3, h4, h5, h6 {
     color: var(--theme-ink);
@@ -339,7 +368,8 @@ code {
 pre code { background: transparent; border: none; padding: 0; }
 
 /* ──────────────────────────────────────────────────────────────
-   11. 모달
+   11. 모달 — 레이아웃/포지셔닝은 Fomantic UI 내장 CSS에 위임
+   (position/overflow/transform 재정의하면 Fomantic JS가 깨짐)
 ────────────────────────────────────────────────────────────── */
 .ui.modal {
     background: var(--site-bg);
@@ -347,39 +377,21 @@ pre code { background: transparent; border: none; padding: 0; }
     border-radius: 12px;
     box-shadow: var(--site-shadow-xl);
     color: var(--site-text);
-    overflow: hidden;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1001;
-    min-width: 300px;
-    max-width: 90vw;
 }
 .ui.modal .header {
     border-bottom: 1px solid var(--site-border);
     color: var(--theme-ink);
     font-weight: 700;
-    padding: 16px 20px;
-    font-size: 16px;
 }
 .ui.modal .content, .ui.modal .modal-form {
-    padding: 16px 20px;
     color: var(--site-text);
 }
 .ui.modal .actions {
     border-top: 1px solid var(--site-border);
-    padding: 12px 20px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
     background: var(--site-surface-muted);
 }
 .ui.dimmer {
-    position: fixed;
-    inset: 0;
     background: var(--site-backdrop);
-    z-index: 1000;
 }
 
 /* ──────────────────────────────────────────────────────────────

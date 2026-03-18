@@ -2421,20 +2421,21 @@ def docs_gitea_sso_relay(request):
     if not public_git:
         return redirect(next_url)
 
-    gitea_oauth_url = public_git + "/user/oauth2/hanplanet"
+    # 상대경로 → 절대 URL (git.hanplanet.com JS에서 window.location.replace 시 www로 복귀)
+    www_base = getattr(settings, "PUBLIC_BASE_URL", "https://www.hanplanet.com").rstrip("/")
+    if next_url.startswith("/"):
+        next_url = www_base + next_url
 
-    response = redirect(gitea_oauth_url)
-    # .hanplanet.com 서브도메인 전체에서 읽을 수 있도록 도메인 설정
-    response.set_cookie(
-        "hp_sso_return",
-        next_url,
-        max_age=120,
-        domain=".hanplanet.com",
-        path="/",
-        secure=True,
-        httponly=False,   # Gitea 측 JS에서 읽어야 함
-        samesite="Lax",
-    )
+    # git.hanplanet.com 경유 — hp_relogin=1 이 footer.tmpl JS에서 감지됨:
+    # 1) Forgejo에 다른 계정이 로그인 중이면 먼저 로그아웃 후 OAuth2 재시작
+    # 2) 이미 로그아웃 상태면 즉시 OAuth2 시작
+    response = redirect(public_git + "/")
+    cookie_kwargs = dict(max_age=120, domain=".hanplanet.com", path="/",
+                         secure=True, httponly=False, samesite="Lax")
+    response.set_cookie("hp_relogin", "1", **cookie_kwargs)
+    response.set_cookie("hp_sso_return", next_url, **cookie_kwargs)
+    response.delete_cookie("hp_logout", path="/", domain=".hanplanet.com")
+    response.delete_cookie("hp_logout_return", path="/", domain=".hanplanet.com")
     return response
 
 
@@ -2493,8 +2494,7 @@ def docs_login(request, ui_lang=None):
                 _clear_docs_login_captcha(request)
                 auth_login(request, authed_user)
                 _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
-                post_login = _resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user)
-                return redirect(_make_gitea_sso_url(post_login))
+                return redirect(_make_gitea_sso_url(next_url))
             else:
                 login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
                 captcha_question = _build_docs_login_captcha(request, refresh=True)
@@ -2507,8 +2507,7 @@ def docs_login(request, ui_lang=None):
             _clear_docs_login_captcha(request)
             auth_login(request, authed_user)
             _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
-            post_login = _resolve_docs_post_login_url(request, resolved_lang, next_url, authed_user)
-            return redirect(_make_gitea_sso_url(post_login))
+            return redirect(_make_gitea_sso_url(next_url))
         else:
             login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
             if target_user is not None:
@@ -2611,8 +2610,50 @@ def docs_logout(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     next_url = resolve_next_url(request, context["docs_base_url"])
+    # Forgejo 세션/토큰 서버사이드 선제 삭제 (로그아웃 전에 user 정보 참조)
+    _forgejo_server_logout(request.user)
     auth_logout(request)
-    return redirect(next_url)
+    # 무조건 git.hanplanet.com 경유 → footer.tmpl JS가 Forgejo 로그아웃 처리 후 www로 복귀
+    git_base = settings.PUBLIC_GIT_BASE_URL.rstrip("/")
+    response = redirect(git_base + "/")
+    _set_hp_logout_cookies(response, next_url)
+    return response
+
+
+def _set_hp_logout_cookies(response, return_url):
+    """hp_logout + hp_logout_return 쿠키를 .hanplanet.com 공유 도메인에 설정."""
+    # 상대경로 → 절대 URL (git.hanplanet.com JS에서 window.location.replace 시 www로 복귀)
+    www_base = getattr(settings, "PUBLIC_BASE_URL", "https://www.hanplanet.com").rstrip("/")
+    if return_url and return_url.startswith("/"):
+        return_url = www_base + return_url
+    cookie_kwargs = dict(max_age=300, domain=".hanplanet.com", path="/",
+                         secure=True, httponly=False, samesite="Lax")
+    response.set_cookie("hp_logout", "1", **cookie_kwargs)
+    response.set_cookie("hp_logout_return", return_url, **cookie_kwargs)
+
+
+def _forgejo_server_logout(user):
+    """Forgejo DB에서 해당 유저의 auth_token, oauth2_grant, session을 삭제해 서버사이드 세션 무효화."""
+    if not user or not user.is_authenticated:
+        return
+    try:
+        from main.models import GitUserMapping
+        mapping = GitUserMapping.objects.filter(user=user).first()
+        if not mapping:
+            return
+        forgejo_user_id = mapping.forgejo_user_id
+        import sqlite3 as _sqlite3
+        db_path = str(settings.BASE_DIR / "forgejo" / "data" / "gitea.db")
+        with _sqlite3.connect(db_path) as conn:
+            conn.execute("DELETE FROM auth_token WHERE user_id = ?", (forgejo_user_id,))
+            conn.execute("DELETE FROM oauth2_grant WHERE user_id = ?", (forgejo_user_id,))
+            conn.execute(
+                "DELETE FROM session WHERE CAST(data AS TEXT) LIKE ?",
+                (f'%"uid"%{forgejo_user_id}%',),
+            )
+            conn.commit()
+    except Exception:
+        pass  # 실패해도 www 로그아웃 및 클라이언트사이드 로그아웃은 정상 진행
 
 
 @require_http_methods(["POST"])
