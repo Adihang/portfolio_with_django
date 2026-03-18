@@ -20,7 +20,8 @@
 <script>
 (function () {
   try {
-    var stored = window.localStorage.getItem('portfolio_theme_mode');
+    var cookieMatch = document.cookie.match(/(?:^|;\s*)portfolio_theme_mode=([^;]+)/);
+    var stored = (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null) || window.localStorage.getItem('portfolio_theme_mode');
     var prefersDark;
     if (stored === 'dark') {
       prefersDark = true;

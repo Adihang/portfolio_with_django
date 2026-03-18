@@ -50,7 +50,8 @@
                 prefersDark = false;
             } else {
                 try {
-                    const storedThemeMode = window.localStorage.getItem('portfolio_theme_mode');
+                    const cookieMatch = document.cookie.match(/(?:^|;\s*)portfolio_theme_mode=([^;]+)/);
+                    const storedThemeMode = (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null) || window.localStorage.getItem('portfolio_theme_mode');
                     if (storedThemeMode === 'dark') {
                         prefersDark = true;
                     } else if (storedThemeMode === 'light') {
@@ -154,7 +155,8 @@
                 prefersDark = false;
             } else {
                 try {
-                    const storedThemeMode = window.localStorage.getItem('portfolio_theme_mode');
+                    const cookieMatch = document.cookie.match(/(?:^|;\s*)portfolio_theme_mode=([^;]+)/);
+                    const storedThemeMode = (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null) || window.localStorage.getItem('portfolio_theme_mode');
                     if (storedThemeMode === 'dark') {
                         prefersDark = true;
                     } else if (storedThemeMode === 'light') {

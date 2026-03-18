@@ -179,10 +179,27 @@
         });
     };
 
-    // 저장된 테마 모드를 읽어오는 함수
+    // .hanplanet.com 공유 쿠키에서 테마 읽기
+    const readThemeCookie = function () {
+        try {
+            const m = document.cookie.match(/(?:^|;\s*)portfolio_theme_mode=([^;]+)/);
+            if (m) return decodeURIComponent(m[1]);
+        } catch (error) {}
+        return null;
+    };
+
+    // .hanplanet.com 공유 쿠키에 테마 쓰기
+    const writeThemeCookie = function (value) {
+        try {
+            document.cookie = 'portfolio_theme_mode=' + value + '; domain=.hanplanet.com; path=/; max-age=31536000; SameSite=Lax';
+        } catch (error) {}
+    };
+
+    // 저장된 테마 모드를 읽어오는 함수 (쿠키 → localStorage 순서)
     const readStoredThemeMode = function () {
         try {
-            const storedMode = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+            const cookieMode = readThemeCookie();
+            const storedMode = cookieMode || window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
             if (storedMode === 'dark') {
                 return true;
             }
@@ -204,18 +221,21 @@
         return null;
     };
 
-    // 테마 모드를 로컬 스토리지에 저장하는 함수
+    // 테마 모드를 로컬 스토리지 + .hanplanet.com 공유 쿠키에 저장하는 함수
     const persistThemeMode = function (darkMode) {
         try {
             if (darkMode === true) {
                 window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'dark');
+                writeThemeCookie('dark');
                 return;
             }
             if (darkMode === false) {
                 window.localStorage.setItem(THEME_MODE_STORAGE_KEY, 'light');
+                writeThemeCookie('light');
                 return;
             }
             window.localStorage.removeItem(THEME_MODE_STORAGE_KEY);
+            writeThemeCookie('');
         } catch (error) {}
     };
 
