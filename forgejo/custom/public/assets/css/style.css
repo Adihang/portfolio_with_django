@@ -348,7 +348,7 @@ body.theme-dark .ui-nav.nav-auto-collapsed .ui-nav-links {
 body.theme-dark .ui-nav {
     background: rgba(34, 34, 34, 0.84);
     background-image: none;
-    box-shadow: 0 8px 18px rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48);
 }
 
 body.portfolio-page.theme-dark .main-surface-layer,
