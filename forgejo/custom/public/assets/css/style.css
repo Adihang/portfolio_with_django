@@ -29,6 +29,8 @@ body {
     font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
     color: inherit;
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     background: linear-gradient(180deg, #171717 0%, #232323 50%, #171717 100%);
 }
 
@@ -2973,6 +2975,7 @@ body.portfolio-page.theme-dark .career_cards hr {
     font-size: 14px;
     color: #6b7280;
     flex: 0 0 auto;
+    margin-top: auto;
 }
 
 .site-footer-link {
