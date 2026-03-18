@@ -116,13 +116,29 @@ class ForgejoClient:
             headers={**basic, "Content-Type": "application/json"},
             json={
                 "name":   "hanplanet",
-                "scopes": ["write:repository", "read:repository", "read:user"],
+                "scopes": [
+                    "write:repository", "read:repository",
+                    "read:user", "write:user",   # write:user — 아바타 업데이트에 필요
+                ],
             },
             timeout=15,
         )
         resp.raise_for_status()
         token_value = resp.json().get("sha1") or resp.json().get("token", "")
         return gitea_user, token_value
+
+    def update_user_avatar(self, forgejo_token: str, image_bytes: bytes) -> None:
+        """유저 본인 토큰으로 아바타 업데이트 (write:user 스코프 필요).
+        image_bytes: PNG 또는 JPEG 바이너리.
+        """
+        b64 = base64.b64encode(image_bytes).decode()
+        resp = requests.post(
+            f"{self._base_url}/api/v1/user/avatar",
+            headers={"Authorization": f"token {forgejo_token}", "Content-Type": "application/json"},
+            json={"image": b64},
+            timeout=30,
+        )
+        resp.raise_for_status()
 
     def internal_authed_clone_url(self, owner: str, repo_name: str) -> str:
         """서버 내부 git 작업용 인증 URL — FORGEJO_BASE_URL(localhost) 기반.

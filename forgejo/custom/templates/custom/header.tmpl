@@ -1,5 +1,20 @@
 {{/* Hanplanet custom theme */}}
-<link rel="stylesheet" href="/assets/css/user.css?v={{AppVer}}">
+{{/* 테마 즉시 적용 — FOUC 방지 (CSS 로드 전 페인트 차단) */}}
+<script>
+(function () {
+  var stored = localStorage.getItem('theme');
+  var theme;
+  if (stored) {
+    theme = stored;
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    theme = 'gitea-dark';
+  } else {
+    theme = 'gitea-light';
+  }
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<link rel="stylesheet" href="/assets/css/user.css?v={{AppVer}}-hp5">
 {{/* 파비콘 — www.hanplanet.com과 동일 */}}
 <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
 <link rel="icon" type="image/png" href="/assets/img/favicon.png">

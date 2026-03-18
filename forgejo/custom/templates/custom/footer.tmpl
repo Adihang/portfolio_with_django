@@ -1,10 +1,12 @@
 {{/* ── Hanplanet HP Footer ──────────────────────────────────── */}}
-<footer class="hp-site-footer" aria-label="Footer links">
-  <a class="hp-site-footer-link" href="https://www.hanplanet.com/ko/privacy" target="_blank" rel="noopener">Privacy Policy</a>
-  <span class="hp-site-footer-sep">/</span>
-  <a class="hp-site-footer-link" href="https://www.hanplanet.com/ko/terms" target="_blank" rel="noopener">Terms of Service</a>
+<footer class="site-footer-links" aria-label="Legal links">
+  <a class="site-footer-link" href="https://www.hanplanet.com/ko/privacy">Privacy Policy</a>
+  <span class="site-footer-sep">/</span>
+  <a class="site-footer-link" href="https://www.hanplanet.com/ko/terms">Terms of Service</a>
 </footer>
 
+<script src="/assets/js/bootstrap.min.js"></script>
+<script src="/assets/js/site_nav_responsive_manager.js"></script>
 <script>
 (function () {
   /* ── Hanplanet SSO 복귀 ─────────────────────────────────── */
@@ -44,10 +46,22 @@
     var currentLang = langCookie ? decodeURIComponent(langCookie[1]) : 'ko-KR';
     syncLang(currentLang);
 
-    var currentTheme = localStorage.getItem('theme') ||
-      document.documentElement.getAttribute('data-theme') || 'gitea-light';
+    /* ── 테마: localStorage → prefers-color-scheme → 라이트 기본 ── */
+    var storedTheme = localStorage.getItem('theme');
+    var currentTheme;
+    if (storedTheme) {
+      currentTheme = storedTheme;
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      currentTheme = 'gitea-dark';
+    } else {
+      currentTheme = 'gitea-light';
+    }
     document.documentElement.setAttribute('data-theme', currentTheme);
     syncTheme(currentTheme);
+
+    /* ── body.page + body.theme-dark — www base.html 공통 클래스 동기화 ── */
+    document.body.classList.add('page');
+    document.body.classList.toggle('theme-dark', currentTheme === 'gitea-dark');
 
     /* ── 언어 버튼 이벤트 ── */
     document.querySelectorAll('[data-hp-lang]').forEach(function (btn) {
@@ -88,113 +102,21 @@
   (function markActiveNavLink() {
     var curPath = window.location.pathname;
     var curHost = window.location.hostname;
-    document.querySelectorAll('.hp-nav-link').forEach(function (link) {
+    document.querySelectorAll('.ui-nav-link').forEach(function (link) {
       var href = link.getAttribute('href');
       if (!href || href === '#') return;
       try {
         var url = new URL(href, window.location.origin);
         if (url.hostname === curHost && curPath.startsWith(url.pathname) && url.pathname !== '/') {
-          link.classList.add('hp-active');
+          link.classList.add('ui-active');
         }
       } catch (e) {}
     });
   })();
 
   /* ── 반응형 네비바 (www site_nav_responsive_manager 적용) ── */
-  (function initHpNavResponsive() {
-    var nav         = document.querySelector('#navbar.hp-nav');
-    var navInner    = nav && nav.querySelector('.hp-nav-inner');
-    var brandGroup  = nav && nav.querySelector('.hp-brand-group');
-    var navLinks    = nav && nav.querySelector('.hp-nav-links');
-    var navCollapse = nav && nav.querySelector('.hp-nav-collapse');
-    var navControls = navCollapse && navCollapse.querySelector('.hp-controls-stack');
-    var toggler     = nav && nav.querySelector('.hp-nav-toggler');
-
-    if (!nav || !navInner || !brandGroup || !navLinks || !navCollapse || !toggler) return;
-
-    var rafId = null;
-    var isCollapsed = false;
-
-    function measureInlineWidth(node, styleOverrides) {
-      if (!node) return 0;
-      var clone = node.cloneNode(true);
-      Object.assign(clone.style, {
-        position: 'fixed', left: '-99999px', top: '-99999px',
-        visibility: 'hidden', pointerEvents: 'none',
-        width: 'auto', maxWidth: 'none', margin: '0', padding: '0'
-      }, styleOverrides || {});
-      document.body.appendChild(clone);
-      var w = Math.ceil(clone.getBoundingClientRect().width);
-      clone.remove();
-      return w;
-    }
-
-    function getNavItemsWidth() {
-      var lw = measureInlineWidth(navLinks, {
-        display: 'inline-flex', flexDirection: 'row',
-        flexWrap: 'nowrap', alignItems: 'center', listStyle: 'none', gap: '0'
-      });
-      var cw = navControls ? measureInlineWidth(navControls, {
-        display: 'inline-flex', flexDirection: 'column',
-        alignItems: 'flex-end', gap: '0'
-      }) : 0;
-      return lw + cw;
-    }
-
-    function closeMenu() {
-      navCollapse.classList.remove('hp-collapse-open');
-      navCollapse.classList.add('hp-collapse-closed');
-      toggler.classList.add('collapsed');
-      toggler.setAttribute('aria-expanded', 'false');
-    }
-
-    function updateNavMode() {
-      rafId = null;
-      nav.classList.remove('hp-auto-collapsed');
-      navCollapse.classList.remove('hp-collapse-closed', 'hp-collapse-open');
-
-      var available  = navInner.getBoundingClientRect().width;
-      var brandWidth = brandGroup.getBoundingClientRect().width;
-      var itemsWidth = getNavItemsWidth();
-      var required   = brandWidth + itemsWidth + 22;
-
-      if (required > available) {
-        nav.classList.add('hp-auto-collapsed');
-        closeMenu();
-        isCollapsed = true;
-      } else {
-        isCollapsed = false;
-        toggler.classList.add('collapsed');
-        toggler.setAttribute('aria-expanded', 'false');
-      }
-    }
-
-    function scheduleUpdate() {
-      if (rafId !== null) return;
-      rafId = window.requestAnimationFrame(updateNavMode);
-    }
-
-    toggler.addEventListener('click', function () {
-      if (!isCollapsed) return;
-      var isOpen = toggler.getAttribute('aria-expanded') === 'true';
-      if (isOpen) {
-        closeMenu();
-      } else {
-        navCollapse.classList.remove('hp-collapse-closed');
-        navCollapse.classList.add('hp-collapse-open');
-        toggler.classList.remove('collapsed');
-        toggler.setAttribute('aria-expanded', 'true');
-      }
-    });
-
-    window.addEventListener('resize', scheduleUpdate, { passive: true });
-    window.addEventListener('orientationchange', scheduleUpdate, { passive: true });
-
-    scheduleUpdate();
-
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(scheduleUpdate).catch(function () {});
-    }
-  })();
+  if (typeof window.__initSiteNavResponsiveManager === 'function') {
+    window.__initSiteNavResponsiveManager();
+  }
 })();
 </script>

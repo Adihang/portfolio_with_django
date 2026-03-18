@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from .forms import PortfolioActionButtonForm, PortfolioCareerForm, PortfolioProfileForm, PortfolioProjectForm
 from .models import (
     Career,
+    GitUserMapping,
     Hobby,
     NavLink,
     PortfolioActionButton,
@@ -967,6 +968,22 @@ def apply_ui_context(request, context, ui_lang):
             link for link in nav_links
             if str(getattr(link, "name", "") or "").strip().lower() not in removed_nav_names
         ]
+
+        # Git 링크: 로그인 유저에게 본인 Forgejo 페이지로 연결
+        if request.user.is_authenticated:
+            forgejo_username = (
+                GitUserMapping.objects
+                .filter(user=request.user)
+                .values_list("forgejo_username", flat=True)
+                .first()
+            )
+            if forgejo_username:
+                for link in resolved_links:
+                    url_value = str(getattr(link, "url", "") or "")
+                    if "git.hanplanet.com" in url_value and str(getattr(link, "name", "") or "").strip().lower() == "git":
+                        link.url = f"https://git.hanplanet.com/{forgejo_username}"
+                        break
+
         context["nav_links"] = resolved_links
     except (OperationalError, ProgrammingError):
         context["nav_links"] = [

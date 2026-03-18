@@ -18,6 +18,29 @@
   --hp-nav-height:         58px;
   --hp-site-z-nav:         3200;
 
+  /* www.hanplanet.com style.css 호환 변수 (기본: 라이트) */
+  --theme-ink:          #111111;
+  --theme-subtle:       #2f2f2f;
+  --theme-accent-strong:#000000;
+  --color-nav-bg-start: rgba(255,255,255,0.8);
+  --color-nav-bg-end:   rgba(243,243,243,0.8);
+  --shadow-medium:      0 8px 18px rgba(0,0,0,0.16);
+  --site-z-nav:         3200;
+  --site-common-header-min-height: 58px;
+  --site-nav-padding-y: 8px;
+  --motion-fast:        0.2s ease;
+  --color-hover-bg:     rgba(0,0,0,0.06);
+  --color-hover-border: rgba(0,0,0,0.24);
+  --theme-border:       rgba(0,0,0,0.18);
+  --surface-strong:     rgba(255,255,255,0.92);
+  --surface-stronger:   rgba(248,248,248,0.96);
+  --shadow-focus-ring:  0 0 0 3px rgba(0,0,0,0.12);
+
+  /* 푸터 (라이트 기본) */
+  --footer-text:       #6b7280;
+  --footer-link-hover: #374151;
+  --footer-sep:        #9ca3af;
+
   /* 콘텐츠 영역 (다크) */
   --hp-font: "Inter","KakaoBigFont","Noto Sans KR","Helvetica Neue",Helvetica,Arial,"맑은 고딕","malgun gothic","돋움",Dotum,sans-serif,"Apple Color Emoji","Noto Color Emoji";
   --hp-bg:           #171717;
@@ -61,6 +84,24 @@
   --hp-theme-accent-strong:#ffffff;
   --hp-color-hover-bg:     rgba(255,255,255,0.1);
   --hp-color-hover-border: rgba(255,255,255,0.28);
+
+  --theme-ink:          #f2f2f2;
+  --theme-subtle:       #d6d6d6;
+  --theme-accent-strong:#ffffff;
+  --color-nav-bg-start: rgba(34,34,34,0.84);
+  --color-nav-bg-end:   rgba(26,26,26,0.84);
+  --shadow-medium:      0 8px 18px rgba(0,0,0,0.48);
+  --color-hover-bg:     rgba(255,255,255,0.1);
+  --color-hover-border: rgba(255,255,255,0.28);
+  --theme-border:       rgba(255,255,255,0.2);
+  --surface-strong:     rgba(42,42,42,0.9);
+  --surface-stronger:   rgba(36,36,36,0.96);
+  --shadow-focus-ring:  0 0 0 3px rgba(255,255,255,0.14);
+
+  /* 푸터 (다크) */
+  --footer-text:       rgba(255,255,255,0.72);
+  --footer-link-hover: #f5f5f5;
+  --footer-sep:        rgba(255,255,255,0.32);
 }
 
 /* ── 라이트 테마 전체 오버라이드 ────────────────────────── */
@@ -108,6 +149,24 @@ html[data-theme="gitea-light"] {
   --hp-theme-accent-strong:#000000;
   --hp-color-hover-bg:     rgba(0,0,0,0.06);
   --hp-color-hover-border: rgba(0,0,0,0.20);
+
+  --theme-ink:          #111111;
+  --theme-subtle:       #2f2f2f;
+  --theme-accent-strong:#000000;
+  --color-nav-bg-start: rgba(255,255,255,0.85);
+  --color-nav-bg-end:   rgba(243,243,243,0.85);
+  --shadow-medium:      0 8px 18px rgba(0,0,0,0.12);
+  --color-hover-bg:     rgba(0,0,0,0.06);
+  --color-hover-border: rgba(0,0,0,0.20);
+  --theme-border:       rgba(0,0,0,0.18);
+  --surface-strong:     rgba(255,255,255,0.92);
+  --surface-stronger:   rgba(248,248,248,0.96);
+  --shadow-focus-ring:  0 0 0 3px rgba(0,0,0,0.12);
+
+  /* 푸터 (라이트 명시) */
+  --footer-text:       #6b7280;
+  --footer-link-hover: #374151;
+  --footer-sep:        #9ca3af;
 
   /* Gitea 내장 변수 */
   --color-body:              #f5f5f5 !important;
@@ -192,6 +251,19 @@ body {
   min-height: 100vh;
 }
 
+/* ── body.page — www.hanplanet.com 공통 클래스 ───────────────
+   www style.css: body.page { background: #ffffff }
+   → Forgejo에서는 테마 배경을 유지해야 하므로 오버라이드 필수  */
+body.page {
+  background: transparent !important;  /* html 배경 그대로 투과 */
+  background-image: none !important;
+}
+
+/* body.theme-dark — www base.html 공통 클래스 (다크 모드 시 추가) */
+body.theme-dark {
+  color: var(--hp-text) !important;
+}
+
 /* Gitea 내장 변수 덮어쓰기 */
 :root, html {
   --color-body:              #171717 !important;
@@ -224,56 +296,167 @@ body {
 }
 
 /* ── 3. HP 네비바 (www.hanplanet.com ui-nav와 동일) ────────── */
-#navbar.hp-nav {
+#navbar.ui-nav {
   position: sticky !important;
   top: 0 !important;
-  z-index: var(--hp-site-z-nav) !important;
-  min-height: var(--hp-nav-height) !important;
-  padding: 8px 18px !important;
-  background: linear-gradient(90deg, var(--hp-color-nav-bg-start), var(--hp-color-nav-bg-end)) !important;
+  z-index: var(--site-z-nav) !important;
+  min-height: var(--site-common-header-min-height) !important;
+  padding: var(--site-nav-padding-y) 18px !important;
+  background: linear-gradient(90deg, var(--color-nav-bg-start), var(--color-nav-bg-end)) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
-  box-shadow: var(--hp-shadow-medium) !important;
+  box-shadow: var(--shadow-medium) !important;
   border-bottom: none !important;
   transition: transform 0.3s cubic-bezier(0.4,0,0.2,1) !important;
 }
 
-.hp-nav-inner {
-  max-width: 1300px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: row !important;
-  align-items: center;
-  flex-wrap: nowrap;
-  min-height: var(--hp-nav-height);
-  gap: 0;
+#navbar.ui-nav .container-fluid {
+  max-width: 1300px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
 }
 
-/* ── 좌측: 컨트롤 스택 ─── */
-.hp-controls-stack {
-  order: 1;
-  flex: 0 0 auto;
+.ui-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-right: 0;
+  min-width: 0;
+}
+
+.ui-brand {
+  display: flex;
+  align-items: center;
+  color: var(--theme-ink) !important;
+  font-weight: 750;
+  letter-spacing: -0.2px;
+  text-decoration: none !important;
+}
+
+.ui-brand-text {
+  font-size: 28px;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.ui-brand:visited,
+.ui-brand:hover,
+.ui-brand:focus-visible,
+.ui-brand:active {
+  color: var(--theme-ink) !important;
+  text-decoration: none !important;
+}
+
+.ui-brand:hover .ui-brand-text,
+.ui-brand:focus-visible .ui-brand-text {
+  transform: scale(1.06);
+}
+
+#navbar.ui-nav .ui-nav-collapse {
+  display: flex !important;
+  flex-grow: 1;
+  flex-basis: auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  min-width: 0;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+.ui-nav-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  gap: 0;
+  flex-wrap: nowrap;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+#navbar.ui-nav .container-fluid,
+#navbar.ui-nav .nav-item,
+#navbar.ui-nav .collapse,
+#navbar.ui-nav .collapse.show,
+#navbar.ui-nav .collapse.collapsing,
+#navbar.ui-nav .ui-nav-collapse,
+#navbar.ui-nav .ui-nav-collapse.show,
+#navbar.ui-nav .ui-nav-collapse.collapsing,
+#navbar.ui-nav .ui-nav-links {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  list-style: none;
+}
+
+.ui-nav-link {
+  padding: 6.4px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--theme-subtle) !important;
+  font-size: 20px;
+  font-weight: 600;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: color var(--motion-fast), background-color var(--motion-fast),
+    border-color var(--motion-fast), transform var(--motion-fast);
+}
+
+.ui-nav-link:visited {
+  color: var(--theme-subtle) !important;
+}
+
+.ui-nav-link:hover,
+.ui-nav-link:focus-visible,
+.ui-nav-link:active,
+.ui-nav-link.ui-active {
+  color: var(--theme-accent-strong) !important;
+  background-color: var(--color-hover-bg);
+  border-color: var(--color-hover-border);
+  transform: translateY(-1px);
+  text-decoration: none !important;
+}
+
+.ui-nav-link.ui-active {
+  font-weight: 700 !important;
+}
+
+.ui-controls-stack {
   display: inline-flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 0;
+  flex: 0 0 auto;
+  margin-left: 0;
 }
 
-.hp-control-toggle {
+.ui-control-toggle,
+.ui-lang-toggle {
+  width: 100%;
   display: grid;
   grid-template-columns: 2.8ch 1ch 2.8ch;
   align-items: center;
+  justify-content: center;
   column-gap: 4px;
-  width: 100%;
 }
 
-/* www .ui-control-link / .ui-lang-link — 직접 포팅 */
-.hp-control-link,
-.hp-lang-link {
+.ui-theme-toggle {
+  padding-top: 0;
+}
+
+.ui-control-link,
+.ui-lang-link {
   display: inline-block;
   text-decoration: none !important;
-  /* a { !important } 오버라이드: !important 필수 */
-  color: var(--hp-theme-subtle) !important;
+  color: var(--theme-subtle) !important;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -281,53 +464,52 @@ body {
   padding: 4px 2px;
   border-bottom: 1.5px solid transparent;
   opacity: 0.8;
-  transition: color var(--hp-motion-fast), border-color var(--hp-motion-fast), opacity var(--hp-motion-fast);
+  transition: color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
   cursor: pointer;
 }
 
-.hp-control-toggle .hp-control-link {
+.ui-control-toggle .ui-control-link {
   width: 2.8ch;
   text-align: center;
   padding-left: 0;
   padding-right: 0;
 }
 
-.hp-control-toggle .hp-control-link:first-of-type {
+.ui-control-toggle .ui-control-link:first-of-type {
   justify-self: end;
   text-align: right;
 }
 
-.hp-control-toggle .hp-control-link:last-of-type {
+.ui-control-toggle .ui-control-link:last-of-type {
   justify-self: start;
   text-align: left;
 }
 
-.hp-control-link:hover,
-.hp-control-link:focus-visible,
-.hp-control-link:active,
-.hp-lang-link:hover,
-.hp-lang-link:focus-visible,
-.hp-lang-link:active {
-  color: var(--hp-theme-accent-strong) !important;
+.ui-control-link:hover,
+.ui-control-link:focus-visible,
+.ui-control-link:active,
+.ui-lang-link:hover,
+.ui-lang-link:focus-visible,
+.ui-lang-link:active {
+  color: var(--theme-accent-strong) !important;
   opacity: 1;
   text-decoration: none !important;
 }
 
-.hp-control-link:visited,
-.hp-lang-link:visited {
-  color: var(--hp-theme-subtle) !important;
+.ui-control-link:visited,
+.ui-lang-link:visited {
+  color: var(--theme-subtle) !important;
 }
 
-/* is-active: www .ui-control-link.is-active 그대로 */
-.hp-control-link.is-active,
-.hp-lang-link.is-active {
-  color: var(--hp-theme-ink) !important;
+.ui-control-link.is-active,
+.ui-lang-link.is-active {
+  color: var(--theme-ink) !important;
   border-bottom-color: currentColor !important;
   opacity: 1 !important;
 }
 
-.hp-lang-divider {
-  color: var(--hp-theme-subtle) !important;
+.ui-lang-divider {
+  color: var(--theme-subtle) !important;
   opacity: 0.6;
   font-size: 14px;
   line-height: 1;
@@ -336,206 +518,138 @@ body {
   justify-content: center;
 }
 
-.hp-theme-toggle {
-  padding-top: 2px;
+/* ── 4. 토글러 & Collapse (Bootstrap 기반) ──────────────── */
+
+/* Bootstrap CSS 없이 로드 시 필요한 navbar-toggler-icon 스타일 */
+#navbar.ui-nav .navbar-toggler-icon {
+  display: inline-block !important;
+  width: 1.5em !important;
+  height: 1.5em !important;
+  vertical-align: middle !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23111111' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E") !important;
 }
 
-/* ── 중앙: 네비 링크 ─── */
-.hp-nav-links {
-  order: 2;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  gap: 0;
-  border: none !important;
-  box-shadow: none !important;
-  background: none !important;
+/* 다크 테마 햄버거 아이콘 */
+[data-theme="gitea-dark"] #navbar.ui-nav .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23f2f2f2' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E") !important;
 }
 
-.hp-nav-item {
-  list-style: none;
-}
-
-.hp-nav-link {
-  display: block;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background-color: transparent;
-  color: var(--hp-theme-subtle) !important;
-  font-size: 20px;
-  font-weight: 600;
-  text-decoration: none !important;
-  white-space: nowrap;
-  transition: color var(--hp-motion-fast), background-color var(--hp-motion-fast),
-    border-color var(--hp-motion-fast), transform var(--hp-motion-fast);
-}
-
-.hp-nav-link:hover,
-.hp-nav-link:focus-visible,
-.hp-nav-link.hp-active {
-  color: var(--hp-theme-accent-strong) !important;
-  background-color: var(--hp-color-hover-bg);
-  border-color: var(--hp-color-hover-border);
-  transform: translateY(-1px);
-  text-decoration: none !important;
-}
-
-.hp-nav-link.hp-active {
-  font-weight: 700 !important;
-}
-
-/* ── 우측: 브랜드 ─── */
-.hp-brand-group {
-  order: 3;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-}
-
-.hp-brand {
-  display: flex;
-  align-items: center;
-  color: var(--hp-theme-ink) !important;
-  font-weight: 750;
-  letter-spacing: -0.2px;
-  text-decoration: none !important;
-}
-
-.hp-brand:hover,
-.hp-brand:visited,
-.hp-brand:focus-visible {
-  color: var(--hp-theme-ink) !important;
-  text-decoration: none !important;
-}
-
-.hp-brand-text {
-  font-size: 28px;
-  display: inline-block;
-  text-align: right;
-  transition: transform 0.2s ease;
-}
-
-.hp-brand:hover .hp-brand-text,
-.hp-brand:focus-visible .hp-brand-text {
-  transform: scale(1.06);
-}
-
-/* ── 4. HP 네비바 — 토글러 & Collapse ───────────────────── */
-
-/* 토글러 (기본: 숨김 — 데스크톱) */
-.hp-nav-toggler {
+.ui-nav-toggler {
   display: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 10px !important;
+  background: var(--surface-strong) !important;
+  padding: 6px 10px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.ui-nav-toggler:hover {
+  border-color: var(--theme-border) !important;
+  box-shadow: var(--shadow-focus-ring);
+}
+
+.ui-nav-toggler:focus:not(:hover) {
+  box-shadow: none;
+}
+
+/* nav-auto-collapsed: 모바일/축소 모드 */
+#navbar.ui-nav.nav-auto-collapsed {
+  padding: 9.6px 18px !important;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-brand-group {
+  order: 1;
+  flex: 0 0 auto;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .container-fluid {
+  display: flex !important;
+  flex-wrap: wrap !important;   /* nowrap !important 오버라이드 필수 */
+  align-items: center !important;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-nav-toggler {
+  display: block !important;
+  margin-left: auto;
   order: 2;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-nav-collapse {
+  display: none !important;
+  order: 3 !important;
+  width: 100% !important;
+  flex: 0 0 100% !important;    /* flex-grow/shrink/basis 한번에 고정 */
+  margin-top: 8px;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-nav-collapse.show {
+  display: flex !important;     /* block 대신 flex 유지 → order/flex-basis 정상 작동 */
+  flex-direction: column !important;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-nav-collapse.collapsing {
+  display: flex !important;
+  flex-direction: column !important;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-nav-links {
+  margin-top: 0;
+  margin-left: 0;
   padding: 8px;
-  margin-left: auto;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--hp-radius-sm);
-  cursor: pointer;
-  color: var(--hp-theme-ink);
-  transition: background var(--hp-motion-fast), border-color var(--hp-motion-fast);
-  align-items: center;
-  justify-content: center;
-}
-
-.hp-nav-toggler:hover {
-  background: var(--hp-color-hover-bg);
-  border-color: var(--hp-color-hover-border);
-}
-
-.hp-toggler-icon {
-  display: block;
-  width: 20px;
-  height: 2px;
-  background: currentColor;
-  border-radius: 2px;
-  position: relative;
-  transition: background var(--hp-motion-fast);
-}
-
-.hp-toggler-icon::before,
-.hp-toggler-icon::after {
-  content: '';
-  display: block;
-  width: 20px;
-  height: 2px;
-  background: currentColor;
-  border-radius: 2px;
-  position: absolute;
-  left: 0;
-  transition: transform 0.22s ease, top 0.22s ease, opacity 0.22s ease;
-}
-
-.hp-toggler-icon::before { top: -6px; }
-.hp-toggler-icon::after  { top:  6px; }
-
-/* 열린 상태 → X 모양 */
-.hp-nav-toggler[aria-expanded="true"] .hp-toggler-icon { background: transparent; }
-.hp-nav-toggler[aria-expanded="true"] .hp-toggler-icon::before { top: 0; transform: rotate(45deg); }
-.hp-nav-toggler[aria-expanded="true"] .hp-toggler-icon::after  { top: 0; transform: rotate(-45deg); }
-
-/* Collapse 래퍼 (데스크톱: 일반 flex row) */
-.hp-nav-collapse {
-  order: 1;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+  border-radius: 14px;
+  background: var(--surface-stronger) !important;
+  border: 1px solid rgba(0,0,0,0.14) !important;
+  width: 100%;
   gap: 0;
-  overflow: visible;
-}
-
-/* 모바일 collapse 상태: 높이 0, 숨김 */
-.hp-nav-collapse.hp-collapse-closed {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-
-.hp-nav-collapse.hp-collapse-open {
-  max-height: 600px;
-  overflow: hidden;
-  transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
-}
-
-/* ── hp-auto-collapsed: 모바일/축소 모드 ─── */
-.hp-nav.hp-auto-collapsed .hp-nav-inner {
-  flex-wrap: wrap;
-}
-
-.hp-nav.hp-auto-collapsed .hp-nav-toggler {
-  display: inline-flex;
-}
-
-.hp-nav.hp-auto-collapsed .hp-nav-collapse {
-  flex: 0 0 100%;
-  order: 10;
+  box-shadow: none !important;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0 10px;
 }
 
-.hp-nav.hp-auto-collapsed .hp-nav-links {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  order: 1;
+#navbar.ui-nav.nav-auto-collapsed .ui-nav-link {
+  display: block;
 }
 
-.hp-nav.hp-auto-collapsed .hp-controls-stack {
-  order: 2;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
+#navbar.ui-nav.nav-auto-collapsed .nav-item {
+  width: 100%;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .nav-item + .nav-item {
+  border-top: 1px solid rgba(0,0,0,0.16);
+  margin-top: 0;
+  padding-top: 0;
+}
+
+#navbar.ui-nav.nav-auto-collapsed .ui-controls-stack {
+  width: 100%;
+  margin-left: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.16);
+  align-items: flex-end;
+}
+
+/* 다크 모드 nav-auto-collapsed 오버라이드 */
+[data-theme="gitea-dark"] #navbar.ui-nav.nav-auto-collapsed .ui-nav-links {
+  background: var(--surface-stronger) !important;
+  border: none !important;
+}
+
+[data-theme="gitea-dark"] #navbar.ui-nav.nav-auto-collapsed .nav-item + .nav-item {
+  border-top-color: transparent;
+}
+
+[data-theme="gitea-dark"] #navbar.ui-nav.nav-auto-collapsed .ui-controls-stack {
+  border-top-color: transparent;
 }
 
 /* ── Gitea 기본 navbar 흔적 제거 ─────────────────────── */
@@ -545,56 +659,65 @@ body {
   display: none !important;
 }
 
+/* Forgejo 기본 #navbar 스타일 완전 무효화 */
+#navbar {
+  height: auto !important;
+  min-height: unset !important;
+  padding: 0 !important;
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  display: block !important;
+  flex-wrap: unset !important;
+  align-items: unset !important;
+  justify-content: unset !important;
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+/* Forgejo/Fomantic UI .navbar 클래스 충돌 방지 */
+nav#navbar.navbar {
+  margin-bottom: 0 !important;
+}
+
 /* ── 루트 페이지 page grid 제거 ──────────────────────── */
 /* display:contents → 래퍼만 제거, 자식 요소는 유지 */
 .ui.stackable.middle.very.relaxed.page.grid {
   display: contents !important;
 }
 
-/* ── 5. HP Footer ────────────────────────────────────────── */
+/* ── 5. Footer (www.hanplanet.com site-footer-links와 동일) ── */
 /* Gitea 기본 footer 숨기기 */
 .page-footer {
   display: none !important;
 }
 
-/* Hanplanet site-footer-links 스타일 */
-.hp-site-footer {
+/* www style.css .site-footer-links 포팅 — CSS 변수로 라이트/다크 테마 대응 */
+.site-footer-links {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   padding: 14px 16px 22px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--footer-text);
   flex: 0 0 auto;
 }
 
-.hp-site-footer-link {
-  color: inherit;
-  text-decoration: none;
+.site-footer-link {
+  color: inherit !important;
+  text-decoration: none !important;
 }
 
-.hp-site-footer-link:hover,
-.hp-site-footer-link:focus-visible {
-  color: #374151 !important;
-  text-decoration: underline;
+.site-footer-link:hover,
+.site-footer-link:focus-visible {
+  color: var(--footer-link-hover) !important;
+  text-decoration: underline !important;
 }
 
-.hp-site-footer-sep {
-  color: #9ca3af;
-}
-
-[data-theme="gitea-dark"] .hp-site-footer {
-  color: rgba(255,255,255,0.72);
-}
-
-[data-theme="gitea-dark"] .hp-site-footer-link:hover,
-[data-theme="gitea-dark"] .hp-site-footer-link:focus-visible {
-  color: #f5f5f5 !important;
-}
-
-[data-theme="gitea-dark"] .hp-site-footer-sep {
-  color: rgba(255,255,255,0.32);
+.site-footer-sep {
+  color: var(--footer-sep);
 }
 
 /* ── 6. 카드 / 세그먼트 ──────────────────────────────────── */
