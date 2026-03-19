@@ -34,6 +34,7 @@ from .handrive_views import (
     DOCS_USER_SCOPED_ENTRY_LIMIT,
     DOCS_USER_SCOPED_QUOTA_BYTES,
     DOCS_URL_ONLY_GROUP_NAME,
+    _build_forgejo_session_blob,
     _resolve_docs_post_login_url,
     get_docs_upload_tmp_dir,
     get_docs_public_write_group,
@@ -318,7 +319,10 @@ class LanguageUrlRoutingTests(TestCase):
 
 
 class DocsSignupAutoLoginTests(TestCase):
-    def test_signup_logs_user_in_immediately(self):
+    @mock.patch("main.handrive_views._attach_forgejo_login_session")
+    @mock.patch("main.handrive_views._trigger_gitea_password_sync")
+    def test_signup_logs_user_in_immediately(self, mock_trigger_sync, mock_attach_session):
+        mock_attach_session.side_effect = lambda response, user: response
         response = self.client.post(
             reverse("main:docs_signup_lang", kwargs={"ui_lang": "ko"}),
             data={
@@ -339,6 +343,8 @@ class DocsSignupAutoLoginTests(TestCase):
             self.client.session["_auth_user_id"],
             str(get_user_model().objects.get(username="autologin_user").pk),
         )
+        mock_attach_session.assert_called_once()
+        mock_trigger_sync.assert_called_once()
 
     def test_signup_saves_privacy_and_terms_consent(self):
         self.client.post(
@@ -626,7 +632,25 @@ class DocsAuthFlowTests(TestCase):
         self.assertContains(response, "이전 페이지")
         self.assertNotContains(response, ">ide<", html=False)
 
-    def test_docs_login_authenticates_non_staff_user(self):
+    @mock.patch("main.handrive_views.subprocess.run")
+    @mock.patch("main.handrive_views.shutil.which", return_value=None)
+    @mock.patch("main.handrive_views.settings.RUNNING_TESTS", False)
+    def test_build_forgejo_session_blob_prefers_homebrew_go(self, mock_which, mock_run):
+        def fake_exists(self):
+            return str(self) == "/opt/homebrew/bin/go"
+
+        mock_run.return_value = mock.Mock(returncode=0, stdout="Zm9v")
+        with mock.patch("main.handrive_views.Path.exists", fake_exists):
+            blob = _build_forgejo_session_blob(123, "docs_login_user")
+
+        self.assertEqual(blob, b"foo")
+        self.assertEqual(mock_run.call_args.args[0][0], "/opt/homebrew/bin/go")
+        mock_which.assert_called_once_with("go")
+
+    @mock.patch("main.handrive_views._attach_forgejo_login_session")
+    @mock.patch("main.handrive_views._trigger_gitea_password_sync")
+    def test_docs_login_authenticates_non_staff_user(self, mock_trigger_sync, mock_attach_session):
+        mock_attach_session.side_effect = lambda response, user: response
         response = self.client.post(
             "/ko/login/",
             data={"username": "docs_login_user", "password": "pw123456", "next": "/ko/docs/list/"},
@@ -635,6 +659,8 @@ class DocsAuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/ko/docs/list/")
         self.assertTrue("_auth_user_id" in self.client.session)
+        mock_attach_session.assert_called_once()
+        mock_trigger_sync.assert_called_once()
 
     def test_resolve_docs_post_login_url_keeps_portfolio_next(self):
         public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
@@ -658,8 +684,11 @@ class DocsAuthFlowTests(TestCase):
             data={"next": "/ko/docs/list/"},
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/ko/docs/list/")
+        self.assertIn(response.status_code, (200, 302))
+        if response.status_code == 302:
+            self.assertEqual(response["Location"], "/ko/docs/list/")
+        else:
+            self.assertContains(response, "hp-git-logout-form")
         self.assertFalse("_auth_user_id" in self.client.session)
 
     def test_docs_logout_csrf_failure_returns_forbidden(self):
@@ -672,6 +701,15 @@ class DocsAuthFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+
+class RootAuthLinkTests(TestCase):
+    def test_root_login_link_keeps_user_on_root(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '/login?next=/', html=False)
+        self.assertContains(response, '/signup?next=/', html=False)
 
 
 class HanplanetMultiplayerPageTests(TestCase):

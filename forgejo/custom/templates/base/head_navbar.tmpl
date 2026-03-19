@@ -23,7 +23,6 @@
 
 			{{/* 네비게이션 링크 */}}
 			<ul class="ui-nav-links">
-				<li class="nav-item"><a class="nav-link ui-nav-link" href="{{.AppSubURL}}/explore/repos">탐색</a></li>
 				<li class="nav-item"><a class="nav-link ui-nav-link" href="https://www.hanplanet.com/handrive/list">HanDrive</a></li>
 				<li class="nav-item">
 				{{if .IsSigned}}
@@ -32,14 +31,15 @@
 					<a class="nav-link ui-nav-link" href="https://git.hanplanet.com">Git</a>
 				{{end}}
 				</li>
+				<li class="nav-item"><a class="nav-link ui-nav-link" href="{{.AppSubURL}}/explore/repos">Repos</a></li>
 			</ul>
 
 			{{/* 언어 + 테마 컨트롤 — www ui_controls_stack.html 동일 구조 */}}
 			<div class="ui-controls-stack">
 				<div class="ui-lang-toggle ui-control-toggle ui-lang-toggle-inline" aria-label="Language Toggle">
-					<a class="ui-lang-link ui-control-link" href="#" data-hp-lang="ko-KR">KO</a>
+					<a class="ui-lang-link ui-control-link{{if eq ctx.Locale.Lang "ko-KR"}} is-active{{end}}" href="?lang=ko-KR" data-hp-lang="ko-KR">KO</a>
 					<span class="ui-lang-divider">|</span>
-					<a class="ui-lang-link ui-control-link" href="#" data-hp-lang="en-US">EN</a>
+					<a class="ui-lang-link ui-control-link{{if eq ctx.Locale.Lang "en-US"}} is-active{{end}}" href="?lang=en-US" data-hp-lang="en-US">EN</a>
 				</div>
 				<div class="ui-lang-toggle ui-control-toggle ui-theme-toggle" aria-label="Theme Toggle">
 					<a href="#" role="button" class="ui-lang-link ui-control-link" data-theme-mode="light">LT</a>
@@ -53,3 +53,4 @@
 	</div>
 </nav>
 <main class="page-content django" role="main">
+<div class="main main-surface-layer">

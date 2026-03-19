@@ -1,6 +1,38 @@
 <!DOCTYPE html>
 <html lang="{{ctx.Locale.Lang}}" data-theme="{{UserThemeName .SignedUser}}">
 <head>
+	<style data-hp-theme-preload>
+		html.preload-light-bg,
+		html.preload-light-bg body {
+			background: #ffffff;
+			background-image: none;
+		}
+
+		html.preload-dark-bg,
+		html.preload-dark-bg body {
+			background: #222222;
+			background-image: none;
+		}
+	</style>
+	<script>
+		(function () {
+			try {
+				var cookieMatch = document.cookie.match(/(?:^|;\s*)portfolio_theme_mode=([^;]+)/);
+				var stored = (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null) || window.localStorage.getItem('portfolio_theme_mode');
+				var prefersDark;
+				if (stored === 'dark') {
+					prefersDark = true;
+				} else if (stored === 'light') {
+					prefersDark = false;
+				} else {
+					prefersDark = Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+				}
+				document.documentElement.classList.add(prefersDark ? 'preload-dark-bg' : 'preload-light-bg');
+			} catch (e) {
+				document.documentElement.classList.add('preload-light-bg');
+			}
+		})();
+	</script>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>{{if .Title}}{{.Title}} - {{end}}{{.PageTitleCommon}}</title>
 	{{if .ManifestData}}<link rel="manifest" href="data:{{.ManifestData}}">{{end}}
@@ -29,7 +61,7 @@
 	<noscript>{{ctx.Locale.Tr "enable_javascript"}}</noscript>
 
 	{{template "custom/body_inner_pre" .}}
-	{{if .PageIsInstall}}<main class="page-content django" role="main">{{end}}
+	{{if .PageIsInstall}}<main class="page-content django" role="main"><div class="main main-surface-layer">{{end}}
 
 	{{if not .PageIsInstall}}
 		{{template "base/head_navbar" .}}

@@ -1,4 +1,5 @@
 {{/* ── Hanplanet HP Footer ──────────────────────────────────── */}}
+</div>
 </main>
 <footer class="site-footer-links" aria-label="Legal links">
   <a class="site-footer-link" href="https://www.hanplanet.com/ko/privacy">Privacy Policy</a>
@@ -7,10 +8,10 @@
 </footer>
 
 {{/* 공통 JS — www.hanplanet.com과 동일한 순서 */}}
-<script src="/assets/js/popup_common.js?v={{AppVer}}-hp16"></script>
-<script src="/assets/js/bootstrap.min.js?v={{AppVer}}-hp16"></script>
-<script src="/assets/js/site_nav_responsive_manager.js?v={{AppVer}}-hp16"></script>
-<script src="/assets/js/script.js?v={{AppVer}}-hp16"></script>
+<script src="/assets/js/popup_common.js?v={{AppVer}}-hp17"></script>
+<script src="/assets/js/bootstrap.min.js?v={{AppVer}}-hp17"></script>
+<script src="/assets/js/site_nav_responsive_manager.js?v={{AppVer}}-hp17"></script>
+<script src="/assets/js/script.js?v={{AppVer}}-hp17"></script>
 
 <script>
 (function () {
@@ -47,6 +48,27 @@
     }
   })();
 
+  /* ── Gitea 내장 언어 전환: lang 쿼리로 locale 변경 ───────────── */
+  (function bindLanguageToggle() {
+    var links = document.querySelectorAll('.ui-lang-toggle-inline a[data-hp-lang]');
+    if (!links.length) return;
+
+    links.forEach(function (link) {
+      link.addEventListener('click', function (event) {
+        var lang = (link.getAttribute('data-hp-lang') || '').trim();
+        if (!lang) return;
+        event.preventDefault();
+        try {
+          var url = new URL(window.location.href);
+          url.searchParams.set('lang', lang);
+          window.location.replace(url.toString());
+        } catch (e) {
+          window.location.replace(window.location.pathname + '?lang=' + encodeURIComponent(lang));
+        }
+      });
+    });
+  })();
+
   /* ── 현재 페이지 네비 링크 active 표시 ──────────────────── */
   (function markActiveNavLink() {
     var curPath = window.location.pathname;
@@ -61,6 +83,40 @@
         }
       } catch (e) {}
     });
+  })();
+
+  /* ── 프로필 카드 unlock 아이콘을 username 오른쪽으로 이동 ── */
+  (function moveProfileUnlockIcon() {
+    function relocate() {
+      var profileCard = document.querySelector('#profile-avatar-card');
+      if (!profileCard) return;
+
+      var usernameNode = profileCard.querySelector('.profile-avatar-name .username.text.center');
+      if (!usernameNode) return;
+
+      var unlockIcon = profileCard.querySelector('.octicon-unlock');
+      if (!unlockIcon) return;
+
+      var currentHost = unlockIcon.closest('.profile-avatar-name');
+      if (currentHost) return;
+
+      var movable = unlockIcon.closest('a, button') || unlockIcon;
+      if (!movable || movable.closest('.profile-avatar-name')) return;
+
+      var movedAlready = usernameNode.querySelector('.octicon-unlock');
+      if (movedAlready) return;
+
+      movable.remove();
+      usernameNode.appendChild(movable);
+    }
+
+    relocate();
+    if (window.MutationObserver) {
+      var observer = new MutationObserver(function () {
+        relocate();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   })();
 
   /* ── 반응형 네비바 ── */

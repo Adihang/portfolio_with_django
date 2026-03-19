@@ -35,6 +35,12 @@ main.django {
     background: linear-gradient(180deg, #171717 0%, #232323 50%, #171717 100%);
 }
 
+main.django > .main-surface-layer {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+}
+
 body {
     min-height: 100dvh;
     display: flex;
@@ -42,6 +48,16 @@ body {
 }
 
 body.page main.django {
+    background: #ffffff;
+    background-image: none;
+}
+
+html.preload-dark-bg body.page main.django {
+    background: var(--site-bg, #222222);
+    background-image: none;
+}
+
+html.preload-light-bg body.page main.django {
     background: #ffffff;
     background-image: none;
 }
@@ -334,32 +350,40 @@ body.project-page.theme-dark main.django .project_detail hr {
 
 body.theme-dark main.django .ui-nav-link:hover,
 body.theme-dark main.django .ui-nav-link:focus-visible,
-body.theme-dark main.django .ui-nav-link:active {
+body.theme-dark main.django .ui-nav-link:active,
+html.preload-dark-bg main.django .ui-nav-link:hover,
+html.preload-dark-bg main.django .ui-nav-link:focus-visible,
+html.preload-dark-bg main.django .ui-nav-link:active {
     background-color: var(--site-hover);
     border-color: transparent;
 }
 
-body.theme-dark main.django .ui-nav-toggler {
+body.theme-dark .ui-nav-toggler,
+html.preload-dark-bg .ui-nav-toggler {
     background: var(--site-surface-muted);
     border-color: transparent;
 }
 
-body.theme-dark main.django .ui-nav-toggler:hover {
+body.theme-dark .ui-nav-toggler:hover,
+html.preload-dark-bg .ui-nav-toggler:hover {
     box-shadow: 0 0 0 0.18rem rgba(255, 255, 255, 0.2);
 }
 
-body.theme-dark main.django .ui-nav .navbar-toggler-icon {
+body.theme-dark .ui-nav .navbar-toggler-icon,
+html.preload-dark-bg .ui-nav .navbar-toggler-icon {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23f2f2f2' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
 }
 
-body.theme-dark main.django .ui-nav.nav-auto-collapsed .ui-nav-links {
+body.theme-dark main.django .ui-nav.nav-auto-collapsed .ui-nav-links,
+html.preload-dark-bg main.django .ui-nav.nav-auto-collapsed .ui-nav-links {
     background: var(--site-elevated-bg);
     border: none;
     outline: none;
     box-shadow: none;
 }
 
-body.theme-dark main.django .ui-nav {
+body.theme-dark main.django .ui-nav,
+html.preload-dark-bg main.django .ui-nav {
     background: rgba(34, 34, 34, 0.84);
     background-image: none;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48);
@@ -2513,6 +2537,30 @@ textarea {
     width: 100%;
 }
 
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea,
+body.theme-dark .ui.input input {
+    color: var(--site-text);
+    background: var(--site-surface-muted);
+    border-color: var(--site-border);
+}
+
+body.theme-dark input::placeholder,
+body.theme-dark textarea::placeholder {
+    color: var(--site-text-subtle);
+}
+
+body.theme-dark textarea {
+    color: var(--site-text);
+    background: var(--site-surface-muted);
+    border-color: var(--site-border);
+}
+
+body.theme-dark textarea::placeholder {
+    color: var(--site-text-subtle);
+}
+
 input[type=submit] {
     margin-top:10px;
 }
@@ -3099,6 +3147,33 @@ body.theme-dark .site-footer-link:focus-visible {
 
 body.theme-dark .site-footer-sep {
     color: rgba(255, 255, 255, 0.32);
+}
+
+body.theme-dark .ui-nav img,
+body.theme-dark .ui-nav svg,
+body.theme-dark .site-footer-links img,
+body.theme-dark .site-footer-links svg {
+    filter: brightness(0) invert(1) saturate(0);
+}
+
+body.theme-dark .ui-nav .ui-brand img,
+body.theme-dark .ui-nav .ui-brand svg {
+    filter: brightness(0) invert(1) saturate(0);
+}
+
+body.theme-dark .ui-nav svg,
+body.theme-dark .site-footer-links svg,
+body.theme-dark .page-content svg {
+    color: #f2f2f2;
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+body.theme-dark .ui-nav svg *,
+body.theme-dark .site-footer-links svg *,
+body.theme-dark .page-content svg * {
+    fill: currentColor;
+    stroke: currentColor;
 }
 
 .legal-page-content {

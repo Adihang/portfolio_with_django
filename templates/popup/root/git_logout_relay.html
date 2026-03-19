@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Signing out</title>
+    <style>
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+        }
+        body {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <form id="hp-git-logout-form" action="{{ git_logout_url }}" method="post" target="hp-git-logout-frame">
+        <input type="hidden" name="_csrf" value="{{ git_logout_csrf_token }}">
+    </form>
+    <iframe name="hp-git-logout-frame" hidden aria-hidden="true" tabindex="-1"></iframe>
+    <script>
+        (function () {
+            var nextUrl = "{{ git_logout_next_url|escapejs }}";
+            var form = document.getElementById('hp-git-logout-form');
+            if (!form) {
+                window.location.replace(nextUrl);
+                return;
+            }
+            form.submit();
+            window.setTimeout(function () {
+                window.location.replace(nextUrl);
+            }, 300);
+        })();
+    </script>
+</body>
+</html>

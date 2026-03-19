@@ -977,11 +977,12 @@ def apply_ui_context(request, context, ui_lang):
                 .values_list("forgejo_username", flat=True)
                 .first()
             )
-            if forgejo_username:
+            git_target_username = forgejo_username or getattr(request.user, "username", "")
+            if git_target_username:
                 for link in resolved_links:
                     url_value = str(getattr(link, "url", "") or "")
                     if "git.hanplanet.com" in url_value and str(getattr(link, "name", "") or "").strip().lower() == "git":
-                        link.url = f"https://git.hanplanet.com/{forgejo_username}"
+                        link.url = f"https://git.hanplanet.com/{quote(str(git_target_username), safe='')}"
                         break
 
         context["nav_links"] = resolved_links
@@ -1995,8 +1996,10 @@ def none(request, ui_lang=None):
         },
         ensure_ascii=False,
     )
-    context["docs_login_url"] = reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang})
-    context["docs_signup_url"] = reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang})
+    current_path = request.get_full_path() or "/"
+    encoded_current_path = quote(current_path, safe="/")
+    context["docs_login_url"] = f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={encoded_current_path}"
+    context["docs_signup_url"] = f"{reverse('main:docs_signup_lang', kwargs={'ui_lang': resolved_lang})}?next={encoded_current_path}"
     context["docs_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
     if request.user.is_authenticated:
         portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()

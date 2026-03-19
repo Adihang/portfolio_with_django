@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
+import logging
 import json
 import os
+import sqlite3
 import re
 import shutil
 import secrets
@@ -44,7 +47,10 @@ from .views import (
     render_markdown_safely,
     resolve_ui_lang,
 )
-from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, PortfolioProfile, UserProfile
+from .forgejo_client import ForgejoClient
+from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, GitUserMapping, PortfolioProfile, UserProfile
+
+logger = logging.getLogger(__name__)
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -2397,6 +2403,140 @@ def _trigger_gitea_password_sync(user, raw_password: str) -> None:
         pass  # Celery 없어도 로그인 막으면 안 됨
 
 
+def _ensure_forgejo_mapping_for_user(user):
+    """Forgejo 계정이 없으면 만들고, GitUserMapping을 보장한다."""
+    if not user or not user.is_authenticated:
+        return None
+
+    mapping = GitUserMapping.objects.filter(user=user).first()
+    if mapping and mapping.forgejo_user_id and mapping.forgejo_username:
+        return mapping
+
+    try:
+        client = ForgejoClient()
+        gitea_user = client.ensure_user(user.username, getattr(user, "email", "") or "")
+    except Exception:
+        logger.exception("Failed to ensure Forgejo user for %s", getattr(user, "username", "unknown"))
+        return mapping
+
+    mapping, _ = GitUserMapping.objects.update_or_create(
+        user=user,
+        defaults={
+            "forgejo_user_id":  gitea_user["id"],
+            "forgejo_username": gitea_user["login"],
+            "forgejo_token":    (mapping.forgejo_token if mapping and mapping.forgejo_token else ""),
+        },
+    )
+    return mapping
+
+
+def _build_forgejo_session_blob(user_id: int, username: str, has_two_factor_auth: bool = False) -> bytes | None:
+    """Forgejo session 테이블에 넣을 gob blob을 생성한다."""
+    if getattr(settings, "RUNNING_TESTS", False):
+        return None
+
+    go_source = f"""
+package main
+
+import (
+    "bytes"
+    "encoding/base64"
+    "encoding/gob"
+    "fmt"
+)
+
+func main() {{
+    payload := map[interface{{}}]interface{{}}{{
+        "uid": int64({int(user_id)}),
+        "uname": {json.dumps(username)},
+        "userHasTwoFactorAuth": {str(bool(has_two_factor_auth)).lower()},
+    }}
+
+    var buf bytes.Buffer
+    if err := gob.NewEncoder(&buf).Encode(payload); err != nil {{
+        panic(err)
+    }}
+
+    fmt.Print(base64.StdEncoding.EncodeToString(buf.Bytes()))
+}}
+"""
+
+    helper_path = None
+    try:
+        go_bin = shutil.which("go")
+        if not go_bin:
+            for candidate in ("/opt/homebrew/bin/go", "/usr/local/bin/go"):
+                if Path(candidate).exists():
+                    go_bin = candidate
+                    break
+        if not go_bin:
+            raise FileNotFoundError("go executable not found")
+
+        with tempfile.NamedTemporaryFile("w", suffix=".go", delete=False, encoding="utf-8") as handle:
+            handle.write(go_source)
+            helper_path = Path(handle.name)
+
+        result = subprocess.run(
+            [go_bin, "run", str(helper_path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "go run failed")
+        return base64.b64decode((result.stdout or "").strip())
+    except Exception:
+        logger.exception("Failed to build Forgejo session blob for %s", username)
+        return None
+    finally:
+        if helper_path is not None:
+            try:
+                helper_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
+def _attach_forgejo_login_session(response, user):
+    """Forgejo 웹 세션을 생성하고 i_like_gitea 쿠키를 응답에 심는다."""
+    mapping = _ensure_forgejo_mapping_for_user(user)
+    if not mapping:
+        return response
+
+    session_blob = _build_forgejo_session_blob(
+        mapping.forgejo_user_id,
+        mapping.forgejo_username,
+        False,
+    )
+    if not session_blob:
+        return response
+
+    session_key = secrets.token_hex(8)
+    expiry = int(time.time()) + 60 * 60 * 24 * 30
+    db_path = Path(settings.BASE_DIR) / "forgejo" / "data" / "gitea.db"
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO session (key, data, expiry) VALUES (?, ?, ?)",
+                (session_key, session_blob, expiry),
+            )
+            conn.commit()
+    except Exception:
+        logger.exception("Failed to persist Forgejo session for %s", getattr(user, "username", "unknown"))
+        return response
+
+    response.set_cookie(
+        "i_like_gitea",
+        session_key,
+        domain=".hanplanet.com",
+        path="/",
+        secure=bool(getattr(settings, "DEFAULT_SECURE_TRANSPORT", True)),
+        httponly=True,
+        samesite="Lax",
+    )
+    return response
+
+
 def _make_gitea_sso_url(post_login_url: str) -> str:
     """로그인 성공 후 Gitea SSO 릴레이 URL로 감쌉니다."""
     from urllib.parse import urlencode
@@ -2494,7 +2634,8 @@ def docs_login(request, ui_lang=None):
                 _clear_docs_login_captcha(request)
                 auth_login(request, authed_user)
                 _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
-                return redirect(_make_gitea_sso_url(next_url))
+                response = redirect(next_url)
+                return _attach_forgejo_login_session(response, authed_user)
             else:
                 login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
                 captcha_question = _build_docs_login_captcha(request, refresh=True)
@@ -2507,7 +2648,8 @@ def docs_login(request, ui_lang=None):
             _clear_docs_login_captcha(request)
             auth_login(request, authed_user)
             _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
-            return redirect(_make_gitea_sso_url(next_url))
+            response = redirect(next_url)
+            return _attach_forgejo_login_session(response, authed_user)
         else:
             login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
             if target_user is not None:
@@ -2587,7 +2729,8 @@ def docs_signup(request, ui_lang=None):
                 authed_user = user
             auth_login(request, authed_user)
             _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password1", ""))
-            return redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, user))
+            response = redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, user))
+            return _attach_forgejo_login_session(response, authed_user)
         signup_error_message = docs_text.get("auth_signup_error", "회원가입 정보를 확인해주세요.")
 
     context.update(
@@ -2613,23 +2756,42 @@ def docs_logout(request, ui_lang=None):
     # Forgejo 세션/토큰 서버사이드 선제 삭제 (로그아웃 전에 user 정보 참조)
     _forgejo_server_logout(request.user)
     auth_logout(request)
-    # 무조건 git.hanplanet.com 경유 → footer.tmpl JS가 Forgejo 로그아웃 처리 후 www로 복귀
-    git_base = settings.PUBLIC_GIT_BASE_URL.rstrip("/")
-    response = redirect(git_base + "/")
-    _set_hp_logout_cookies(response, next_url)
-    return response
+    git_logout_csrf_token = _fetch_gitea_logout_csrf_token()
+    if git_logout_csrf_token:
+        public_git = getattr(settings, "PUBLIC_GIT_BASE_URL", "").rstrip("/")
+        return render(
+            request,
+            "popup/root/git_logout_relay.html",
+            {
+                "git_logout_url": public_git + "/user/logout",
+                "git_logout_csrf_token": git_logout_csrf_token,
+                "git_logout_next_url": next_url,
+            },
+        )
+    return redirect(next_url)
 
 
-def _set_hp_logout_cookies(response, return_url):
-    """hp_logout + hp_logout_return 쿠키를 .hanplanet.com 공유 도메인에 설정."""
-    # 상대경로 → 절대 URL (git.hanplanet.com JS에서 window.location.replace 시 www로 복귀)
-    www_base = getattr(settings, "PUBLIC_BASE_URL", "https://www.hanplanet.com").rstrip("/")
-    if return_url and return_url.startswith("/"):
-        return_url = www_base + return_url
-    cookie_kwargs = dict(max_age=300, domain=".hanplanet.com", path="/",
-                         secure=True, httponly=False, samesite="Lax")
-    response.set_cookie("hp_logout", "1", **cookie_kwargs)
-    response.set_cookie("hp_logout_return", return_url, **cookie_kwargs)
+def _fetch_gitea_logout_csrf_token() -> str:
+    """Forgejo 홈 HTML에서 로그아웃용 CSRF 토큰을 추출한다."""
+    public_git = getattr(settings, "PUBLIC_GIT_BASE_URL", "").rstrip("/")
+    if not public_git:
+        return ""
+    try:
+        response = httpx.get(f"{public_git}/", timeout=8, follow_redirects=True)
+        response.raise_for_status()
+    except Exception:
+        return ""
+
+    html = response.text or ""
+    patterns = [
+        r"csrfToken:\s*'([^']+)'",
+        r'csrfToken:\s*"([^"]+)"',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, html)
+        if match:
+            return match.group(1)
+    return ""
 
 
 def _forgejo_server_logout(user):
