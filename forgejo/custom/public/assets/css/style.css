@@ -25,26 +25,33 @@
     unicode-range: U+1100-11FF, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
 }
 
-body {
+main.django {
     font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
     color: inherit;
-    min-height: 100vh;
+    min-height: 0;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg, #171717 0%, #232323 50%, #171717 100%);
 }
 
-body.page {
+body {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+body.page main.django {
     background: #ffffff;
     background-image: none;
 }
 
-body.theme-dark.page {
+body.theme-dark.page main.django {
     background: var(--site-bg);
     background-image: none;
 }
 
-body.bubble-page {
+body.bubble-page main.django {
     background: #bfbfbf;
     background-image: none;
     color: #101010;
@@ -52,43 +59,43 @@ body.bubble-page {
     transition: background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-body.bubble-page .bubble-bg-layer,
-body.bubble-page #interactiveBubbleCanvas,
-body.bubble-page .bubble-bg-canvas {
+body.bubble-page main.django .bubble-bg-layer,
+body.bubble-page main.django #interactiveBubbleCanvas,
+body.bubble-page main.django .bubble-bg-canvas {
     display: block;
     transition: background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-:root {
+main.django {
     --site-scrollbar-thumb: rgba(120, 120, 128, 0.45);
     --site-scrollbar-thumb-hover: rgba(95, 95, 103, 0.58);
     --site-placeholder: #b8b8b8;
 }
 
-body.theme-dark {
+body.theme-dark main.django {
     --site-scrollbar-thumb: rgba(198, 198, 205, 0.52);
     --site-scrollbar-thumb-hover: rgba(224, 224, 232, 0.68);
     --site-placeholder: #888888;
 }
 
-html::-webkit-scrollbar,
-body ::-webkit-scrollbar {
+main.django::-webkit-scrollbar,
+main.django ::-webkit-scrollbar {
     background: transparent;
 }
 
-html::-webkit-scrollbar-track,
-body ::-webkit-scrollbar-track {
+main.django::-webkit-scrollbar-track,
+main.django ::-webkit-scrollbar-track {
     background: transparent;
 }
 
-html::-webkit-scrollbar-corner,
-body ::-webkit-scrollbar-corner {
+main.django::-webkit-scrollbar-corner,
+main.django ::-webkit-scrollbar-corner {
     background: transparent;
 }
 
 *::-webkit-scrollbar-button,
-html::-webkit-scrollbar-button,
-body ::-webkit-scrollbar-button {
+main.django::-webkit-scrollbar-button,
+main.django ::-webkit-scrollbar-button {
     width: 0;
     height: 0;
     max-width: 0;
@@ -103,26 +110,26 @@ body ::-webkit-scrollbar-button {
 }
 
 *::-webkit-scrollbar-button:single-button,
-html::-webkit-scrollbar-button:single-button,
-body ::-webkit-scrollbar-button:single-button,
+main.django::-webkit-scrollbar-button:single-button,
+main.django ::-webkit-scrollbar-button:single-button,
 *::-webkit-scrollbar-button:start,
-html::-webkit-scrollbar-button:start,
-body ::-webkit-scrollbar-button:start,
+main.django::-webkit-scrollbar-button:start,
+main.django ::-webkit-scrollbar-button:start,
 *::-webkit-scrollbar-button:end,
-html::-webkit-scrollbar-button:end,
-body ::-webkit-scrollbar-button:end,
+main.django::-webkit-scrollbar-button:end,
+main.django ::-webkit-scrollbar-button:end,
 *::-webkit-scrollbar-button:vertical:start:decrement,
-html::-webkit-scrollbar-button:vertical:start:decrement,
-body ::-webkit-scrollbar-button:vertical:start:decrement,
+main.django::-webkit-scrollbar-button:vertical:start:decrement,
+main.django ::-webkit-scrollbar-button:vertical:start:decrement,
 *::-webkit-scrollbar-button:vertical:end:increment,
-html::-webkit-scrollbar-button:vertical:end:increment,
-body ::-webkit-scrollbar-button:vertical:end:increment,
+main.django::-webkit-scrollbar-button:vertical:end:increment,
+main.django ::-webkit-scrollbar-button:vertical:end:increment,
 *::-webkit-scrollbar-button:horizontal:start:decrement,
-html::-webkit-scrollbar-button:horizontal:start:decrement,
-body ::-webkit-scrollbar-button:horizontal:start:decrement,
+main.django::-webkit-scrollbar-button:horizontal:start:decrement,
+main.django ::-webkit-scrollbar-button:horizontal:start:decrement,
 *::-webkit-scrollbar-button:horizontal:end:increment,
-html::-webkit-scrollbar-button:horizontal:end:increment,
-body ::-webkit-scrollbar-button:horizontal:end:increment,
+main.django::-webkit-scrollbar-button:horizontal:end:increment,
+main.django ::-webkit-scrollbar-button:horizontal:end:increment,
 *::-webkit-scrollbar-button:decrement,
 *::-webkit-scrollbar-button:increment,
 *::-webkit-scrollbar-button:vertical:decrement,
@@ -143,55 +150,55 @@ body ::-webkit-scrollbar-button:horizontal:end:increment,
     appearance: none;
 }
 
-html::-webkit-scrollbar-thumb,
-body ::-webkit-scrollbar-thumb {
+main.django::-webkit-scrollbar-thumb,
+main.django ::-webkit-scrollbar-thumb {
     background: var(--site-scrollbar-thumb);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 
-html::-webkit-scrollbar-thumb:hover,
-body ::-webkit-scrollbar-thumb:hover {
+main.django::-webkit-scrollbar-thumb:hover,
+main.django ::-webkit-scrollbar-thumb:hover {
     background: var(--site-scrollbar-thumb-hover);
 }
 
-html,
-body,
-body * {
+main.django,
+main.django *,
+main.django {
     scrollbar-width: thin;
     scrollbar-color: var(--site-scrollbar-thumb) transparent;
 }
 
-body.portfolio-page,
-body.portfolio-page .bubble-bg-layer,
-body.portfolio-page #interactiveBubbleCanvas,
-body.portfolio-page .ui-nav,
-body.portfolio-page .ui-nav-links,
-body.portfolio-page .ui-nav-link,
-body.portfolio-page .ui-nav-toggler,
-body.portfolio-page section,
-body.portfolio-page hr,
-body.portfolio-page .main-surface-layer,
-body.portfolio-page .main-surface-layer h1,
-body.portfolio-page .main-surface-layer h2,
-body.portfolio-page .main-surface-layer h3,
-body.portfolio-page .main-surface-layer h4,
-body.portfolio-page .main-surface-layer h5,
-body.portfolio-page .main-surface-layer p,
-body.portfolio-page .main-surface-layer li,
-body.portfolio-page .main-surface-layer span,
-body.portfolio-page .main-surface-layer div,
-body.portfolio-page .main-surface-layer b,
-body.portfolio-page .main-surface-layer strong,
-body.portfolio-page .project_card,
-body.portfolio-page .career_card,
-body.portfolio-page .project_card_img,
-body.portfolio-page .hobby_card_img,
-body.portfolio-page .tag,
-body.portfolio-page .career_card_date,
-body.portfolio-page .contact,
-body.portfolio-page .foot {
+body.portfolio-page main.django,
+body.portfolio-page main.django .bubble-bg-layer,
+body.portfolio-page main.django #interactiveBubbleCanvas,
+body.portfolio-page main.django .ui-nav,
+body.portfolio-page main.django .ui-nav-links,
+body.portfolio-page main.django .ui-nav-link,
+body.portfolio-page main.django .ui-nav-toggler,
+body.portfolio-page main.django section,
+body.portfolio-page main.django hr,
+body.portfolio-page main.django .main-surface-layer,
+body.portfolio-page main.django .main-surface-layer h1,
+body.portfolio-page main.django .main-surface-layer h2,
+body.portfolio-page main.django .main-surface-layer h3,
+body.portfolio-page main.django .main-surface-layer h4,
+body.portfolio-page main.django .main-surface-layer h5,
+body.portfolio-page main.django .main-surface-layer p,
+body.portfolio-page main.django .main-surface-layer li,
+body.portfolio-page main.django .main-surface-layer span,
+body.portfolio-page main.django .main-surface-layer div,
+body.portfolio-page main.django .main-surface-layer b,
+body.portfolio-page main.django .main-surface-layer strong,
+body.portfolio-page main.django .project_card,
+body.portfolio-page main.django .career_card,
+body.portfolio-page main.django .project_card_img,
+body.portfolio-page main.django .hobby_card_img,
+body.portfolio-page main.django .tag,
+body.portfolio-page main.django .career_card_date,
+body.portfolio-page main.django .contact,
+body.portfolio-page main.django .foot {
     transition:
         background-color 0.62s cubic-bezier(0.22, 1, 0.36, 1),
         color 0.52s cubic-bezier(0.22, 1, 0.36, 1),
@@ -199,7 +206,7 @@ body.portfolio-page .foot {
         box-shadow 0.62s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-body.theme-dark {
+body.theme-dark main.django {
     --site-bg: #222222;
     --site-text: #f2f2f2;
     --site-text-strong: #f5f5f5;
@@ -272,115 +279,115 @@ body.theme-dark {
     --btn-template-transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
-body.portfolio-page.theme-dark {
+body.portfolio-page.theme-dark main.django {
     color: #e8e8e8;
     background: var(--site-bg);
     background-image: none;
 }
 
-body.project-page.theme-dark {
+body.project-page.theme-dark main.django {
     color: #e8e8e8;
     background: var(--site-bg);
     background-image: none;
 }
 
-body.root-page.theme-dark {
+body.root-page.theme-dark main.django {
     color: #e8e8e8;
     background: var(--site-bg);
     background-image: none;
 }
 
-html.preload-light-bg body.portfolio-page.theme-dark {
+body.preload-light-bg.portfolio-page.theme-dark main.django {
     background: var(--site-bg);
     background-image: none;
 }
 
-html.preload-light-bg body.project-page.theme-dark {
+body.preload-light-bg.project-page.theme-dark main.django {
     background: var(--site-bg);
     background-image: none;
 }
 
-body.portfolio-page.theme-dark .bubble-bg-layer {
+body.portfolio-page.theme-dark main.django .bubble-bg-layer {
     background: var(--site-bg);
 }
 
-body.portfolio-page.theme-dark #interactiveBubbleCanvas {
+body.portfolio-page.theme-dark main.django #interactiveBubbleCanvas {
     background: var(--site-bg);
 }
 
-body.portfolio-page.theme-dark section {
+body.portfolio-page.theme-dark main.django section {
     border-color: var(--theme-border);
 }
 
-body.portfolio-page.theme-dark hr {
+body.portfolio-page.theme-dark main.django hr {
     border: 0;
     border-top: 1px solid var(--theme-border);
     height: 0;
     opacity: 1;
 }
 
-body.project-page.theme-dark hr,
-body.project-page.theme-dark .project_detail hr {
+body.project-page.theme-dark main.django hr,
+body.project-page.theme-dark main.django .project_detail hr {
     border-color: rgba(255, 255, 255, 0.28);
     opacity: 1;
 }
 
-body.theme-dark .ui-nav-link:hover,
-body.theme-dark .ui-nav-link:focus-visible,
-body.theme-dark .ui-nav-link:active {
+body.theme-dark main.django .ui-nav-link:hover,
+body.theme-dark main.django .ui-nav-link:focus-visible,
+body.theme-dark main.django .ui-nav-link:active {
     background-color: var(--site-hover);
     border-color: transparent;
 }
 
-body.theme-dark .ui-nav-toggler {
+body.theme-dark main.django .ui-nav-toggler {
     background: var(--site-surface-muted);
     border-color: transparent;
 }
 
-body.theme-dark .ui-nav-toggler:hover {
+body.theme-dark main.django .ui-nav-toggler:hover {
     box-shadow: 0 0 0 0.18rem rgba(255, 255, 255, 0.2);
 }
 
-body.theme-dark .ui-nav .navbar-toggler-icon {
+body.theme-dark main.django .ui-nav .navbar-toggler-icon {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23f2f2f2' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.4' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
 }
 
-body.theme-dark .ui-nav.nav-auto-collapsed .ui-nav-links {
+body.theme-dark main.django .ui-nav.nav-auto-collapsed .ui-nav-links {
     background: var(--site-elevated-bg);
     border: none;
     outline: none;
     box-shadow: none;
 }
 
-body.theme-dark .ui-nav {
+body.theme-dark main.django .ui-nav {
     background: rgba(34, 34, 34, 0.84);
     background-image: none;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48);
 }
 
-body.portfolio-page.theme-dark .main-surface-layer,
-body.portfolio-page.theme-dark .main-surface-layer h1,
-body.portfolio-page.theme-dark .main-surface-layer h2,
-body.portfolio-page.theme-dark .main-surface-layer h3,
-body.portfolio-page.theme-dark .main-surface-layer h4,
-body.portfolio-page.theme-dark .main-surface-layer h5,
-body.portfolio-page.theme-dark .main-surface-layer p,
-body.portfolio-page.theme-dark .main-surface-layer li,
-body.portfolio-page.theme-dark .main-surface-layer span,
-body.portfolio-page.theme-dark .main-surface-layer div,
-body.portfolio-page.theme-dark .main-surface-layer b,
-body.portfolio-page.theme-dark .main-surface-layer strong {
+body.portfolio-page.theme-dark main.django .main-surface-layer,
+body.portfolio-page.theme-dark main.django .main-surface-layer h1,
+body.portfolio-page.theme-dark main.django .main-surface-layer h2,
+body.portfolio-page.theme-dark main.django .main-surface-layer h3,
+body.portfolio-page.theme-dark main.django .main-surface-layer h4,
+body.portfolio-page.theme-dark main.django .main-surface-layer h5,
+body.portfolio-page.theme-dark main.django .main-surface-layer p,
+body.portfolio-page.theme-dark main.django .main-surface-layer li,
+body.portfolio-page.theme-dark main.django .main-surface-layer span,
+body.portfolio-page.theme-dark main.django .main-surface-layer div,
+body.portfolio-page.theme-dark main.django .main-surface-layer b,
+body.portfolio-page.theme-dark main.django .main-surface-layer strong {
     color: #ececec;
 }
 
-body.portfolio-page.theme-dark .project_card {
+body.portfolio-page.theme-dark main.django .project_card {
     background-color: var(--shared-card-bg);
     border: none;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
     border-radius: 14px;
 }
 
-body.portfolio-page.theme-dark .career_card {
+body.portfolio-page.theme-dark main.django .career_card {
     background: transparent;
     border: none;
     box-shadow: none;
@@ -389,16 +396,16 @@ body.portfolio-page.theme-dark .career_card {
     margin-bottom: 0;
 }
 
-body.portfolio-page.theme-dark .project_card_text hr,
-body.portfolio-page.theme-dark .career_cards hr {
+body.portfolio-page.theme-dark main.django .project_card_text hr,
+body.portfolio-page.theme-dark main.django .career_cards hr {
     border: 0;
     border-top: 1px solid var(--theme-border);
     height: 0;
     opacity: 1;
 }
 
-body.portfolio-page.theme-dark .main_contents hr,
-body.portfolio-page.theme-dark .main_banner hr {
+body.portfolio-page.theme-dark main.django .main_contents hr,
+body.portfolio-page.theme-dark main.django .main_banner hr {
     border: 0;
     border-top: 1px solid var(--theme-border);
     height: 0;
@@ -406,17 +413,17 @@ body.portfolio-page.theme-dark .main_banner hr {
 }
 
 /* Keep section border and hr line visually identical in portfolio dark mode. */
-body.portfolio-page.theme-dark section {
+body.portfolio-page.theme-dark main.django section {
     border-color: var(--theme-border);
 }
 
-body.portfolio-page.theme-dark .project_card_img,
-body.portfolio-page.theme-dark .hobby_card_img {
+body.portfolio-page.theme-dark main.django .project_card_img,
+body.portfolio-page.theme-dark main.django .hobby_card_img {
     background-color: rgba(38, 38, 38, 0.92);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42);
 }
 
-body.portfolio-page.theme-dark .tag {
+body.portfolio-page.theme-dark main.django .tag {
     background-color: rgb(95, 95, 95);
     color: #f3f3f3;
     box-shadow: none;
@@ -1724,6 +1731,83 @@ body.portfolio-page section {
     --project-tags-area-height: 86px;
 }
 
+body {
+    font-family: "Inter", 'KakaoBigFont', 'Noto Sans KR', "Helvetica Neue", Helvetica, Arial, "맑은 고딕", malgun gothic, "돋움", Dotum, sans-serif, "Apple Color Emoji", "Noto Color Emoji";
+}
+
+body.theme-dark {
+    --site-bg: #222222;
+    --site-text: #f2f2f2;
+    --site-text-strong: #f5f5f5;
+    --site-text-stronger: #fafafa;
+    --site-text-muted: #d6d6d6;
+    --site-text-subtle: #c8c8c8;
+    --site-text-faint: #b2b2b2;
+    --site-text-secondary: #c2c2c2;
+    --site-border-soft: rgba(255, 255, 255, 0.13);
+    --site-border: rgba(255, 255, 255, 0.18);
+    --site-border-mid: rgba(255, 255, 255, 0.24);
+    --site-border-strong: rgba(255, 255, 255, 0.28);
+    --site-border-heavy: rgba(255, 255, 255, 0.32);
+    --site-border-context: rgba(255, 255, 255, 0.36);
+    --site-hover-soft: rgba(255, 255, 255, 0.08);
+    --site-hover: rgba(255, 255, 255, 0.13);
+    --site-hover-strong: rgba(255, 255, 255, 0.19);
+    --site-hover-button: rgba(255, 255, 255, 0.13);
+    --site-surface-toolbar: rgba(34, 34, 34, 0.9);
+    --site-surface-muted: rgba(40, 40, 40, 0.94);
+    --site-surface-muted-strong: rgba(46, 46, 46, 0.96);
+    --site-backdrop: rgba(0, 0, 0, 0.58);
+    --site-backdrop-strong: rgba(0, 0, 0, 0.68);
+    --site-shadow-md: 0 16px 34px rgba(0, 0, 0, 0.5);
+    --site-shadow-lg: 0 16px 34px rgba(0, 0, 0, 0.55);
+    --site-shadow-xl: 0 20px 44px rgba(0, 0, 0, 0.6);
+    --site-link: #d2d2d2;
+    --site-btn-hover-border: rgba(255, 255, 255, 0.36);
+    --site-btn-primary-bg: rgba(95, 95, 95, 0.9);
+    --site-btn-primary-border: transparent;
+    --site-btn-primary-text: #f7f7f7;
+    --site-btn-primary-hover-bg: rgba(124, 124, 124, 0.95);
+    --site-btn-primary-hover-border: transparent;
+    --site-btn-primary-hover-text: #ffffff;
+    --site-selected-bg: rgba(255, 255, 255, 0.17);
+    --site-divider-weak: rgba(255, 255, 255, 0.16);
+    --site-panel-border: rgba(255, 255, 255, 0.24);
+    --site-elevated-bg: rgba(46, 46, 46, 0.97);
+    --site-crumb-color: #e2e2e2;
+    --site-crumb-current-color: #fafafa;
+    --site-crumb-sep-color: #b5b5b5;
+    --site-save-row-color: #ebebeb;
+    --site-save-row-hover: rgba(255, 255, 255, 0.11);
+    --site-save-folder-color: #f0f0f0;
+    --site-close-color: #cdcdcd;
+    --site-overlay-soft: rgba(0, 0, 0, 0.52);
+    --site-overlay-shadow: 0 14px 34px rgba(0, 0, 0, 0.58);
+    --shared-card-bg: rgba(43, 43, 43, 0.94);
+    --theme-ink: #f2f2f2;
+    --theme-subtle: #d6d6d6;
+    --theme-accent: #ffffff;
+    --theme-accent-strong: #ffffff;
+    --theme-border: rgba(255, 255, 255, 0.28);
+    --theme-surface: rgba(34, 34, 34, 0.92);
+    --theme-glow: rgba(255, 255, 255, 0.18);
+    --color-white: #ffffff;
+    --color-ink: #f2f2f2;
+    --color-muted: #c2c2c2;
+    --color-muted-soft: #d6d6d6;
+    --color-section-border: #5e5e5e;
+    --color-hover-bg: rgba(255, 255, 255, 0.08);
+    --color-hover-border: rgba(255, 255, 255, 0.24);
+    --color-nav-bg-start: rgba(34, 34, 34, 0.84);
+    --color-nav-bg-end: rgba(34, 34, 34, 0.84);
+    --surface-strong: rgba(32, 32, 32, 0.95);
+    --surface-stronger: rgba(46, 46, 46, 0.98);
+    --shadow-soft: 0 4px 8px rgba(0, 0, 0, 0.34);
+    --shadow-medium: 0 8px 18px rgba(0, 0, 0, 0.48);
+    --shadow-hover: 0 10px 18px rgba(0, 0, 0, 0.48);
+    --shadow-focus-ring: 0 0 0 0.18rem rgba(255, 255, 255, 0.2);
+}
+
 .hover-dark {
     transition: filter 0.5s ease;
 }
@@ -1744,6 +1828,7 @@ body.portfolio-page section {
     backdrop-filter: blur(8px);
     box-shadow: var(--shadow-medium);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: inherit;
 }
 
 /* 메뉴바 숨김 효과 */
@@ -1822,6 +1907,7 @@ body.theme-dark .ui-nav::after {
     font-weight: 750;
     letter-spacing: -0.2px;
     text-decoration: none;
+    font-family: inherit;
 }
 
 .ui-brand-text {
@@ -1928,6 +2014,7 @@ body.theme-dark .ui-nav::after {
     font-weight: 600;
     transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
     white-space: nowrap;
+    font-family: inherit;
 }
 
 .ui-nav-link:visited {
@@ -2071,6 +2158,7 @@ body.theme-dark .ui-pwa-install-icon {
     opacity: 0.8;
     transition: color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
     cursor: pointer;
+    font-family: inherit;
 }
 
 .ui-control-toggle .ui-control-link {
@@ -2132,6 +2220,7 @@ body.theme-dark .ui-pwa-install-icon {
     background: var(--surface-strong);
     padding: 6px 10px;
     transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+    font-family: inherit;
 }
 
 .ui-nav-toggler:hover {
@@ -2981,6 +3070,7 @@ body.portfolio-page.theme-dark .career_cards hr {
     color: #6b7280;
     flex: 0 0 auto;
     margin-top: auto;
+    font-family: inherit;
 }
 
 .site-footer-link {

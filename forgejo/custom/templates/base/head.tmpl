@@ -29,6 +29,7 @@
 	<noscript>{{ctx.Locale.Tr "enable_javascript"}}</noscript>
 
 	{{template "custom/body_inner_pre" .}}
+	{{if .PageIsInstall}}<main class="page-content django" role="main">{{end}}
 
 	{{if not .PageIsInstall}}
 		{{template "base/head_navbar" .}}

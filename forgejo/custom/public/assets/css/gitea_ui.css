@@ -1,562 +1,156 @@
-/* ══════════════════════════════════════════════════════════════════
-   gitea_ui.css  —  Hanplanet Gitea 전용 UI 테마
-   ┌ 색상은 style.css의 CSS 변수를 참조합니다.
-   │   :root           → 라이트모드 기본값
-   │   body.theme-dark → 다크모드 오버라이드
-   └ style.css 동기화(cp) 만으로 색상이 자동 반영됩니다.
-══════════════════════════════════════════════════════════════════ */
+/* Hanplanet Forgejo main theme
+   - role="main" 내부의 색상만 Hanplanet 변수로 맞춘다
+   - 레이아웃, 여백, 배치, 드롭다운 구조는 Forgejo 기본 CSS/JS에 맡긴다 */
 
-/* ──────────────────────────────────────────────────────────────
-   0. Sticky footer 레이아웃
-   div.full.height 는 base/head.tmpl 오버라이드로 제거됨
-────────────────────────────────────────────────────────────── */
-body {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-}
 .page-content {
-    flex-grow: 1;
+    flex: 1 0 auto;
+    color: var(--site-text, #111111);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   0. 전체 페이지 배경
-────────────────────────────────────────────────────────────── */
-body.page {
-    background: var(--site-bg, #ffffff);
-    background-image: none;
-}
-body.theme-dark.page {
-    background: var(--site-bg, #222222);
-    background-image: none;
+.page-content a {
+    color: var(--site-link, #4f4f4f);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   0-1. 네비바 다크 모드 그림자
-   gitea_ui.css 가 마지막 로드 → Forgejo 내장 CSS 덮어쓰기 보장
-────────────────────────────────────────────────────────────── */
-body.theme-dark .ui-nav {
-    background: rgba(34, 34, 34, 0.84);
-    background-image: none;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.48);
+.page-content a:hover {
+    color: var(--theme-ink, #111111);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   1. 기본 텍스트 / 링크
-────────────────────────────────────────────────────────────── */
-.page-content,
-.page-content * {
-    box-sizing: border-box;
-}
-.page-content {
-    color: var(--site-text);
-    padding: 20px 0;
-}
-
-a {
-    color: var(--site-link);
-    text-decoration: none;
-}
-a:hover {
-    color: var(--theme-ink);
-    text-decoration: underline;
-}
-/* Forgejo 버튼 요소 호버 시 밑줄 제거 */
-.ui.button:hover,
-.ui.buttons .button:hover,
-a.ui.button:hover {
-    text-decoration: none;
-}
-a.muted, .muted {
-    color: var(--site-text-muted);
-    text-decoration: none;
-}
-a.muted:hover { color: var(--theme-ink); }
-
-h1, h2, h3, h4, h5, h6 {
-    color: var(--theme-ink);
-    margin: 0 0 0.5em;
-}
-img { max-width: 100%; }
-
-/* ──────────────────────────────────────────────────────────────
-   2. 레이아웃
-────────────────────────────────────────────────────────────── */
-.ui.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 16px;
-    width: 100%;
-}
-.ui.grid { display: grid; }
-.page-content.user.profile .ui.container { padding: 24px 16px; }
-
-/* ──────────────────────────────────────────────────────────────
-   3. 구분선
-────────────────────────────────────────────────────────────── */
-.divider, hr, .ui.divider {
-    border: none;
-    border-top: 1px solid var(--site-border);
-    margin: 10px 0;
+.page-content .muted,
+.page-content .light.grey,
+.page-content .text.grey,
+.page-content .text.muted,
+.page-content .repository .repo-description,
+.page-content .repository .commit-message,
+.page-content .repository .time,
+.page-content .user.profile .text.light.grey,
+.page-content .dashboard.feeds .news .time-since {
+    color: var(--site-text-muted, #5a5a5a);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   4. SVG 아이콘
-────────────────────────────────────────────────────────────── */
-svg.svg, svg.octicon {
-    fill: currentColor;
-    vertical-align: middle;
-    flex-shrink: 0;
-}
-.page-content svg.svg,
-.page-content svg.octicon {
-    color: var(--site-text-muted);
+.page-content h1,
+.page-content h2,
+.page-content h3,
+.page-content h4,
+.page-content h5,
+.page-content h6,
+.page-content .header,
+.page-content .ui.header {
+    color: var(--theme-ink, #111111);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   5. 버튼
-────────────────────────────────────────────────────────────── */
-.ui.button,
-button.ui,
-.ui.buttons .button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--site-surface-muted);
-    color: var(--site-text);
-    border: 1px solid var(--site-border-mid);
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-    transition: background var(--motion-fast), border-color var(--motion-fast);
-    white-space: nowrap;
-}
-.ui.button:hover, button.ui:hover {
-    background: var(--site-hover);
-    border-color: var(--site-border-strong);
-    color: var(--theme-ink);
-    text-decoration: none;
+.page-content .ui.button,
+.page-content .ui.buttons .button,
+.page-content button.ui,
+.page-content a.ui.button {
+    color: var(--site-text, #111111);
 }
 
-.ui.primary.button, .ui.green.button {
-    background: var(--site-btn-primary-bg);
-    color: var(--site-btn-primary-text);
-    border-color: transparent;
-}
-.ui.primary.button:hover, .ui.green.button:hover {
-    background: var(--site-btn-primary-hover-bg);
-    color: var(--site-btn-primary-hover-text);
+.page-content .ui.primary.button,
+.page-content .ui.green.button {
+    background: var(--site-btn-primary-bg, #161616);
+    color: var(--site-btn-primary-text, #ffffff);
+    border-color: var(--site-btn-primary-border, #161616);
 }
 
-.ui.cancel.button, .ui.basic.button {
-    background: transparent;
-    color: var(--site-text-muted);
-    border-color: var(--site-border);
-}
-.ui.cancel.button:hover, .ui.basic.button:hover {
-    background: var(--site-hover-soft);
-    color: var(--site-text);
+.page-content .ui.primary.button:hover,
+.page-content .ui.green.button:hover {
+    background: var(--site-btn-primary-hover-bg, #2b2b2b);
+    color: var(--site-btn-primary-hover-text, #ffffff);
+    border-color: var(--site-btn-primary-hover-border, #2b2b2b);
 }
 
-.ui.tiny.button  { font-size: 12px; padding: 4px 10px; }
-.ui.small.button { font-size: 13px; padding: 5px 12px; }
-.ui.large.button { font-size: 16px; padding: 8px 18px; }
-
-/* ──────────────────────────────────────────────────────────────
-   6. 폼 / 인풋
-────────────────────────────────────────────────────────────── */
-.ui.form, form { color: var(--site-text); }
-
-.ui.form .field label, form label {
-    display: block;
-    color: var(--site-text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 4px;
+.page-content .ui.basic.button,
+.page-content .ui.basic.buttons .button,
+.page-content .ui.cancel.button {
+    color: var(--site-text-muted, #5a5a5a);
 }
 
-input[type="text"], input[type="email"], input[type="password"],
-input[type="search"], input[type="number"], input[type="url"],
-input[type="tel"], textarea, select, .ui.input input {
-    background: var(--site-bg);
-    color: var(--site-text);
-    border: 1px solid var(--site-border-mid);
-    border-radius: 6px;
-    padding: 7px 11px;
-    font-size: 14px;
-    width: 100%;
-    outline: none;
-    transition: border-color var(--motion-fast);
-}
-input:focus, textarea:focus, select:focus {
-    border-color: var(--theme-ink);
-    box-shadow: 0 0 0 2px var(--site-border);
-}
-input::placeholder, textarea::placeholder {
-    color: var(--site-text-subtle);
-    opacity: 0.7;
+.page-content input,
+.page-content textarea,
+.page-content select,
+.page-content .ui.input input {
+    color: var(--site-text, #111111);
 }
 
-.ui.form .field { margin-bottom: 14px; }
-.ui.form .actions, .actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    padding-top: 12px;
+.page-content input::placeholder,
+.page-content textarea::placeholder {
+    color: var(--site-text-subtle, #666666);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   7. 메뉴 / 드롭다운
-────────────────────────────────────────────────────────────── */
-.ui.menu, .menu {
-    display: flex;
-    flex-wrap: wrap;
-    background: var(--site-elevated-bg);
-    border: 1px solid var(--site-border);
-    border-radius: 8px;
-    padding: 4px 0;
-    list-style: none;
-    margin: 0;
+.page-content .ui.label,
+.page-content .label {
+    color: var(--site-text-muted, #5a5a5a);
 }
 
-.menu .item, .ui.menu .item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    color: var(--site-text);
-    text-decoration: none;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 14px;
-    white-space: nowrap;
-    transition: background var(--motion-fast), color var(--motion-fast);
-}
-.menu .item:hover, .ui.menu .item:hover {
-    background: var(--site-hover);
-    color: var(--theme-ink);
-    text-decoration: none;
-}
-.menu .item.active, .ui.menu .item.active {
-    color: var(--theme-ink);
-    font-weight: 600;
-}
-.menu .divider, .ui.menu .divider {
-    border-top: 1px solid var(--site-border);
-    margin: 4px 8px;
-    height: 0;
-    padding: 0;
+.page-content .ui.message,
+.page-content .ui.info.message {
+    color: var(--site-text, #111111);
 }
 
-/* 드롭다운 팝업 */
-.ui.dropdown .menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    min-width: max-content;
-    z-index: 1000;
-    box-shadow: var(--shadow-medium);
-    flex-direction: column;
-    border-radius: 8px;
-    margin-top: 4px;
-}
-.ui.dropdown {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    color: var(--site-text);
+.page-content .ui.error.message {
+    color: #b91c1c;
 }
 
-/* 탭 메뉴 */
-.ui.tabular.menu, .flex-items-menu {
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid var(--site-border);
-    border-radius: 0;
-    gap: 0;
-    padding: 0;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-}
-.flex-items-menu .item, .ui.tabular.menu .item {
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    margin-bottom: -1px;
-    padding: 8px 16px;
-    color: var(--site-text-muted);
-}
-.flex-items-menu .item:hover, .ui.tabular.menu .item:hover {
-    background: transparent;
-    color: var(--theme-ink);
-    border-bottom-color: var(--site-border-mid);
-}
-.flex-items-menu .item.active, .ui.tabular.menu .item.active {
-    color: var(--theme-ink);
-    border-bottom-color: var(--theme-ink);
-    background: transparent;
+.page-content .ui.success.message {
+    color: #1a8a37;
 }
 
-/* ──────────────────────────────────────────────────────────────
-   8. 카드 / 박스
-────────────────────────────────────────────────────────────── */
-.ui.card, .ui.cards .card {
-    background: var(--site-elevated-bg);
-    border: 1px solid var(--site-border);
-    border-radius: 8px;
-    box-shadow: none;
-    color: var(--site-text);
-    overflow: hidden;
-}
-.ui.card .header, .ui.cards .card .header {
-    color: var(--theme-ink);
-    font-weight: 600;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--site-border);
-}
-.ui.card .content, .ui.cards .card .content {
-    padding: 12px 16px;
-    color: var(--site-text);
-}
-.ui.card .extra.content, .ui.cards .card .extra.content {
-    border-top: 1px solid var(--site-border);
-    color: var(--site-text-muted);
-    font-size: 13px;
-    padding: 8px 16px;
+.page-content .ui.warning.message {
+    color: #92680a;
 }
 
-/* ──────────────────────────────────────────────────────────────
-   9. 테이블
-────────────────────────────────────────────────────────────── */
-table { border-collapse: collapse; width: 100%; color: var(--site-text); }
-th, td {
-    border: 1px solid var(--site-border);
-    padding: 8px 12px;
-    text-align: left;
-    color: inherit;
-}
-th {
-    background: var(--site-surface-muted);
-    color: var(--site-text-strong);
-    font-weight: 600;
-}
-tr:hover td { background: var(--site-hover-soft); }
-
-/* ──────────────────────────────────────────────────────────────
-   10. 코드 블록
-────────────────────────────────────────────────────────────── */
-pre, .code-view pre {
-    background: var(--site-surface-muted);
-    border: 1px solid var(--site-border);
-    border-radius: 6px;
-    padding: 14px 16px;
-    overflow-x: auto;
-    font-size: 13px;
-    color: var(--site-text);
-}
-code {
-    background: var(--site-surface-muted);
-    border: 1px solid var(--site-border-soft);
-    border-radius: 4px;
-    padding: 2px 5px;
-    font-size: 0.875em;
-    color: var(--site-text);
-}
-pre code { background: transparent; border: none; padding: 0; }
-
-/* ──────────────────────────────────────────────────────────────
-   11. 모달 — 레이아웃/포지셔닝은 Fomantic UI 내장 CSS에 위임
-   (position/overflow/transform 재정의하면 Fomantic JS가 깨짐)
-────────────────────────────────────────────────────────────── */
-.ui.modal {
-    background: var(--site-bg);
-    border: 1px solid var(--site-border-mid);
-    border-radius: 12px;
-    box-shadow: var(--site-shadow-xl);
-    color: var(--site-text);
-}
-.ui.modal .header {
-    border-bottom: 1px solid var(--site-border);
-    color: var(--theme-ink);
-    font-weight: 700;
-}
-.ui.modal .content, .ui.modal .modal-form {
-    color: var(--site-text);
-}
-.ui.modal .actions {
-    border-top: 1px solid var(--site-border);
-    background: var(--site-surface-muted);
-}
-.ui.dimmer {
-    background: var(--site-backdrop);
-}
-
-/* ──────────────────────────────────────────────────────────────
-   12. 라벨 / 배지
-────────────────────────────────────────────────────────────── */
-.ui.label, .label {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--site-surface-muted);
-    color: var(--site-text-muted);
-    border: 1px solid var(--site-border);
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-/* 색상 배지는 라이트/다크 각각 지정 (CSS 변수 없음) */
-.ui.green.label  { background: rgba(33,186,69,0.12);  color: #1a8a37; border-color: rgba(33,186,69,0.3); }
-.ui.red.label    { background: rgba(219,40,40,0.12);  color: #b91c1c; border-color: rgba(219,40,40,0.3); }
-.ui.yellow.label { background: rgba(251,189,8,0.15);  color: #92680a; border-color: rgba(251,189,8,0.4); }
-.ui.blue.label   { background: rgba(65,131,196,0.12); color: #1e66a8; border-color: rgba(65,131,196,0.3); }
-
-body.theme-dark .ui.green.label  { color: #4ade80; background: rgba(33,186,69,0.18); }
-body.theme-dark .ui.red.label    { color: #f87171; background: rgba(219,40,40,0.18); }
-body.theme-dark .ui.yellow.label { color: #fbbf24; background: rgba(251,189,8,0.18); }
-body.theme-dark .ui.blue.label   { color: #60a5fa; background: rgba(65,131,196,0.18); }
-
-/* ──────────────────────────────────────────────────────────────
-   13. 메시지 / 알림
-────────────────────────────────────────────────────────────── */
-.ui.message {
-    background: var(--site-surface-muted);
-    border: 1px solid var(--site-border);
-    border-radius: 8px;
-    padding: 14px 18px;
-    color: var(--site-text);
-    margin: 12px 0;
-}
-.ui.error.message   { background: rgba(219,40,40,0.08);  border-color: rgba(219,40,40,0.3);  color: #b91c1c; }
-.ui.success.message { background: rgba(33,186,69,0.08);  border-color: rgba(33,186,69,0.3);  color: #1a8a37; }
-.ui.warning.message { background: rgba(251,189,8,0.10);  border-color: rgba(251,189,8,0.4);  color: #92680a; }
-body.theme-dark .ui.error.message   { color: #f87171; }
-body.theme-dark .ui.success.message { color: #4ade80; }
-body.theme-dark .ui.warning.message { color: #fbbf24; }
-
-/* ──────────────────────────────────────────────────────────────
-   14. 아바타 / 프로필
-────────────────────────────────────────────────────────────── */
-.avatar, img.avatar    { border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.ui.image.label .avatar { border-radius: 50%; }
-.content .header       { color: var(--theme-ink);         font-weight: 700; font-size: 16px; margin-bottom: 4px; }
-.content .description  { color: var(--site-text-muted);  font-size: 14px; }
-.content .extra        { color: var(--site-text-subtle);  font-size: 13px; }
-
-/* ──────────────────────────────────────────────────────────────
-   15. Flex 리스트 (저장소 목록)
-────────────────────────────────────────────────────────────── */
-.flex-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    border: 1px solid var(--site-border);
-    border-radius: 8px;
-    overflow: hidden;
-}
-.flex-list > * {
-    border-bottom: 1px solid var(--site-border);
-    padding: 12px 16px;
-}
-.flex-list > *:last-child { border-bottom: none; }
-
-/* ──────────────────────────────────────────────────────────────
-   16. 페이지네이션
-────────────────────────────────────────────────────────────── */
-.ui.pagination.menu {
-    background: transparent;
-    border: none;
-    gap: 4px;
-    padding: 0;
-}
-.ui.pagination.menu .item {
-    background: var(--site-surface-muted);
-    border: 1px solid var(--site-border);
-    border-radius: 6px;
-    color: var(--site-text);
-    min-width: 36px;
-    justify-content: center;
-}
-.ui.pagination.menu .item:hover {
-    background: var(--site-hover);
-    color: var(--theme-ink);
-}
-.ui.pagination.menu .item.active {
-    background: var(--theme-ink);
-    color: var(--site-bg);
-    border-color: transparent;
-}
-
-/* ──────────────────────────────────────────────────────────────
-   17. 홈 히어로
-────────────────────────────────────────────────────────────── */
 .page-content.home {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 20px;
     text-align: center;
 }
-.page-content.home .hero h1,
-.page-content.home .hero h2 { color: var(--theme-ink); }
+
 .page-content.home .hero h2 {
-    color: var(--site-text-muted);
-    font-weight: 400;
-    margin-top: 8px;
+    color: var(--site-text-muted, #5a5a5a);
 }
-.page-content.home img.logo { opacity: 0.85; }
+
+.page-content.home img.logo {
+    opacity: 0.88;
+}
+
 body.theme-dark .page-content.home img.logo {
     filter: invert(1) brightness(0.85);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   18. 오버플로우 메뉴
-────────────────────────────────────────────────────────────── */
-.overflow-menu-items {
-    display: none;
-    position: absolute;
-    background: var(--site-elevated-bg);
-    border: 1px solid var(--site-border);
-    border-radius: 8px;
-    box-shadow: var(--shadow-medium);
-    z-index: 200;
-    min-width: 150px;
-    padding: 4px 0;
+body.theme-dark .page-content .ui.error.message {
+    color: #f87171;
 }
 
-/* ──────────────────────────────────────────────────────────────
-   19. 저장소 페이지
-────────────────────────────────────────────────────────────── */
-.repository .file-list td,
-.repository .file-list th { color: var(--site-text); }
-.repository .commit-message  { color: var(--site-text-muted); font-size: 13px; }
-.repository .repo-description { color: var(--site-text-muted); }
+body.theme-dark .page-content .ui.success.message {
+    color: #4ade80;
+}
 
-/* ──────────────────────────────────────────────────────────────
-   20. 텍스트 유틸리티
-────────────────────────────────────────────────────────────── */
-.text.grey, .text.muted { color: var(--site-text-muted) !important; }
-.text.red   { color: #dc2626 !important; }
-.text.green { color: #16a34a !important; }
-.text.blue  { color: #2563eb !important; }
-.text.center { text-align: center !important; }
-body.theme-dark .text.red   { color: #f87171 !important; }
-body.theme-dark .text.green { color: #4ade80 !important; }
-body.theme-dark .text.blue  { color: #60a5fa !important; }
+body.theme-dark .page-content .ui.warning.message {
+    color: #fbbf24;
+}
 
-.modal-blockee-name { color: var(--site-text) !important; }
+/* Bootstrap bleed-through correction inside Forgejo main content.
+   Keep the Hanplanet shell untouched and only restore layout spacing
+   for content rendered inside `.page-content`. */
+.page-content .container,
+.page-content .container-fluid {
+    padding-left: 0;
+    padding-right: 0;
+}
 
-/* ──────────────────────────────────────────────────────────────
-   21. 반응형
-────────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-    .ui.container { padding: 0 12px; }
-    .page-content { padding: 12px 0; }
+.page-content .row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.page-content [class*="col-"] {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.page-content .ui.container {
+    width: auto;
+    max-width: calc(100% - 64px);
+}
+
+.page-content .ui.dropdown .menu {
+    z-index: 1000;
 }
