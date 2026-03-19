@@ -141,8 +141,279 @@ body.portfolio-page.theme-dark .portfolio-watermark-layer {
 .main-surface-layer {
     position: relative;
     z-index: 1;
-    min-height: 100vh;
     background-color: transparent;
+}
+
+main.page-content.django {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+main.page-content.django > .main.main-surface-layer {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django > .main.main-surface-layer {
+    background-color: var(--site-bg);
+    color: var(--site-text);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django {
+    --forgejo-main-bg: var(--site-bg);
+    --forgejo-main-surface: var(--site-surface-muted);
+    --forgejo-main-surface-strong: var(--site-surface-muted-strong);
+    --forgejo-main-text: var(--site-text);
+    --forgejo-main-text-strong: var(--site-text-strong);
+    --forgejo-main-text-muted: var(--site-text-subtle);
+    --forgejo-main-text-faint: var(--site-text-faint);
+    --forgejo-main-border: var(--site-border);
+    --forgejo-main-border-strong: var(--site-border-strong);
+    --forgejo-main-link: var(--site-link);
+    --forgejo-main-hover: var(--site-hover);
+    --forgejo-main-hover-soft: var(--site-hover-soft);
+    --forgejo-main-selected: var(--site-selected-bg);
+    --color-primary-light-1: color-mix(in srgb, var(--color-primary) 88%, var(--site-bg));
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django a,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.link {
+    color: var(--forgejo-main-link);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django a:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django a:focus-visible,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.link:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.link:focus-visible {
+    color: var(--forgejo-main-text-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django p,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django li,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django td,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django th,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django label,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django span,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django strong,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django em,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django small,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django div,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django summary,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django details {
+    color: var(--forgejo-main-text);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .text-muted,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .muted,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .diff-stats .count,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.label.muted {
+    color: var(--forgejo-main-text-muted);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.segment,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.attached.segment,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.card,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.cards > .card,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.message,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.table,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.form,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.menu,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.dropdown .menu,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.popup,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.label,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .label,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.segment,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django pre,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django code,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django kbd,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django samp,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.checkbox label {
+    background-color: var(--forgejo-main-surface);
+    color: var(--forgejo-main-text);
+    border-color: var(--forgejo-main-border);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.table thead th,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.table tfoot th,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.table td {
+    border-color: var(--forgejo-main-border);
+    color: var(--forgejo-main-text);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-files-table tr:not(:last-child) > td,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-files-table tr:not(:last-child) > th {
+    border-bottom: 1px solid var(--forgejo-main-border);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .file-header {
+    background-color: var(--forgejo-main-surface);
+    color: var(--forgejo-main-text);
+    border: 1px solid var(--forgejo-main-border);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-home-filelist {
+    border: 1px solid var(--forgejo-main-border);
+    border-radius: var(--border-radius, 10px);
+    background-color: var(--forgejo-main-surface);
+    overflow: hidden;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-home-filelist #repo-files-table {
+    margin: 0;
+    border: 0;
+    background: transparent;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-home-filelist #repo-files-table .repo-file-line,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-home-filelist #repo-files-table .repo-file-cell {
+    border-top: 1px solid var(--forgejo-main-border);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-home-filelist #repo-files-table .repo-file-last-commit {
+    background-color: var(--forgejo-main-surface-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repo-button-row-left {
+    border-right: 1px solid var(--forgejo-main-border);
+    padding-right: 0.75rem;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository-summary {
+    border: 1px solid var(--forgejo-main-border);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository-summary + .repo-home-filelist {
+    margin-top: -1px;
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.button,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django button,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.menu .item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.dropdown .item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.action.input > .button {
+    color: var(--forgejo-main-text);
+    border-color: var(--forgejo-main-border);
+    background-color: var(--forgejo-main-surface);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.button:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django button:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.menu .item:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.dropdown .item:hover {
+    background-color: var(--forgejo-main-hover);
+    border-color: var(--forgejo-main-border-strong);
+    color: var(--forgejo-main-text-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django input,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django textarea,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django select,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.input input,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.form textarea,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.form input {
+    background-color: var(--forgejo-main-surface-strong);
+    color: var(--forgejo-main-text);
+    border-color: var(--forgejo-main-border);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django input::placeholder,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django textarea::placeholder {
+    color: var(--forgejo-main-text-faint);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django input[name="q"] {
+    background-color: var(--forgejo-main-surface-strong);
+    color: var(--forgejo-main-text);
+    border-style: solid;
+    border-width: 1px 0 1px 1px;
+    border-color: var(--forgejo-main-border);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    box-shadow: none;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django button.ui.small.icon.button[aria-label^="Search"] {
+    background-color: var(--forgejo-main-surface-strong);
+    color: var(--forgejo-main-text);
+    border-style: solid;
+    border-width: 1px 1px 1px 0;
+    border-color: var(--forgejo-main-border);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    box-shadow: none;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django button.ui.small.icon.button[aria-label^="Search"]:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django button.ui.small.icon.button[aria-label^="Search"]:focus-visible {
+    background-color: var(--forgejo-main-hover);
+    border-color: var(--forgejo-main-border-strong);
+    color: var(--forgejo-main-text-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.secondary.pointing.menu .overflow-menu-button.active {
+    background-color: transparent;
+    border-bottom: 2px solid currentColor;
+    color: var(--forgejo-main-text-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .overflow-menu-items .item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .overflow-menu-items .item:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .overflow-menu-items .item:focus-visible,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .overflow-menu-items .item.active {
+    background-color: transparent;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.menu .active.item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.vertical.menu .active.item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.tabular.menu .active.item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.secondary.menu .active.item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.dropdown .menu .active.item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .branch-selector-dropdown .branch-tag-item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .clone-panel-tab .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .org-team-navbar .active.item {
+    color: var(--forgejo-main-text-strong);
+    background-color: var(--forgejo-main-selected);
+    border-color: var(--forgejo-main-border-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.menu .active.item > i.icon,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.vertical.menu .active.item > i.icon,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.tabular.menu .active.item > i.icon,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.secondary.menu .active.item > i.icon {
+    color: inherit;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django svg,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django svg * {
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.divider {
+    border-color: var(--forgejo-main-border);
+    color: var(--forgejo-main-text-faint);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .ui.header,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .header,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django h1,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django h2,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django h3,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django h4,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django h5,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django h6 {
+    color: var(--forgejo-main-text-strong);
 }
 
 .root-search-page {
@@ -1646,6 +1917,14 @@ body.theme-dark .ui-nav::after {
     background-color: var(--color-hover-bg);
     border-color: var(--color-hover-border);
     transform: translateY(-1px);
+}
+
+.ui-nav a,
+.ui-nav a:hover,
+.ui-nav a:focus-visible,
+.ui-nav a:active,
+.ui-nav a:visited {
+    text-decoration: none;
 }
 
 .ui-control-toggle,
