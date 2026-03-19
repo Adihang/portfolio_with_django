@@ -1,1 +1,100 @@
+[data-tippy-root] {
+  background-color: var(--forgejo-main-surface, var(--site-surface-muted));
+  color: var(--forgejo-main-text, var(--site-text));
+  border: 1px solid var(--forgejo-main-border, var(--site-border));
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  overflow: visible;
+}
 
+.tippy-box {
+  padding: 5px;
+  background: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+.tippy-box[data-theme~='light-border'] {
+  background: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+.tippy-box > .tippy-content > :not(:last-child) {
+  border-bottom: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
+}
+
+.clone-panel-popup > :not(:last-child) {
+  border-bottom: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
+}
+
+.tw-flex-wrap > * {
+  border: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
+}
+
+.tippy-box[data-theme~='light-border'] > .tippy-arrow::before {
+  color: var(--forgejo-main-surface, var(--site-surface-muted));
+}
+
+[id^='tippy-'].tippy-box {
+  background: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+[id^='tippy-'].tippy-box > .tippy-arrow::before {
+  color: var(--forgejo-main-surface, var(--site-surface-muted));
+}
+
+[data-tippy-root][id^='tippy-'] {
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+body.theme-dark .tippy-box {
+  background: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+body.theme-dark .tippy-box[data-theme~='light-border'] {
+  background: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+body.theme-dark .tippy-box > .tippy-content > :not(:last-child) {
+  border-bottom: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
+}
+
+body.theme-dark .clone-panel-popup > :not(:last-child) {
+  border-bottom: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
+}
+
+body.theme-dark .tw-flex-wrap > * {
+  border-color: var(--forgejo-main-border, var(--site-divider-weak));
+}
+
+body.theme-dark .tippy-box[data-theme~='light-border'] > .tippy-arrow::before {
+  color: var(--forgejo-main-surface, var(--site-surface-muted));
+}
+
+body.theme-dark [id^='tippy-'].tippy-box {
+  background: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+body.theme-dark [id^='tippy-'].tippy-box > .tippy-arrow::before {
+  color: var(--forgejo-main-surface, var(--site-surface-muted));
+}
+
+body.theme-dark [data-tippy-root] {
+  background-color: var(--forgejo-main-surface, var(--site-surface-muted));
+  color: var(--forgejo-main-text, var(--site-text));
+  border-color: var(--forgejo-main-border, var(--site-border));
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+body.theme-dark [data-tippy-root][id^='tippy-'] {
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
