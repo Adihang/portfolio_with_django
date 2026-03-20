@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import uuid
+from pathlib import Path
 
 from celery import shared_task
 from django.db import transaction
@@ -23,6 +24,7 @@ from .forgejo_client import ForgejoClient
 from .models import GitRepository, GitUserMapping
 
 logger = logging.getLogger(__name__)
+DOCS_PUBLIC_WRITE_GROUP_NAME = "__DOCS_PUBLIC_ALL__"
 
 
 def _make_placeholder_png() -> bytes:
@@ -84,6 +86,63 @@ def _abs_handrive_path(owner, relative_path: str) -> str:
     else:
         root = (Path(settings.MEDIA_ROOT) / "HanDrive").resolve()
     return str((root / relative_path).resolve())
+
+
+def _get_owner_visible_root_relative(owner) -> str:
+    username = str(getattr(owner, "username", "") or "").strip()
+    if not username:
+        return ""
+    if owner.is_superuser:
+        return f"media/HanDrive/users/{username}"
+    if owner.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists():
+        return f"users/{username}"
+    return ""
+
+
+def _get_repo_mount_relative_path(owner, repo_name: str) -> str:
+    base = _get_owner_visible_root_relative(owner)
+    return f"{base}/{repo_name}" if base else repo_name
+
+
+def _get_repo_storage_path(owner_username: str, repo_name: str) -> Path:
+    return (Path(settings.BASE_DIR) / "forgejo" / "data" / "repos" / owner_username / f"{repo_name}.git").resolve()
+
+
+def _remove_path(path_obj: Path) -> None:
+    if not path_obj.exists() and not path_obj.is_symlink():
+        return
+    if path_obj.is_symlink() or path_obj.is_file():
+        path_obj.unlink()
+        return
+    shutil.rmtree(path_obj)
+
+
+def _replace_source_with_repo_mount(repo, source_relative: str) -> str:
+    owner = repo.owner
+    source_abs = Path(_abs_handrive_path(owner, source_relative))
+    mount_relative = _get_repo_mount_relative_path(owner, repo.repo_name)
+    mount_abs = Path(_abs_handrive_path(owner, mount_relative))
+    repo_storage_path = _get_repo_storage_path(owner.username, repo.repo_name)
+
+    if not repo_storage_path.exists():
+        raise FileNotFoundError(f"repo storage missing: {repo_storage_path}")
+
+    if mount_abs != source_abs and (mount_abs.exists() or mount_abs.is_symlink()):
+        raise FileExistsError(f"repo mount path already exists: {mount_abs}")
+
+    _remove_path(source_abs)
+    mount_abs.parent.mkdir(parents=True, exist_ok=True)
+    if mount_abs.exists() or mount_abs.is_symlink():
+        _remove_path(mount_abs)
+    os.symlink(str(repo_storage_path), str(mount_abs), target_is_directory=True)
+
+    if mount_relative != source_relative:
+        from .handrive_views import move_docs_acl_rules, move_docs_shared_links
+
+        move_docs_acl_rules(source_relative, mount_relative)
+        move_docs_shared_links(source_relative, mount_relative)
+
+    return mount_relative
 
 
 def _ensure_gitea_user_token(client: ForgejoClient, user) -> "GitUserMapping":
@@ -168,9 +227,8 @@ def create_repo_task(repo_id: int) -> None:
       6. README.md 없으면 자동 생성
       7. 변경 사항 있을 때만 commit
       8. push
-      9. /tmp/.git → HanDrive 폴더에 복사 (.git 세팅)
-     10. origin을 유저 인증 URL로 재설정
-     11. status = active
+     9. 원본 HanDrive 폴더 삭제 후 루트 repo alias 생성
+     10. status = active
     """
     tmp = f"/tmp/{repo_id}_{uuid.uuid4().hex}"
     repo = None
@@ -238,19 +296,11 @@ def create_repo_task(repo_id: int) -> None:
 
         _run([GIT_BIN, "-C", tmp, "push", internal_url])
 
-        # HanDrive 폴더에 .git 설치
-        # (create_repo는 .git 없는 폴더 대상이므로 기존 .git이 있으면 교체)
-        abs_git_path = os.path.join(abs_path, ".git")
-        if os.path.exists(abs_git_path):
-            shutil.rmtree(abs_git_path)
-        shutil.copytree(os.path.join(tmp, ".git"), abs_git_path)
-
-        # origin을 유저 인증 URL로 재설정 + git config
-        _setup_local_git(client, abs_path, repo, mapping)
+        repo.handrive_path = _replace_source_with_repo_mount(repo, repo.handrive_path)
 
         repo.status = "active"
         repo.error_message = None
-        repo.save(update_fields=["status", "error_message", "updated_at"])
+        repo.save(update_fields=["handrive_path", "status", "error_message", "updated_at"])
 
     except Exception as exc:
         logger.exception(
@@ -279,9 +329,9 @@ def import_repo_task(repo_id: int) -> None:
       2. clone URL 즉시 DB 저장
       3. forgejo remote 추가 (중복 제거 후)
       4. mirror push
-      5. status = active 저장
-      6. forgejo remote 제거
-      7. origin을 유저 인증 URL로 재설정 (.git 유지)
+      5. 원본 HanDrive 폴더 삭제 후 루트 repo alias 생성
+      6. status = active 저장
+      7. forgejo remote 제거
     """
     repo = None
 
@@ -333,17 +383,18 @@ def import_repo_task(repo_id: int) -> None:
             timeout=600,
         )
 
-        # push 성공 확인 후 status 저장 (순서 중요: remote 재설정 전에 active 기록)
+        repo.handrive_path = _replace_source_with_repo_mount(repo, repo.handrive_path)
+
+        # push 성공 확인 후 status 저장
         repo.status = "active"
         repo.error_message = None
-        repo.save(update_fields=["status", "error_message", "updated_at"])
+        repo.save(update_fields=["handrive_path", "status", "error_message", "updated_at"])
 
-        # forgejo remote 제거 후 origin을 유저 인증 URL로 재설정 (.git 유지)
+        # forgejo remote 제거
         subprocess.run(
             [GIT_BIN, "-C", abs_path, "remote", "remove", "forgejo"],
             capture_output=True, timeout=10,
         )
-        _setup_local_git(client, abs_path, repo, mapping)
 
     except Exception as exc:
         logger.exception(

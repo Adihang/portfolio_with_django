@@ -3619,12 +3619,37 @@ def git_repo_create(request):
     if not repo_name:
         return _git_json_error("repo_name is required")
 
+    try:
+        from .handrive_views import (
+            get_request_docs_root_dir,
+            normalize_relative_path,
+            has_docs_write_access,
+            has_docs_directory_write_access,
+            _get_git_repo_for_relative_path,
+        )
+        normalized_path = normalize_relative_path(path, allow_empty=False)
+        docs_root = get_request_docs_root_dir(request).resolve()
+        target_path = (docs_root / normalized_path).absolute()
+        if target_path != docs_root and docs_root not in target_path.parents:
+            raise ValueError("허용되지 않은 경로입니다.")
+        if not target_path.exists():
+            raise FileNotFoundError("경로를 찾을 수 없습니다.")
+    except (ValueError, FileNotFoundError):
+        return _git_json_error("유효한 폴더 경로가 아닙니다.")
+
+    if not target_path.is_dir():
+        return _git_json_error("폴더에만 Repo를 생성할 수 있습니다.")
+    if _get_git_repo_for_relative_path(request, normalized_path) is not None:
+        return _git_json_error("이미 Git 저장소가 연결된 경로입니다.", status=409)
+    if not has_docs_write_access(request, normalized_path) or not has_docs_directory_write_access(request, normalized_path):
+        return _git_json_error("Repo를 생성할 권한이 없습니다.", status=403)
+
     svc = GitRepositoryService()
-    if svc.exists(path):
+    if svc.exists(normalized_path):
         return _git_json_error("이미 Git 저장소가 연결된 경로입니다.", status=409)
 
     try:
-        repo = svc.create_repo(request.user, path, repo_name)
+        repo = svc.create_repo(request.user, normalized_path, repo_name)
     except ValueError as exc:
         return _git_json_error(str(exc))
 
@@ -3647,9 +3672,10 @@ def git_repo_by_path(request):
     if not path:
         return _git_json_error("path is required")
 
-    try:
-        repo = GitRepository.objects.get(handrive_path=path, owner=request.user)
-    except GitRepository.DoesNotExist:
+    from .handrive_views import _get_git_repo_for_relative_path
+
+    repo = _get_git_repo_for_relative_path(request, path)
+    if repo is None:
         return _git_json_error("저장소를 찾을 수 없습니다.", status=404)
 
     return JsonResponse({
@@ -3743,6 +3769,7 @@ def git_repo_status(request, repo_id: int):
     return JsonResponse({
         "ok":                        True,
         "status":                    repo.status,
+        "handrive_path":             repo.handrive_path,
         "error_message":             repo.error_message,
         "clone_http_url":            _build_public_clone_url(repo.forgejo_clone_http_url),
         "clone_http_url_authed":     _build_user_authed_clone_url(repo, request.user),
@@ -3824,6 +3851,10 @@ def _build_gitea_web_url(forgejo_clone_http_url: str) -> str:
 
 
 def _git_repo_dict(repo: GitRepository, request) -> dict:
+    permission = "owner" if repo.owner_id == getattr(request.user, "id", None) else ""
+    if not permission:
+        collaborator = repo.collaborators.filter(user=request.user).values("permission").first()
+        permission = str((collaborator or {}).get("permission", "") or "").lower()
     public_http = _build_public_clone_url(repo.forgejo_clone_http_url)
     authed_http = _build_user_authed_clone_url(repo, request.user)
     return {
@@ -3836,6 +3867,10 @@ def _git_repo_dict(repo: GitRepository, request) -> dict:
         "forgejo_clone_http_authed": authed_http,
         "forgejo_clone_ssh":         repo.forgejo_clone_ssh_url,
         "gitea_web_url":             _build_gitea_web_url(repo.forgejo_clone_http_url),
+        "permission":                permission,
+        "is_owner":                  bool(repo.owner_id == getattr(request.user, "id", None)),
+        "can_manage":                permission in {"read", "write", "admin", "owner"},
+        "can_delete":                permission == "owner",
         "created_at":                repo.created_at.isoformat() if repo.created_at else None,
         "updated_at":                repo.updated_at.isoformat() if repo.updated_at else None,
     }

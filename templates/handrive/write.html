@@ -48,6 +48,7 @@
     data-original-path="{{ original_relative_path }}"
     data-initial-dir="{{ initial_dir }}"
     data-public-write-direct-save="{% if write_public_direct_save %}1{% else %}0{% endif %}"
+    data-write-requires-commit-message="{% if write_requires_commit_message %}1{% else %}0{% endif %}"
     data-is-superuser="{% if user.is_superuser %}1{% else %}0{% endif %}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
@@ -81,6 +82,7 @@
 {% include "popup/handrive/markdown_snippet_menu.html" %}
 
 {% include "popup/handrive/save_modal.html" %}
+{% include "popup/handrive/commit_message_modal.html" %}
 {% include "popup/handrive/page_help_modal.html" %}
 {% include "popup/handrive/markdown_help_modal.html" %}
 {% include "popup/handrive/markdown_preview_modal.html" %}

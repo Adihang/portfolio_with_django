@@ -1,18 +1,26 @@
 <div id="handrive-context-menu" class="handrive-context-menu" hidden>
-    <button type="button" data-action="open">{{ docs_text.menu_open }}</button>
-    <button type="button" data-action="download">{{ docs_text.menu_download }}</button>
+    <div class="handrive-context-menu-group" data-menu-group>
+        <button type="button" data-action="open">{{ docs_text.menu_open }}</button>
+        <button type="button" data-action="download">{{ docs_text.menu_download }}</button>
+    </div>
+    <div class="handrive-context-menu-group" data-menu-group>
+        <button type="button" data-action="upload">{{ docs_text.menu_upload }}</button>
+        <button type="button" data-action="new-folder">{{ docs_text.menu_new_folder }}</button>
+        <button type="button" data-action="new-doc">{{ docs_text.menu_new_document }}</button>
+    </div>
+    <div class="handrive-context-menu-group" data-menu-group>
+        <button type="button" data-action="git-create-repo">Repo 생성</button>
+        <button type="button" data-action="git-manage-repo">Repo 관리</button>
+        <button type="button" data-action="git-delete-repo">{{ docs_text.menu_delete_repo }}</button>
+    </div>
     {% if docs_can_manage_acl %}
-    <button type="button" data-action="permissions">{{ docs_text.menu_permissions }}</button>
+    <div class="handrive-context-menu-group" data-menu-group>
+        <button type="button" data-action="permissions">{{ docs_text.menu_permissions }}</button>
+    </div>
     {% endif %}
-    <hr>
-    <button type="button" data-action="upload">{{ docs_text.menu_upload }}</button>
-    <button type="button" data-action="new-folder">{{ docs_text.menu_new_folder }}</button>
-    <button type="button" data-action="new-doc">{{ docs_text.menu_new_document }}</button>
-    <hr>
-    <button type="button" data-action="git-create-repo">Repo 생성</button>
-    <button type="button" data-action="git-manage-repo">Repo 관리</button>
-    <hr>
-    <button type="button" data-action="edit">{{ docs_text.menu_edit }}</button>
-    <button type="button" data-action="rename">{{ docs_text.menu_rename }}</button>
-    <button type="button" data-action="delete">{{ docs_text.menu_delete }}</button>
+    <div class="handrive-context-menu-group" data-menu-group>
+        <button type="button" data-action="edit">{{ docs_text.menu_edit }}</button>
+        <button type="button" data-action="rename">{{ docs_text.menu_rename }}</button>
+        <button type="button" data-action="delete">{{ docs_text.menu_delete }}</button>
+    </div>
 </div>

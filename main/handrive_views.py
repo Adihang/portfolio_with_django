@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import json
 import os
@@ -16,7 +17,7 @@ import uuid
 from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlparse, unquote
 import httpx
 
 from django import forms
@@ -27,6 +28,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
@@ -51,6 +53,7 @@ from .forgejo_client import ForgejoClient
 from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, GitUserMapping, PortfolioProfile, UserProfile
 
 logger = logging.getLogger(__name__)
+GIT_BIN = "/usr/bin/git"
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -115,6 +118,7 @@ DOCS_RENDER_MODE_MEDIA_IMAGE = "media_image"
 DOCS_RENDER_MODE_MEDIA_VIDEO = "media_video"
 DOCS_RENDER_MODE_MEDIA_AUDIO = "media_audio"
 DOCS_ACTIVE_ROOT_DIR: ContextVar[Path | None] = ContextVar("docs_active_root_dir", default=None)
+DOCS_ACTIVE_REQUEST: ContextVar[object | None] = ContextVar("docs_active_request", default=None)
 DOCS_DEFAULT_RENDER_PROFILE = {
     "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
     "css_class": "handrive-plain-text",
@@ -244,9 +248,13 @@ DOCS_TEXT = {
         "menu_permissions": "권한",
         "menu_edit": "수정",
         "menu_delete": "삭제",
+        "menu_delete_repo": "Repo 삭제",
         "menu_new_folder": "새 폴더",
         "menu_new_document": "새 파일",
         "rename_title": "이름 바꾸기",
+        "commit_message_title": "커밋 메시지",
+        "commit_message_label": "메시지",
+        "commit_message_placeholder": "커밋 메시지를 입력해주세요.",
         "rename_new_name": "새 이름",
         "rename_new_name_placeholder": "새 이름",
         "cancel": "취소",
@@ -264,6 +272,7 @@ DOCS_TEXT = {
         "apply": "변경",
         "edit_button": "수정",
         "delete_button": "삭제",
+        "delete_repo_button": "Repo 삭제",
         "download_button": "다운로드",
         "write_title_edit": "수정",
         "write_title_create": "새 파일",
@@ -373,6 +382,8 @@ DOCS_TEXT = {
         "permission_empty_groups": "표시할 그룹이 없습니다.",
         "permission_public_group_label": "전체",
         "public_write_badge": "전체 허용",
+        "repository_badge": "Repository",
+        "branch_badge": "Branch",
         "markdown_help_aria": "마크다운 문법 안내",
         "markdown_help_fallback_title": "마크다운 문법",
         "markdown_help_fallback_missing": "안내 파일을 찾을 수 없습니다.",
@@ -385,6 +396,8 @@ DOCS_TEXT = {
         "js_error_processing_failed": "처리 중 오류가 발생했습니다.",
         "js_confirm_delete_entry": "정말 삭제할까요?\n{path}",
         "js_confirm_delete_entries": "선택한 {count}개 항목을 삭제할까요?",
+        "js_confirm_delete_repo_entry": "이 Repo를 삭제하면 Forgejo 저장소가 삭제되고 폴더는 내 루트 폴더로 이동합니다.\n정말 삭제할까요?\n{path}",
+        "js_confirm_delete_repo_entries": "선택한 {count}개 항목 중 Repo를 삭제하면 Forgejo 저장소가 삭제되고 폴더는 각 사용자 루트 폴더로 이동합니다.\n정말 삭제할까요?",
         "js_permission_target_multiple": "{count}개 항목",
         "js_empty_documents": "파일이 없습니다.",
         "js_confirm_delete_doc": "이 파일을 삭제할까요?",
@@ -440,9 +453,13 @@ DOCS_TEXT = {
         "menu_permissions": "Permissions",
         "menu_edit": "Edit",
         "menu_delete": "Delete",
+        "menu_delete_repo": "Delete Repo",
         "menu_new_folder": "New Folder",
         "menu_new_document": "New File",
         "rename_title": "Rename",
+        "commit_message_title": "Commit Message",
+        "commit_message_label": "Message",
+        "commit_message_placeholder": "Enter a commit message.",
         "rename_new_name": "New name",
         "rename_new_name_placeholder": "New name",
         "cancel": "Cancel",
@@ -450,6 +467,7 @@ DOCS_TEXT = {
         "apply": "Apply",
         "edit_button": "Edit",
         "delete_button": "Delete",
+        "delete_repo_button": "Delete Repo",
         "download_button": "Download",
         "write_title_edit": "Edit File",
         "write_title_create": "New File",
@@ -569,6 +587,8 @@ DOCS_TEXT = {
         "permission_empty_groups": "No groups to display.",
         "permission_public_group_label": "All",
         "public_write_badge": "Public Write",
+        "repository_badge": "Repository",
+        "branch_badge": "Branch",
         "markdown_help_aria": "Markdown syntax guide",
         "markdown_help_fallback_title": "Markdown Guide",
         "markdown_help_fallback_missing": "Guide file not found.",
@@ -581,6 +601,8 @@ DOCS_TEXT = {
         "js_error_processing_failed": "An error occurred while processing.",
         "js_confirm_delete_entry": "Delete this item?\n{path}",
         "js_confirm_delete_entries": "Delete {count} selected items?",
+        "js_confirm_delete_repo_entry": "Deleting this Repo also deletes the Forgejo repository, then moves the folder back to your root folder.\nDelete it now?\n{path}",
+        "js_confirm_delete_repo_entries": "Deleting Repo items among the selected {count} entries also deletes the Forgejo repositories, then moves each folder back to its user's root folder.\nDelete them now?",
         "js_permission_target_multiple": "{count} items",
         "js_empty_documents": "No files found.",
         "js_confirm_delete_doc": "Delete this file?",
@@ -663,10 +685,12 @@ def with_request_docs_root(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         token = DOCS_ACTIVE_ROOT_DIR.set(get_request_docs_root_dir(request))
+        request_token = DOCS_ACTIVE_REQUEST.set(request)
         try:
             return view_func(request, *args, **kwargs)
         finally:
             DOCS_ACTIVE_ROOT_DIR.reset(token)
+            DOCS_ACTIVE_REQUEST.reset(request_token)
 
     return _wrapped
 
@@ -697,7 +721,7 @@ def normalize_relative_path(raw_path: str | None, allow_empty: bool = True) -> s
 def resolve_path(relative_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
     root = docs_root_dir().resolve()
     normalized = normalize_relative_path(relative_path)
-    candidate = (root / normalized).resolve()
+    candidate = (root / normalized).absolute()
 
     if candidate != root and root not in candidate.parents:
         raise ValueError("허용되지 않은 경로입니다.")
@@ -809,7 +833,11 @@ def get_docs_upload_tmp_dir() -> Path:
 
 def relative_from_root(path_obj: Path) -> str:
     root = docs_root_dir().resolve()
-    return path_obj.resolve().relative_to(root).as_posix()
+    absolute_path = path_obj.absolute()
+    try:
+        return absolute_path.relative_to(root).as_posix()
+    except ValueError:
+        return path_obj.resolve().relative_to(root).as_posix()
 
 
 def markdown_slug_from_relative(relative_path: str) -> str:
@@ -1284,10 +1312,15 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
 
 def has_docs_write_access(request, path_value: str | None) -> bool:
     user = getattr(request, "user", None)
-    if user and user.is_superuser:
-        return True
     scoped_home_dir = get_scoped_docs_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    git_virtual = _get_git_virtual_context(request, normalized_path)
+    if git_virtual is not None:
+        return git_virtual["kind"] == "branch_file" and str(git_virtual.get("repo_permission") or "").lower() in {"write", "admin", "owner"}
+    if is_docs_git_repo_mounted_path(request, normalized_path):
+        return False
+    if user and user.is_superuser:
+        return True
     is_scoped_public_user = bool(scoped_home_dir and is_public_group_scoped_user(request))
     in_scoped_home = is_path_in_docs_scope(normalized_path, scoped_home_dir)
     if is_scoped_public_user and in_scoped_home:
@@ -1329,10 +1362,15 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
 
 def has_docs_directory_write_access(request, path_value: str | None) -> bool:
     user = getattr(request, "user", None)
-    if user and user.is_superuser:
-        return True
     scoped_home_dir = get_scoped_docs_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
+    git_virtual = _get_git_virtual_context(request, normalized_path)
+    if git_virtual is not None:
+        return git_virtual["kind"] == "branch_dir" and str(git_virtual.get("repo_permission") or "").lower() in {"write", "admin", "owner"}
+    if is_docs_git_repo_mounted_path(request, normalized_path):
+        return False
+    if user and user.is_superuser:
+        return True
     is_scoped_public_user = bool(scoped_home_dir and is_public_group_scoped_user(request))
     in_scoped_home = is_path_in_docs_scope(normalized_path, scoped_home_dir)
     if is_scoped_public_user and in_scoped_home:
@@ -1414,6 +1452,7 @@ def delete_docs_acl_rules_for_path(path_value: str) -> None:
 
 def list_directory_entries(directory: Path, request=None) -> list[dict]:
     entries = []
+    existing_entry_paths = set()
     for child in sorted(directory.iterdir(), key=lambda p: (0 if p.is_dir() else 1, p.name.lower())):
         if child.is_dir():
             entry = build_entry(child)
@@ -1427,12 +1466,15 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                 if is_docs_url_only_enabled(request, entry["path"]) and not can_edit:
                     continue
             if request is not None:
+                is_git_repo_root = is_docs_git_repo_root_path(request, entry["path"])
                 entry["can_edit"] = can_edit
                 entry["can_write_children"] = has_docs_directory_write_access(request, entry["path"])
+                entry["can_delete"] = can_edit or is_git_repo_root
                 entry["is_public_write"] = False
                 entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
             entries.append(entry)
+            existing_entry_paths.add(entry["path"])
             continue
         if child.is_file():
             entry = build_entry(child)
@@ -1448,6 +1490,7 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
             if request is not None:
                 entry["can_edit"] = can_edit
                 entry["can_write_children"] = False
+                entry["can_delete"] = can_edit
                 entry["is_public_write"] = is_docs_public_write_enabled(request, entry["path"])
                 entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
@@ -1460,21 +1503,74 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                             build_docs_shared_view_url(_ui_lang, _link.owner.username, _link.share_slug)
                         )
             entries.append(entry)
+            existing_entry_paths.add(entry["path"])
 
-    # 디렉토리 엔트리에 git repo 정보 일괄 추가 (단일 쿼리)
+    # 디렉토리 엔트리에 git repo 정보 일괄 추가
     if request is not None and hasattr(request, "user") and request.user.is_authenticated:
-        from .models import GitRepository
+        current_dir_relative = relative_from_root(directory)
+        visible_repos = _get_visible_git_repositories(request)
+        visible_repo_map = {
+            _get_visible_git_repo_root_relative(request, repo): repo
+            for repo in visible_repos
+        }
         dir_paths = [e["path"] for e in entries if e.get("type") == "dir"]
-        if dir_paths:
-            repos = GitRepository.objects.filter(
-                handrive_path__in=dir_paths,
-                owner=request.user,
-            ).values("handrive_path", "id", "status")
-            repo_map = {r["handrive_path"]: r for r in repos}
-            for entry in entries:
-                if entry.get("type") == "dir" and entry["path"] in repo_map:
-                    r = repo_map[entry["path"]]
-                    entry["git_repo"] = {"id": r["id"], "status": r["status"]}
+        for entry in entries:
+            if entry.get("type") != "dir":
+                continue
+            repo = visible_repo_map.get(entry["path"])
+            if repo is None:
+                continue
+            permission = _get_git_repo_permission_for_request(request, repo)
+            entry["git_repo"] = {
+                "id": repo.id,
+                "status": repo.status,
+                "permission": permission,
+                "is_owner": bool(repo.owner_id == getattr(request.user, "id", None)),
+                "can_delete": permission == "owner",
+                "can_manage": permission in {"read", "write", "admin", "owner"},
+            }
+            entry["can_edit"] = False
+            entry["can_write_children"] = False
+            entry["can_delete"] = permission == "owner"
+
+        virtual_repo_entries = []
+        for repo in visible_repos:
+            repo_path = _get_visible_git_repo_root_relative(request, repo)
+            repo_parent = normalize_relative_path(str(Path(repo_path).parent).replace("\\", "/"), allow_empty=True)
+            if repo_parent == ".":
+                repo_parent = ""
+            if repo_parent != current_dir_relative or repo_path in existing_entry_paths:
+                continue
+            if not has_docs_read_access(request, repo_path):
+                continue
+            repo_name = Path(repo_path).name
+            permission = _get_git_repo_permission_for_request(request, repo)
+            virtual_repo_entries.append(
+                {
+                    "name": repo_name,
+                    "path": repo_path,
+                    "type": "dir",
+                    "has_children": True,
+                    "size_display": "",
+                    "can_edit": False,
+                    "can_write_children": False,
+                    "can_delete": permission == "owner",
+                    "is_public_write": False,
+                    "is_url_only": False,
+                    "write_acl_labels": get_write_acl_display_labels(request, repo_path),
+                    "git_repo": {
+                        "id": repo.id,
+                        "status": repo.status,
+                        "permission": permission,
+                        "is_owner": bool(repo.owner_id == getattr(request.user, "id", None)),
+                        "can_delete": permission == "owner",
+                        "can_manage": permission in {"read", "write", "admin", "owner"},
+                    },
+                }
+            )
+        if virtual_repo_entries:
+            entries.extend(sorted(virtual_repo_entries, key=lambda item: (0, item["name"].lower())))
+            entries.sort(key=lambda item: (0 if item.get("type") == "dir" else 1, item.get("name", "").lower()))
 
     return entries
 
@@ -1483,11 +1579,610 @@ def _get_current_dir_git_repo(request, current_dir: str):
     """현재 디렉토리 자체의 GitRepository 정보를 반환 (없으면 None)."""
     if not current_dir or request is None or not hasattr(request, "user") or not request.user.is_authenticated:
         return None
-    from .models import GitRepository
-    repo = GitRepository.objects.filter(handrive_path=current_dir, owner=request.user).values("id", "status").first()
+    repo = _get_git_repo_for_relative_path(request, current_dir)
     if repo:
-        return {"id": repo["id"], "status": repo["status"]}
+        permission = _get_git_repo_permission_for_request(request, repo)
+        return {
+            "id": repo.id,
+            "status": repo.status,
+            "permission": permission,
+            "is_owner": bool(repo.owner_id == getattr(request.user, "id", None)),
+            "can_delete": permission == "owner",
+            "can_manage": permission in {"read", "write", "admin", "owner"},
+        }
     return None
+
+
+def _get_git_repo_for_relative_path(request, relative_path: str):
+    if request is None or not hasattr(request, "user") or not request.user.is_authenticated:
+        return None
+    normalized = normalize_relative_path(relative_path, allow_empty=False)
+    for repo in _get_visible_git_repositories(request):
+        if _get_visible_git_repo_root_relative(request, repo) == normalized:
+            return repo
+    return None
+
+
+def _sync_git_collaborators_from_forgejo(repo) -> None:
+    from .models import GitCollaborator
+
+    owner_name = str(repo.forgejo_owner or getattr(repo.owner, "username", "") or "").strip()
+    repo_name = str(repo.forgejo_repo_name or repo.repo_name or "").strip()
+    if not owner_name or not repo_name:
+        return
+
+    try:
+        collaborators = ForgejoClient().list_collaborators(owner_name, repo_name)
+    except Exception:
+        return
+
+    usernames = []
+    permission_map = {}
+    for collaborator in collaborators:
+        username = str(collaborator.get("username") or collaborator.get("login") or "").strip()
+        if not username:
+            continue
+        usernames.append(username)
+        try:
+            permission_map[username] = ForgejoClient().get_collaborator_permission(owner_name, repo_name, username)
+        except Exception:
+            permission_map[username] = "read"
+
+    User = get_user_model()
+    users_by_username = {
+        user.username: user
+        for user in User.objects.filter(username__in=usernames, is_active=True)
+    }
+    existing = {
+        collaborator.user.username: collaborator
+        for collaborator in GitCollaborator.objects.filter(repository=repo).select_related("user")
+    }
+
+    seen_usernames = set()
+    for username in usernames:
+        user = users_by_username.get(username)
+        if user is None:
+            continue
+        seen_usernames.add(username)
+        GitCollaborator.objects.update_or_create(
+            repository=repo,
+            user=user,
+            defaults={"permission": permission_map.get(username, "read")},
+        )
+
+    stale_usernames = set(existing.keys()) - seen_usernames
+    if stale_usernames:
+        GitCollaborator.objects.filter(
+            repository=repo,
+            user__username__in=stale_usernames,
+        ).delete()
+
+
+def _get_visible_git_repositories(request):
+    cached = getattr(request, "_visible_git_repositories", None)
+    if cached is not None:
+        return cached
+    if request is None or not hasattr(request, "user") or not request.user.is_authenticated:
+        setattr(request, "_visible_git_repositories", [])
+        setattr(request, "_visible_git_repo_permissions", {})
+        return []
+
+    from .models import GitRepository
+
+    all_repos = list(
+        GitRepository.objects.exclude(status="deleted")
+        .select_related("owner")
+        .prefetch_related("collaborators")
+    )
+    for repo in all_repos:
+        _sync_git_collaborators_from_forgejo(repo)
+    repos = list(
+        GitRepository.objects.filter(
+            Q(owner=request.user) | Q(collaborators__user=request.user)
+        )
+        .exclude(status="deleted")
+        .select_related("owner")
+        .prefetch_related("collaborators")
+        .distinct()
+    )
+    permissions = {}
+    current_user_id = getattr(request.user, "id", None)
+    for repo in repos:
+        if repo.owner_id == current_user_id:
+            permissions[repo.id] = "owner"
+            continue
+        collaborator = next((item for item in repo.collaborators.all() if item.user_id == current_user_id), None)
+        permissions[repo.id] = str(getattr(collaborator, "permission", "") or "read").lower()
+    setattr(request, "_visible_git_repositories", repos)
+    setattr(request, "_visible_git_repo_permissions", permissions)
+    return repos
+
+
+def _get_git_repo_permission_for_request(request, repo) -> str:
+    permissions = getattr(request, "_visible_git_repo_permissions", None)
+    if permissions is None:
+        _get_visible_git_repositories(request)
+        permissions = getattr(request, "_visible_git_repo_permissions", {})
+    return str((permissions or {}).get(repo.id, "") or "").lower()
+
+
+def _get_visible_git_repo_root_relative(request, repo) -> str:
+    if request is not None and hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
+        if repo.owner_id != getattr(request.user, "id", None):
+            viewer_root = _get_owner_visible_root_relative(request.user)
+            if viewer_root:
+                return normalize_relative_path(f"{viewer_root}/{repo.repo_name}", allow_empty=False)
+    return normalize_relative_path(repo.handrive_path, allow_empty=False)
+
+
+def _get_git_repo_mount_prefixes(request) -> tuple[str, ...]:
+    cached = getattr(request, "_docs_git_repo_mount_prefixes", None)
+    if cached is not None:
+        return cached
+
+    prefixes = tuple(
+        sorted(
+            {_get_visible_git_repo_root_relative(request, repo) for repo in _get_visible_git_repositories(request)},
+            key=len,
+        )
+    )
+    setattr(request, "_docs_git_repo_mount_prefixes", prefixes)
+    return prefixes
+
+
+def _get_owner_visible_root_relative(owner) -> str:
+    username = str(getattr(owner, "username", "") or "").strip()
+    if not username:
+        return ""
+    if getattr(owner, "is_superuser", False):
+        return f"media/HanDrive/users/{username}"
+    if owner.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists():
+        return f"users/{username}"
+    return ""
+
+
+def _get_repo_restore_relative_path(owner, repo_name: str) -> str:
+    base = _get_owner_visible_root_relative(owner)
+    return f"{base}/{repo_name}" if base else repo_name
+
+
+def _get_repo_storage_path(owner, repo_name: str) -> Path:
+    return (Path(settings.BASE_DIR) / "forgejo" / "data" / "repos" / owner.username / f"{repo_name}.git").resolve()
+
+
+def _encode_git_branch_segment(branch_name: str) -> str:
+    return quote(str(branch_name or ""), safe="")
+
+
+def _decode_git_branch_segment(branch_segment: str) -> str:
+    return unquote(str(branch_segment or ""))
+
+
+def _copy_tree_contents(source_dir: Path, destination_dir: Path) -> None:
+    destination_dir.mkdir(parents=True, exist_ok=False)
+    for child in source_dir.iterdir():
+        target_child = destination_dir / child.name
+        if child.is_dir():
+            shutil.copytree(child, target_child, symlinks=True)
+        else:
+            shutil.copy2(child, target_child)
+
+
+def _run_git_repo_command(repo, *args: str, text: bool = True, check: bool = True, timeout: int = 120):
+    repo_storage_path = _get_repo_storage_path(repo.owner, repo.repo_name)
+    command = [GIT_BIN, f"--git-dir={repo_storage_path}", *args]
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=text,
+        timeout=timeout,
+    )
+    if check and result.returncode != 0:
+        stderr = result.stderr.strip() if isinstance(result.stderr, str) else ""
+        raise RuntimeError(stderr or f"git command failed: {' '.join(command)}")
+    return result
+
+
+def _git_repo_branches(repo) -> list[str]:
+    result = _run_git_repo_command(
+        repo,
+        "for-each-ref",
+        "--format=%(refname:short)",
+        "refs/heads",
+    )
+    return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+
+
+def _git_repo_object_type(repo, branch_name: str, repo_relative_path: str = "") -> str:
+    spec = branch_name if not repo_relative_path else f"{branch_name}:{repo_relative_path}"
+    result = _run_git_repo_command(repo, "cat-file", "-t", spec)
+    return (result.stdout or "").strip()
+
+
+def _git_repo_read_file_bytes(repo, branch_name: str, repo_relative_path: str) -> bytes:
+    spec = f"{branch_name}:{repo_relative_path}"
+    result = _run_git_repo_command(repo, "show", spec, text=False)
+    return result.stdout or b""
+
+
+def _git_repo_list_tree(repo, branch_name: str, repo_relative_path: str = "") -> list[dict]:
+    spec = branch_name if not repo_relative_path else f"{branch_name}:{repo_relative_path}"
+    result = _run_git_repo_command(repo, "ls-tree", "-z", spec, text=False)
+    payload = result.stdout or b""
+    entries = []
+    for raw_item in payload.split(b"\x00"):
+        if not raw_item:
+            continue
+        meta, name_bytes = raw_item.split(b"\t", 1)
+        _mode, object_type, object_sha = meta.decode("utf-8").split(" ", 2)
+        name = name_bytes.decode("utf-8")
+        if name == ".gitkeep":
+            continue
+        entry = {
+            "name": name,
+            "type": object_type,
+            "sha": object_sha,
+            "size_display": "",
+        }
+        if object_type == "blob":
+            size_result = _run_git_repo_command(repo, "cat-file", "-s", object_sha)
+            try:
+                entry["size_display"] = format_docs_bytes_display(int((size_result.stdout or "0").strip() or "0"))
+            except ValueError:
+                entry["size_display"] = ""
+        entries.append(entry)
+    return sorted(entries, key=lambda item: (0 if item["type"] == "tree" else 1, item["name"].lower()))
+
+
+def _git_repo_latest_commit_subject(repo, branch_name: str, repo_relative_path: str = "") -> str:
+    args = ["log", "-1", "--format=%s", branch_name]
+    normalized_path = normalize_relative_path(repo_relative_path, allow_empty=True)
+    if normalized_path:
+        args.extend(["--", normalized_path])
+    result = _run_git_repo_command(repo, *args)
+    return (result.stdout or "").strip()
+
+
+def _git_repo_path_exists(repo, branch_name: str, repo_relative_path: str) -> bool:
+    normalized_path = normalize_relative_path(repo_relative_path, allow_empty=False)
+    spec = f"{branch_name}:{normalized_path}"
+    result = _run_git_repo_command(repo, "cat-file", "-e", spec, check=False)
+    return result.returncode == 0
+
+
+def _resolve_git_worktree_path(worktree_dir: Path, repo_relative_path: str = "") -> Path:
+    normalized_path = normalize_relative_path(repo_relative_path, allow_empty=True)
+    target_path = worktree_dir if not normalized_path else worktree_dir.joinpath(*normalized_path.split("/"))
+    resolved_root = worktree_dir.resolve()
+    resolved_target = target_path.resolve()
+    if resolved_target != resolved_root and resolved_root not in resolved_target.parents:
+        raise ValueError("잘못된 Repo 경로입니다.")
+    return target_path
+
+
+def _remove_gitkeep_placeholder(directory: Path) -> None:
+    placeholder = directory / ".gitkeep"
+    if placeholder.exists():
+        placeholder.unlink()
+
+
+def _ensure_gitkeep_if_empty(directory: Path, repo_root: Path) -> None:
+    current = directory
+    resolved_root = repo_root.resolve()
+    while True:
+        resolved_current = current.resolve()
+        if resolved_current == resolved_root:
+            return
+        if current.exists() and current.is_dir() and not any(current.iterdir()):
+            (current / ".gitkeep").write_text("", encoding="utf-8")
+            return
+        return
+
+
+def _copy_local_item_to_git_worktree(source_path: Path, destination_path: Path) -> None:
+    if source_path.is_dir():
+        shutil.copytree(source_path, destination_path, symlinks=True)
+        git_dir = destination_path / ".git"
+        if git_dir.exists():
+            shutil.rmtree(git_dir, ignore_errors=True)
+        return
+    shutil.copy2(source_path, destination_path)
+
+
+def _commit_git_branch_mutation(repo, branch_name: str, commit_message: str, author_user, mutator) -> None:
+    message = str(commit_message or "").strip()
+    if not message:
+        raise ValueError("커밋 메시지를 입력해주세요.")
+
+    client = ForgejoClient()
+    clone_url = client.internal_authed_clone_url(repo.forgejo_owner or repo.owner.username, repo.forgejo_repo_name or repo.repo_name)
+    with tempfile.TemporaryDirectory(prefix="handrive_git_commit_") as temp_dir:
+        clone_result = subprocess.run(
+            [GIT_BIN, "clone", "--branch", branch_name, "--single-branch", clone_url, temp_dir],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        if clone_result.returncode != 0:
+            raise RuntimeError(clone_result.stderr.strip() or "repo clone failed")
+
+        subprocess.run([GIT_BIN, "-C", temp_dir, "config", "user.name", author_user.username], capture_output=True, timeout=10)
+        subprocess.run(
+            [GIT_BIN, "-C", temp_dir, "config", "user.email", getattr(author_user, "email", "") or f"{author_user.username}@hanplanet.local"],
+            capture_output=True,
+            timeout=10,
+        )
+
+        mutator(Path(temp_dir))
+
+        status_result = subprocess.run([GIT_BIN, "-C", temp_dir, "status", "--porcelain"], capture_output=True, text=True, timeout=30)
+        if not (status_result.stdout or "").strip():
+            raise ValueError("변경된 내용이 없습니다.")
+
+        add_result = subprocess.run([GIT_BIN, "-C", temp_dir, "add", "-A"], capture_output=True, text=True, timeout=60)
+        if add_result.returncode != 0:
+            raise RuntimeError(add_result.stderr.strip() or "git add failed")
+        commit_result = subprocess.run([GIT_BIN, "-C", temp_dir, "commit", "-m", message], capture_output=True, text=True, timeout=60)
+        if commit_result.returncode != 0:
+            raise RuntimeError(commit_result.stderr.strip() or "git commit failed")
+        push_result = subprocess.run([GIT_BIN, "-C", temp_dir, "push", "origin", branch_name], capture_output=True, text=True, timeout=180)
+        if push_result.returncode != 0:
+            raise RuntimeError(push_result.stderr.strip() or "git push failed")
+
+
+def _build_available_git_repo_filename(repo, branch_name: str, repo_relative_dir: str, original_name: str) -> str:
+    raw_name = (original_name or "").strip()
+    if not raw_name:
+        raise ValueError("업로드할 파일 이름이 올바르지 않습니다.")
+
+    existing_names = {
+        item["name"]
+        for item in _git_repo_list_tree(repo, branch_name, repo_relative_dir)
+        if item["type"] == "blob"
+    }
+
+    suffix = Path(raw_name).suffix.lower()
+    normalized_extension = normalize_file_extension(suffix, allow_empty=True)
+    if normalized_extension:
+        base_name = validate_name(raw_name, for_file=True, file_extension=normalized_extension)
+    else:
+        base_name = validate_name(raw_name, for_file=False)
+
+    candidate = f"{base_name}{normalized_extension}"
+    if candidate not in existing_names:
+        return candidate
+
+    index = 2
+    while True:
+        candidate = f"{base_name} ({index}){normalized_extension}"
+        if candidate not in existing_names:
+            return candidate
+        index += 1
+
+
+def _get_git_virtual_context(request, path_value: str | None):
+    if request is None or not hasattr(request, "user") or not request.user.is_authenticated:
+        return None
+
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+    if not normalized:
+        return None
+
+    repo = None
+    repo_root = ""
+    for candidate in _get_visible_git_repositories(request):
+        candidate_root = _get_visible_git_repo_root_relative(request, candidate)
+        if normalized == candidate_root or normalized.startswith(candidate_root + "/"):
+            if len(candidate_root) > len(repo_root):
+                repo = candidate
+                repo_root = candidate_root
+    if repo is None:
+        return None
+
+    remaining = normalized[len(repo_root):].lstrip("/")
+    if not remaining:
+        return {
+            "repo": repo,
+            "repo_permission": _get_git_repo_permission_for_request(request, repo),
+            "repo_root": repo_root,
+            "kind": "repo_root",
+            "display_path": repo_root,
+            "branch_segment": "",
+            "branch_name": "",
+            "repo_relative_path": "",
+        }
+
+    segments = remaining.split("/")
+    branch_segment = segments[0]
+    branch_name = _decode_git_branch_segment(branch_segment)
+    if branch_name not in _git_repo_branches(repo):
+        return None
+
+    repo_relative_path = "/".join(segments[1:])
+    kind = "branch_dir"
+    if repo_relative_path:
+        try:
+            object_type = _git_repo_object_type(repo, branch_name, repo_relative_path)
+        except RuntimeError:
+            return None
+        kind = "branch_dir" if object_type == "tree" else "branch_file"
+
+    return {
+        "repo": repo,
+        "repo_permission": _get_git_repo_permission_for_request(request, repo),
+        "repo_root": repo_root,
+        "kind": kind,
+        "display_path": normalized,
+        "branch_segment": branch_segment,
+        "branch_name": branch_name,
+        "repo_relative_path": repo_relative_path,
+    }
+
+
+def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *, scoped_home_dir: str = "", root_url: str | None = None):
+    context = _get_git_virtual_context(request, current_path)
+    if context is None:
+        return build_docs_breadcrumbs(
+            base_url,
+            current_path,
+            scoped_home_dir=scoped_home_dir,
+            root_label=get_handrive_root_label(request, scoped_home_dir),
+            root_url=root_url,
+            include_root_parent=bool(getattr(request.user, "is_superuser", False) and scoped_home_dir),
+            root_parent_label=get_handrive_root_label(request, ""),
+        )
+
+    breadcrumbs = build_docs_breadcrumbs(
+        base_url,
+        context["repo_root"],
+        scoped_home_dir=scoped_home_dir,
+        root_label=get_handrive_root_label(request, scoped_home_dir),
+        root_url=root_url,
+        include_root_parent=bool(getattr(request.user, "is_superuser", False) and scoped_home_dir),
+        root_parent_label=get_handrive_root_label(request, ""),
+    )
+    if context["kind"] == "repo_root":
+        return breadcrumbs
+
+    if breadcrumbs:
+        breadcrumbs[-1]["is_current"] = False
+    branch_path = f"{context['repo_root']}/{context['branch_segment']}"
+    breadcrumbs.append(
+        {
+            "label": context["branch_name"],
+            "url": build_docs_list_url(base_url, branch_path),
+            "is_current": context["kind"] == "branch_dir" and not context["repo_relative_path"],
+            "path": branch_path,
+        }
+    )
+
+    if context["repo_relative_path"]:
+        parts = [part for part in context["repo_relative_path"].split("/") if part]
+        accumulated = []
+        for index, part in enumerate(parts):
+            accumulated.append(part)
+            path_value = branch_path + "/" + "/".join(accumulated)
+            breadcrumbs.append(
+                {
+                    "label": part,
+                    "url": build_docs_list_url(base_url, path_value),
+                    "is_current": index == len(parts) - 1,
+                    "path": path_value,
+                }
+            )
+    return breadcrumbs
+
+
+def _build_git_virtual_entries(request, context) -> list[dict]:
+    repo = context["repo"]
+    repo_root = context["repo_root"]
+    repo_permission = str(context.get("repo_permission") or "").lower()
+    can_write_repo = repo_permission in {"write", "admin", "owner"}
+    can_delete_repo_items = repo_permission in {"write", "admin", "owner"}
+    if context["kind"] == "repo_root":
+        return [
+            {
+                "name": branch_name,
+                "path": f"{repo_root}/{_encode_git_branch_segment(branch_name)}",
+                "type": "dir",
+                "has_children": True,
+                "size_display": "",
+                "can_edit": False,
+                "can_write_children": can_write_repo,
+                "can_delete": False,
+                "is_public_write": False,
+                "is_url_only": False,
+                "write_acl_labels": [],
+                "git_branch_root": True,
+                "git_repo_branch": branch_name,
+                "requires_commit_message": True,
+            }
+            for branch_name in _git_repo_branches(repo)
+        ]
+
+    branch_prefix = f"{repo_root}/{context['branch_segment']}"
+    entries = []
+    for item in _git_repo_list_tree(repo, context["branch_name"], context["repo_relative_path"]):
+        entry_path = f"{branch_prefix}/{item['name']}" if not context["repo_relative_path"] else f"{branch_prefix}/{context['repo_relative_path']}/{item['name']}"
+        entry = {
+            "name": item["name"],
+            "path": entry_path,
+            "type": "dir" if item["type"] == "tree" else "file",
+            "size_display": item.get("size_display", ""),
+            "can_edit": can_write_repo,
+            "can_write_children": item["type"] == "tree" and can_write_repo,
+            "can_delete": can_delete_repo_items,
+            "is_public_write": False,
+            "is_url_only": False,
+            "write_acl_labels": [],
+            "git_repo_branch": context["branch_name"],
+            "requires_commit_message": True,
+        }
+        repo_relative_entry_path = item["name"] if not context["repo_relative_path"] else f"{context['repo_relative_path']}/{item['name']}"
+        if item["type"] == "tree":
+            entry["has_children"] = True
+            entry["git_commit_message"] = _git_repo_latest_commit_subject(repo, context["branch_name"], repo_relative_entry_path)
+        else:
+            entry["slug_path"] = entry_path
+            entry["git_commit_message"] = _git_repo_latest_commit_subject(repo, context["branch_name"], repo_relative_entry_path)
+        entries.append(entry)
+    return entries
+
+
+def _commit_git_branch_changes(repo, branch_name: str, commit_message: str, file_updates: dict[str, bytes], author_user) -> None:
+    def _mutate(worktree_dir: Path) -> None:
+        for repo_relative_path, content_bytes in file_updates.items():
+            target_file = _resolve_git_worktree_path(worktree_dir, repo_relative_path)
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            _remove_gitkeep_placeholder(target_file.parent)
+            target_file.write_bytes(content_bytes)
+
+    _commit_git_branch_mutation(repo, branch_name, commit_message, author_user, _mutate)
+
+
+def _materialize_git_repo_mount(target_path: Path, destination_path: Path) -> None:
+    with tempfile.TemporaryDirectory(prefix="handrive_repo_restore_") as temp_dir:
+        checkout_path = Path(temp_dir) / "checkout"
+        result = subprocess.run(
+            [GIT_BIN, "clone", "--depth=1", str(target_path), str(checkout_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "failed to clone repo contents")
+        git_metadata_dir = checkout_path / ".git"
+        if git_metadata_dir.exists():
+            shutil.rmtree(git_metadata_dir, ignore_errors=True)
+        _copy_tree_contents(checkout_path, destination_path)
+
+
+def is_docs_git_repo_mounted_path(request, path_value: str | None) -> bool:
+    if request is None:
+        request = DOCS_ACTIVE_REQUEST.get()
+    if request is None:
+        return False
+
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+    if not normalized:
+        return False
+
+    for prefix in _get_git_repo_mount_prefixes(request):
+        if normalized == prefix or normalized.startswith(prefix + "/"):
+            return True
+    return False
+
+
+def is_docs_git_repo_root_path(request, path_value: str | None) -> bool:
+    if request is None:
+        request = DOCS_ACTIVE_REQUEST.get()
+    if request is None:
+        return False
+
+    normalized = normalize_relative_path(path_value, allow_empty=True)
+    if not normalized:
+        return False
+    return normalized in _get_git_repo_mount_prefixes(request)
 
 
 def list_all_directories(request=None) -> list[str]:
@@ -2585,12 +3280,13 @@ def docs_login(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
+    post_login_url = context["docs_base_url"]
     next_url = resolve_next_url(request, context["docs_base_url"])
     auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
     hide_global_nav = is_docs_share_auth_entry(request, context["docs_base_url"])
 
     if request.user.is_authenticated:
-        return redirect(next_url)
+        return redirect(post_login_url)
 
     form = AuthenticationForm(request, data=request.POST or None)
     login_error_message = ""
@@ -2634,7 +3330,7 @@ def docs_login(request, ui_lang=None):
                 _clear_docs_login_captcha(request)
                 auth_login(request, authed_user)
                 _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
-                response = redirect(next_url)
+                response = redirect(post_login_url)
                 return _attach_forgejo_login_session(response, authed_user)
             else:
                 login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
@@ -2648,7 +3344,7 @@ def docs_login(request, ui_lang=None):
             _clear_docs_login_captcha(request)
             auth_login(request, authed_user)
             _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
-            response = redirect(next_url)
+            response = redirect(post_login_url)
             return _attach_forgejo_login_session(response, authed_user)
         else:
             login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
@@ -2871,12 +3567,26 @@ def docs_list(request, folder_path="", ui_lang=None):
             raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     try:
-        directory, current_dir = resolve_path(folder_path, must_exist=True)
-    except (ValueError, FileNotFoundError):
+        current_dir = normalize_relative_path(folder_path, allow_empty=True)
+    except ValueError:
         raise Http404("폴더를 찾을 수 없습니다.")
 
-    if not directory.is_dir():
-        raise Http404("폴더를 찾을 수 없습니다.")
+    git_virtual = _get_git_virtual_context(request, current_dir)
+    if git_virtual is None:
+        try:
+            directory, current_dir = resolve_path(folder_path, must_exist=True)
+        except (ValueError, FileNotFoundError):
+            raise Http404("폴더를 찾을 수 없습니다.")
+        if not directory.is_dir():
+            raise Http404("폴더를 찾을 수 없습니다.")
+        initial_entries = list_directory_entries(directory, request=request)
+        current_dir_size_display = format_docs_bytes_display(calculate_docs_quota_breakdown(directory)[0]) if directory.is_dir() else ""
+    else:
+        if git_virtual["kind"] == "branch_file":
+            raise Http404("폴더를 찾을 수 없습니다.")
+        initial_entries = _build_git_virtual_entries(request, git_virtual)
+        current_dir_size_display = ""
+
     if not has_docs_read_access(request, current_dir):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
@@ -2887,20 +3597,32 @@ def docs_list(request, folder_path="", ui_lang=None):
             "current_path_label": current_dir or get_handrive_root_label(request, scoped_home_dir),
             "handrive_root_label": get_handrive_js_root_label(request, scoped_home_dir),
             "scoped_home_dir": scoped_home_dir,
+            "current_dir_is_root": bool((scoped_home_dir and current_dir == scoped_home_dir) or (not scoped_home_dir and current_dir == "")),
             "current_dir_can_edit": has_docs_write_access(request, current_dir),
             "current_dir_can_write_children": has_docs_directory_write_access(request, current_dir),
-            "breadcrumbs": build_docs_breadcrumbs(
+            "current_dir_requires_commit_message": bool(git_virtual is not None and git_virtual["kind"] == "branch_dir"),
+            "current_dir_git_branch_root": bool(
+                git_virtual is not None
+                and git_virtual["kind"] == "branch_dir"
+                and not git_virtual["repo_relative_path"]
+            ),
+            "current_dir_git_commit_message": (
+                _git_repo_latest_commit_subject(git_virtual["repo"], git_virtual["branch_name"], git_virtual["repo_relative_path"])
+                if git_virtual is not None
+                and git_virtual["kind"] == "branch_dir"
+                and git_virtual["repo_relative_path"]
+                else ""
+            ),
+            "breadcrumbs": _build_git_virtual_breadcrumbs(
+                request,
                 context["docs_base_url"],
                 current_dir,
                 scoped_home_dir=scoped_home_dir,
-                root_label=get_handrive_root_label(request, scoped_home_dir),
                 root_url=context["handrive_root_url"],
-                include_root_parent=bool(getattr(request.user, "is_superuser", False) and scoped_home_dir),
-                root_parent_label=get_handrive_root_label(request, ""),
             ),
-            "initial_entries": list_directory_entries(directory, request=request),
+            "initial_entries": initial_entries,
             "current_dir_git_repo": _get_current_dir_git_repo(request, current_dir),
-            "list_current_dir_size_display": format_docs_bytes_display(calculate_docs_quota_breakdown(directory)[0]) if directory.is_dir() else "",
+            "list_current_dir_size_display": current_dir_size_display,
             "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
         }
     )
@@ -2916,22 +3638,57 @@ def docs_view(request, doc_path, ui_lang=None):
     is_superuser = bool(getattr(request.user, "is_superuser", False))
 
     try:
-        file_path, relative_file_path = normalize_docs_relative_path(doc_path, must_exist=True)
-    except (ValueError, FileNotFoundError):
+        relative_file_path = normalize_relative_path(doc_path, allow_empty=False)
+    except ValueError:
         raise Http404("파일을 찾을 수 없습니다.")
+    git_virtual = _get_git_virtual_context(request, relative_file_path)
+    if git_virtual is None:
+        try:
+            file_path, relative_file_path = normalize_docs_relative_path(doc_path, must_exist=True)
+        except (ValueError, FileNotFoundError):
+            raise Http404("파일을 찾을 수 없습니다.")
+        file_name = file_path.name
+        file_extension = file_path.suffix.lower()
+        file_size_display = format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else ""
+        content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
+        rendered_content_html, render_profile = render_docs_content(
+            content,
+            file_extension,
+            source_path=file_path,
+            relative_path=relative_file_path,
+            request=request,
+        )
+    else:
+        if git_virtual["kind"] != "branch_file":
+            raise Http404("파일을 찾을 수 없습니다.")
+        file_name = Path(git_virtual["repo_relative_path"]).name
+        file_extension = Path(file_name).suffix.lower()
+        file_size_display = format_docs_bytes_display(len(_git_repo_read_file_bytes(git_virtual["repo"], git_virtual["branch_name"], git_virtual["repo_relative_path"])))
+        if is_docs_non_editable_media_extension(file_extension):
+            content = ""
+            rendered_content_html, render_profile = render_docs_content(
+                content,
+                file_extension,
+                source_path=Path(file_name),
+                relative_path=relative_file_path,
+                request=request,
+            )
+        else:
+            content = _git_repo_read_file_bytes(
+                git_virtual["repo"],
+                git_virtual["branch_name"],
+                git_virtual["repo_relative_path"],
+            ).decode("utf-8")
+            rendered_content_html, render_profile = render_docs_content(
+                content,
+                file_extension,
+                relative_path=relative_file_path,
+                request=request,
+            )
     if not is_superuser and not is_path_in_docs_scope(relative_file_path, scoped_home_dir):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
     if not has_docs_read_access(request, relative_file_path):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
-
-    content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-    rendered_content_html, render_profile = render_docs_content(
-        content,
-        file_path.suffix.lower(),
-        source_path=file_path,
-        relative_path=relative_file_path,
-        request=request,
-    )
     slug_path = markdown_slug_from_relative(relative_file_path)
     parent_dir = str(Path(relative_file_path).parent).replace("\\", "/")
     if parent_dir == ".":
@@ -2948,29 +3705,27 @@ def docs_view(request, doc_path, ui_lang=None):
 
     context.update(
         {
-            "doc_title": file_path.name,
+            "doc_title": file_name,
             "doc_relative_path": relative_file_path,
             "doc_slug_path": slug_path,
             "doc_parent_dir": parent_dir,
             "doc_can_edit": has_docs_write_access(request, relative_file_path),
             "doc_can_show_edit": has_docs_write_access(request, relative_file_path)
-            and not is_docs_non_editable_media_extension(file_path.suffix.lower()),
+            and not is_docs_non_editable_media_extension(file_extension),
             "doc_is_url_only": doc_is_url_only,
             "doc_share_url": doc_share_url,
             "doc_content_html": rendered_content_html,
             "doc_content_mode": render_profile["mode"],
             "doc_content_class": render_profile["css_class"],
-            "view_breadcrumbs": build_docs_breadcrumbs(
+            "view_breadcrumbs": _build_git_virtual_breadcrumbs(
+                request,
                 context["docs_base_url"],
                 parent_dir,
                 scoped_home_dir=scoped_home_dir,
-                root_label=get_handrive_root_label(request, scoped_home_dir),
                 root_url=context["handrive_root_url"],
-                include_root_parent=bool(getattr(request.user, "is_superuser", False) and scoped_home_dir),
-                root_parent_label=get_handrive_root_label(request, ""),
             ),
-            "view_current_file_name": file_path.name,
-            "view_current_file_size_display": format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else "",
+            "view_current_file_name": file_name,
+            "view_current_file_size_display": file_size_display,
             "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
         }
     )
@@ -3058,33 +3813,59 @@ def docs_write(request, ui_lang=None):
     initial_content = ""
     write_current_file_name = ""
     write_public_direct_save = False
+    write_requires_commit_message = False
 
     if requested_path:
         try:
-            file_path, original_relative_path = normalize_markdown_relative_path(requested_path, must_exist=True)
-        except (ValueError, FileNotFoundError):
+            original_relative_path = normalize_relative_path(requested_path, allow_empty=False)
+        except ValueError:
             raise Http404("수정할 파일을 찾을 수 없습니다.")
+        git_virtual = _get_git_virtual_context(request, original_relative_path)
+        if git_virtual is None:
+            try:
+                file_path, original_relative_path = normalize_markdown_relative_path(requested_path, must_exist=True)
+            except (ValueError, FileNotFoundError):
+                raise Http404("수정할 파일을 찾을 수 없습니다.")
+            file_name = file_path.name
+            initial_filename = file_path.stem
+            initial_extension = file_path.suffix.lower() if file_path.suffix else DOCS_FILE_EXTENSION
+            initial_content = file_path.read_text(encoding="utf-8")
+        else:
+            if git_virtual["kind"] != "branch_file":
+                raise Http404("수정할 파일을 찾을 수 없습니다.")
+            file_name = Path(git_virtual["repo_relative_path"]).name
+            initial_filename = Path(file_name).stem
+            initial_extension = Path(file_name).suffix.lower() if Path(file_name).suffix else DOCS_FILE_EXTENSION
+            initial_content = _git_repo_read_file_bytes(
+                git_virtual["repo"],
+                git_virtual["branch_name"],
+                git_virtual["repo_relative_path"],
+            ).decode("utf-8")
+            write_requires_commit_message = True
+            write_public_direct_save = True
         if not is_superuser and not is_path_in_docs_scope(original_relative_path, scoped_home_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         if not has_docs_write_access(request, original_relative_path):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
-        write_public_direct_save = is_docs_public_write_enabled(request, original_relative_path)
-
+        write_public_direct_save = write_public_direct_save or is_docs_public_write_enabled(request, original_relative_path)
         mode = "edit"
-        initial_filename = file_path.stem
-        initial_extension = file_path.suffix.lower() if file_path.suffix else DOCS_FILE_EXTENSION
         initial_filename_input = f"{initial_filename}{initial_extension}"
-        write_current_file_name = file_path.name
+        write_current_file_name = file_name
         parent_dir = str(Path(original_relative_path).parent).replace("\\", "/")
         initial_dir = "" if parent_dir == "." else parent_dir
-        initial_content = file_path.read_text(encoding="utf-8")
     elif requested_dir:
         initial_dir = normalize_relative_path(requested_dir)
         if not is_superuser and not is_path_in_docs_scope(initial_dir, scoped_home_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
-        target_dir, _ = resolve_path(initial_dir, must_exist=True)
-        if not target_dir.is_dir():
-            raise Http404("대상 폴더를 찾을 수 없습니다.")
+        git_virtual = _get_git_virtual_context(request, initial_dir)
+        if git_virtual is None:
+            target_dir, _ = resolve_path(initial_dir, must_exist=True)
+            if not target_dir.is_dir():
+                raise Http404("대상 폴더를 찾을 수 없습니다.")
+        else:
+            if git_virtual["kind"] != "branch_dir":
+                raise Http404("대상 폴더를 찾을 수 없습니다.")
+            write_requires_commit_message = True
         if not has_docs_directory_write_access(request, initial_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
     else:
@@ -3130,6 +3911,7 @@ def docs_write(request, ui_lang=None):
             ),
             "write_current_file_name": write_current_file_name,
             "write_public_direct_save": write_public_direct_save,
+            "write_requires_commit_message": write_requires_commit_message,
         }
     )
     return render(request, "handrive/write.html", context)
@@ -3416,12 +4198,24 @@ def docs_api_list(request):
     rel_path = request.GET.get("path", "")
 
     try:
-        target_dir, normalized = resolve_path(rel_path, must_exist=True)
-    except (ValueError, FileNotFoundError) as exc:
+        normalized = normalize_relative_path(rel_path, allow_empty=True)
+    except ValueError as exc:
         return json_error(str(exc), status=404)
 
-    if not target_dir.is_dir():
-        return json_error("폴더 경로가 아닙니다.", status=400)
+    git_virtual = _get_git_virtual_context(request, normalized)
+    if git_virtual is None:
+        try:
+            target_dir, normalized = resolve_path(rel_path, must_exist=True)
+        except (ValueError, FileNotFoundError) as exc:
+            return json_error(str(exc), status=404)
+        if not target_dir.is_dir():
+            return json_error("폴더 경로가 아닙니다.", status=400)
+        entries = list_directory_entries(target_dir, request=request)
+    else:
+        if git_virtual["kind"] == "branch_file":
+            return json_error("폴더 경로가 아닙니다.", status=400)
+        entries = _build_git_virtual_entries(request, git_virtual)
+
     if not has_docs_read_access(request, normalized):
         return json_error("파일을 볼 권한이 없습니다.", status=403)
 
@@ -3429,7 +4223,7 @@ def docs_api_list(request):
         {
             "ok": True,
             "path": normalized,
-            "entries": list_directory_entries(target_dir, request=request),
+            "entries": entries,
         }
     )
 
@@ -3442,12 +4236,58 @@ def docs_api_rename(request):
         payload = parse_json_body(request)
         rel_path = normalize_relative_path(payload.get("path"), allow_empty=False)
         new_name = validate_name(payload.get("new_name"), for_file=False)
-        source_path, source_relative = resolve_path(rel_path, must_exist=True)
+        commit_message = str(payload.get("commit_message") or "").strip()
+        git_virtual_source = _get_git_virtual_context(request, rel_path)
+        if git_virtual_source is None:
+            source_path, source_relative = resolve_path(rel_path, must_exist=True)
+        else:
+            source_path = None
+            source_relative = rel_path
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
     if source_relative == "":
         return json_error("루트 폴더는 이름을 바꿀 수 없습니다.", status=400)
+    mounted_repo = _get_git_repo_for_relative_path(request, source_relative)
+    if mounted_repo is not None:
+        return json_error("Repo 루트는 이름을 바꿀 수 없습니다.", status=400)
+    if git_virtual_source is not None:
+        if git_virtual_source["kind"] == "repo_root":
+            return json_error("Repo 루트는 이름을 바꿀 수 없습니다.", status=400)
+        if git_virtual_source["kind"] == "branch_dir" and not git_virtual_source["repo_relative_path"]:
+            return json_error("브랜치 이름은 여기서 바꿀 수 없습니다.", status=400)
+        old_repo_relative = normalize_relative_path(git_virtual_source["repo_relative_path"], allow_empty=False)
+        old_name = Path(old_repo_relative).name
+        suffix = Path(old_name).suffix.lower()
+        candidate_name = validate_name(new_name, for_file=git_virtual_source["kind"] == "branch_file", file_extension=suffix if git_virtual_source["kind"] == "branch_file" else "")
+        new_leaf_name = f"{candidate_name}{suffix}" if git_virtual_source["kind"] == "branch_file" else candidate_name
+        parent_relative = normalize_relative_path(str(Path(old_repo_relative).parent).replace("\\", "/"), allow_empty=True)
+        if parent_relative == ".":
+            parent_relative = ""
+        new_repo_relative = f"{parent_relative}/{new_leaf_name}" if parent_relative else new_leaf_name
+        if _git_repo_path_exists(git_virtual_source["repo"], git_virtual_source["branch_name"], new_repo_relative):
+            return json_error("같은 이름의 항목이 이미 존재합니다.", status=409)
+
+        def _mutate(worktree_dir: Path) -> None:
+            source_target = _resolve_git_worktree_path(worktree_dir, old_repo_relative)
+            destination_target = _resolve_git_worktree_path(worktree_dir, new_repo_relative)
+            destination_target.parent.mkdir(parents=True, exist_ok=True)
+            _remove_gitkeep_placeholder(destination_target.parent)
+            source_target.rename(destination_target)
+
+        try:
+            _commit_git_branch_mutation(git_virtual_source["repo"], git_virtual_source["branch_name"], commit_message, request.user, _mutate)
+        except ValueError as exc:
+            return json_error(str(exc), status=400)
+        relative_destination = f"{git_virtual_source['repo_root']}/{git_virtual_source['branch_segment']}/{new_repo_relative}"
+        response = {
+            "ok": True,
+            "path": relative_destination,
+            "type": "dir" if git_virtual_source["kind"] == "branch_dir" else "file",
+        }
+        if git_virtual_source["kind"] == "branch_file":
+            response["slug_path"] = relative_destination
+        return JsonResponse(response)
     if not has_docs_write_access(request, source_relative):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
     if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
@@ -3491,25 +4331,84 @@ def docs_api_delete(request):
     try:
         payload = parse_json_body(request)
         path_values = parse_path_values(payload, allow_empty=False)
+        commit_message = str(payload.get("commit_message") or "").strip()
+        repo_delete_requested = bool(payload.get("repo_delete"))
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
-    resolved_targets: list[tuple[Path, str]] = []
+    resolved_targets: list[tuple[Path | None, str, dict | None]] = []
     seen_paths = set()
     try:
         for path_value in path_values:
-            target_path, target_relative = resolve_path(path_value, must_exist=True)
+            git_virtual = _get_git_virtual_context(request, path_value)
+            if git_virtual is None:
+                target_path, target_relative = resolve_path(path_value, must_exist=True)
+            else:
+                target_path = None
+                target_relative = path_value
             if target_relative in seen_paths:
                 continue
             seen_paths.add(target_relative)
-            resolved_targets.append((target_path, target_relative))
+            resolved_targets.append((target_path, target_relative, git_virtual))
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
-    for target_path, target_relative in resolved_targets:
+    git_virtual_targets = [item for item in resolved_targets if item[2] is not None]
+    if git_virtual_targets:
+        if len(git_virtual_targets) != len(resolved_targets):
+            return json_error("Repo 브랜치 항목과 일반 항목은 함께 삭제할 수 없습니다.", status=400)
+        repo_ids = {item[2]["repo"].id for item in git_virtual_targets}
+        branch_names = {item[2]["branch_name"] for item in git_virtual_targets}
+        if len(repo_ids) != 1 or len(branch_names) != 1:
+            return json_error("같은 Repo 브랜치의 항목만 함께 삭제할 수 있습니다.", status=400)
+        for _target_path, target_relative, git_virtual in git_virtual_targets:
+            if git_virtual["kind"] == "repo_root":
+                return json_error("Repo 루트 삭제는 Repo 삭제를 사용해주세요.", status=400)
+            if git_virtual["kind"] == "branch_dir" and not git_virtual["repo_relative_path"]:
+                return json_error("브랜치 루트는 삭제할 수 없습니다.", status=400)
+
+        selected_directory_paths = {
+            target_relative
+            for _target_path, target_relative, git_virtual in git_virtual_targets
+            if git_virtual["kind"] == "branch_dir"
+        }
+        effective_targets = []
+        for item in git_virtual_targets:
+            _target_path, target_relative, _git_virtual = item
+            is_descendant_of_selected_directory = any(
+                target_relative != selected_dir and target_relative.startswith(f"{selected_dir}/")
+                for selected_dir in selected_directory_paths
+            )
+            if not is_descendant_of_selected_directory:
+                effective_targets.append(item)
+
+        repo = effective_targets[0][2]["repo"]
+        branch_name = effective_targets[0][2]["branch_name"]
+        repo_relative_targets = [normalize_relative_path(item[2]["repo_relative_path"], allow_empty=False) for item in effective_targets]
+
+        def _mutate(worktree_dir: Path) -> None:
+            for repo_relative_path in repo_relative_targets:
+                target_path = _resolve_git_worktree_path(worktree_dir, repo_relative_path)
+                parent_path = target_path.parent
+                if target_path.is_dir():
+                    shutil.rmtree(target_path)
+                elif target_path.exists():
+                    target_path.unlink()
+                _ensure_gitkeep_if_empty(parent_path, worktree_dir)
+
+        try:
+            _commit_git_branch_mutation(repo, branch_name, commit_message, request.user, _mutate)
+        except ValueError as exc:
+            return json_error(str(exc), status=400)
+        return JsonResponse({"ok": True, "deleted_paths": [item[1] for item in effective_targets]})
+
+    for target_path, target_relative, _git_virtual in resolved_targets:
         if target_relative == "":
             return json_error("루트 폴더는 삭제할 수 없습니다.", status=400)
-        if not has_docs_write_access(request, target_relative):
+        is_repo_root_delete = target_path.is_dir() and is_docs_git_repo_root_path(request, target_relative)
+        if is_repo_root_delete and not repo_delete_requested:
+            return json_error("Repo 루트 삭제는 Repo 삭제를 사용해주세요.", status=403)
+        if not is_repo_root_delete and not has_docs_write_access(request, target_relative):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
         if target_path.is_file() and is_docs_public_write_enabled(request, target_relative):
             return json_error("전체 허용 파일은 삭제할 수 없습니다.", status=403)
@@ -3521,11 +4420,11 @@ def docs_api_delete(request):
 
     selected_directory_paths = {
         target_relative
-        for target_path, target_relative in resolved_targets
+        for target_path, target_relative, _git_virtual in resolved_targets
         if target_path.is_dir()
     }
     effective_targets: list[tuple[Path, str]] = []
-    for target_path, target_relative in resolved_targets:
+    for target_path, target_relative, _git_virtual in resolved_targets:
         is_descendant_of_selected_directory = any(
             target_relative != selected_dir and target_relative.startswith(f"{selected_dir}/")
             for selected_dir in selected_directory_paths
@@ -3536,8 +4435,34 @@ def docs_api_delete(request):
 
     deleted_paths = []
     for target_path, target_relative in effective_targets:
+        git_repo = _get_git_repo_for_relative_path(request, target_relative) if target_path.is_dir() else None
+        if git_repo is not None:
+            owner_name = git_repo.forgejo_owner or request.user.username
+            repo_name = git_repo.forgejo_repo_name or git_repo.repo_name
+            restore_relative = _get_repo_restore_relative_path(git_repo.owner, git_repo.repo_name)
+            restore_path, _ = resolve_path(restore_relative, must_exist=False)
+            if restore_path != target_path and (restore_path.exists() or restore_path.is_symlink()):
+                return json_error("Repo를 되돌릴 루트 폴더에 같은 이름의 항목이 이미 존재합니다.", status=409)
+            with tempfile.TemporaryDirectory(prefix="handrive_repo_restore_") as temp_dir:
+                staged_restore_path = Path(temp_dir) / "restored"
+                _materialize_git_repo_mount(target_path, staged_restore_path)
+                ForgejoClient().delete_repo(owner_name, repo_name)
+                if target_path.is_symlink() or target_path.is_file():
+                    target_path.unlink()
+                elif target_path.exists():
+                    shutil.rmtree(target_path)
+                _copy_tree_contents(staged_restore_path, restore_path)
+                if restore_path != target_path:
+                    move_docs_acl_rules(target_relative, restore_relative)
+                    move_docs_shared_links(target_relative, restore_relative)
+            git_repo.delete()
+            deleted_paths.append(target_relative)
+            continue
         if target_path.is_dir():
-            shutil.rmtree(target_path)
+            if target_path.is_symlink():
+                target_path.unlink()
+            else:
+                shutil.rmtree(target_path)
         else:
             target_path.unlink()
         delete_docs_acl_rules_for_path(target_relative)
@@ -3555,15 +4480,41 @@ def docs_api_mkdir(request):
         payload = parse_json_body(request)
         parent_dir = normalize_relative_path(payload.get("parent_dir"), allow_empty=True)
         folder_name = validate_name(payload.get("folder_name"), for_file=False)
-        parent_path, _ = resolve_path(parent_dir, must_exist=True)
-        enforce_docs_scoped_quota(request, quota_path=parent_dir, extra_entries=1)
+        commit_message = str(payload.get("commit_message") or "").strip()
+        git_virtual_parent = _get_git_virtual_context(request, parent_dir)
+        if git_virtual_parent is None:
+            parent_path, _ = resolve_path(parent_dir, must_exist=True)
+            enforce_docs_scoped_quota(request, quota_path=parent_dir, extra_entries=1)
+        else:
+            parent_path = None
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
-    if not parent_path.is_dir():
+    if git_virtual_parent is None and not parent_path.is_dir():
         return json_error("폴더 생성 위치가 올바르지 않습니다.", status=400)
     if not has_docs_directory_write_access(request, parent_dir):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
+    if git_virtual_parent is not None:
+        if git_virtual_parent["kind"] != "branch_dir":
+            return json_error("폴더 생성 위치가 올바르지 않습니다.", status=400)
+        repo_relative_path = (
+            f"{git_virtual_parent['repo_relative_path']}/{folder_name}"
+            if git_virtual_parent["repo_relative_path"]
+            else folder_name
+        )
+        if _git_repo_path_exists(git_virtual_parent["repo"], git_virtual_parent["branch_name"], repo_relative_path):
+            return json_error("같은 이름의 폴더가 이미 존재합니다.", status=409)
+
+        def _mutate(worktree_dir: Path) -> None:
+            target_path = _resolve_git_worktree_path(worktree_dir, repo_relative_path)
+            target_path.mkdir(parents=True, exist_ok=False)
+            (target_path / ".gitkeep").write_text("", encoding="utf-8")
+
+        try:
+            _commit_git_branch_mutation(git_virtual_parent["repo"], git_virtual_parent["branch_name"], commit_message, request.user, _mutate)
+        except ValueError as exc:
+            return json_error(str(exc), status=400)
+        return JsonResponse({"ok": True, "path": f"{git_virtual_parent['repo_root']}/{git_virtual_parent['branch_segment']}/{repo_relative_path}"})
 
     target_path = parent_path / folder_name
     if target_path.exists():
@@ -3581,13 +4532,130 @@ def docs_api_move(request):
         payload = parse_json_body(request)
         source_path_value = normalize_relative_path(payload.get("source_path"), allow_empty=False)
         target_dir_value = normalize_relative_path(payload.get("target_dir"), allow_empty=True)
-        source_path, source_relative = resolve_path(source_path_value, must_exist=True)
-        target_dir_path, target_dir_relative = resolve_path(target_dir_value, must_exist=True)
+        commit_message = str(payload.get("commit_message") or "").strip()
+        git_virtual_source = _get_git_virtual_context(request, source_path_value)
+        git_virtual_target = _get_git_virtual_context(request, target_dir_value)
+        if git_virtual_source is None:
+            source_path, source_relative = resolve_path(source_path_value, must_exist=True)
+        else:
+            source_path = None
+            source_relative = source_path_value
+        if git_virtual_target is None:
+            target_dir_path, target_dir_relative = resolve_path(target_dir_value, must_exist=True)
+        else:
+            target_dir_path = None
+            target_dir_relative = target_dir_value
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
     if source_relative == "":
         return json_error("루트 폴더는 이동할 수 없습니다.", status=400)
+    if git_virtual_source is not None or git_virtual_target is not None:
+        if git_virtual_source is None and git_virtual_target is not None:
+            if not target_dir_relative:
+                return json_error("이동 대상 경로가 올바르지 않습니다.", status=400)
+            if not target_dir_relative or git_virtual_target["kind"] != "branch_dir":
+                return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
+            if not has_docs_write_access(request, source_relative):
+                return json_error("파일을 수정할 권한이 없습니다.", status=403)
+            if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
+                return json_error("전체 허용 파일은 이동할 수 없습니다.", status=403)
+            source_was_dir = source_path.is_dir()
+            source_name = source_path.name
+            target_repo_relative = (
+                f"{git_virtual_target['repo_relative_path']}/{source_name}"
+                if git_virtual_target["repo_relative_path"]
+                else source_name
+            )
+            if _git_repo_path_exists(git_virtual_target["repo"], git_virtual_target["branch_name"], target_repo_relative):
+                return json_error("같은 이름의 항목이 이미 존재합니다.", status=409)
+
+            def _mutate(worktree_dir: Path) -> None:
+                destination_target = _resolve_git_worktree_path(worktree_dir, target_repo_relative)
+                destination_target.parent.mkdir(parents=True, exist_ok=True)
+                _remove_gitkeep_placeholder(destination_target.parent)
+                _copy_local_item_to_git_worktree(source_path, destination_target)
+
+            try:
+                _commit_git_branch_mutation(git_virtual_target["repo"], git_virtual_target["branch_name"], commit_message, request.user, _mutate)
+            except ValueError as exc:
+                return json_error(str(exc), status=400)
+
+            if source_path.is_dir():
+                if source_path.is_symlink():
+                    source_path.unlink()
+                else:
+                    shutil.rmtree(source_path)
+            else:
+                source_path.unlink()
+            delete_docs_acl_rules_for_path(source_relative)
+            delete_docs_shared_links_for_path(source_relative)
+
+            destination_relative = f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{target_repo_relative}"
+            response = {
+                "ok": True,
+                "path": destination_relative,
+                "type": "dir" if source_was_dir else "file",
+            }
+            if not source_was_dir:
+                response["slug_path"] = destination_relative
+            return JsonResponse(response)
+        if git_virtual_source is None or git_virtual_target is None:
+            return json_error("Repo 브랜치 항목은 같은 브랜치 안에서만 이동할 수 있습니다.", status=400)
+        if git_virtual_source["repo"].id != git_virtual_target["repo"].id or git_virtual_source["branch_name"] != git_virtual_target["branch_name"]:
+            return json_error("Repo 브랜치 항목은 같은 브랜치 안에서만 이동할 수 있습니다.", status=400)
+        if git_virtual_source["kind"] == "repo_root" or (git_virtual_source["kind"] == "branch_dir" and not git_virtual_source["repo_relative_path"]):
+            return json_error("브랜치 루트는 이동할 수 없습니다.", status=400)
+        if git_virtual_target["kind"] != "branch_dir":
+            return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
+        source_repo_relative = normalize_relative_path(git_virtual_source["repo_relative_path"], allow_empty=False)
+        target_repo_relative = (
+            f"{git_virtual_target['repo_relative_path']}/{Path(source_repo_relative).name}"
+            if git_virtual_target["repo_relative_path"]
+            else Path(source_repo_relative).name
+        )
+        source_parent_relative = normalize_relative_path(str(Path(source_repo_relative).parent).replace("\\", "/"), allow_empty=True)
+        if source_parent_relative == ".":
+            source_parent_relative = ""
+        if source_parent_relative == git_virtual_target["repo_relative_path"]:
+            response = {
+                "ok": True,
+                "path": source_relative,
+                "type": "dir" if git_virtual_source["kind"] == "branch_dir" else "file",
+            }
+            if git_virtual_source["kind"] == "branch_file":
+                response["slug_path"] = source_relative
+            return JsonResponse(response)
+        if _git_repo_path_exists(git_virtual_source["repo"], git_virtual_source["branch_name"], target_repo_relative):
+            return json_error("같은 이름의 항목이 이미 존재합니다.", status=409)
+
+        def _mutate(worktree_dir: Path) -> None:
+            source_target = _resolve_git_worktree_path(worktree_dir, source_repo_relative)
+            destination_target = _resolve_git_worktree_path(worktree_dir, target_repo_relative)
+            source_parent = source_target.parent
+            if source_target.is_dir():
+                resolved_source = source_target.resolve()
+                resolved_destination_parent = destination_target.parent.resolve()
+                if resolved_destination_parent == resolved_source or resolved_source in resolved_destination_parent.parents:
+                    raise ValueError("폴더를 자기 자신 또는 하위 폴더로 이동할 수 없습니다.")
+            destination_target.parent.mkdir(parents=True, exist_ok=True)
+            _remove_gitkeep_placeholder(destination_target.parent)
+            source_target.rename(destination_target)
+            _ensure_gitkeep_if_empty(source_parent, worktree_dir)
+
+        try:
+            _commit_git_branch_mutation(git_virtual_source["repo"], git_virtual_source["branch_name"], commit_message, request.user, _mutate)
+        except ValueError as exc:
+            return json_error(str(exc), status=400)
+        destination_relative = f"{git_virtual_source['repo_root']}/{git_virtual_source['branch_segment']}/{target_repo_relative}"
+        response = {
+            "ok": True,
+            "path": destination_relative,
+            "type": "dir" if git_virtual_source["kind"] == "branch_dir" else "file",
+        }
+        if git_virtual_source["kind"] == "branch_file":
+            response["slug_path"] = destination_relative
+        return JsonResponse(response)
     if not target_dir_path.is_dir():
         return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
     if not has_docs_write_access(request, source_relative):
@@ -3644,14 +4712,20 @@ def docs_api_move(request):
 def docs_api_upload(request):
     try:
         target_dir_value = normalize_relative_path(request.POST.get("dir"), allow_empty=True)
-        target_dir_path, target_dir_relative = resolve_path(target_dir_value, must_exist=True)
+        git_virtual_target = _get_git_virtual_context(request, target_dir_value)
+        if git_virtual_target is None:
+            target_dir_path, target_dir_relative = resolve_path(target_dir_value, must_exist=True)
+        else:
+            target_dir_path = None
+            target_dir_relative = target_dir_value
     except (ValueError, FileNotFoundError) as exc:
         return json_error(str(exc), status=400)
 
-    if not target_dir_path.is_dir():
+    if git_virtual_target is None and not target_dir_path.is_dir():
         return json_error("업로드 위치가 폴더가 아닙니다.", status=400)
     if not has_docs_directory_write_access(request, target_dir_relative):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
+    commit_message = str(request.POST.get("commit_message") or "").strip()
 
     upload_id = str(request.POST.get("upload_id") or "").strip()
     chunk_index_value = request.POST.get("chunk_index")
@@ -3715,28 +4789,59 @@ def docs_api_upload(request):
             return json_error("업로드 청크가 누락되었습니다.", status=400)
 
         try:
-            destination_path = build_available_upload_path(target_dir_path, original_name)
             upload_size = sum(
                 (session_dir / f"{index:06d}.part").stat().st_size
                 for index in range(total_chunks)
             )
-            enforce_docs_scoped_quota(
-                request,
-                quota_path=target_dir_relative,
-                extra_bytes=upload_size,
-                extra_entries=1,
-            )
+            if git_virtual_target is None:
+                destination_path = build_available_upload_path(target_dir_path, original_name)
+                enforce_docs_scoped_quota(
+                    request,
+                    quota_path=target_dir_relative,
+                    extra_bytes=upload_size,
+                    extra_entries=1,
+                )
+            else:
+                if git_virtual_target["kind"] != "branch_dir":
+                    return json_error("업로드 위치가 폴더가 아닙니다.", status=400)
+                destination_name = _build_available_git_repo_filename(
+                    git_virtual_target["repo"],
+                    git_virtual_target["branch_name"],
+                    git_virtual_target["repo_relative_path"],
+                    original_name,
+                )
         except ValueError as exc:
             return json_error(str(exc), status=400)
 
-        with destination_path.open("wb") as destination_handle:
-            for index in range(total_chunks):
-                part_path = session_dir / f"{index:06d}.part"
-                with part_path.open("rb") as source_handle:
-                    shutil.copyfileobj(source_handle, destination_handle)
-
+        content_bytes = bytearray()
+        for index in range(total_chunks):
+            part_path = session_dir / f"{index:06d}.part"
+            content_bytes.extend(part_path.read_bytes())
         shutil.rmtree(session_dir, ignore_errors=True)
-        uploaded_entry = build_entry(destination_path)
+        if git_virtual_target is None:
+            with destination_path.open("wb") as destination_handle:
+                destination_handle.write(bytes(content_bytes))
+            uploaded_entry = build_entry(destination_path)
+        else:
+            repo_relative_path = (
+                f"{git_virtual_target['repo_relative_path']}/{destination_name}"
+                if git_virtual_target["repo_relative_path"]
+                else destination_name
+            )
+            _commit_git_branch_changes(
+                git_virtual_target["repo"],
+                git_virtual_target["branch_name"],
+                commit_message,
+                {repo_relative_path: bytes(content_bytes)},
+                request.user,
+            )
+            uploaded_entry = {
+                "name": destination_name,
+                "path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
+                "type": "file",
+                "slug_path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
+                "size_display": format_docs_bytes_display(len(content_bytes)),
+            }
         return JsonResponse(
             {
                 "ok": True,
@@ -3754,29 +4859,71 @@ def docs_api_upload(request):
     upload_total_entries = 0
     for uploaded_file in uploaded_files:
         try:
-            destination_path = build_available_upload_path(target_dir_path, uploaded_file.name)
+            if git_virtual_target is None:
+                build_available_upload_path(target_dir_path, uploaded_file.name)
+            else:
+                if git_virtual_target["kind"] != "branch_dir":
+                    return json_error("업로드 위치가 폴더가 아닙니다.", status=400)
+                _build_available_git_repo_filename(
+                    git_virtual_target["repo"],
+                    git_virtual_target["branch_name"],
+                    git_virtual_target["repo_relative_path"],
+                    uploaded_file.name,
+                )
         except ValueError as exc:
             return json_error(str(exc), status=400)
         upload_total_size += uploaded_file.size or 0
         upload_total_entries += 1
 
-    try:
-        enforce_docs_scoped_quota(
-            request,
-            quota_path=target_dir_relative,
-            extra_bytes=upload_total_size,
-            extra_entries=upload_total_entries,
+    if git_virtual_target is None:
+        try:
+            enforce_docs_scoped_quota(
+                request,
+                quota_path=target_dir_relative,
+                extra_bytes=upload_total_size,
+                extra_entries=upload_total_entries,
+            )
+        except ValueError as exc:
+            return json_error(str(exc), status=400)
+
+        for uploaded_file in uploaded_files:
+            destination_path = build_available_upload_path(target_dir_path, uploaded_file.name)
+            with destination_path.open("wb") as destination_handle:
+                for chunk in uploaded_file.chunks():
+                    destination_handle.write(chunk)
+
+            uploaded_entries.append(build_entry(destination_path))
+    else:
+        file_updates = {}
+        for uploaded_file in uploaded_files:
+            destination_name = _build_available_git_repo_filename(
+                git_virtual_target["repo"],
+                git_virtual_target["branch_name"],
+                git_virtual_target["repo_relative_path"],
+                uploaded_file.name,
+            )
+            repo_relative_path = (
+                f"{git_virtual_target['repo_relative_path']}/{destination_name}"
+                if git_virtual_target["repo_relative_path"]
+                else destination_name
+            )
+            file_updates[repo_relative_path] = uploaded_file.read()
+            uploaded_entries.append(
+                {
+                    "name": destination_name,
+                    "path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
+                    "type": "file",
+                    "slug_path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
+                    "size_display": format_docs_bytes_display(len(file_updates[repo_relative_path])),
+                }
+            )
+        _commit_git_branch_changes(
+            git_virtual_target["repo"],
+            git_virtual_target["branch_name"],
+            commit_message,
+            file_updates,
+            request.user,
         )
-    except ValueError as exc:
-        return json_error(str(exc), status=400)
-
-    for uploaded_file in uploaded_files:
-        destination_path = build_available_upload_path(target_dir_path, uploaded_file.name)
-        with destination_path.open("wb") as destination_handle:
-            for chunk in uploaded_file.chunks():
-                destination_handle.write(chunk)
-
-        uploaded_entries.append(build_entry(destination_path))
 
     return JsonResponse(
         {
@@ -3810,26 +4957,59 @@ def docs_api_preview(request):
         preview_relative_path = normalize_relative_path(payload.get("path"), allow_empty=True)
         preview_target_dir = normalize_relative_path(payload.get("target_dir"), allow_empty=True)
         if preview_relative_path:
-            file_path, relative_file_path = normalize_docs_relative_path(
-                preview_relative_path, must_exist=True
-            )
+            git_virtual = _get_git_virtual_context(request, preview_relative_path)
+            if git_virtual is None:
+                file_path, relative_file_path = normalize_docs_relative_path(
+                    preview_relative_path, must_exist=True
+                )
+            else:
+                if git_virtual["kind"] != "branch_file":
+                    return json_error("파일을 찾을 수 없습니다.", status=404)
+                file_path = None
+                relative_file_path = preview_relative_path
             if not has_docs_read_access(request, relative_file_path):
                 return json_error("파일을 볼 권한이 없습니다.", status=403)
-            content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-            rendered_html, render_profile = render_docs_content(
-                content,
-                file_path.suffix.lower(),
-                source_path=file_path,
-                relative_path=relative_file_path,
-                request=request,
-            )
+            if git_virtual is None:
+                content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
+                rendered_html, render_profile = render_docs_content(
+                    content,
+                    file_path.suffix.lower(),
+                    source_path=file_path,
+                    relative_path=relative_file_path,
+                    request=request,
+                )
+                title = file_path.name
+            else:
+                title = Path(git_virtual["repo_relative_path"]).name
+                file_extension = Path(title).suffix.lower()
+                if is_docs_non_editable_media_extension(file_extension):
+                    content = ""
+                    rendered_html, render_profile = render_docs_content(
+                        content,
+                        file_extension,
+                        source_path=Path(title),
+                        relative_path=relative_file_path,
+                        request=request,
+                    )
+                else:
+                    content = _git_repo_read_file_bytes(
+                        git_virtual["repo"],
+                        git_virtual["branch_name"],
+                        git_virtual["repo_relative_path"],
+                    ).decode("utf-8")
+                    rendered_html, render_profile = render_docs_content(
+                        content,
+                        file_extension,
+                        relative_path=relative_file_path,
+                        request=request,
+                    )
             return JsonResponse(
                 {
                     "ok": True,
                     "html": rendered_html,
                     "path": relative_file_path,
-                    "slug_path": markdown_slug_from_relative(relative_file_path),
-                    "title": file_path.name,
+                    "slug_path": relative_file_path if git_virtual is not None else markdown_slug_from_relative(relative_file_path),
+                    "title": title,
                     "render_mode": render_profile["mode"],
                     "render_class": render_profile["css_class"],
                 }
@@ -3846,13 +5026,18 @@ def docs_api_preview(request):
     source_extension = preview_extension or DOCS_FILE_EXTENSION
     source_path = None
     if original_relative_path:
-        try:
-            source_path, source_relative = normalize_docs_relative_path(
-                original_relative_path, must_exist=True
-            )
-        except (ValueError, FileNotFoundError) as exc:
-            return json_error(str(exc), status=400)
-        source_extension = source_path.suffix.lower() if source_path.suffix else DOCS_FILE_EXTENSION
+        git_virtual = _get_git_virtual_context(request, original_relative_path)
+        if git_virtual is None:
+            try:
+                source_path, source_relative = normalize_docs_relative_path(
+                    original_relative_path, must_exist=True
+                )
+            except (ValueError, FileNotFoundError) as exc:
+                return json_error(str(exc), status=400)
+            source_extension = source_path.suffix.lower() if source_path.suffix else DOCS_FILE_EXTENSION
+        else:
+            source_relative = original_relative_path
+            source_extension = Path(git_virtual["repo_relative_path"]).suffix.lower() or DOCS_FILE_EXTENSION
         if not has_docs_write_access(request, source_relative):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
     else:
@@ -3885,21 +5070,35 @@ def docs_api_save(request):
         target_dir = normalize_relative_path(payload.get("target_dir"), allow_empty=True)
         requested_extension = normalize_file_extension(payload.get("extension"), allow_empty=True)
         content = payload.get("content", "")
+        commit_message = str(payload.get("commit_message") or "").strip()
         if not isinstance(content, str):
             raise ValueError("내용 형식이 올바르지 않습니다.")
 
-        target_dir_path, target_dir_rel = resolve_path(target_dir, must_exist=True)
-        if not target_dir_path.is_dir():
-            raise ValueError("저장 위치가 폴더가 아닙니다.")
+        git_virtual_target = _get_git_virtual_context(request, target_dir)
+        if git_virtual_target is None:
+            target_dir_path, target_dir_rel = resolve_path(target_dir, must_exist=True)
+            if not target_dir_path.is_dir():
+                raise ValueError("저장 위치가 폴더가 아닙니다.")
+        else:
+            if git_virtual_target["kind"] != "branch_dir":
+                raise ValueError("저장 위치가 폴더가 아닙니다.")
+            target_dir_path = None
+            target_dir_rel = target_dir
         source_path = None
         source_relative = ""
         source_is_public_write = False
         source_extension = DOCS_FILE_EXTENSION
+        git_virtual_source = None
         if original_relative_path:
-            source_path, source_relative = normalize_markdown_relative_path(
-                original_relative_path, must_exist=True
-            )
-            source_extension = source_path.suffix.lower() if source_path.suffix else DOCS_FILE_EXTENSION
+            git_virtual_source = _get_git_virtual_context(request, original_relative_path)
+            if git_virtual_source is None:
+                source_path, source_relative = normalize_markdown_relative_path(
+                    original_relative_path, must_exist=True
+                )
+                source_extension = source_path.suffix.lower() if source_path.suffix else DOCS_FILE_EXTENSION
+            else:
+                source_relative = original_relative_path
+                source_extension = Path(git_virtual_source["repo_relative_path"]).suffix.lower() or DOCS_FILE_EXTENSION
             if not has_docs_write_access(request, source_relative):
                 return json_error("파일을 수정할 권한이 없습니다.", status=403)
             source_is_public_write = is_docs_public_write_enabled(request, source_relative)
@@ -3913,6 +5112,40 @@ def docs_api_save(request):
             for_file=True,
             file_extension=target_extension,
         )
+        if git_virtual_target is not None:
+            destination_repo_relative = (
+                f"{git_virtual_target['repo_relative_path']}/{filename}{target_extension}"
+                if git_virtual_target["repo_relative_path"]
+                else f"{filename}{target_extension}"
+            )
+            if git_virtual_source is not None:
+                if git_virtual_source["kind"] != "branch_file":
+                    return json_error("Repo 브랜치 파일만 저장할 수 있습니다.", status=400)
+                if git_virtual_source["repo"].id != git_virtual_target["repo"].id or git_virtual_source["branch_name"] != git_virtual_target["branch_name"]:
+                    return json_error("Repo 브랜치 파일은 같은 브랜치 안에서만 저장할 수 있습니다.", status=400)
+                expected_relative = f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{destination_repo_relative}"
+                if normalize_relative_path(expected_relative, allow_empty=False) != original_relative_path:
+                    return json_error("Repo 브랜치 파일은 이름이나 위치를 바꿀 수 없습니다.", status=400)
+                commit_updates = {git_virtual_source["repo_relative_path"]: content.encode("utf-8")}
+            else:
+                if _git_repo_path_exists(git_virtual_target["repo"], git_virtual_target["branch_name"], destination_repo_relative):
+                    return json_error("같은 이름의 파일이 이미 존재합니다.", status=409)
+                commit_updates = {destination_repo_relative: content.encode("utf-8")}
+                original_relative_path = f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{destination_repo_relative}"
+            _commit_git_branch_changes(
+                git_virtual_target["repo"],
+                git_virtual_target["branch_name"],
+                commit_message,
+                commit_updates,
+                request.user,
+            )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "path": original_relative_path,
+                    "slug_path": original_relative_path,
+                }
+            )
         destination = target_dir_path / f"{filename}{target_extension}"
         destination_exists = destination.exists()
         is_same_as_source = bool(
@@ -3996,9 +5229,28 @@ def docs_api_save(request):
 @with_request_docs_root
 def docs_api_download(request):
     try:
-        file_path, rel_path = normalize_docs_relative_path(request.GET.get("path"), must_exist=True)
-    except (ValueError, FileNotFoundError):
+        rel_path = normalize_relative_path(request.GET.get("path"), allow_empty=False)
+    except ValueError:
         raise Http404("다운로드할 파일을 찾을 수 없습니다.")
+    git_virtual = _get_git_virtual_context(request, rel_path)
+    if git_virtual is None:
+        try:
+            file_path, rel_path = normalize_docs_relative_path(request.GET.get("path"), must_exist=True)
+        except (ValueError, FileNotFoundError):
+            raise Http404("다운로드할 파일을 찾을 수 없습니다.")
+        filename = file_path.name
+        file_handle = file_path.open("rb")
+    else:
+        if git_virtual["kind"] != "branch_file":
+            raise Http404("다운로드할 파일을 찾을 수 없습니다.")
+        filename = Path(git_virtual["repo_relative_path"]).name
+        file_handle = io.BytesIO(
+            _git_repo_read_file_bytes(
+                git_virtual["repo"],
+                git_virtual["branch_name"],
+                git_virtual["repo_relative_path"],
+            )
+        )
 
     share_owner = request.GET.get("share_owner", "").strip()
     share_slug = request.GET.get("share_slug", "").strip()
@@ -4013,4 +5265,4 @@ def docs_api_download(request):
     elif not has_docs_read_access(request, rel_path):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
-    return FileResponse(file_path.open("rb"), as_attachment=True, filename=file_path.name)
+    return FileResponse(file_handle, as_attachment=True, filename=filename)

@@ -41,8 +41,13 @@
     data-handrive-page="list"
     data-is-superuser="{% if user.is_superuser %}1{% else %}0{% endif %}"
     data-current-dir="{{ current_dir }}"
+    data-current-dir-is-root="{% if current_dir_is_root %}1{% else %}0{% endif %}"
     data-current-dir-can-edit="{% if current_dir_can_edit %}1{% else %}0{% endif %}"
     data-current-dir-can-write-children="{% if current_dir_can_write_children %}1{% else %}0{% endif %}"
+    data-current-dir-requires-commit-message="{% if current_dir_requires_commit_message %}1{% else %}0{% endif %}"
+    data-current-dir-git-branch-root="{% if current_dir_git_branch_root %}1{% else %}0{% endif %}"
+    data-current-dir-git-commit-message="{{ current_dir_git_commit_message|default:''|escape }}"
+    data-account-profile-image-url="{{ account_profile_image_url|default:''|escape }}"
     data-scoped-home-dir="{{ scoped_home_dir|default:'' }}"
     data-handrive-base-url="{{ docs_base_url }}"
     data-handrive-root-url="{{ handrive_root_url }}"
@@ -160,6 +165,7 @@
 
 {% include "popup/handrive/rename_modal.html" %}
 {% include "popup/handrive/folder_create_modal.html" %}
+{% include "popup/handrive/commit_message_modal.html" %}
 
 {% if docs_can_manage_acl %}
     {% include "popup/handrive/permission_modal.html" %}

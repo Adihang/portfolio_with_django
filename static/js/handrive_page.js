@@ -907,6 +907,99 @@
 
     const requestConfirmDialog = createDocsConfirmDialog();
 
+    function createDocsCommitMessageDialog() {
+        const modal = document.getElementById("handrive-commit-message-modal");
+        const backdrop = document.getElementById("handrive-commit-message-modal-backdrop");
+        const target = document.getElementById("handrive-commit-message-target");
+        const input = document.getElementById("handrive-commit-message-input");
+        const cancelButton = document.getElementById("handrive-commit-message-cancel-btn");
+        const confirmButton = document.getElementById("handrive-commit-message-confirm-btn");
+
+        if (!modal || !backdrop || !target || !input || !cancelButton || !confirmButton) {
+            return async function () {
+                return null;
+            };
+        }
+
+        let resolvePending = null;
+        let isOpen = false;
+        let lastFocusedElement = null;
+
+        const close = function (value) {
+            if (!isOpen) {
+                return;
+            }
+            modal.hidden = true;
+            isOpen = false;
+            if (resolvePending) {
+                resolvePending(value);
+                resolvePending = null;
+            }
+            if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+                lastFocusedElement.focus();
+            }
+            lastFocusedElement = null;
+        };
+
+        const submit = function () {
+            var message = String(input.value || "").trim();
+            if (!message) {
+                window.alert("커밋 메시지를 입력해주세요.");
+                input.focus();
+                return;
+            }
+            close(message);
+        };
+
+        backdrop.addEventListener("click", function () {
+            close(null);
+        });
+        cancelButton.addEventListener("click", function () {
+            close(null);
+        });
+        confirmButton.addEventListener("click", function () {
+            submit();
+        });
+        input.addEventListener("keydown", function (event) {
+            if (!isOpen) {
+                return;
+            }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                close(null);
+                return;
+            }
+            if (event.key === "Enter") {
+                event.preventDefault();
+                submit();
+            }
+        });
+
+        return function requestCommitMessageDialog(options) {
+            if (resolvePending) {
+                resolvePending(null);
+                resolvePending = null;
+            }
+
+            var settings = options || {};
+            target.textContent = settings.targetPath || "";
+            input.value = String(settings.initialValue || "");
+            modal.hidden = false;
+            isOpen = true;
+            lastFocusedElement = document.activeElement;
+            window.setTimeout(function () {
+                input.focus();
+                input.select();
+            }, 0);
+
+            return new Promise(function (resolve) {
+                resolvePending = resolve;
+            });
+        };
+    }
+
+    const requestCommitMessageDialog = createDocsCommitMessageDialog();
+
     function createDocsUrlShareModal() {
         const shareModal = document.getElementById("handrive-url-share-modal");
         const shareBackdrop = document.getElementById("handrive-url-share-modal-backdrop");
@@ -1399,6 +1492,7 @@
         const contextPermissionsButton = contextMenu ? contextMenu.querySelector('button[data-action="permissions"]') : null;
         const contextGitCreateRepoButton = contextMenu ? contextMenu.querySelector('button[data-action="git-create-repo"]') : null;
         const contextGitManageRepoButton = contextMenu ? contextMenu.querySelector('button[data-action="git-manage-repo"]') : null;
+        const contextGitDeleteRepoButton = contextMenu ? contextMenu.querySelector('button[data-action="git-delete-repo"]') : null;
         const renameModal = document.getElementById("handrive-rename-modal");
         const renameModalBackdrop = document.getElementById("handrive-rename-modal-backdrop");
         const renameInput = document.getElementById("handrive-rename-input");
@@ -1469,9 +1563,14 @@
         ]);
 
         const currentDir = normalizePath(root.dataset.currentDir || "", true);
+        const currentDirIsRoot = root.dataset.currentDirIsRoot === "1";
         const currentDirCanEdit = root.dataset.currentDirCanEdit === "1";
         const currentDirCanWriteChildren =
             root.dataset.currentDirCanWriteChildren === "1" || currentDirCanEdit;
+        const currentDirRequiresCommitMessage = root.dataset.currentDirRequiresCommitMessage === "1";
+        const currentDirGitBranchRoot = root.dataset.currentDirGitBranchRoot === "1";
+        const currentDirGitCommitMessage = String(root.dataset.currentDirGitCommitMessage || "").trim();
+        const accountProfileImageUrl = String(root.dataset.accountProfileImageUrl || "").trim();
         const docsRootLabel = (root.dataset.handriveRootLabel || breadcrumbRootLabel || "HanDrive").trim() || "HanDrive";
         const effectiveRootLabel = (isSuperuser && scopedHomeDir) ? "Hanplanet" : docsRootLabel;
         const initialEntries = getJsonScriptData("handrive-initial-entries", []);
@@ -1599,6 +1698,25 @@
                 return "font";
             }
             return "file";
+        }
+
+        async function promptCommitMessage(targetPath) {
+            return requestCommitMessageDialog({ targetPath: targetPath || "" });
+        }
+
+        function requiresCommitMessageForDirectory(pathValue) {
+            var normalized = normalizePath(pathValue, true);
+            if (normalized === currentDir) {
+                return currentDirRequiresCommitMessage;
+            }
+            var entry = state.entryByPath.get(normalized);
+            return Boolean(entry && entry.requires_commit_message);
+        }
+
+        function requiresCommitMessageForEntries(entries) {
+            return Array.isArray(entries) && entries.some(function (entry) {
+                return Boolean(entry && entry.requires_commit_message);
+            });
         }
 
         function isGenericFileIconKey(iconKey) {
@@ -2115,10 +2233,16 @@
         }
 
         function isEntryDeletable(entry) {
-            if (!entry || entry.isCurrentFolder) {
+            if (!entry) {
                 return false;
             }
-            if (!entry.can_edit) {
+            if (entry.type === "dir" && entry.git_repo) {
+                return false;
+            }
+            if (entry.isCurrentFolder && !entry.can_delete) {
+                return false;
+            }
+            if (!entry.can_edit && !entry.can_delete) {
                 return false;
             }
             return !(entry.type === "file" && entry.is_public_write);
@@ -2604,6 +2728,13 @@
                     extension: resolved.extension,
                     content: content,
                 };
+                if (entry && entry.requires_commit_message) {
+                    const commitMessage = await promptCommitMessage(sourcePath);
+                    if (commitMessage === null) {
+                        return;
+                    }
+                    payload.commit_message = commitMessage;
+                }
                 const data = await requestJson(saveApiUrl, buildPostOptions(payload));
 
                 // 저장 후에는 취소 버튼 동작처럼 편집기를 닫고, 해당 파일 미리보기를 다시 연다.
@@ -2861,26 +2992,42 @@
             const canWriteChildren = Boolean(
                 targetEntry && targetEntry.type === "dir" && targetEntry.can_write_children
             );
+            const isGitVirtualEntry = Boolean(
+                targetEntry && (
+                    targetEntry.git_repo ||
+                    targetEntry.git_branch_root ||
+                    targetEntry.git_repo_branch ||
+                    targetEntry.is_git_virtual
+                )
+            );
             const canDownloadAllFiles = targets.length > 0 && targets.every(function (entry) {
                 return Boolean(entry) && !entry.isCurrentFolder && entry.type === "file";
             });
             const isPublicWriteFile = Boolean(targetEntry && targetEntry.type === "file" && targetEntry.is_public_write);
+            const isSingleRepoDirectory = Boolean(!isMultiSelection && targetEntry && targetEntry.type === "dir" && targetEntry.git_repo);
+            const repoMeta = targetEntry && targetEntry.git_repo ? targetEntry.git_repo : null;
+            const canManageRepo = Boolean(repoMeta && repoMeta.can_manage);
+            const canDeleteRepo = Boolean(repoMeta && repoMeta.can_delete);
 
             if (isMultiSelection) {
                 const canDeleteAll = targets.every(function (entry) {
                     return isEntryDeletable(entry);
+                });
+                const includesRepoDirectory = targets.some(function (entry) {
+                    return Boolean(entry && entry.type === "dir" && entry.git_repo);
                 });
                 setContextButtonVisible(contextOpenButton, true);
                 setContextButtonVisible(contextDownloadButton, canDownloadAllFiles);
                 setContextButtonVisible(contextUploadButton, false);
                 setContextButtonVisible(contextEditButton, false);
                 setContextButtonVisible(contextRenameButton, false);
-                setContextButtonVisible(contextDeleteButton, canDeleteAll);
+                setContextButtonVisible(contextDeleteButton, canDeleteAll && !includesRepoDirectory);
                 setContextButtonVisible(contextNewFolderButton, false);
                 setContextButtonVisible(contextNewDocButton, false);
-                setContextButtonVisible(contextPermissionsButton, true);
+                setContextButtonVisible(contextPermissionsButton, false);
                 setContextButtonVisible(contextGitCreateRepoButton, false);
                 setContextButtonVisible(contextGitManageRepoButton, false);
+                setContextButtonVisible(contextGitDeleteRepoButton, false);
                 syncContextMenuDividers();
                 return;
             }
@@ -2888,15 +3035,19 @@
             var hasGitRepo = !!(targetEntry && targetEntry.git_repo);
             setContextButtonVisible(contextOpenButton, !isCurrentFolder);
             setContextButtonVisible(contextDownloadButton, !isCurrentFolder && !isDirectory);
-            setContextButtonVisible(contextUploadButton, isDirectory && canWriteChildren);
+            setContextButtonVisible(contextUploadButton, isDirectory && canWriteChildren && !hasGitRepo);
             setContextButtonVisible(contextEditButton, !isDirectory && canShowEditEntry);
-            setContextButtonVisible(contextRenameButton, !isCurrentFolder && canEditEntry && !isPublicWriteFile);
+            setContextButtonVisible(contextRenameButton, !isCurrentFolder && canEditEntry && !isPublicWriteFile && !hasGitRepo);
             setContextButtonVisible(contextDeleteButton, isEntryDeletable(targetEntry));
-            setContextButtonVisible(contextNewFolderButton, isDirectory && canWriteChildren);
-            setContextButtonVisible(contextNewDocButton, isDirectory && canWriteChildren);
-            setContextButtonVisible(contextPermissionsButton, true);
-            setContextButtonVisible(contextGitCreateRepoButton, isDirectory && canWriteChildren && !hasGitRepo);
-            setContextButtonVisible(contextGitManageRepoButton, isDirectory && hasGitRepo);
+            setContextButtonVisible(contextNewFolderButton, isDirectory && canWriteChildren && !hasGitRepo);
+            setContextButtonVisible(contextNewDocButton, isDirectory && canWriteChildren && !hasGitRepo);
+            setContextButtonVisible(contextPermissionsButton, !isGitVirtualEntry);
+            setContextButtonVisible(
+                contextGitCreateRepoButton,
+                isDirectory && canWriteChildren && isEntryDeletable(targetEntry) && !hasGitRepo && !isGitVirtualEntry
+            );
+            setContextButtonVisible(contextGitManageRepoButton, isDirectory && hasGitRepo && canManageRepo);
+            setContextButtonVisible(contextGitDeleteRepoButton, isSingleRepoDirectory && canDeleteRepo);
             syncContextMenuDividers();
         }
 
@@ -2904,31 +3055,28 @@
             if (!contextMenu) {
                 return;
             }
-            var children = Array.from(contextMenu.children);
-            // 앞/뒤가 모두 hidden이거나 메뉴 끝에 있는 hr 숨기기
-            children.forEach(function (el) {
-                if (el.tagName !== "HR") {
-                    return;
-                }
-                var prevVisible = false;
-                var nextVisible = false;
-                var prev = el.previousElementSibling;
-                while (prev) {
-                    if (prev.tagName !== "HR" && prev.style.display !== "none") {
-                        prevVisible = true;
-                        break;
+            var groups = Array.from(contextMenu.querySelectorAll("[data-menu-group]"));
+            var visibleGroups = [];
+            groups.forEach(function (group) {
+                var hasVisibleButton = Array.from(group.querySelectorAll("button[data-action]")).some(function (button) {
+                    if (!button || button.hidden) {
+                        return false;
                     }
-                    prev = prev.previousElementSibling;
-                }
-                var next = el.nextElementSibling;
-                while (next) {
-                    if (next.tagName !== "HR" && next.style.display !== "none") {
-                        nextVisible = true;
-                        break;
+                    if (button.style && button.style.display === "none") {
+                        return false;
                     }
-                    next = next.nextElementSibling;
+                    return window.getComputedStyle(button).display !== "none";
+                });
+                group.classList.toggle("is-hidden", !hasVisibleButton);
+                group.classList.remove("has-divider");
+                if (hasVisibleButton) {
+                    visibleGroups.push(group);
                 }
-                el.style.display = (!prevVisible || !nextVisible) ? "none" : "";
+            });
+            visibleGroups.forEach(function (group, index) {
+                if (index > 0) {
+                    group.classList.add("has-divider");
+                }
             });
         }
 
@@ -3367,7 +3515,15 @@
 
         function getDocsPathLabel(pathValue) {
             const normalized = normalizePath(pathValue, true);
-            return normalized ? "/handrive/" + normalized : "/handrive";
+            if (!normalized) {
+                return "/handrive";
+            }
+            const parts = normalized.split("/").filter(Boolean);
+            const hiddenRootPrefixes = new Set(["users", "groups"]);
+            const displayParts = hiddenRootPrefixes.has(parts[0]) && parts.length > 1
+                ? parts.slice(1)
+                : parts;
+            return "/" + displayParts.join("/");
         }
 
         function getParentDirectory(pathValue) {
@@ -3548,8 +3704,9 @@
             });
         }
 
-        function createOperationQueueItem(operationType, entries, targetDirPath) {
+        function createOperationQueueItem(operationType, entries, targetDirPath, commitMessage, options) {
             const normalizedEntries = Array.isArray(entries) ? entries.filter(Boolean) : [];
+            const settings = options || {};
             state.uploadQueueSequence += 1;
             const item = {
                 id: state.uploadQueueSequence,
@@ -3571,6 +3728,8 @@
                 errorMessage: "",
                 savedPath: "",
                 savedSlugPath: "",
+                commitMessage: String(commitMessage || ""),
+                isRepoDelete: Boolean(settings.repoDelete),
                 abortRequested: false,
                 abortController: null,
             };
@@ -3755,11 +3914,15 @@
             state.contextEntries = [];
 
             setContextButtonVisible(contextDownloadButton, false);
+            setContextButtonVisible(contextUploadButton, false);
             setContextButtonVisible(contextEditButton, false);
             setContextButtonVisible(contextRenameButton, false);
             setContextButtonVisible(contextNewFolderButton, false);
             setContextButtonVisible(contextNewDocButton, false);
             setContextButtonVisible(contextPermissionsButton, false);
+            setContextButtonVisible(contextGitCreateRepoButton, false);
+            setContextButtonVisible(contextGitManageRepoButton, false);
+            setContextButtonVisible(contextGitDeleteRepoButton, false);
 
             if (item.status === "uploading" || item.status === "queued") {
                 if (contextOpenButton) {
@@ -3842,6 +4005,9 @@
                     formData.append("file_name", file.name);
                     formData.append("chunk_index", String(chunkIndex));
                     formData.append("total_chunks", String(totalChunks));
+                    if (item.commitMessage) {
+                        formData.append("commit_message", item.commitMessage);
+                    }
                     formData.append("chunk", chunkBlob, file.name);
 
                     const xhr = new XMLHttpRequest();
@@ -4007,7 +4173,11 @@
                 item.abortController = controller;
                 const entry = entries[index];
                 await requestJson(deleteApiUrl, Object.assign(
-                    buildPostOptions({ path: entry.path }),
+                    buildPostOptions({
+                        path: entry.path,
+                        commit_message: item.commitMessage || "",
+                        repo_delete: Boolean(item.isRepoDelete),
+                    }),
                     { signal: controller.signal }
                 ));
                 deletedPaths.push(entry.path);
@@ -4036,6 +4206,7 @@
                     buildPostOptions({
                         source_path: entry.path,
                         target_dir: item.targetDirPath,
+                        commit_message: item.commitMessage || "",
                     }),
                     { signal: controller.signal }
                 ));
@@ -4109,7 +4280,7 @@
             }
         }
 
-        function enqueueUploadFiles(files, targetDirPath) {
+        async function enqueueUploadFiles(files, targetDirPath) {
             const fileList = Array.from(files || []).filter(function (file) {
                 return Boolean(file);
             });
@@ -4117,6 +4288,13 @@
                 return;
             }
             const normalizedTargetDir = normalizePath(targetDirPath, true);
+            var commitMessage = "";
+            if (requiresCommitMessageForDirectory(normalizedTargetDir)) {
+                commitMessage = await promptCommitMessage(normalizedTargetDir);
+                if (commitMessage === null) {
+                    return;
+                }
+            }
             fileList.forEach(function (file) {
                 state.uploadQueueSequence += 1;
                 state.uploadQueueItems.push({
@@ -4129,6 +4307,7 @@
                     errorMessage: "",
                     savedPath: "",
                     savedSlugPath: "",
+                    commitMessage: commitMessage,
                     abortRequested: false,
                     xhr: null,
                 });
@@ -4234,7 +4413,14 @@
             if (!Array.isArray(sourceEntries) || sourceEntries.length === 0 || !moveApiUrl) {
                 return;
             }
-            createOperationQueueItem("move", sourceEntries, targetDirPath);
+            var commitMessage = "";
+            if (requiresCommitMessageForEntries(sourceEntries) || requiresCommitMessageForDirectory(targetDirPath)) {
+                commitMessage = await promptCommitMessage(targetDirPath);
+                if (commitMessage === null) {
+                    return;
+                }
+            }
+            createOperationQueueItem("move", sourceEntries, targetDirPath, commitMessage);
             processOperationQueue().catch(alertError);
         }
 
@@ -4329,7 +4515,7 @@
                     enqueueUploadFiles(
                         event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : [],
                         targetDirPath
-                    );
+                    ).catch(alertError);
                     return;
                 }
                 if (fileTransfersOnly) {
@@ -4395,7 +4581,7 @@
                 if (candidate.isCurrentFolder) {
                     return false;
                 }
-                if (!candidate.can_edit) {
+                if (!(candidate.can_edit || candidate.can_delete)) {
                     return false;
                 }
                 return !(candidate.type === "file" && candidate.is_public_write);
@@ -4429,7 +4615,11 @@
                 isCurrentFolder: true,
                 can_edit: currentDirCanEdit,
                 can_write_children: currentDirCanWriteChildren,
-                git_repo: currentDirGitRepo || null
+                can_delete: Boolean(currentDirGitRepo),
+                requires_commit_message: currentDirRequiresCommitMessage,
+                git_repo: currentDirGitRepo || null,
+                git_branch_root: currentDirGitBranchRoot,
+                is_git_virtual: Boolean(currentDirGitRepo || currentDirGitBranchRoot || currentDirRequiresCommitMessage),
             };
 
             const item = document.createElement("li");
@@ -4448,6 +4638,21 @@
             const typeMarker = document.createElement("span");
             typeMarker.className = "handrive-item-type-icon is-dir";
             typeMarker.setAttribute("aria-hidden", "true");
+            if (currentDirIsRoot) {
+                typeMarker.classList.add("is-root-avatar");
+                if (accountProfileImageUrl) {
+                    const avatarImage = document.createElement("img");
+                    avatarImage.className = "handrive-current-dir-avatar";
+                    avatarImage.src = accountProfileImageUrl;
+                    avatarImage.alt = "";
+                    avatarImage.loading = "lazy";
+                    typeMarker.appendChild(avatarImage);
+                }
+            } else if (currentFolderEntry.git_repo) {
+                typeMarker.classList.add("is-repo");
+            } else if (currentDirGitBranchRoot) {
+                typeMarker.classList.add("is-branch");
+            }
 
             const name = document.createElement("span");
             name.className = "handrive-item-name handrive-current-dir-name";
@@ -4455,6 +4660,21 @@
 
             row.appendChild(typeMarker);
             row.appendChild(name);
+
+            let badgeText = "";
+            if (currentFolderEntry.git_repo) {
+                badgeText = t("repository_badge", "Repository");
+            } else if (currentDirGitBranchRoot) {
+                badgeText = t("branch_badge", "Branch");
+            } else if (currentDirGitCommitMessage) {
+                badgeText = currentDirGitCommitMessage;
+            }
+            if (badgeText) {
+                const badge = document.createElement("span");
+                badge.className = "handrive-item-public-badge";
+                badge.textContent = badgeText;
+                row.appendChild(badge);
+            }
 
             row.addEventListener("click", function (event) {
                 event.preventDefault();
@@ -4769,9 +4989,18 @@
                 return;
             }
 
+            var commitMessage = "";
+            if (entry.requires_commit_message) {
+                commitMessage = await promptCommitMessage(entry.path);
+                if (commitMessage === null) {
+                    return;
+                }
+            }
+
             const data = await requestJson(renameApiUrl, buildPostOptions({
                 path: entry.path,
-                new_name: trimmed
+                new_name: trimmed,
+                commit_message: commitMessage
             }));
             const renamedPath = data && data.path ? data.path : "";
             if (entry.type === "dir" && renamedPath) {
@@ -4799,11 +5028,20 @@
                 return;
             }
 
+            var commitMessage = "";
+            if (parentEntry.requires_commit_message) {
+                commitMessage = await promptCommitMessage(parentEntry.path);
+                if (commitMessage === null) {
+                    return;
+                }
+            }
+
             await requestJson(
                 mkdirApiUrl,
                 buildPostOptions({
                     parent_dir: parentEntry.path,
-                    folder_name: folderName
+                    folder_name: folderName,
+                    commit_message: commitMessage
                 })
             );
 
@@ -4811,10 +5049,11 @@
             await refreshCurrentDirectory();
         }
 
-        async function deleteEntries(entriesOrEntry) {
+        async function deleteEntries(entriesOrEntry, options) {
             const entries = Array.isArray(entriesOrEntry)
                 ? entriesOrEntry.filter(Boolean)
                 : (entriesOrEntry ? [entriesOrEntry] : []);
+            const settings = options || {};
             if (entries.length === 0) {
                 return;
             }
@@ -4823,25 +5062,51 @@
             const targetPaths = entries.map(function (entry) {
                 return entry.path;
             });
+            const includesRepo = entries.some(function (entry) {
+                return Boolean(entry && entry.type === "dir" && entry.git_repo);
+            });
+            const isSingleRepoDelete = entries.length === 1 && includesRepo;
+            if (includesRepo && !settings.repoDelete) {
+                throw new Error(t("js_repo_delete_requires_button", "Repo는 일반 삭제가 아니라 Repo 삭제를 사용해야 합니다."));
+            }
             const confirmed = await requestConfirmDialog({
-                title: t("delete_button", "삭제"),
-                message: isMultiple
-                    ? formatTemplate(
-                        t("js_confirm_delete_entries", "선택한 {count}개 항목을 삭제할까요?"),
-                        { count: entries.length }
-                    )
-                    : formatTemplate(
-                        t("js_confirm_delete_entry", "정말 삭제할까요?\n{path}"),
-                        { path: targetPaths[0] }
-                    ),
+                title: isSingleRepoDelete ? t("delete_repo_button", "Repo 삭제") : t("delete_button", "삭제"),
+                message: includesRepo
+                    ? (isMultiple
+                        ? formatTemplate(
+                            t("js_confirm_delete_repo_entries", "선택한 {count}개 항목 중 Repo 폴더를 삭제하면 Forgejo 저장소도 함께 삭제됩니다.\n정말 삭제할까요?"),
+                            { count: entries.length }
+                        )
+                        : formatTemplate(
+                            t("js_confirm_delete_repo_entry", "이 Repo 폴더를 삭제하면 Forgejo 저장소도 함께 삭제됩니다.\n정말 삭제할까요?\n{path}"),
+                            { path: targetPaths[0] }
+                        ))
+                    : (isMultiple
+                        ? formatTemplate(
+                            t("js_confirm_delete_entries", "선택한 {count}개 항목을 삭제할까요?"),
+                            { count: entries.length }
+                        )
+                        : formatTemplate(
+                            t("js_confirm_delete_entry", "정말 삭제할까요?\n{path}"),
+                            { path: targetPaths[0] }
+                        )),
                 cancelText: t("cancel", "취소"),
-                confirmText: t("delete_button", "삭제")
+                confirmText: isSingleRepoDelete ? t("delete_repo_button", "Repo 삭제") : t("delete_button", "삭제")
             });
             if (!confirmed) {
                 return;
             }
 
-            createOperationQueueItem("delete", entries, "");
+            var commitMessage = "";
+            if (requiresCommitMessageForEntries(entries)) {
+                commitMessage = await promptCommitMessage(targetPaths[0] || "");
+                if (commitMessage === null) {
+                    return;
+                }
+            }
+            createOperationQueueItem("delete", entries, "", commitMessage, {
+                repoDelete: Boolean(settings.repoDelete),
+            });
             processOperationQueue().catch(alertError);
         }
 
@@ -4968,7 +5233,7 @@
             row.setAttribute("data-entry-path", entry.path);
             state.entryRowByPath.set(entry.path, row);
             const isPublicWriteFile = Boolean(entry.type === "file" && entry.is_public_write);
-            row.draggable = Boolean(moveApiUrl && entry.can_edit && !isPublicWriteFile);
+            row.draggable = Boolean(moveApiUrl && (entry.can_edit || entry.can_delete) && !isPublicWriteFile);
             if (state.selectedPaths.has(entry.path)) {
                 row.classList.add("is-selected");
             }
@@ -4978,6 +5243,11 @@
             const typeMarker = document.createElement("span");
             typeMarker.className = "handrive-item-type-icon " + (entry.type === "dir" ? "is-dir" : "is-file");
             typeMarker.setAttribute("aria-hidden", "true");
+            if (entry.type === "dir" && entry.git_repo) {
+                typeMarker.classList.add("is-repo");
+            } else if (entry.type === "dir" && entry.git_branch_root) {
+                typeMarker.classList.add("is-branch");
+            }
             if (entry.type === "file") {
                 const fileIconKey = getFileIconKey(entry.path);
                 typeMarker.setAttribute("data-file-icon", fileIconKey);
@@ -5014,11 +5284,22 @@
                 row.appendChild(aclWrap);
             }
 
-            if (entry.type === "file" && entry.is_public_write) {
-                const publicBadge = document.createElement("span");
-                publicBadge.className = "handrive-item-public-badge";
-                publicBadge.textContent = t("public_write_badge", "전체 허용");
-                row.appendChild(publicBadge);
+            let badgeText = "";
+            if (entry.type === "dir" && entry.git_repo) {
+                badgeText = t("repository_badge", "Repository");
+            } else if (entry.type === "dir" && entry.git_branch_root) {
+                badgeText = t("branch_badge", "Branch");
+            } else if (entry.git_commit_message) {
+                badgeText = String(entry.git_commit_message || "").trim();
+            } else if (entry.type === "file" && entry.is_public_write) {
+                badgeText = t("public_write_badge", "전체 허용");
+            }
+
+            if (badgeText) {
+                const badge = document.createElement("span");
+                badge.className = "handrive-item-public-badge";
+                badge.textContent = badgeText;
+                row.appendChild(badge);
             }
 
             row.addEventListener("click", function (event) {
@@ -5289,6 +5570,9 @@
                 if (action === "git-manage-repo") {
                     openGitRepoModal(entry);
                 }
+                if (action === "git-delete-repo") {
+                    deleteEntries(entry, { repoDelete: true }).catch(alertError);
+                }
             });
         }
 
@@ -5300,7 +5584,7 @@
                     contextUploadInput.value = "";
                     return;
                 }
-                enqueueUploadFiles(contextUploadInput.files, targetDirPath);
+                enqueueUploadFiles(contextUploadInput.files, targetDirPath).catch(alertError);
                 contextUploadInput.value = "";
             });
         }
@@ -5491,7 +5775,7 @@
             if (gitRepoOpenButton) {
                 if (webUrl) {
                     gitRepoOpenButton.hidden = false;
-                    gitRepoOpenButton.onclick = function () { window.open(webUrl, "_blank"); };
+                    gitRepoOpenButton.onclick = function () { window.location.href = webUrl; };
                 } else {
                     gitRepoOpenButton.hidden = true;
                     gitRepoOpenButton.onclick = null;
@@ -5507,6 +5791,7 @@
                 );
                 if (data.status === "active") {
                     _gitRepoStopPolling();
+                    var remappedPath = data.handrive_path ? normalizePath(data.handrive_path, true) : "";
                     if (gitRepoTitle) gitRepoTitle.textContent = "Git 리포지토리 관리";
                     _showGitRepoStatus(
                         "연결된 리포지토리",
@@ -5517,10 +5802,17 @@
                     // entry 데이터 갱신 — 우클릭 메뉴 버튼 상태를 즉시 업데이트
                     if (gitRepoModal && gitRepoModal._targetEntry) {
                         gitRepoModal._targetEntry.git_repo = { id: repoId, status: "active" };
+                        if (remappedPath) {
+                            gitRepoModal._targetEntry.path = remappedPath;
+                        }
                         // 현재 디렉토리 자체가 대상인 경우 currentDirGitRepo도 갱신
                         if (gitRepoModal._targetEntry.path === currentDir) {
                             currentDirGitRepo = { id: repoId, status: "active" };
                         }
+                    }
+                    if (remappedPath && remappedPath !== currentDir && !remappedPath.startsWith(currentDir + "/")) {
+                        window.location.href = buildListUrl(handriveBaseUrl, getParentDirectory(remappedPath), handriveRootUrl);
+                        return;
                     }
                     refreshCurrentDirectory().catch(function () {});
                 } else if (data.status === "failed") {
@@ -5858,7 +6150,7 @@
                 enqueueUploadFiles(
                     event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : [],
                     currentDir
-                );
+                ).catch(alertError);
             });
         }
 
@@ -5903,7 +6195,7 @@
             }
 
             event.preventDefault();
-            enqueueUploadFiles(files, currentDir);
+            enqueueUploadFiles(files, currentDir).catch(alertError);
         });
 
         if (uploadQueueCloseButton) {
@@ -6085,6 +6377,7 @@
         const originalPath = root.dataset.originalPath || "";
         const initialDir = root.dataset.initialDir || "";
         const isPublicWriteDirectSave = root.dataset.publicWriteDirectSave === "1";
+        const writeRequiresCommitMessage = root.dataset.writeRequiresCommitMessage === "1";
 
         const filenameInput = document.getElementById("handrive-filename-input");
         const saveFilenameInput = document.getElementById("handrive-save-filename-input");
@@ -6132,6 +6425,9 @@
             document.querySelectorAll("button[data-editor-snippet]")
         );
         const DOCS_CUSTOM_EXTENSION_OPTION_VALUE = "__custom__";
+        async function promptWriteCommitMessage(targetPath) {
+            return requestCommitMessageDialog({ targetPath: targetPath || "" });
+        }
         const extensionPresetValues = saveExtensionSelect
             ? Array.from(saveExtensionSelect.options)
                 .map(function (option) {
@@ -7707,6 +8003,13 @@
                     extension: targetExtension,
                     content: contentInput ? contentInput.value : ""
                 };
+                if (writeRequiresCommitMessage) {
+                    const commitMessage = await promptWriteCommitMessage(originalPath || targetDir);
+                    if (commitMessage === null) {
+                        return;
+                    }
+                    payload.commit_message = commitMessage;
+                }
                 const data = await requestJson(saveApiUrl, buildPostOptions(payload));
                 markCurrentAsSaved();
 
@@ -7778,11 +8081,19 @@
             }
 
             try {
+                var commitMessage = "";
+                if (writeRequiresCommitMessage) {
+                    commitMessage = await promptWriteCommitMessage(parentDir);
+                    if (commitMessage === null) {
+                        return;
+                    }
+                }
                 const data = await requestJson(
                     mkdirApiUrl,
                     buildPostOptions({
                         parent_dir: parentDir,
-                        folder_name: trimmed
+                        folder_name: trimmed,
+                        commit_message: commitMessage
                     })
                 );
                 const createdPath = upsertDirectory(data.path || "");

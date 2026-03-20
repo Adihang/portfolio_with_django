@@ -1,3 +1,15 @@
+.page-content.home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 88px);
+  transform: translateY(-30px);
+}
+
+.page-content.home > .tw-px-8 {
+  width: 100%;
+}
+
 [data-tippy-root] {
   background-color: var(--forgejo-main-surface, var(--site-surface-muted));
   color: var(--forgejo-main-text, var(--site-text));
@@ -28,8 +40,25 @@
   border-bottom: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
 }
 
-.tw-flex-wrap > * {
-  border: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
+/* Bootstrap .modal rules override Forgejo's Semantic UI modals unless restored. */
+.ui.modal {
+  position: absolute !important;
+  top: auto !important;
+  left: auto !important;
+  width: auto;
+  height: auto !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+}
+
+.ui.page.modals.dimmer,
+.ui.dimmer.modals {
+  z-index: var(--site-z-modal, 3600) !important;
+}
+
+.ui.page.modals.dimmer .ui.modal,
+.ui.dimmer.modals .ui.modal {
+  z-index: calc(var(--site-z-modal, 3600) + 1) !important;
 }
 
 .tippy-box[data-theme~='light-border'] > .tippy-arrow::before {
@@ -68,10 +97,6 @@ body.theme-dark .tippy-box > .tippy-content > :not(:last-child) {
 
 body.theme-dark .clone-panel-popup > :not(:last-child) {
   border-bottom: 1px solid var(--forgejo-main-border, var(--site-divider-weak));
-}
-
-body.theme-dark .tw-flex-wrap > * {
-  border-color: var(--forgejo-main-border, var(--site-divider-weak));
 }
 
 body.theme-dark .tippy-box[data-theme~='light-border'] > .tippy-arrow::before {

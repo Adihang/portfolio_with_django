@@ -1810,7 +1810,7 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     border: 0;
     background: transparent;
     color: var(--handrive-text-subtle);
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
@@ -1898,6 +1898,78 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     transform: scale(1.286);
     background: none;
     line-height: 1;
+}
+
+.handrive-item-type-icon.is-dir.is-root-avatar {
+    position: relative;
+    flex: 0 0 22px;
+    width: 22px;
+    min-width: 22px;
+    max-width: 22px;
+    height: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: 50%;
+    align-self: center;
+}
+
+.handrive-item-type-icon.is-dir.is-root-avatar::before {
+    content: "";
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    margin: 0;
+    transform: none;
+    border-radius: 50%;
+    background-size: cover;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%233a3a3a' stroke='%237d7d7d' stroke-width='1.2'/%3E%3Ccircle cx='12' cy='9' r='3.3' stroke='%23f0f0f0' stroke-width='1.7'/%3E%3Cpath d='M6.6 17.6c1.55-2.5 3.35-3.7 5.4-3.7 2.05 0 3.85 1.2 5.4 3.7' stroke='%23f0f0f0' stroke-width='1.7'/%3E%3C/svg%3E");
+}
+
+body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23f1f1f1' stroke='%239a9a9a' stroke-width='1.2'/%3E%3Ccircle cx='12' cy='9' r='3.3' stroke='%232f2f2f' stroke-width='1.7'/%3E%3Cpath d='M6.6 17.6c1.55-2.5 3.35-3.7 5.4-3.7 2.05 0 3.85 1.2 5.4 3.7' stroke='%232f2f2f' stroke-width='1.7'/%3E%3C/svg%3E");
+}
+
+.handrive-current-dir-avatar {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    max-height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    z-index: 1;
+}
+
+.handrive-item-type-icon.is-dir.is-repo::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    margin: 0;
+    transform: scale(1.18);
+    background-image: url("/static/icons/handrive/git.svg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+
+.handrive-item-type-icon.is-dir.is-branch::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    margin: 0;
+    transform: scale(1.16);
+    background-image: url("/static/icons/handrive/git-branch.svg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
 }
 
 .handrive-item-type-icon.is-file {
@@ -2088,6 +2160,34 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     display: none;
 }
 
+.handrive-context-menu-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+}
+
+.handrive-context-menu-group.is-hidden {
+    display: none;
+}
+
+.handrive-context-menu-group.has-divider {
+    margin-top: 2px;
+    padding-top: 6px;
+}
+
+.handrive-context-menu-group.has-divider::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 8px;
+    right: 8px;
+    height: 1px;
+    background: var(--handrive-divider-weak);
+    opacity: 0.45;
+    pointer-events: none;
+}
+
 .handrive-context-menu button {
     border: 0;
     border-radius: 8px;
@@ -2101,12 +2201,6 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
 .handrive-context-menu button:hover,
 .handrive-context-menu button:focus-visible {
     background: var(--handrive-hover);
-}
-
-.handrive-context-menu hr {
-    border: 0;
-    border-top: 1px solid var(--handrive-divider-weak);
-    margin: 2px 0;
 }
 
 .handrive-markdown-context-menu {

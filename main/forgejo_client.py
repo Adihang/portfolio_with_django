@@ -215,3 +215,18 @@ class ForgejoClient:
         resp = requests.delete(url, headers=self._headers, timeout=15)
         if resp.status_code not in (204, 404):
             resp.raise_for_status()
+
+    def list_collaborators(self, owner: str, repo_name: str) -> list[dict]:
+        """협업자 목록 조회"""
+        url = f"{self._base_url}/api/v1/repos/{owner}/{repo_name}/collaborators"
+        resp = requests.get(url, headers=self._headers, timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_collaborator_permission(self, owner: str, repo_name: str, username: str) -> str:
+        """협업자 권한 조회"""
+        url = f"{self._base_url}/api/v1/repos/{owner}/{repo_name}/collaborators/{username}/permission"
+        resp = requests.get(url, headers=self._headers, timeout=15)
+        resp.raise_for_status()
+        payload = resp.json() or {}
+        return str(payload.get("permission") or payload.get("role_name") or "read").strip().lower()
