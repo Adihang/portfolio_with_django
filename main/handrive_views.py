@@ -14,10 +14,12 @@ import sys
 import tempfile
 import time
 import uuid
+import zipfile
 from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
 from urllib.parse import quote, urlparse, unquote
+from xml.etree import ElementTree as ET
 import httpx
 
 from django import forms
@@ -54,6 +56,15 @@ from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, GitUs
 
 logger = logging.getLogger(__name__)
 GIT_BIN = "/usr/bin/git"
+LIBREOFFICE_CANDIDATE_BINS = (
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    "/opt/homebrew/bin/libreoffice",
+    "/opt/homebrew/bin/soffice",
+    "/usr/local/bin/libreoffice",
+    "/usr/local/bin/soffice",
+    "/usr/bin/libreoffice",
+    "/usr/bin/soffice",
+)
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -117,6 +128,7 @@ DOCS_RENDER_MODE_PLAIN_TEXT = "plain_text"
 DOCS_RENDER_MODE_MEDIA_IMAGE = "media_image"
 DOCS_RENDER_MODE_MEDIA_VIDEO = "media_video"
 DOCS_RENDER_MODE_MEDIA_AUDIO = "media_audio"
+DOCS_RENDER_MODE_OFFICE = "office"
 DOCS_ACTIVE_ROOT_DIR: ContextVar[Path | None] = ContextVar("docs_active_root_dir", default=None)
 DOCS_ACTIVE_REQUEST: ContextVar[object | None] = ContextVar("docs_active_request", default=None)
 DOCS_DEFAULT_RENDER_PROFILE = {
@@ -147,6 +159,30 @@ DOCS_RENDER_PROFILES_BY_EXTENSION = {
     ".json": {
         "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
         "css_class": "handrive-json",
+    },
+    ".doc": {
+        "mode": DOCS_RENDER_MODE_OFFICE,
+        "css_class": "handrive-office handrive-office-word",
+    },
+    ".docx": {
+        "mode": DOCS_RENDER_MODE_OFFICE,
+        "css_class": "handrive-office handrive-office-word",
+    },
+    ".xls": {
+        "mode": DOCS_RENDER_MODE_OFFICE,
+        "css_class": "handrive-office handrive-office-sheet",
+    },
+    ".xlsx": {
+        "mode": DOCS_RENDER_MODE_OFFICE,
+        "css_class": "handrive-office handrive-office-sheet",
+    },
+    ".ppt": {
+        "mode": DOCS_RENDER_MODE_OFFICE,
+        "css_class": "handrive-office handrive-office-presentation",
+    },
+    ".pptx": {
+        "mode": DOCS_RENDER_MODE_OFFICE,
+        "css_class": "handrive-office handrive-office-presentation",
     },
     ".png": {
         "mode": DOCS_RENDER_MODE_MEDIA_IMAGE,
@@ -233,6 +269,7 @@ DOCS_NON_EDITABLE_MEDIA_MODES = {
     DOCS_RENDER_MODE_MEDIA_IMAGE,
     DOCS_RENDER_MODE_MEDIA_VIDEO,
     DOCS_RENDER_MODE_MEDIA_AUDIO,
+    DOCS_RENDER_MODE_OFFICE,
 }
 
 DOCS_TEXT = {
@@ -881,6 +918,110 @@ def render_docs_media_safely(source_path: Path, relative_path: str, share_owner:
     )
 
 
+def render_docs_pdf_safely(pdf_bytes: bytes, file_name: str = "preview.pdf") -> str:
+    encoded_pdf = base64.b64encode(pdf_bytes).decode("ascii")
+    pdf_data_url = f"data:application/pdf;base64,{encoded_pdf}#view=FitH"
+    safe_title = escape(file_name)
+    return mark_safe(
+        '<div class="handrive-media-wrap handrive-media-pdf-wrap">'
+        f'<iframe class="handrive-media-element handrive-media-pdf-element" src="{pdf_data_url}" title="{safe_title}"></iframe>'
+        "</div>"
+    )
+
+
+def find_libreoffice_binary() -> str:
+    for candidate in LIBREOFFICE_CANDIDATE_BINS:
+        if Path(candidate).exists():
+            return candidate
+    resolved = shutil.which("soffice") or shutil.which("libreoffice")
+    return str(resolved or "")
+
+
+def convert_office_bytes_to_pdf(file_extension: str, source_bytes: bytes, file_name: str = "document") -> bytes | None:
+    soffice_bin = find_libreoffice_binary()
+    if not soffice_bin or not source_bytes:
+        return None
+    suffix = normalize_file_extension(file_extension, allow_empty=False)
+    pdf_filter = {
+        ".doc": "writer_pdf_Export",
+        ".docx": "writer_pdf_Export",
+        ".xls": "calc_pdf_Export",
+        ".xlsx": "calc_pdf_Export",
+        ".ppt": "impress_pdf_Export",
+        ".pptx": "impress_pdf_Export",
+    }.get(suffix, "")
+    with tempfile.TemporaryDirectory(prefix="handrive-office-preview-") as tmp_dir:
+        work_dir = Path(tmp_dir)
+        source_name = f"source{suffix}"
+        source_path = work_dir / source_name
+        pdf_path = work_dir / "source.pdf"
+        try:
+            source_path.write_bytes(source_bytes)
+            result = subprocess.run(
+                [
+                    soffice_bin,
+                    "--headless",
+                    "--convert-to",
+                    f"pdf:{pdf_filter}" if pdf_filter else "pdf",
+                    "--outdir",
+                    str(work_dir),
+                    str(source_path),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if result.returncode != 0 or not pdf_path.exists():
+            return None
+        try:
+            return pdf_path.read_bytes()
+        except OSError:
+            return None
+
+
+def convert_office_bytes_to_html(file_extension: str, source_bytes: bytes) -> str | None:
+    soffice_bin = find_libreoffice_binary()
+    if not soffice_bin or not source_bytes:
+        return None
+    suffix = normalize_file_extension(file_extension, allow_empty=False)
+    if suffix not in {".xls", ".xlsx"}:
+        return None
+    with tempfile.TemporaryDirectory(prefix="handrive-office-html-preview-") as tmp_dir:
+        work_dir = Path(tmp_dir)
+        source_path = work_dir / f"source{suffix}"
+        html_path = work_dir / "source.html"
+        try:
+            source_path.write_bytes(source_bytes)
+            result = subprocess.run(
+                [
+                    soffice_bin,
+                    "--headless",
+                    "--convert-to",
+                    "html",
+                    "--outdir",
+                    str(work_dir),
+                    str(source_path),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if result.returncode != 0 or not html_path.exists():
+            return None
+        try:
+            return html_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
+
+
 def _inject_before_first_closing_tag(source: str, closing_tag: str, injection: str) -> str:
     pattern = re.compile(re.escape(closing_tag), re.IGNORECASE)
     if pattern.search(source):
@@ -978,6 +1119,251 @@ def load_docs_html_companion_assets(source_path: Path, request=None) -> tuple[st
     return _read_asset(companion_css_path), _read_asset(companion_js_path)
 
 
+def load_git_repo_html_companion_assets(request, repo, branch_name: str, repo_relative_path: str) -> tuple[str, str]:
+    normalized_relative = normalize_relative_path(repo_relative_path, allow_empty=False)
+    target_path = Path(normalized_relative)
+    if target_path.suffix.lower() != ".html":
+        return "", ""
+
+    base_path = target_path.with_suffix("")
+    companion_specs = (
+        (f"{base_path.as_posix()}.css", ".css"),
+        (f"{base_path.as_posix()}.js", ".js"),
+    )
+
+    contents: list[str] = []
+    for companion_relative, _extension in companion_specs:
+        content = ""
+        if _git_repo_path_exists(repo, branch_name, companion_relative):
+            try:
+                content = _git_repo_read_file_bytes(repo, branch_name, companion_relative).decode("utf-8")
+            except (OSError, UnicodeDecodeError):
+                content = ""
+        contents.append(content)
+
+    return contents[0], contents[1]
+
+
+def _read_zip_xml_text(archive: zipfile.ZipFile, member_name: str) -> str:
+    try:
+        return archive.read(member_name).decode("utf-8")
+    except KeyError:
+        return ""
+
+
+def _extract_docx_preview_html(file_bytes: bytes) -> str:
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            document_xml = _read_zip_xml_text(archive, "word/document.xml")
+    except (zipfile.BadZipFile, OSError):
+        return "<p>미리보기를 지원하지 않는 Word 파일입니다.</p>"
+    if not document_xml:
+        return "<p>미리보기를 지원하지 않는 Word 파일입니다.</p>"
+
+    try:
+        root = ET.fromstring(document_xml)
+    except ET.ParseError:
+        return "<p>문서를 해석할 수 없습니다.</p>"
+
+    body = root.find("w:body", namespace)
+    if body is None:
+        return "<p>문서를 해석할 수 없습니다.</p>"
+
+    blocks: list[str] = []
+    for child in body:
+        tag_name = child.tag.rsplit("}", 1)[-1]
+        if tag_name == "p":
+            text = "".join(node.text or "" for node in child.findall(".//w:t", namespace)).strip()
+            if text:
+                blocks.append(f"<p>{escape(text)}</p>")
+        elif tag_name == "tbl":
+            rows = []
+            for row in child.findall(".//w:tr", namespace):
+                cells = []
+                for cell in row.findall("./w:tc", namespace):
+                    cell_text = "".join(node.text or "" for node in cell.findall(".//w:t", namespace)).strip()
+                    cells.append(f"<td>{escape(cell_text)}</td>")
+                if cells:
+                    rows.append("<tr>" + "".join(cells) + "</tr>")
+            if rows:
+                blocks.append('<div class="handrive-office-table-wrap"><table class="handrive-office-table">' + "".join(rows) + "</table></div>")
+
+    if not blocks:
+        return "<p>문서에 표시할 텍스트가 없습니다.</p>"
+    return "".join(blocks)
+
+
+def _excel_column_index(reference: str) -> int:
+    letters = "".join(character for character in str(reference or "") if character.isalpha()).upper()
+    index = 0
+    for character in letters:
+        index = index * 26 + (ord(character) - 64)
+    return max(0, index - 1)
+
+
+def _extract_xlsx_preview_html(file_bytes: bytes) -> str:
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            shared_strings_xml = _read_zip_xml_text(archive, "xl/sharedStrings.xml")
+            workbook_xml = _read_zip_xml_text(archive, "xl/workbook.xml")
+            workbook_rels_xml = _read_zip_xml_text(archive, "xl/_rels/workbook.xml.rels")
+            if not workbook_xml or not workbook_rels_xml:
+                return "<p>미리보기를 지원하지 않는 Excel 파일입니다.</p>"
+
+            shared_strings: list[str] = []
+            if shared_strings_xml:
+                shared_root = ET.fromstring(shared_strings_xml)
+                for item in shared_root.findall(".//{*}si"):
+                    shared_strings.append("".join(node.text or "" for node in item.findall(".//{*}t")))
+
+            rel_map = {}
+            rel_root = ET.fromstring(workbook_rels_xml)
+            for rel in rel_root.findall(".//{*}Relationship"):
+                rel_id = rel.attrib.get("Id", "")
+                target = rel.attrib.get("Target", "")
+                if rel_id and target:
+                    rel_map[rel_id] = target.lstrip("/")
+
+            workbook_root = ET.fromstring(workbook_xml)
+            sheet_specs = []
+            for sheet in workbook_root.findall(".//{*}sheet")[:3]:
+                rel_id = sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id", "")
+                target = rel_map.get(rel_id, "")
+                if not target:
+                    continue
+                sheet_specs.append((sheet.attrib.get("name", "Sheet"), f"xl/{target}" if not target.startswith("xl/") else target))
+
+            sections: list[str] = []
+            for sheet_name, sheet_path in sheet_specs:
+                sheet_xml = _read_zip_xml_text(archive, sheet_path)
+                if not sheet_xml:
+                    continue
+                sheet_root = ET.fromstring(sheet_xml)
+                rows_html = []
+                for row in sheet_root.findall(".//{*}sheetData/{*}row")[:30]:
+                    values: dict[int, str] = {}
+                    max_index = -1
+                    for cell in row.findall("./{*}c"):
+                        cell_ref = cell.attrib.get("r", "")
+                        column_index = _excel_column_index(cell_ref)
+                        max_index = max(max_index, column_index)
+                        cell_type = cell.attrib.get("t", "")
+                        value = ""
+                        if cell_type == "inlineStr":
+                            value = "".join(node.text or "" for node in cell.findall(".//{*}t"))
+                        else:
+                            raw_value = "".join(node.text or "" for node in cell.findall("./{*}v"))
+                            if cell_type == "s":
+                                try:
+                                    shared_index = int(raw_value)
+                                    value = shared_strings[shared_index]
+                                except (ValueError, IndexError):
+                                    value = raw_value
+                            else:
+                                value = raw_value
+                        values[column_index] = value
+                    if max_index < 0:
+                        continue
+                    cells_html = []
+                    for column_index in range(min(max_index + 1, 20)):
+                        cells_html.append(f"<td>{escape(values.get(column_index, ''))}</td>")
+                    rows_html.append("<tr>" + "".join(cells_html) + "</tr>")
+                if rows_html:
+                    sections.append(
+                        f'<section class="handrive-office-sheet-section"><h3>{escape(sheet_name)}</h3><div class="handrive-office-table-wrap"><table class="handrive-office-table">{"".join(rows_html)}</table></div></section>'
+                    )
+            if not sections:
+                return "<p>시트에 표시할 데이터가 없습니다.</p>"
+            return "".join(sections)
+    except (zipfile.BadZipFile, OSError, ET.ParseError):
+        return "<p>미리보기를 지원하지 않는 Excel 파일입니다.</p>"
+
+
+def _extract_pptx_preview_html(file_bytes: bytes) -> str:
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            slide_names = sorted(
+                name for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            )[:20]
+            if not slide_names:
+                return "<p>미리보기를 지원하지 않는 PowerPoint 파일입니다.</p>"
+            sections = []
+            for index, slide_name in enumerate(slide_names, start=1):
+                slide_xml = _read_zip_xml_text(archive, slide_name)
+                if not slide_xml:
+                    continue
+                slide_root = ET.fromstring(slide_xml)
+                texts = [
+                    (node.text or "").strip()
+                    for node in slide_root.findall(".//{*}t")
+                    if (node.text or "").strip()
+                ]
+                if not texts:
+                    sections.append(f'<section class="handrive-office-slide"><h3>Slide {index}</h3><p>표시할 텍스트가 없습니다.</p></section>')
+                    continue
+                slide_body = "".join(f"<p>{escape(text)}</p>" for text in texts[:30])
+                sections.append(f'<section class="handrive-office-slide"><h3>Slide {index}</h3>{slide_body}</section>')
+            return "".join(sections) or "<p>슬라이드에 표시할 내용이 없습니다.</p>"
+    except (zipfile.BadZipFile, OSError, ET.ParseError):
+        return "<p>미리보기를 지원하지 않는 PowerPoint 파일입니다.</p>"
+
+
+def render_docs_office_preview_safely(file_extension: str, source_bytes: bytes) -> str:
+    extension = str(file_extension or "").lower()
+    if extension in {".xls", ".xlsx"}:
+        html_text = convert_office_bytes_to_html(extension, source_bytes)
+        if html_text:
+            office_override_css = """
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    color: #1f2328;
+}
+body, div, table, thead, tbody, tfoot, tr, th, td, p, span, font {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Nanum Gothic", sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+    color: inherit !important;
+}
+body {
+    padding: 14px;
+    overflow-x: auto;
+}
+table {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    width: max-content;
+    min-width: 100%;
+    background: #ffffff;
+}
+td, th {
+    border: 1px solid #d0d7de !important;
+    padding: 6px 8px !important;
+    vertical-align: middle !important;
+    white-space: pre-wrap;
+}
+col {
+    width: auto !important;
+}
+"""
+            return render_docs_html_live_safely(html_text, companion_css=office_override_css)
+    pdf_bytes = convert_office_bytes_to_pdf(extension, source_bytes, f"preview{extension or '.docx'}")
+    if pdf_bytes:
+        return render_docs_pdf_safely(pdf_bytes, f"preview{extension or '.pdf'}")
+    if extension == ".docx":
+        return mark_safe(_extract_docx_preview_html(source_bytes))
+    if extension == ".xlsx":
+        return mark_safe(_extract_xlsx_preview_html(source_bytes))
+    if extension == ".pptx":
+        return mark_safe(_extract_pptx_preview_html(source_bytes))
+    if extension in {".doc", ".xls", ".ppt"}:
+        return mark_safe("<p>이 형식은 구형 Office 포맷이라 미리보기를 지원하지 않습니다. 최신 형식으로 저장하면 미리보기가 가능합니다.</p>")
+    return mark_safe("<p>미리보기를 지원하지 않는 Office 파일입니다.</p>")
+
+
 def resolve_docs_render_profile(file_extension: str | None) -> dict[str, str]:
     try:
         normalized_extension = normalize_file_extension(file_extension, allow_empty=True)
@@ -1018,6 +1404,9 @@ def render_docs_content(
     file_extension: str | None,
     *,
     source_path: Path | None = None,
+    source_bytes: bytes | None = None,
+    companion_css: str = "",
+    companion_js: str = "",
     relative_path: str = "",
     request=None,
     share_owner: str = "",
@@ -1025,15 +1414,23 @@ def render_docs_content(
 ) -> tuple[str, dict[str, str]]:
     profile = resolve_docs_render_profile(file_extension)
     if profile["css_class"] == "handrive-html":
-        companion_css = ""
-        companion_js = ""
-        if source_path is not None:
-            companion_css, companion_js = load_docs_html_companion_assets(source_path, request=request)
+        resolved_companion_css = companion_css or ""
+        resolved_companion_js = companion_js or ""
+        if source_path is not None and not (resolved_companion_css or resolved_companion_js):
+            resolved_companion_css, resolved_companion_js = load_docs_html_companion_assets(source_path, request=request)
         rendered = render_docs_html_live_safely(
             content,
-            companion_css=companion_css,
-            companion_js=companion_js,
+            companion_css=resolved_companion_css,
+            companion_js=resolved_companion_js,
         )
+    elif profile["mode"] == DOCS_RENDER_MODE_OFFICE:
+        office_bytes = source_bytes
+        if office_bytes is None and source_path is not None:
+            try:
+                office_bytes = source_path.read_bytes()
+            except OSError:
+                office_bytes = b""
+        rendered = render_docs_office_preview_safely(profile["extension"], office_bytes or b"")
     elif profile["mode"] == DOCS_RENDER_MODE_MARKDOWN:
         rendered = render_markdown_safely(content)
     elif profile["mode"] in {
@@ -1526,6 +1923,7 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                 "status": repo.status,
                 "permission": permission,
                 "is_owner": bool(repo.owner_id == getattr(request.user, "id", None)),
+                "owner_username": str(repo.forgejo_owner or getattr(repo.owner, "username", "") or "").strip(),
                 "can_delete": permission == "owner",
                 "can_manage": permission in {"read", "write", "admin", "owner"},
             }
@@ -1563,6 +1961,7 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                         "status": repo.status,
                         "permission": permission,
                         "is_owner": bool(repo.owner_id == getattr(request.user, "id", None)),
+                        "owner_username": str(repo.forgejo_owner or getattr(repo.owner, "username", "") or "").strip(),
                         "can_delete": permission == "owner",
                         "can_manage": permission in {"read", "write", "admin", "owner"},
                     },
@@ -1580,13 +1979,19 @@ def _get_current_dir_git_repo(request, current_dir: str):
     if not current_dir or request is None or not hasattr(request, "user") or not request.user.is_authenticated:
         return None
     repo = _get_git_repo_for_relative_path(request, current_dir)
+    if repo is None:
+        git_virtual = _get_git_virtual_context(request, current_dir)
+        if git_virtual is not None:
+            repo = git_virtual.get("repo")
     if repo:
         permission = _get_git_repo_permission_for_request(request, repo)
         return {
             "id": repo.id,
+            "repo_name": str(repo.forgejo_repo_name or repo.repo_name or "").strip(),
             "status": repo.status,
             "permission": permission,
             "is_owner": bool(repo.owner_id == getattr(request.user, "id", None)),
+            "owner_username": str(repo.forgejo_owner or getattr(repo.owner, "username", "") or "").strip(),
             "can_delete": permission == "owner",
             "can_manage": permission in {"read", "write", "admin", "owner"},
         }
@@ -1834,13 +2239,24 @@ def _git_repo_list_tree(repo, branch_name: str, repo_relative_path: str = "") ->
     return sorted(entries, key=lambda item: (0 if item["type"] == "tree" else 1, item["name"].lower()))
 
 
-def _git_repo_latest_commit_subject(repo, branch_name: str, repo_relative_path: str = "") -> str:
-    args = ["log", "-1", "--format=%s", branch_name]
+def _git_repo_latest_commit_meta(repo, branch_name: str, repo_relative_path: str = "") -> dict[str, str]:
+    args = ["log", "-1", "--format=%s%x1f%an", branch_name]
     normalized_path = normalize_relative_path(repo_relative_path, allow_empty=True)
     if normalized_path:
         args.extend(["--", normalized_path])
     result = _run_git_repo_command(repo, *args)
-    return (result.stdout or "").strip()
+    output = (result.stdout or "").strip()
+    if not output:
+        return {"subject": "", "author_username": ""}
+    subject, _, author_username = output.partition("\x1f")
+    return {
+        "subject": str(subject or "").strip(),
+        "author_username": str(author_username or "").strip(),
+    }
+
+
+def _git_repo_latest_commit_subject(repo, branch_name: str, repo_relative_path: str = "") -> str:
+    return _git_repo_latest_commit_meta(repo, branch_name, repo_relative_path).get("subject", "")
 
 
 def _git_repo_path_exists(repo, branch_name: str, repo_relative_path: str) -> bool:
@@ -2119,12 +2535,15 @@ def _build_git_virtual_entries(request, context) -> list[dict]:
             "requires_commit_message": True,
         }
         repo_relative_entry_path = item["name"] if not context["repo_relative_path"] else f"{context['repo_relative_path']}/{item['name']}"
+        commit_meta = _git_repo_latest_commit_meta(repo, context["branch_name"], repo_relative_entry_path)
         if item["type"] == "tree":
             entry["has_children"] = True
-            entry["git_commit_message"] = _git_repo_latest_commit_subject(repo, context["branch_name"], repo_relative_entry_path)
+            entry["git_commit_message"] = commit_meta.get("subject", "")
+            entry["git_commit_author_username"] = commit_meta.get("author_username", "")
         else:
             entry["slug_path"] = entry_path
-            entry["git_commit_message"] = _git_repo_latest_commit_subject(repo, context["branch_name"], repo_relative_entry_path)
+            entry["git_commit_message"] = commit_meta.get("subject", "")
+            entry["git_commit_author_username"] = commit_meta.get("author_username", "")
         entries.append(entry)
     return entries
 
@@ -3590,6 +4009,14 @@ def docs_list(request, folder_path="", ui_lang=None):
     if not has_docs_read_access(request, current_dir):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
+    current_dir_commit_meta = {"subject": "", "author_username": ""}
+    if git_virtual is not None and git_virtual["kind"] == "branch_dir" and git_virtual["repo_relative_path"]:
+        current_dir_commit_meta = _git_repo_latest_commit_meta(
+            git_virtual["repo"],
+            git_virtual["branch_name"],
+            git_virtual["repo_relative_path"],
+        )
+
     context.update(
         {
             "current_dir": current_dir,
@@ -3600,19 +4027,16 @@ def docs_list(request, folder_path="", ui_lang=None):
             "current_dir_is_root": bool((scoped_home_dir and current_dir == scoped_home_dir) or (not scoped_home_dir and current_dir == "")),
             "current_dir_can_edit": has_docs_write_access(request, current_dir),
             "current_dir_can_write_children": has_docs_directory_write_access(request, current_dir),
+            "current_dir_has_children": bool(initial_entries),
+            "current_dir_is_git_repo_root": is_docs_git_repo_root_path(request, current_dir),
             "current_dir_requires_commit_message": bool(git_virtual is not None and git_virtual["kind"] == "branch_dir"),
             "current_dir_git_branch_root": bool(
                 git_virtual is not None
                 and git_virtual["kind"] == "branch_dir"
                 and not git_virtual["repo_relative_path"]
             ),
-            "current_dir_git_commit_message": (
-                _git_repo_latest_commit_subject(git_virtual["repo"], git_virtual["branch_name"], git_virtual["repo_relative_path"])
-                if git_virtual is not None
-                and git_virtual["kind"] == "branch_dir"
-                and git_virtual["repo_relative_path"]
-                else ""
-            ),
+            "current_dir_git_commit_message": current_dir_commit_meta.get("subject", ""),
+            "current_dir_git_commit_author_username": current_dir_commit_meta.get("author_username", ""),
             "breadcrumbs": _build_git_virtual_breadcrumbs(
                 request,
                 context["docs_base_url"],
@@ -3650,38 +4074,61 @@ def docs_view(request, doc_path, ui_lang=None):
         file_name = file_path.name
         file_extension = file_path.suffix.lower()
         file_size_display = format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else ""
-        content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-        rendered_content_html, render_profile = render_docs_content(
-            content,
-            file_extension,
-            source_path=file_path,
-            relative_path=relative_file_path,
-            request=request,
-        )
+        if resolve_docs_render_profile(file_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
+            content = ""
+            rendered_content_html, render_profile = render_docs_content(
+                content,
+                file_extension,
+                source_path=file_path,
+                relative_path=relative_file_path,
+                request=request,
+            )
+        else:
+            content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
+            rendered_content_html, render_profile = render_docs_content(
+                content,
+                file_extension,
+                source_path=file_path,
+                relative_path=relative_file_path,
+                request=request,
+            )
     else:
         if git_virtual["kind"] != "branch_file":
             raise Http404("파일을 찾을 수 없습니다.")
         file_name = Path(git_virtual["repo_relative_path"]).name
         file_extension = Path(file_name).suffix.lower()
-        file_size_display = format_docs_bytes_display(len(_git_repo_read_file_bytes(git_virtual["repo"], git_virtual["branch_name"], git_virtual["repo_relative_path"])))
+        repo_file_bytes = _git_repo_read_file_bytes(
+            git_virtual["repo"],
+            git_virtual["branch_name"],
+            git_virtual["repo_relative_path"],
+        )
+        file_size_display = format_docs_bytes_display(len(repo_file_bytes))
         if is_docs_non_editable_media_extension(file_extension):
             content = ""
             rendered_content_html, render_profile = render_docs_content(
                 content,
                 file_extension,
                 source_path=Path(file_name),
+                source_bytes=repo_file_bytes,
                 relative_path=relative_file_path,
                 request=request,
             )
         else:
-            content = _git_repo_read_file_bytes(
+            content = ""
+            if resolve_docs_render_profile(file_extension).get("mode") != DOCS_RENDER_MODE_OFFICE:
+                content = repo_file_bytes.decode("utf-8")
+            companion_css, companion_js = load_git_repo_html_companion_assets(
+                request,
                 git_virtual["repo"],
                 git_virtual["branch_name"],
                 git_virtual["repo_relative_path"],
-            ).decode("utf-8")
+            )
             rendered_content_html, render_profile = render_docs_content(
                 content,
                 file_extension,
+                source_bytes=repo_file_bytes,
+                companion_css=companion_css,
+                companion_js=companion_js,
                 relative_path=relative_file_path,
                 request=request,
             )
@@ -4970,14 +5417,25 @@ def docs_api_preview(request):
             if not has_docs_read_access(request, relative_file_path):
                 return json_error("파일을 볼 권한이 없습니다.", status=403)
             if git_virtual is None:
-                content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-                rendered_html, render_profile = render_docs_content(
-                    content,
-                    file_path.suffix.lower(),
-                    source_path=file_path,
-                    relative_path=relative_file_path,
-                    request=request,
-                )
+                file_extension = file_path.suffix.lower()
+                if resolve_docs_render_profile(file_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
+                    content = ""
+                    rendered_html, render_profile = render_docs_content(
+                        content,
+                        file_extension,
+                        source_path=file_path,
+                        relative_path=relative_file_path,
+                        request=request,
+                    )
+                else:
+                    content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
+                    rendered_html, render_profile = render_docs_content(
+                        content,
+                        file_extension,
+                        source_path=file_path,
+                        relative_path=relative_file_path,
+                        request=request,
+                    )
                 title = file_path.name
             else:
                 title = Path(git_virtual["repo_relative_path"]).name
@@ -4992,14 +5450,26 @@ def docs_api_preview(request):
                         request=request,
                     )
                 else:
-                    content = _git_repo_read_file_bytes(
+                    repo_file_bytes = _git_repo_read_file_bytes(
                         git_virtual["repo"],
                         git_virtual["branch_name"],
                         git_virtual["repo_relative_path"],
-                    ).decode("utf-8")
+                    )
+                    content = ""
+                    if resolve_docs_render_profile(file_extension).get("mode") != DOCS_RENDER_MODE_OFFICE:
+                        content = repo_file_bytes.decode("utf-8")
+                    companion_css, companion_js = load_git_repo_html_companion_assets(
+                        request,
+                        git_virtual["repo"],
+                        git_virtual["branch_name"],
+                        git_virtual["repo_relative_path"],
+                    )
                     rendered_html, render_profile = render_docs_content(
                         content,
                         file_extension,
+                        source_bytes=repo_file_bytes,
+                        companion_css=companion_css,
+                        companion_js=companion_js,
                         relative_path=relative_file_path,
                         request=request,
                     )
@@ -5025,6 +5495,7 @@ def docs_api_preview(request):
 
     source_extension = preview_extension or DOCS_FILE_EXTENSION
     source_path = None
+    git_virtual = None
     if original_relative_path:
         git_virtual = _get_git_virtual_context(request, original_relative_path)
         if git_virtual is None:
@@ -5044,10 +5515,34 @@ def docs_api_preview(request):
         if not has_docs_directory_write_access(request, preview_target_dir):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
+    companion_css = ""
+    companion_js = ""
+    source_bytes = None
+    if original_relative_path and git_virtual is not None:
+        companion_css, companion_js = load_git_repo_html_companion_assets(
+            request,
+            git_virtual["repo"],
+            git_virtual["branch_name"],
+            git_virtual["repo_relative_path"],
+        )
+        source_bytes = _git_repo_read_file_bytes(
+            git_virtual["repo"],
+            git_virtual["branch_name"],
+            git_virtual["repo_relative_path"],
+        )
+    elif source_path is not None and resolve_docs_render_profile(source_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
+        try:
+            source_bytes = source_path.read_bytes()
+        except OSError:
+            source_bytes = b""
+
     rendered_html, render_profile = render_docs_content(
         content,
         source_extension,
         source_path=source_path,
+        source_bytes=source_bytes,
+        companion_css=companion_css,
+        companion_js=companion_js,
         request=request,
     )
     return JsonResponse(

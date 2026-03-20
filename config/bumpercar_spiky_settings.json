@@ -26,6 +26,12 @@
       "max_health_segments": 3,
       "movement_type": "classic"
     },
+    "happy": {
+      "base_speed_multiplier": 1.0,
+      "max_boost_speed_multiplier": 1.2555,
+      "max_health_segments": 3,
+      "movement_type": "classic"
+    },
     "double": {
       "base_speed_multiplier": 1.0,
       "max_boost_speed_multiplier": 1.2555,

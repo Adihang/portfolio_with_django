@@ -102,6 +102,12 @@ BUMPERCAR_SPIKY_CHARACTER_SETTINGS_DEFAULTS = {
         "max_health_segments": 3,
         "movement_type": "classic",
     },
+    "happy": {
+        "base_speed_multiplier": 1.0,
+        "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        "max_health_segments": 3,
+        "movement_type": "classic",
+    },
     "double": {
         "base_speed_multiplier": 1.0,
         "max_boost_speed_multiplier": BUMPERCAR_SPIKY_DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
@@ -146,6 +152,7 @@ BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS = {
     "deaths": 0,
     "player_kills": 0,
     "ner_kills": 0,
+    "play_seconds": 0,
     "max_ner_party_size": 0,
     "game_clears": 0,
     "ner_phase1_attack_dodges": 0,
@@ -290,6 +297,7 @@ def _collect_bumpercar_skin_variant_dirs(skin_name, folder_name):
 def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
     stats = normalize_bumpercar_spiky_account_stats(account_stats)
     total_game_clears = int(stats.get("game_clears", 0))
+    total_play_seconds = int(stats.get("play_seconds", 0))
     is_english = ui_lang == "en"
     is_admin = bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
     skin_specs = [
@@ -304,6 +312,26 @@ def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
                 else "셰이디의 차원문에서 튀어나온\n정체불명의 생명체 입니다.\n\"스핔이 네르지 마세요!\""
             ),
             "unlocked": True,
+        },
+        {
+            "name": "happy",
+            "asset_source_name": "happy",
+            "preview_icon_name": "main",
+            "display_name": "Happy Spiky" if is_english else "행복한 스핔이",
+            "visual_scale": 1.14,
+            "unlock_condition": "Play for 2 hours." if is_english else "2시간 이상 게임 플레이",
+            "description": (
+                "Spiky no longer needs to wander around looking for the pumpkin friend.\n"
+                "Playing with the cult leader is much more fun.\n"
+                "\"It's much comfier to roll around in the cult leader's room\n"
+                "like an old ghost.\""
+                if is_english
+                else "스핔이는 호박 친구를 찾으러 다닐 필요 없이\n"
+                    "교주와 노는게 더 즐겁다는 것을 깨달았습니다.\n"
+                    "\"늙은 유령처럼 교주님 방에서\n"
+                    "뒹굴거리며 노는게 더 편한거에요\""
+            ),
+            "unlocked": is_admin or total_play_seconds >= 7200,
         },
         {
             "name": "double",
@@ -1814,6 +1842,7 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
     ]
     character_labels = {
         "default": "Spiky" if resolved_lang == "en" else "스핔이",
+        "happy": "Happy Spiky" if resolved_lang == "en" else "행복한 스핔이",
         "double": "Twin Spiky" if resolved_lang == "en" else "쌍핔이",
         "many": "Spikies" if resolved_lang == "en" else "스핔이들",
         "pumkin": "Hopiki" if resolved_lang == "en" else "호핔이",

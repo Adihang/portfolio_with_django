@@ -215,12 +215,15 @@ module.exports = {
      * 더미는 고유 사분면, NPC는 별도 초기화 처리를 거친다.
      * @param {object} player - 리스폰할 플레이어
      * @param {number} now - 현재 타임스탬프(ms)
+     * @param {object} [options]
+     * @param {boolean} [options.consumeSharedLife=true] - 인간 유저 리스폰 시 공용 목숨 차감 여부
      * @returns {boolean} 리스폰 성공 여부
      */
-    respawnPlayer(player, now) {
+    respawnPlayer(player, now, options = {}) {
         if (!player) {
             return false
         }
+        const consumeSharedLife = options.consumeSharedLife !== false
         this.syncDoubleSkinState(player, now)
 
         // 인간 유저는 공용 목숨이 남아 있을 때만 리스폰 가능하다.
@@ -233,7 +236,7 @@ module.exports = {
         }
 
         // 인간 유저 리스폰 시 공용 목숨을 1 소모한다.
-        if (!player.isNpc && !player.isDummy) {
+        if (!player.isNpc && !player.isDummy && consumeSharedLife) {
             this.sharedLivesRemaining = Math.max(0, Number(this.sharedLivesRemaining || 0) - 1)
             player.livesRemaining = this.sharedLivesRemaining
         }

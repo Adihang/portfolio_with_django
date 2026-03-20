@@ -33,6 +33,12 @@ const DEFAULT_CHARACTER_SETTINGS = {
         max_health_segments: 3,
         movement_type: "classic"
     },
+    happy: {
+        base_speed_multiplier: 1,
+        max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,
+        max_health_segments: 3,
+        movement_type: "classic"
+    },
     double: {
         base_speed_multiplier: 1,
         max_boost_speed_multiplier: DEFAULT_PLAYER_MAX_BOOST_SPEED_MULTIPLIER,

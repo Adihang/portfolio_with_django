@@ -286,14 +286,34 @@ module.exports = {
             }
         }
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
+        for (const savedProgress of this.playerProgress.values()) {
+            if (!savedProgress) {
+                continue
+            }
+            savedProgress.defeatReceivedCount = 0
+            savedProgress.defeatDealtCount = 0
+            savedProgress.collisionVisualUntil = 0
+            savedProgress.collisionImpactUntil = 0
+            savedProgress.npcDefeatDamageRatio = 0
+            savedProgress.collisionImpactX = 0
+            savedProgress.collisionImpactY = 0
+            savedProgress.collisionRecoveryStartedAt = 0
+            savedProgress.collisionRecoveryUntil = 0
+            savedProgress.boostDisabledStartedAt = 0
+            savedProgress.boostDisabledUntil = 0
+            savedProgress.deathStartedAt = 0
+            savedProgress.deathUntil = 0
+            savedProgress.respawnRequested = false
+        }
         for (const player of this.players.values()) {
             if (player.isDummy) {
                 continue
             }
             if (isPersistentHumanPlayer(player)) {
                 player.defeatReceivedCount = 0
+                player.defeatDealtCount = 0
                 player.livesRemaining = this.sharedLivesRemaining
-                this.respawnPlayer(player, now)
+                this.respawnPlayer(player, now, { consumeSharedLife: false })
             }
         }
         this.addNerNpcPlayer()

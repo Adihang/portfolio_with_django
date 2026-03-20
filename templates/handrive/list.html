@@ -28,9 +28,6 @@
             <div class="handrive-toolbar-actions ui-toolbar-actions">
                 {% include "handrive/_auth_button.html" %}
                 {% include "handrive/_superuser_ops_button.html" %}
-                {% if user.is_staff %}
-                <a class="handrive-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -44,9 +41,12 @@
     data-current-dir-is-root="{% if current_dir_is_root %}1{% else %}0{% endif %}"
     data-current-dir-can-edit="{% if current_dir_can_edit %}1{% else %}0{% endif %}"
     data-current-dir-can-write-children="{% if current_dir_can_write_children %}1{% else %}0{% endif %}"
+    data-current-dir-has-children="{% if current_dir_has_children %}1{% else %}0{% endif %}"
+    data-current-dir-is-git-repo-root="{% if current_dir_is_git_repo_root %}1{% else %}0{% endif %}"
     data-current-dir-requires-commit-message="{% if current_dir_requires_commit_message %}1{% else %}0{% endif %}"
     data-current-dir-git-branch-root="{% if current_dir_git_branch_root %}1{% else %}0{% endif %}"
     data-current-dir-git-commit-message="{{ current_dir_git_commit_message|default:''|escape }}"
+    data-current-dir-git-commit-author-username="{{ current_dir_git_commit_author_username|default:''|escape }}"
     data-account-profile-image-url="{{ account_profile_image_url|default:''|escape }}"
     data-scoped-home-dir="{{ scoped_home_dir|default:'' }}"
     data-handrive-base-url="{{ docs_base_url }}"

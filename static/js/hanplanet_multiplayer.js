@@ -400,6 +400,7 @@
         const runtime = {
             name: skinConfig && skinConfig.name ? skinConfig.name : 'default',
             displayName: skinConfig && skinConfig.display_name ? skinConfig.display_name : 'Default',
+            visualScale: Math.max(0.1, Number(skinConfig && skinConfig.visual_scale !== undefined ? skinConfig.visual_scale : 1)),
             unlocked: Boolean(skinConfig && skinConfig.unlocked),
             unlockCondition: skinConfig && skinConfig.unlock_condition ? skinConfig.unlock_condition : '',
             description: skinConfig && skinConfig.description ? skinConfig.description : '',
@@ -2001,7 +2002,7 @@
                 if ((player.npcState || '') === 'windup' && previousState.npcState !== 'windup') {
                     playRandomNerAccelerationSound(volume, player.id);
                 }
-            } else if (player.id !== selfId && !player.isNpc) {
+            } else if (player.id !== selfId && !player.isNpc && !player.isPumpkinNpc && !player.isDummy && !player.isHouse) {
                 if (getPlayerSkinProfile(player.skinName || 'default').type === 'double' && player.doubleState && !player.doubleState.merged) {
                     processDoubleUnitSounds(player, listenerPlayer, false);
                 }
@@ -2990,6 +2991,13 @@
         const defaultCharacterBoostSpeedMultiplier = 359.0726978998385 / 286;
         const defaultSkinProfiles = {
             default: {
+                baseSpeedMultiplier: 1,
+                maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
+                maxHealthSegments: 3,
+                type: 'classic',
+                movementType: 'classic'
+            },
+            happy: {
                 baseSpeedMultiplier: 1,
                 maxBoostSpeedMultiplier: defaultCharacterBoostSpeedMultiplier,
                 maxHealthSegments: 3,
@@ -4238,9 +4246,12 @@
             const isNpcChargeVisualActive = spriteState.isNpcChargeVisualActive;
             const isBoostVisualActive = spriteState.isBoostVisualActive;
             const spriteScale = spriteState.spriteScale;
+            const skinVisualScale = !isNpc && spriteState.skinRuntime
+                ? Math.max(0.1, Number(spriteState.skinRuntime.visualScale || 1))
+                : 1;
             const activeIcon = spriteState.activeIcon;
             const activeIconReady = spriteState.activeIconReady;
-            const fallbackSpriteHeight = playerSpriteHeight * spriteScale * zoom;
+            const fallbackSpriteHeight = playerSpriteHeight * spriteScale * zoom * skinVisualScale;
             const useDomGifOverlay = Boolean(activeIconReady && isAnimatedGifIcon(activeIcon));
             const fallbackNaturalWidth = activeIcon.naturalWidth || playerSpriteWidth;
             const fallbackNaturalHeight = activeIcon.naturalHeight || playerSpriteHeight;
@@ -4470,11 +4481,14 @@
                     ? 0
                     : Math.max(0, playerMaxHealthSegments - (defeatReceivedCount % playerMaxHealthSegments || 0));
                 if (!isDeathVisualActive) {
+                    const defaultClassicHealthBarReferenceWidth = spriteWidth / Math.max(0.1, skinVisualScale);
                     const healthBarReferenceWidth = skinProfile.type === 'evolution'
                         ? (playerSpriteHeight * spriteScale * zoom * defaultPlayerAspectRatio)
                         : ((skinProfile.type === 'pumkin' || isPumpkinNpc)
                             ? (playerSpriteHeight * zoom * defaultPlayerAspectRatio)
-                            : spriteWidth);
+                            : ((spriteState.skinRuntime && spriteState.skinRuntime.name === 'happy')
+                                ? defaultClassicHealthBarReferenceWidth
+                                : spriteWidth));
                     const healthBarWidth = Math.max(24, healthBarReferenceWidth * 0.9);
                     const totalSegments = Math.max(1, isPumpkinNpc ? PUMPKIN_NPC_HEALTH_SEGMENTS : playerMaxHealthSegments);
                     const segmentGap = skinProfile.type === 'evolution'

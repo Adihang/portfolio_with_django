@@ -26,9 +26,6 @@
             <div class="handrive-toolbar-actions ui-toolbar-actions">
                 {% include "handrive/_auth_button.html" %}
                 {% include "handrive/_superuser_ops_button.html" %}
-                {% if user.is_staff %}
-                <a class="handrive-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
-                {% endif %}
                 <button class="handrive-btn" type="button" id="handrive-cancel-btn">{{ docs_text.cancel }}</button>
                 <button class="handrive-btn handrive-btn-primary" type="button" id="handrive-save-btn">{{ docs_text.save_button }}</button>
             </div>

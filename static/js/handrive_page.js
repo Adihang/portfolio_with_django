@@ -267,6 +267,10 @@
             "handrive-css",
             "handrive-js",
             "handrive-py",
+            "handrive-office",
+            "handrive-office-word",
+            "handrive-office-sheet",
+            "handrive-office-presentation",
             "handrive-media",
             "handrive-media-image",
             "handrive-media-video",
@@ -307,6 +311,19 @@
                     className === "handrive-css" ||
                     className === "handrive-js" ||
                     className === "handrive-py"
+                ) {
+                    targetElement.classList.add(className);
+                }
+            });
+            return;
+        }
+        if (renderClasses.includes("handrive-office")) {
+            renderClasses.forEach(function (className) {
+                if (
+                    className === "handrive-office" ||
+                    className === "handrive-office-word" ||
+                    className === "handrive-office-sheet" ||
+                    className === "handrive-office-presentation"
                 ) {
                     targetElement.classList.add(className);
                 }
@@ -1567,14 +1584,38 @@
         const currentDirCanEdit = root.dataset.currentDirCanEdit === "1";
         const currentDirCanWriteChildren =
             root.dataset.currentDirCanWriteChildren === "1" || currentDirCanEdit;
+        const currentDirHasChildren = root.dataset.currentDirHasChildren === "1";
+        const currentDirIsGitRepoRoot = root.dataset.currentDirIsGitRepoRoot === "1";
         const currentDirRequiresCommitMessage = root.dataset.currentDirRequiresCommitMessage === "1";
         const currentDirGitBranchRoot = root.dataset.currentDirGitBranchRoot === "1";
         const currentDirGitCommitMessage = String(root.dataset.currentDirGitCommitMessage || "").trim();
+        const currentDirGitCommitAuthorUsername = String(root.dataset.currentDirGitCommitAuthorUsername || "").trim();
         const accountProfileImageUrl = String(root.dataset.accountProfileImageUrl || "").trim();
         const docsRootLabel = (root.dataset.handriveRootLabel || breadcrumbRootLabel || "HanDrive").trim() || "HanDrive";
         const effectiveRootLabel = (isSuperuser && scopedHomeDir) ? "Hanplanet" : docsRootLabel;
         const initialEntries = getJsonScriptData("handrive-initial-entries", []);
         let currentDirGitRepo = getJsonScriptData("handrive-current-dir-git-repo", null);
+
+        function appendBadgeWithPrefix(row, badgeText, prefixText) {
+            const normalizedBadgeText = String(badgeText || "").trim();
+            if (!normalizedBadgeText) {
+                return;
+            }
+            const wrap = document.createElement("span");
+            wrap.className = "handrive-item-public-badge-wrap";
+            const normalizedPrefixText = String(prefixText || "").trim();
+            if (normalizedPrefixText) {
+                const prefix = document.createElement("span");
+                prefix.className = "handrive-item-public-badge-prefix";
+                prefix.textContent = normalizedPrefixText;
+                wrap.appendChild(prefix);
+            }
+            const badge = document.createElement("span");
+            badge.className = "handrive-item-public-badge";
+            badge.textContent = normalizedBadgeText;
+            wrap.appendChild(badge);
+            row.appendChild(wrap);
+        }
 
         function getPathFileExtension(pathValue) {
             const normalized = normalizePath(pathValue, true);
@@ -1613,14 +1654,23 @@
             if ([".md", ".txt", ".rtf"].includes(extension)) {
                 return "text";
             }
-            if ([".doc", ".docx", ".odt", ".pages", ".hwp", ".hwpx"].includes(extension)) {
-                return "document";
+            if ([".doc", ".docx"].includes(extension)) {
+                return "word";
             }
-            if ([".xls", ".xlsx", ".csv", ".tsv", ".ods", ".numbers"].includes(extension)) {
-                return "sheet";
+            if ([".odt", ".pages", ".hwp", ".hwpx"].includes(extension)) {
+                return "file";
             }
-            if ([".ppt", ".pptx", ".odp", ".key"].includes(extension)) {
-                return "presentation";
+            if ([".xls", ".xlsx"].includes(extension)) {
+                return "excel";
+            }
+            if ([".csv", ".tsv", ".ods", ".numbers"].includes(extension)) {
+                return "file";
+            }
+            if ([".ppt", ".pptx"].includes(extension)) {
+                return "powerpoint";
+            }
+            if ([".odp", ".key"].includes(extension)) {
+                return "file";
             }
             if ([".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
                 return "data";
@@ -1731,6 +1781,9 @@
                 "document",
                 "sheet",
                 "presentation",
+                "word",
+                "excel",
+                "powerpoint",
                 "data",
                 "code",
                 "json",
@@ -2847,6 +2900,7 @@
             const safeHtml = typeof html === "string" ? html : "";
             const normalizedRenderMode =
                 renderMode === "markdown" ||
+                renderMode === "office" ||
                 renderMode === "media_image" ||
                 renderMode === "media_video" ||
                 renderMode === "media_audio"
@@ -4615,9 +4669,10 @@
                 isCurrentFolder: true,
                 can_edit: currentDirCanEdit,
                 can_write_children: currentDirCanWriteChildren,
-                can_delete: Boolean(currentDirGitRepo),
+                can_delete: Boolean(currentDirGitRepo && currentDirIsGitRepoRoot),
                 requires_commit_message: currentDirRequiresCommitMessage,
-                git_repo: currentDirGitRepo || null,
+                git_repo: currentDirIsGitRepoRoot ? (currentDirGitRepo || null) : null,
+                git_repo_meta: currentDirGitRepo || null,
                 git_branch_root: currentDirGitBranchRoot,
                 is_git_virtual: Boolean(currentDirGitRepo || currentDirGitBranchRoot || currentDirRequiresCommitMessage),
             };
@@ -4648,32 +4703,57 @@
                     avatarImage.loading = "lazy";
                     typeMarker.appendChild(avatarImage);
                 }
-            } else if (currentFolderEntry.git_repo) {
+            } else if (currentDirIsGitRepoRoot) {
                 typeMarker.classList.add("is-repo");
             } else if (currentDirGitBranchRoot) {
                 typeMarker.classList.add("is-branch");
+            } else if (!currentDirHasChildren) {
+                typeMarker.classList.add("is-empty");
             }
 
             const name = document.createElement("span");
             name.className = "handrive-item-name handrive-current-dir-name";
             name.textContent = getCurrentFolderName(currentDir);
 
+            const nameWrap = document.createElement("span");
+            nameWrap.className = "handrive-current-dir-name-wrap";
+
             row.appendChild(typeMarker);
-            row.appendChild(name);
+            row.appendChild(nameWrap);
+            nameWrap.appendChild(name);
+
+            const currentDirRepoName =
+                currentDirGitRepo && currentDirGitRepo.repo_name
+                    ? String(currentDirGitRepo.repo_name).trim()
+                    : "";
+            if (
+                currentDirRepoName &&
+                (
+                    currentDirGitBranchRoot ||
+                    currentDirRequiresCommitMessage
+                )
+            ) {
+                const repoLabel = document.createElement("span");
+                repoLabel.className = "handrive-current-dir-repo-name";
+                repoLabel.textContent = currentDirRepoName;
+                nameWrap.appendChild(repoLabel);
+            }
 
             let badgeText = "";
-            if (currentFolderEntry.git_repo) {
+            let badgePrefixText = "";
+            if (currentDirIsGitRepoRoot && currentFolderEntry.git_repo) {
                 badgeText = t("repository_badge", "Repository");
+                if (!currentFolderEntry.git_repo.is_owner) {
+                    badgePrefixText = String(currentFolderEntry.git_repo.owner_username || "").trim();
+                }
             } else if (currentDirGitBranchRoot) {
                 badgeText = t("branch_badge", "Branch");
             } else if (currentDirGitCommitMessage) {
                 badgeText = currentDirGitCommitMessage;
+                badgePrefixText = currentDirGitCommitAuthorUsername;
             }
             if (badgeText) {
-                const badge = document.createElement("span");
-                badge.className = "handrive-item-public-badge";
-                badge.textContent = badgeText;
-                row.appendChild(badge);
+                appendBadgeWithPrefix(row, badgeText, badgePrefixText);
             }
 
             row.addEventListener("click", function (event) {
@@ -5247,6 +5327,8 @@
                 typeMarker.classList.add("is-repo");
             } else if (entry.type === "dir" && entry.git_branch_root) {
                 typeMarker.classList.add("is-branch");
+            } else if (entry.type === "dir" && entry.has_children === false) {
+                typeMarker.classList.add("is-empty");
             }
             if (entry.type === "file") {
                 const fileIconKey = getFileIconKey(entry.path);
@@ -5285,21 +5367,23 @@
             }
 
             let badgeText = "";
+            let badgePrefixText = "";
             if (entry.type === "dir" && entry.git_repo) {
                 badgeText = t("repository_badge", "Repository");
+                if (!entry.git_repo.is_owner) {
+                    badgePrefixText = String(entry.git_repo.owner_username || "").trim();
+                }
             } else if (entry.type === "dir" && entry.git_branch_root) {
                 badgeText = t("branch_badge", "Branch");
             } else if (entry.git_commit_message) {
                 badgeText = String(entry.git_commit_message || "").trim();
+                badgePrefixText = String(entry.git_commit_author_username || "").trim();
             } else if (entry.type === "file" && entry.is_public_write) {
                 badgeText = t("public_write_badge", "전체 허용");
             }
 
             if (badgeText) {
-                const badge = document.createElement("span");
-                badge.className = "handrive-item-public-badge";
-                badge.textContent = badgeText;
-                row.appendChild(badge);
+                appendBadgeWithPrefix(row, badgeText, badgePrefixText);
             }
 
             row.addEventListener("click", function (event) {
@@ -6973,16 +7057,25 @@
             if (extension === ".pdf") {
                 return "pdf";
             }
-            if ([".md", ".txt", ".rtf"].includes(extension)) {
+            if ([".txt", ".rtf"].includes(extension)) {
                 return "text";
             }
-            if ([".doc", ".docx", ".odt", ".pages", ".hwp", ".hwpx"].includes(extension)) {
+            if ([".doc", ".docx"].includes(extension)) {
+                return "word";
+            }
+            if ([".odt", ".pages", ".hwp", ".hwpx"].includes(extension)) {
                 return "document";
             }
-            if ([".xls", ".xlsx", ".csv", ".tsv", ".ods", ".numbers"].includes(extension)) {
+            if ([".xls", ".xlsx"].includes(extension)) {
+                return "excel";
+            }
+            if ([".csv", ".tsv", ".ods", ".numbers"].includes(extension)) {
                 return "sheet";
             }
-            if ([".ppt", ".pptx", ".odp", ".key"].includes(extension)) {
+            if ([".ppt", ".pptx"].includes(extension)) {
+                return "powerpoint";
+            }
+            if ([".odp", ".key"].includes(extension)) {
                 return "presentation";
             }
             if ([".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
@@ -7892,7 +7985,9 @@
                         content: contentInput ? contentInput.value : "",
                     })
                 );
-                const renderMode = data && data.render_mode === "markdown" ? "markdown" : "plain_text";
+                const renderMode = data && (data.render_mode === "markdown" || data.render_mode === "office")
+                    ? data.render_mode
+                    : "plain_text";
                 const renderClass = data && typeof data.render_class === "string" ? data.render_class : "";
                 applyDocsRenderedContentModeClass(markdownPreviewContent, renderMode, renderClass);
                 markdownPreviewContent.innerHTML = data && typeof data.html === "string" ? data.html : "";

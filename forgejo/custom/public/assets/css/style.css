@@ -178,6 +178,11 @@ body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-conten
     --forgejo-main-hover: var(--site-hover);
     --forgejo-main-hover-soft: var(--site-hover-soft);
     --forgejo-main-selected: var(--site-selected-bg);
+    --color-menu: var(--forgejo-main-surface);
+    --color-secondary-nav-bg: var(--forgejo-main-surface);
+    --color-hover-opaque: var(--forgejo-main-hover-soft);
+    --color-box-body: var(--forgejo-main-surface);
+    --color-box-header: var(--forgejo-main-surface-strong);
     --color-primary-light-1: color-mix(in srgb, var(--color-primary) 88%, var(--site-bg));
 }
 
@@ -286,6 +291,13 @@ body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-conten
 
 body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository-summary {
     border: 1px solid var(--forgejo-main-border);
+    background-color: var(--forgejo-main-surface);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu {
+    border: none;
+    background-color: var(--forgejo-main-surface);
+    box-shadow: inset 0 -1px 0 var(--forgejo-main-border);
 }
 
 body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository-summary + .repo-home-filelist {
@@ -363,6 +375,62 @@ body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-conten
     background-color: transparent;
     border-bottom: 2px solid currentColor;
     color: var(--forgejo-main-text-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.secondary.pointing.menu,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.tabular.menu {
+    background-color: var(--forgejo-main-surface);
+    color: var(--forgejo-main-text);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu .item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.secondary.pointing.menu .item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.tabular.menu .item {
+    background-color: transparent;
+    color: var(--forgejo-main-text);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > .item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > a.item,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > a.item.active {
+    background-color: transparent;
+    color: var(--forgejo-main-text);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu .item:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.secondary.pointing.menu .item:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.tabular.menu .item:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu .item:focus-visible,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.secondary.pointing.menu .item:focus-visible,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.tabular.menu .item:focus-visible {
+    background-color: var(--forgejo-main-hover-soft);
+    color: var(--forgejo-main-text-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .sub-menu .item.active:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.secondary.pointing.menu .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.secondary.pointing.menu .item.active:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.tabular.menu .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .ui.tabular.menu .item.active:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > .item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > .item.active:hover,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > a.item.active,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .repository .repository-summary .segment.sub-menu > a.item.active:hover {
+    background-color: var(--forgejo-main-selected);
+    color: var(--forgejo-main-text-strong);
+    border-color: var(--forgejo-main-border-strong);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django #repo-files-table .repo-file-item:hover > .repo-file-cell,
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django #repo-files-table .parent-link:hover {
+    background: var(--forgejo-main-hover-soft);
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django #repo-files-table .repo-file-item:hover > .repo-file-last-commit {
+    background: var(--forgejo-main-hover);
 }
 
 body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .overflow-menu-items .item,
@@ -1709,7 +1777,7 @@ body.theme-dark {
 .ui-nav {
     position: sticky;
     top: 0;
-    z-index: var(--site-z-nav);
+    z-index: calc(var(--site-z-popup, 3400) - 10);
     min-height: var(--site-common-header-min-height);
     padding: var(--site-nav-padding-y) 18px;
     border-bottom: none;

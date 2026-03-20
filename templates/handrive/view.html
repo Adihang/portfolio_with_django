@@ -46,9 +46,6 @@
                 </a>
                 {% include "handrive/_auth_button.html" %}
                 {% include "handrive/_superuser_ops_button.html" %}
-                {% if user.is_staff %}
-                    <a class="handrive-btn" href="{% url 'admin:index' %}">{{ docs_text.admin_button }}</a>
-                {% endif %}
                 {% if doc_can_show_edit %}
                     <a class="handrive-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
                 {% endif %}

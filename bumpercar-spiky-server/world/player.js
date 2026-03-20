@@ -86,6 +86,7 @@ class Player {
         this.doubleUnits = [createDoubleUnitState(), createDoubleUnitState()]
         this.playerWinVisualUntil = 0
         this.lastActiveInputAt = Date.now()
+        this.sessionStartedAt = Date.now()
         this.x = Math.random() * WORLD_SIZE
         this.y = Math.random() * WORLD_SIZE
         this.isDummy = false

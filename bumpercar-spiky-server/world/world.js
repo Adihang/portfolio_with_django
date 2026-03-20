@@ -230,7 +230,15 @@ class World {
      * @param {Player} player - 제거할 플레이어
      */
     removePlayer(player) {
-        this.revokePumpkinOwnershipForConnection(player && player.connectionKey, Date.now())
+        const now = Date.now()
+        this.revokePumpkinOwnershipForConnection(player && player.connectionKey, now)
+        if (player && !player.isNpc && !player.isDummy) {
+            const sessionStartedAt = Number(player.sessionStartedAt || 0)
+            const elapsedSeconds = sessionStartedAt > 0 ? Math.floor((now - sessionStartedAt) / 1000) : 0
+            if (elapsedSeconds > 0) {
+                postStatsUpdate(player.id, { play_seconds: elapsedSeconds })
+            }
+        }
         this.updateStoredPlayerProgress(player)
         this.grid.remove(player)
         this.players.delete(player.id)
@@ -316,11 +324,10 @@ class World {
                 const allOut = this.areAllHumanPlayersOut()
                 console.log(`[world.update] pendingReset 도달 now=${now} pending=${this.pendingRoundResetAt} allOut=${allOut} encounterResetOnAllDead=${this.encounterResetOnAllDead}`)
                 if (allOut) {
-                    if (this.encounterResetOnAllDead) {
-                        this.resetEncounterToInitial(now)
-                    } else {
-                        this.resetRoundLives(now)
-                    }
+                    // 공용 목숨이 0이 된 상태에서 전원 사망하면 항상 전체 인카운터를 초기화한다.
+                    // 라운드만 리셋하면 encounterStage가 유지되어 배경색/BGM이 이전 페이즈에 남는다.
+                    this.resetEncounterToInitial(now)
+                    return
                 }
             }
         }
