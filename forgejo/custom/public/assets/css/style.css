@@ -424,6 +424,16 @@ body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-conten
     border-color: var(--forgejo-main-border-strong);
 }
 
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .vch__month__label {
+    font-weight: 100 !important;
+    font-variation-settings: "wght" 100 !important;
+}
+
+body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django .vch__day__label {
+    font-weight: 500 !important;
+    font-variation-settings: "wght" 500 !important;
+}
+
 body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django #repo-files-table .repo-file-item:hover > .repo-file-cell,
 body.page:not(.root-page):not(.portfolio-page):not(.legal-page) main.page-content.django #repo-files-table .parent-link:hover {
     background: var(--forgejo-main-hover-soft);
