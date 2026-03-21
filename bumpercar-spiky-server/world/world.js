@@ -63,6 +63,7 @@ class World {
     constructor() {
         // players: 현재 월드에 존재하는 모든 엔티티 (인간·NPC·더미·펌킨·하우스)
         // playerProgress: 재접속 시 이어붙일 인간 유저 진행도
+        // encounter* 필드: 하우스 인카운터의 현재 단계와 공지/카운트다운 타이머
         this.players = new Map()
         this.playerProgress = new Map()
         this.sharedLivesRemaining = PLAYER_STARTING_LIVES
@@ -93,6 +94,8 @@ class World {
      * @returns {Player} 생성된 플레이어 객체
      */
     addPlayer(connectionKey, displayId = connectionKey, options = {}) {
+        // addPlayer 는 "접속"과 "재접속 복원"을 동시에 처리한다.
+        // 따라서 savedProgress 복원, 스킨 복원, double 상태 복원이 함께 들어 있다.
         const resolvedConnectionKey = String(connectionKey || displayId || "").trim()
         const resolvedDisplayId = String(displayId || resolvedConnectionKey || "").trim()
         const existingPlayer = this.players.get(resolvedDisplayId)

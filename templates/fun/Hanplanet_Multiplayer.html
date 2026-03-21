@@ -2,7 +2,7 @@
 {% load static_versioned %}
 {% block body_class %}ui-page hanplanet-multiplayer-page{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" type="text/css" href="{% static_v 'css/hanplanet_multiplayer.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static_v 'css/fun/bumpercar_spiky/multiplayer.css' %}">
 {% endblock %}
 {% block content %}
 {% include 'handrive/_assets_head.html' %}
@@ -229,8 +229,8 @@
 </main>
 
 {% include "popup/fun/multiplayer_idle_timeout_modal.html" %}
-<script src="{% static_v 'js/msgpack.min.js' %}" defer></script>
-<script src="{% static_v 'js/hanplanet_multiplayer.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+<script src="{% static_v 'js/vendor/msgpack.min.js' %}" defer></script>
+<script src="{% static_v 'js/fun/bumpercar_spiky/multiplayer.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
 {% include "popup/root/auth_logout_modal.html" %}
-<script src="{% static_v 'js/minigame_account_widget.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
+<script src="{% static_v 'js/common/minigame_account_widget.js' %}" defer onerror="window.__reloadStaticScript(this)"></script>
 {% endblock %}

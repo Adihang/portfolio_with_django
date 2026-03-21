@@ -35,7 +35,8 @@ module.exports = {
             return
         }
 
-        // 유저 사망은 입력과 이동을 모두 멈춘다. 공용 목숨은 리스폰 시 차감한다.
+        // 유저 사망은 입력과 이동을 모두 멈춘다.
+        // 공용 목숨은 death 시작 시점이 아니라 respawn 시점 기준으로 차감/복원 흐름을 맞춘다.
         player.livesRemaining = this.sharedLivesRemaining
         player.deathStartedAt = now
         player.deathUntil = now + PLAYER_DEATH_DURATION_MS
@@ -75,8 +76,8 @@ module.exports = {
         this.updateStoredPlayerProgress(player)
         postStatsUpdate(player.id, { deaths: 1 })
 
-        // 공용 목숨이 모두 소진되고 전원이 쓰러졌다면,
-        // 마지막 사망 연출이 끝난 뒤 다음 라운드로 리셋한다.
+        // 공용 목숨이 모두 소진되고 전원이 쓰러졌다면
+        // 마지막 사망 연출이 끝나는 시점으로 라운드 리셋을 예약한다.
         if (this.areAllHumanPlayersOut()) {
             this.pendingRoundResetAt = Math.max(Number(this.pendingRoundResetAt || 0), player.deathUntil)
         }

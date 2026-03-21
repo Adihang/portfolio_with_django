@@ -1,6 +1,17 @@
 from __future__ import annotations
 
-import base64
+"""HanDrive 웹 진입점과 API를 모아 둔 메인 view 모듈.
+
+역할 구분:
+- 이 파일: 경로 해석, 권한 검사, 템플릿 context 조합, JSON API 입출력
+- ``main.handrive.preview``: 파일 내용을 브라우저 미리보기 HTML로 변환
+- ``main.handrive.html_assets``: HTML 파일의 같은 이름 css/js companion asset 로드
+
+핵심 난점은 일반 파일 경로와 git virtual path를 같은 UI에서 다뤄야 한다는 점이다.
+그래서 대부분의 API는 먼저 일반 경로인지 repo/branch 가상 경로인지 판별한 뒤,
+각기 다른 읽기/쓰기 경로로 분기한다.
+"""
+
 import io
 import logging
 import json
@@ -14,12 +25,10 @@ import sys
 import tempfile
 import time
 import uuid
-import zipfile
 from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
 from urllib.parse import quote, urlparse, unquote
-from xml.etree import ElementTree as ET
 import httpx
 
 from django import forms
@@ -52,19 +61,12 @@ from .views import (
     resolve_ui_lang,
 )
 from .forgejo_client import ForgejoClient
+from .handrive.html_assets import load_local_html_companion_assets, load_repo_html_companion_assets
+from .handrive.preview import render_docs_html_live_safely, render_docs_office_preview_safely, render_docs_pdf_safely
 from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, GitUserMapping, PortfolioProfile, UserProfile
 
 logger = logging.getLogger(__name__)
 GIT_BIN = "/usr/bin/git"
-LIBREOFFICE_CANDIDATE_BINS = (
-    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-    "/opt/homebrew/bin/libreoffice",
-    "/opt/homebrew/bin/soffice",
-    "/usr/local/bin/libreoffice",
-    "/usr/local/bin/soffice",
-    "/usr/bin/libreoffice",
-    "/usr/bin/soffice",
-)
 
 DOCS_FILE_EXTENSION = ".md"
 DOCS_ALLOWED_FILE_EXTENSIONS = (
@@ -687,6 +689,7 @@ DOCS_TEXT = {
 
 
 def get_docs_text(ui_lang: str | None) -> dict:
+    """UI 언어에 맞는 HanDrive 문자열 사본을 반환한다."""
     lang = (ui_lang or "").strip().lower()
     if lang not in DOCS_TEXT:
         lang = "ko"
@@ -694,6 +697,7 @@ def get_docs_text(ui_lang: str | None) -> dict:
 
 
 def get_request_docs_root_dir(request=None) -> Path:
+    """요청 사용자 기준 HanDrive root 를 계산한다."""
     user = getattr(request, "user", None)
     if user and user.is_authenticated and user.is_superuser:
         return Path(settings.BASE_DIR).resolve()
@@ -712,6 +716,7 @@ def get_request_docs_root_dir(request=None) -> Path:
 
 
 def docs_root_dir() -> Path:
+    """현재 요청 기준 HanDrive 루트 디렉터리를 반환한다."""
     active_root = DOCS_ACTIVE_ROOT_DIR.get()
     if active_root is not None:
         return active_root
@@ -719,6 +724,7 @@ def docs_root_dir() -> Path:
 
 
 def with_request_docs_root(view_func):
+    """요청 처리 동안 docs root/request contextvar 를 주입한다."""
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         token = DOCS_ACTIVE_ROOT_DIR.set(get_request_docs_root_dir(request))
@@ -733,6 +739,7 @@ def with_request_docs_root(view_func):
 
 
 def normalize_relative_path(raw_path: str | None, allow_empty: bool = True) -> str:
+    """사용자 입력 경로를 안전한 HanDrive 상대경로로 정규화한다."""
     value = (raw_path or "").strip().replace("\\", "/")
     value = value.strip("/")
     if not value:
@@ -756,6 +763,7 @@ def normalize_relative_path(raw_path: str | None, allow_empty: bool = True) -> s
 
 
 def resolve_path(relative_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
+    """상대경로를 현재 docs root 아래 절대경로로 변환한다."""
     root = docs_root_dir().resolve()
     normalized = normalize_relative_path(relative_path)
     candidate = (root / normalized).absolute()
@@ -770,6 +778,7 @@ def resolve_path(relative_path: str | None, must_exist: bool = True) -> tuple[Pa
 
 
 def normalize_file_extension(extension: str | None, *, allow_empty: bool = False) -> str:
+    """확장자를 ``.ext`` 형태로 정규화하고 허용 패턴을 검사한다."""
     candidate = (extension or "").strip().lower()
     if not candidate:
         if allow_empty:
@@ -783,6 +792,7 @@ def normalize_file_extension(extension: str | None, *, allow_empty: bool = False
 
 
 def normalize_docs_relative_path(raw_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
+    """HanDrive 일반 문서 경로를 정규화하고 기본 확장자를 보정한다."""
     normalized = normalize_relative_path(raw_path, allow_empty=False)
     suffix = Path(normalized).suffix.lower()
     if suffix:
@@ -816,6 +826,7 @@ def validate_name(
     for_file: bool = False,
     file_extension: str | None = DOCS_FILE_EXTENSION,
 ) -> str:
+    """새 파일/폴더 이름을 검증하고 저장 가능한 형태로 반환한다."""
     candidate = (name or "").strip()
     if not candidate:
         raise ValueError("이름을 입력해주세요.")
@@ -835,6 +846,7 @@ def validate_name(
 
 
 def build_available_upload_path(parent_dir: Path, original_name: str) -> Path:
+    """동일 이름 충돌이 없도록 업로드 대상 파일 경로를 계산한다."""
     raw_name = (original_name or "").strip()
     if not raw_name:
         raise ValueError("업로드할 파일 이름이 올바르지 않습니다.")
@@ -863,12 +875,14 @@ def build_available_upload_path(parent_dir: Path, original_name: str) -> Path:
 
 
 def get_docs_upload_tmp_dir() -> Path:
+    """업로드 임시 파일 저장 디렉터리를 반환한다."""
     temp_dir = Path(tempfile.gettempdir()) / "hanplanet_handrive_uploads"
     temp_dir.mkdir(parents=True, exist_ok=True)
     return temp_dir
 
 
 def relative_from_root(path_obj: Path) -> str:
+    """docs root 기준 상대경로를 ``posix`` 문자열로 돌려준다."""
     root = docs_root_dir().resolve()
     absolute_path = path_obj.absolute()
     try:
@@ -878,17 +892,20 @@ def relative_from_root(path_obj: Path) -> str:
 
 
 def markdown_slug_from_relative(relative_path: str) -> str:
+    """문서 상대경로에서 기본 마크다운 확장자를 제거한 slug 를 만든다."""
     if relative_path.lower().endswith(DOCS_FILE_EXTENSION):
         return relative_path[: -len(DOCS_FILE_EXTENSION)]
     return relative_path
 
 
 def render_plain_text_safely(text: str) -> str:
+    """plain text 를 안전한 ``pre/code`` HTML 로 감싼다."""
     escaped_text = escape(text or "")
     return mark_safe(f"<pre><code>{escaped_text}</code></pre>")
 
 
 def build_docs_download_url(relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
+    """문서/공유문서 다운로드 API URL 을 생성한다."""
     encoded_path = quote(relative_path or "")
     url = f"{reverse('main:docs_api_download')}?path={encoded_path}"
     if share_owner and share_slug:
@@ -897,6 +914,7 @@ def build_docs_download_url(relative_path: str, share_owner: str = "", share_slu
 
 
 def render_docs_media_safely(source_path: Path, relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
+    """이미지·비디오·오디오 파일을 HanDrive 미리보기용 HTML로 감싼다."""
     source_url = escape(build_docs_download_url(relative_path, share_owner=share_owner, share_slug=share_slug))
     extension = source_path.suffix.lower()
     if extension in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".avif"}:
@@ -918,187 +936,8 @@ def render_docs_media_safely(source_path: Path, relative_path: str, share_owner:
     )
 
 
-def render_docs_pdf_safely(pdf_bytes: bytes, file_name: str = "preview.pdf") -> str:
-    encoded_pdf = base64.b64encode(pdf_bytes).decode("ascii")
-    pdf_data_url = f"data:application/pdf;base64,{encoded_pdf}#view=FitH"
-    safe_title = escape(file_name)
-    return mark_safe(
-        '<div class="handrive-media-wrap handrive-media-pdf-wrap">'
-        f'<iframe class="handrive-media-element handrive-media-pdf-element" src="{pdf_data_url}" title="{safe_title}"></iframe>'
-        "</div>"
-    )
-
-
-def find_libreoffice_binary() -> str:
-    for candidate in LIBREOFFICE_CANDIDATE_BINS:
-        if Path(candidate).exists():
-            return candidate
-    resolved = shutil.which("soffice") or shutil.which("libreoffice")
-    return str(resolved or "")
-
-
-def convert_office_bytes_to_pdf(file_extension: str, source_bytes: bytes, file_name: str = "document") -> bytes | None:
-    soffice_bin = find_libreoffice_binary()
-    if not soffice_bin or not source_bytes:
-        return None
-    suffix = normalize_file_extension(file_extension, allow_empty=False)
-    pdf_filter = {
-        ".doc": "writer_pdf_Export",
-        ".docx": "writer_pdf_Export",
-        ".xls": "calc_pdf_Export",
-        ".xlsx": "calc_pdf_Export",
-        ".ppt": "impress_pdf_Export",
-        ".pptx": "impress_pdf_Export",
-    }.get(suffix, "")
-    with tempfile.TemporaryDirectory(prefix="handrive-office-preview-") as tmp_dir:
-        work_dir = Path(tmp_dir)
-        source_name = f"source{suffix}"
-        source_path = work_dir / source_name
-        pdf_path = work_dir / "source.pdf"
-        try:
-            source_path.write_bytes(source_bytes)
-            result = subprocess.run(
-                [
-                    soffice_bin,
-                    "--headless",
-                    "--convert-to",
-                    f"pdf:{pdf_filter}" if pdf_filter else "pdf",
-                    "--outdir",
-                    str(work_dir),
-                    str(source_path),
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=60,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        if result.returncode != 0 or not pdf_path.exists():
-            return None
-        try:
-            return pdf_path.read_bytes()
-        except OSError:
-            return None
-
-
-def convert_office_bytes_to_html(file_extension: str, source_bytes: bytes) -> str | None:
-    soffice_bin = find_libreoffice_binary()
-    if not soffice_bin or not source_bytes:
-        return None
-    suffix = normalize_file_extension(file_extension, allow_empty=False)
-    if suffix not in {".xls", ".xlsx"}:
-        return None
-    with tempfile.TemporaryDirectory(prefix="handrive-office-html-preview-") as tmp_dir:
-        work_dir = Path(tmp_dir)
-        source_path = work_dir / f"source{suffix}"
-        html_path = work_dir / "source.html"
-        try:
-            source_path.write_bytes(source_bytes)
-            result = subprocess.run(
-                [
-                    soffice_bin,
-                    "--headless",
-                    "--convert-to",
-                    "html",
-                    "--outdir",
-                    str(work_dir),
-                    str(source_path),
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=60,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        if result.returncode != 0 or not html_path.exists():
-            return None
-        try:
-            return html_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            return None
-
-
-def _inject_before_first_closing_tag(source: str, closing_tag: str, injection: str) -> str:
-    pattern = re.compile(re.escape(closing_tag), re.IGNORECASE)
-    if pattern.search(source):
-        return pattern.sub(lambda match: f"{injection}{match.group(0)}", source, count=1)
-    return f"{source}{injection}"
-
-
-def build_docs_html_live_document(html_source: str, *, companion_css: str = "", companion_js: str = "") -> str:
-    document = html_source or ""
-    css_text = companion_css or ""
-    js_text = companion_js or ""
-    csp_meta = (
-        "\n<meta http-equiv=\"Content-Security-Policy\" "
-        "content=\"default-src 'none'; "
-        "script-src 'unsafe-inline'; "
-        "style-src 'unsafe-inline'; "
-        "img-src data: blob:; "
-        "font-src data:; "
-        "media-src data: blob:; "
-        "connect-src 'none'; "
-        "frame-src 'none'; "
-        "object-src 'none'; "
-        "form-action 'none'; "
-        "base-uri 'none'; "
-        "navigate-to 'none'\">"
-    )
-
-    if re.search(r"</head\s*>", document, flags=re.IGNORECASE):
-        document = _inject_before_first_closing_tag(document, "</head>", csp_meta)
-    else:
-        document = f"{csp_meta}{document}"
-
-    if css_text:
-        safe_css_text = css_text.replace("</style", "<\\/style")
-        css_block = f"\n<style data-handrive-linked-css>\n{safe_css_text}\n</style>\n"
-        if re.search(r"</head\s*>", document, flags=re.IGNORECASE):
-            document = _inject_before_first_closing_tag(document, "</head>", css_block)
-        else:
-            document = f"{css_block}{document}"
-
-    if js_text:
-        safe_js_text = js_text.replace("</script", "<\\/script")
-        js_block = f"\n<script data-handrive-linked-js>\n{safe_js_text}\n</script>\n"
-        if re.search(r"</body\s*>", document, flags=re.IGNORECASE):
-            document = _inject_before_first_closing_tag(document, "</body>", js_block)
-        else:
-            document = f"{document}{js_block}"
-
-    return document
-
-
-def render_docs_html_live_safely(html_source: str, *, companion_css: str = "", companion_js: str = "") -> str:
-    live_document = build_docs_html_live_document(
-        html_source,
-        companion_css=companion_css,
-        companion_js=companion_js,
-    )
-    escaped_srcdoc = escape(live_document)
-    iframe_html = (
-        '<div class="handrive-html-live-wrap">'
-        '<iframe class="handrive-html-live-frame" '
-        'sandbox="allow-scripts" '
-        'referrerpolicy="no-referrer" '
-        f'srcdoc="{escaped_srcdoc}"></iframe>'
-        "</div>"
-    )
-    return mark_safe(iframe_html)
-
-
 def load_docs_html_companion_assets(source_path: Path, request=None) -> tuple[str, str]:
-    if source_path.suffix.lower() != ".html":
-        return "", ""
-
-    base_path = source_path.with_suffix("")
-    companion_css_path = base_path.with_suffix(".css")
-    companion_js_path = base_path.with_suffix(".js")
-
+    """일반 HTML 파일과 같은 이름의 css/js companion asset 을 읽는다."""
     def _can_read(asset_path: Path) -> bool:
         if request is None:
             return True
@@ -1108,263 +947,32 @@ def load_docs_html_companion_assets(source_path: Path, request=None) -> tuple[st
             return False
         return has_docs_read_access(request, asset_relative_path)
 
-    def _read_asset(asset_path: Path) -> str:
-        if not asset_path.exists() or not asset_path.is_file() or not _can_read(asset_path):
-            return ""
-        try:
-            return asset_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            return ""
-
-    return _read_asset(companion_css_path), _read_asset(companion_js_path)
+    return load_local_html_companion_assets(source_path, can_read_path=_can_read)
 
 
 def load_git_repo_html_companion_assets(request, repo, branch_name: str, repo_relative_path: str) -> tuple[str, str]:
+    """repo branch 내부 HTML 파일의 companion css/js asset 을 읽는다."""
     normalized_relative = normalize_relative_path(repo_relative_path, allow_empty=False)
-    target_path = Path(normalized_relative)
-    if target_path.suffix.lower() != ".html":
-        return "", ""
+    del request
 
-    base_path = target_path.with_suffix("")
-    companion_specs = (
-        (f"{base_path.as_posix()}.css", ".css"),
-        (f"{base_path.as_posix()}.js", ".js"),
+    def _path_exists(path_value: str) -> bool:
+        return _git_repo_path_exists(repo, branch_name, path_value)
+
+    def _read_text(path_value: str) -> str:
+        try:
+            return _git_repo_read_file_bytes(repo, branch_name, path_value).decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            return ""
+
+    return load_repo_html_companion_assets(
+        normalized_relative,
+        path_exists=_path_exists,
+        read_text_file=_read_text,
     )
-
-    contents: list[str] = []
-    for companion_relative, _extension in companion_specs:
-        content = ""
-        if _git_repo_path_exists(repo, branch_name, companion_relative):
-            try:
-                content = _git_repo_read_file_bytes(repo, branch_name, companion_relative).decode("utf-8")
-            except (OSError, UnicodeDecodeError):
-                content = ""
-        contents.append(content)
-
-    return contents[0], contents[1]
-
-
-def _read_zip_xml_text(archive: zipfile.ZipFile, member_name: str) -> str:
-    try:
-        return archive.read(member_name).decode("utf-8")
-    except KeyError:
-        return ""
-
-
-def _extract_docx_preview_html(file_bytes: bytes) -> str:
-    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-    try:
-        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
-            document_xml = _read_zip_xml_text(archive, "word/document.xml")
-    except (zipfile.BadZipFile, OSError):
-        return "<p>미리보기를 지원하지 않는 Word 파일입니다.</p>"
-    if not document_xml:
-        return "<p>미리보기를 지원하지 않는 Word 파일입니다.</p>"
-
-    try:
-        root = ET.fromstring(document_xml)
-    except ET.ParseError:
-        return "<p>문서를 해석할 수 없습니다.</p>"
-
-    body = root.find("w:body", namespace)
-    if body is None:
-        return "<p>문서를 해석할 수 없습니다.</p>"
-
-    blocks: list[str] = []
-    for child in body:
-        tag_name = child.tag.rsplit("}", 1)[-1]
-        if tag_name == "p":
-            text = "".join(node.text or "" for node in child.findall(".//w:t", namespace)).strip()
-            if text:
-                blocks.append(f"<p>{escape(text)}</p>")
-        elif tag_name == "tbl":
-            rows = []
-            for row in child.findall(".//w:tr", namespace):
-                cells = []
-                for cell in row.findall("./w:tc", namespace):
-                    cell_text = "".join(node.text or "" for node in cell.findall(".//w:t", namespace)).strip()
-                    cells.append(f"<td>{escape(cell_text)}</td>")
-                if cells:
-                    rows.append("<tr>" + "".join(cells) + "</tr>")
-            if rows:
-                blocks.append('<div class="handrive-office-table-wrap"><table class="handrive-office-table">' + "".join(rows) + "</table></div>")
-
-    if not blocks:
-        return "<p>문서에 표시할 텍스트가 없습니다.</p>"
-    return "".join(blocks)
-
-
-def _excel_column_index(reference: str) -> int:
-    letters = "".join(character for character in str(reference or "") if character.isalpha()).upper()
-    index = 0
-    for character in letters:
-        index = index * 26 + (ord(character) - 64)
-    return max(0, index - 1)
-
-
-def _extract_xlsx_preview_html(file_bytes: bytes) -> str:
-    try:
-        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
-            shared_strings_xml = _read_zip_xml_text(archive, "xl/sharedStrings.xml")
-            workbook_xml = _read_zip_xml_text(archive, "xl/workbook.xml")
-            workbook_rels_xml = _read_zip_xml_text(archive, "xl/_rels/workbook.xml.rels")
-            if not workbook_xml or not workbook_rels_xml:
-                return "<p>미리보기를 지원하지 않는 Excel 파일입니다.</p>"
-
-            shared_strings: list[str] = []
-            if shared_strings_xml:
-                shared_root = ET.fromstring(shared_strings_xml)
-                for item in shared_root.findall(".//{*}si"):
-                    shared_strings.append("".join(node.text or "" for node in item.findall(".//{*}t")))
-
-            rel_map = {}
-            rel_root = ET.fromstring(workbook_rels_xml)
-            for rel in rel_root.findall(".//{*}Relationship"):
-                rel_id = rel.attrib.get("Id", "")
-                target = rel.attrib.get("Target", "")
-                if rel_id and target:
-                    rel_map[rel_id] = target.lstrip("/")
-
-            workbook_root = ET.fromstring(workbook_xml)
-            sheet_specs = []
-            for sheet in workbook_root.findall(".//{*}sheet")[:3]:
-                rel_id = sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id", "")
-                target = rel_map.get(rel_id, "")
-                if not target:
-                    continue
-                sheet_specs.append((sheet.attrib.get("name", "Sheet"), f"xl/{target}" if not target.startswith("xl/") else target))
-
-            sections: list[str] = []
-            for sheet_name, sheet_path in sheet_specs:
-                sheet_xml = _read_zip_xml_text(archive, sheet_path)
-                if not sheet_xml:
-                    continue
-                sheet_root = ET.fromstring(sheet_xml)
-                rows_html = []
-                for row in sheet_root.findall(".//{*}sheetData/{*}row")[:30]:
-                    values: dict[int, str] = {}
-                    max_index = -1
-                    for cell in row.findall("./{*}c"):
-                        cell_ref = cell.attrib.get("r", "")
-                        column_index = _excel_column_index(cell_ref)
-                        max_index = max(max_index, column_index)
-                        cell_type = cell.attrib.get("t", "")
-                        value = ""
-                        if cell_type == "inlineStr":
-                            value = "".join(node.text or "" for node in cell.findall(".//{*}t"))
-                        else:
-                            raw_value = "".join(node.text or "" for node in cell.findall("./{*}v"))
-                            if cell_type == "s":
-                                try:
-                                    shared_index = int(raw_value)
-                                    value = shared_strings[shared_index]
-                                except (ValueError, IndexError):
-                                    value = raw_value
-                            else:
-                                value = raw_value
-                        values[column_index] = value
-                    if max_index < 0:
-                        continue
-                    cells_html = []
-                    for column_index in range(min(max_index + 1, 20)):
-                        cells_html.append(f"<td>{escape(values.get(column_index, ''))}</td>")
-                    rows_html.append("<tr>" + "".join(cells_html) + "</tr>")
-                if rows_html:
-                    sections.append(
-                        f'<section class="handrive-office-sheet-section"><h3>{escape(sheet_name)}</h3><div class="handrive-office-table-wrap"><table class="handrive-office-table">{"".join(rows_html)}</table></div></section>'
-                    )
-            if not sections:
-                return "<p>시트에 표시할 데이터가 없습니다.</p>"
-            return "".join(sections)
-    except (zipfile.BadZipFile, OSError, ET.ParseError):
-        return "<p>미리보기를 지원하지 않는 Excel 파일입니다.</p>"
-
-
-def _extract_pptx_preview_html(file_bytes: bytes) -> str:
-    try:
-        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
-            slide_names = sorted(
-                name for name in archive.namelist()
-                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
-            )[:20]
-            if not slide_names:
-                return "<p>미리보기를 지원하지 않는 PowerPoint 파일입니다.</p>"
-            sections = []
-            for index, slide_name in enumerate(slide_names, start=1):
-                slide_xml = _read_zip_xml_text(archive, slide_name)
-                if not slide_xml:
-                    continue
-                slide_root = ET.fromstring(slide_xml)
-                texts = [
-                    (node.text or "").strip()
-                    for node in slide_root.findall(".//{*}t")
-                    if (node.text or "").strip()
-                ]
-                if not texts:
-                    sections.append(f'<section class="handrive-office-slide"><h3>Slide {index}</h3><p>표시할 텍스트가 없습니다.</p></section>')
-                    continue
-                slide_body = "".join(f"<p>{escape(text)}</p>" for text in texts[:30])
-                sections.append(f'<section class="handrive-office-slide"><h3>Slide {index}</h3>{slide_body}</section>')
-            return "".join(sections) or "<p>슬라이드에 표시할 내용이 없습니다.</p>"
-    except (zipfile.BadZipFile, OSError, ET.ParseError):
-        return "<p>미리보기를 지원하지 않는 PowerPoint 파일입니다.</p>"
-
-
-def render_docs_office_preview_safely(file_extension: str, source_bytes: bytes) -> str:
-    extension = str(file_extension or "").lower()
-    if extension in {".xls", ".xlsx"}:
-        html_text = convert_office_bytes_to_html(extension, source_bytes)
-        if html_text:
-            office_override_css = """
-html, body {
-    margin: 0;
-    padding: 0;
-    background: #ffffff;
-    color: #1f2328;
-}
-body, div, table, thead, tbody, tfoot, tr, th, td, p, span, font {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Nanum Gothic", sans-serif !important;
-    font-size: 14px !important;
-    line-height: 1.45 !important;
-    color: inherit !important;
-}
-body {
-    padding: 14px;
-    overflow-x: auto;
-}
-table {
-    border-collapse: collapse !important;
-    border-spacing: 0 !important;
-    width: max-content;
-    min-width: 100%;
-    background: #ffffff;
-}
-td, th {
-    border: 1px solid #d0d7de !important;
-    padding: 6px 8px !important;
-    vertical-align: middle !important;
-    white-space: pre-wrap;
-}
-col {
-    width: auto !important;
-}
-"""
-            return render_docs_html_live_safely(html_text, companion_css=office_override_css)
-    pdf_bytes = convert_office_bytes_to_pdf(extension, source_bytes, f"preview{extension or '.docx'}")
-    if pdf_bytes:
-        return render_docs_pdf_safely(pdf_bytes, f"preview{extension or '.pdf'}")
-    if extension == ".docx":
-        return mark_safe(_extract_docx_preview_html(source_bytes))
-    if extension == ".xlsx":
-        return mark_safe(_extract_xlsx_preview_html(source_bytes))
-    if extension == ".pptx":
-        return mark_safe(_extract_pptx_preview_html(source_bytes))
-    if extension in {".doc", ".xls", ".ppt"}:
-        return mark_safe("<p>이 형식은 구형 Office 포맷이라 미리보기를 지원하지 않습니다. 최신 형식으로 저장하면 미리보기가 가능합니다.</p>")
-    return mark_safe("<p>미리보기를 지원하지 않는 Office 파일입니다.</p>")
 
 
 def resolve_docs_render_profile(file_extension: str | None) -> dict[str, str]:
+    """확장자별 preview render mode 와 CSS class 조합을 반환한다."""
     try:
         normalized_extension = normalize_file_extension(file_extension, allow_empty=True)
     except ValueError:
@@ -1384,6 +992,7 @@ def resolve_docs_render_profile(file_extension: str | None) -> dict[str, str]:
 
 
 def get_docs_save_extension_options() -> list[str]:
+    """쓰기 화면의 빠른 확장자 선택 목록을 만든다."""
     options = []
     for extension, profile in DOCS_RENDER_PROFILES_BY_EXTENSION.items():
         if (
@@ -1412,6 +1021,11 @@ def render_docs_content(
     share_owner: str = "",
     share_slug: str = "",
 ) -> tuple[str, dict[str, str]]:
+    """파일 확장자에 맞는 미리보기 렌더러를 선택한다.
+
+    markdown/plain text/media/office 렌더 경로를 한곳에서 통합하고,
+    필요하면 source bytes 와 HTML companion asset 도 함께 사용한다.
+    """
     profile = resolve_docs_render_profile(file_extension)
     if profile["css_class"] == "handrive-html":
         resolved_companion_css = companion_css or ""
@@ -1445,10 +1059,12 @@ def render_docs_content(
 
 
 def is_docs_non_editable_media_extension(file_extension: str | None) -> bool:
+    """에디터 대신 전용 preview 를 써야 하는 확장자인지 판별한다."""
     return resolve_docs_render_profile(file_extension).get("mode") in DOCS_NON_EDITABLE_MEDIA_MODES
 
 
 def load_docs_source_content(file_path: Path, *, request=None, relative_path: str = "") -> str:
+    """편집 가능한 텍스트 파일의 원본 내용을 읽는다."""
     if is_docs_non_editable_media_extension(file_path.suffix.lower()):
         return ""
     try:
@@ -1460,6 +1076,7 @@ def load_docs_source_content(file_path: Path, *, request=None, relative_path: st
 
 
 def build_entry(path_obj: Path) -> dict:
+    """filesystem 경로를 list API 엔트리 dict 로 직렬화한다."""
     rel_path = relative_from_root(path_obj)
     is_dir = path_obj.is_dir()
     data = {
@@ -1493,6 +1110,7 @@ def build_entry(path_obj: Path) -> dict:
 
 
 def build_acl_candidate_paths(path_value: str | None) -> list[str]:
+    """한 경로에 적용 가능한 상위 ACL 후보 경로들을 반환한다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
     if not normalized:
         return [""]
@@ -1507,6 +1125,7 @@ def build_acl_candidate_paths(path_value: str | None) -> list[str]:
 
 
 def get_docs_acl_rule_map(request) -> dict[str, DocsAccessRule]:
+    """요청 단위 ACL rule 캐시 맵을 반환한다."""
     rule_map = getattr(request, "_docs_acl_rule_map", None)
     if rule_map is None:
         rules = DocsAccessRule.objects.prefetch_related(
@@ -1521,6 +1140,7 @@ def get_docs_acl_rule_map(request) -> dict[str, DocsAccessRule]:
 
 
 def get_effective_docs_acl_rule(request, path_value: str | None) -> tuple[DocsAccessRule | None, str]:
+    """경로에 실제 적용되는 가장 가까운 ACL rule 을 찾는다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
     cache = getattr(request, "_docs_acl_effective_cache", None)
     if cache is None:
@@ -1541,6 +1161,7 @@ def get_effective_docs_acl_rule(request, path_value: str | None) -> tuple[DocsAc
 
 
 def has_descendant_docs_acl_rule(request, path_value: str | None) -> bool:
+    """하위 트리에 별도 ACL rule 이 존재하는지 확인한다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
 
     cache = getattr(request, "_docs_acl_descendant_rule_cache", None)
@@ -1563,16 +1184,19 @@ def has_descendant_docs_acl_rule(request, path_value: str | None) -> bool:
 
 
 def get_docs_public_write_group() -> Group:
+    """공개 쓰기 pseudo-group 을 보장하고 반환한다."""
     group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
     return group
 
 
 def rule_has_public_group(rule: DocsAccessRule, group_relation: str) -> bool:
+    """ACL rule relation 안에 public-write marker group 이 있는지 검사한다."""
     groups = getattr(rule, group_relation).all()
     return any(group.name == DOCS_PUBLIC_WRITE_GROUP_NAME for group in groups)
 
 
 def get_public_group_display_label(request) -> str:
+    """UI 언어에 맞는 공개 그룹 표시 라벨을 캐시해 반환한다."""
     cached = getattr(request, "_docs_public_group_display_label", None)
     if isinstance(cached, str) and cached:
         return cached
@@ -1583,6 +1207,7 @@ def get_public_group_display_label(request) -> str:
 
 
 def is_docs_public_write_enabled(request, path_value: str | None) -> bool:
+    """주어진 경로에 public-write ACL 이 적용되는지 확인한다."""
     rule, _ = get_effective_docs_acl_rule(request, path_value)
     if rule is None:
         return False
@@ -1590,6 +1215,7 @@ def is_docs_public_write_enabled(request, path_value: str | None) -> bool:
 
 
 def is_docs_url_only_enabled(request, path_value: str | None) -> bool:
+    """URL-only 그룹으로 제한된 경로인지 확인한다."""
     rule, _ = get_effective_docs_acl_rule(request, path_value)
     if rule is None:
         return False
@@ -1599,6 +1225,7 @@ def is_docs_url_only_enabled(request, path_value: str | None) -> bool:
 
 
 def get_write_acl_display_labels(request, path_value: str | None) -> list[str]:
+    """쓰기 권한 배지에 노출할 사용자/그룹 라벨을 만든다."""
     rule, _ = get_effective_docs_acl_rule(request, path_value)
     if rule is None:
         return []
@@ -1627,6 +1254,7 @@ def get_write_acl_display_labels(request, path_value: str | None) -> list[str]:
 
 
 def get_request_user_group_ids(request) -> set[int]:
+    """현재 요청 사용자의 group id 집합을 캐시해 반환한다."""
     cached = getattr(request, "_docs_acl_user_group_ids", None)
     if cached is not None:
         return cached
@@ -1647,6 +1275,7 @@ def user_matches_docs_acl_rule(
     user_relation: str,
     group_relation: str,
 ) -> bool:
+    """사용자가 특정 ACL rule 의 user/group relation 에 포함되는지 판정한다."""
     user = getattr(request, "user", None)
     if user and user.is_superuser:
         return True
@@ -1668,6 +1297,7 @@ def user_matches_docs_acl_rule(
 
 
 def has_docs_read_access(request, path_value: str | None) -> bool:
+    """주어진 경로를 읽을 수 있는지 최종 판정한다."""
     user = getattr(request, "user", None)
     if user and user.is_superuser:
         return True
@@ -1708,6 +1338,7 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
 
 
 def has_docs_write_access(request, path_value: str | None) -> bool:
+    """파일 단위 쓰기 권한을 판정한다."""
     user = getattr(request, "user", None)
     scoped_home_dir = get_scoped_docs_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
@@ -1758,6 +1389,7 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
 
 
 def has_docs_directory_write_access(request, path_value: str | None) -> bool:
+    """폴더 하위 생성/업로드 가능 여부를 판정한다."""
     user = getattr(request, "user", None)
     scoped_home_dir = get_scoped_docs_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
@@ -1792,6 +1424,7 @@ def has_docs_directory_write_access(request, path_value: str | None) -> bool:
 
 
 def move_docs_acl_rules(source_path: str, destination_path: str) -> None:
+    """경로 이동/이름변경 시 ACL rule 들도 같은 상대위치로 이동한다."""
     source_normalized = normalize_relative_path(source_path, allow_empty=True)
     destination_normalized = normalize_relative_path(destination_path, allow_empty=True)
     if source_normalized == destination_normalized:
@@ -1838,6 +1471,7 @@ def move_docs_acl_rules(source_path: str, destination_path: str) -> None:
 
 
 def delete_docs_acl_rules_for_path(path_value: str) -> None:
+    """경로와 하위 트리에 연결된 ACL rule 을 삭제한다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
     if not normalized:
         DocsAccessRule.objects.filter(path="").delete()
@@ -1848,6 +1482,7 @@ def delete_docs_acl_rules_for_path(path_value: str) -> None:
 
 
 def list_directory_entries(directory: Path, request=None) -> list[dict]:
+    """실제 디렉터리 엔트리와 가상 repo root 엔트리를 함께 구성한다."""
     entries = []
     existing_entry_paths = set()
     for child in sorted(directory.iterdir(), key=lambda p: (0 if p.is_dir() else 1, p.name.lower())):
@@ -1999,6 +1634,7 @@ def _get_current_dir_git_repo(request, current_dir: str):
 
 
 def _get_git_repo_for_relative_path(request, relative_path: str):
+    """현재 사용자에게 보이는 repo root 경로와 정확히 일치하는 GitRepository 를 찾는다."""
     if request is None or not hasattr(request, "user") or not request.user.is_authenticated:
         return None
     normalized = normalize_relative_path(relative_path, allow_empty=False)
@@ -2009,6 +1645,7 @@ def _get_git_repo_for_relative_path(request, relative_path: str):
 
 
 def _sync_git_collaborators_from_forgejo(repo) -> None:
+    """Forgejo collaborator 목록을 Django ``GitCollaborator`` 테이블과 동기화한다."""
     from .models import GitCollaborator
 
     owner_name = str(repo.forgejo_owner or getattr(repo.owner, "username", "") or "").strip()
@@ -2064,6 +1701,7 @@ def _sync_git_collaborators_from_forgejo(repo) -> None:
 
 
 def _get_visible_git_repositories(request):
+    """현재 사용자 기준 owner/collaborator repo 목록과 permission 캐시를 만든다."""
     cached = getattr(request, "_visible_git_repositories", None)
     if cached is not None:
         return cached
@@ -2104,6 +1742,7 @@ def _get_visible_git_repositories(request):
 
 
 def _get_git_repo_permission_for_request(request, repo) -> str:
+    """현재 요청 사용자의 repo permission 문자열을 반환한다."""
     permissions = getattr(request, "_visible_git_repo_permissions", None)
     if permissions is None:
         _get_visible_git_repositories(request)
@@ -2112,6 +1751,7 @@ def _get_git_repo_permission_for_request(request, repo) -> str:
 
 
 def _get_visible_git_repo_root_relative(request, repo) -> str:
+    """현재 사용자가 HanDrive 에서 보게 될 repo root 상대경로를 계산한다."""
     if request is not None and hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
         if repo.owner_id != getattr(request.user, "id", None):
             viewer_root = _get_owner_visible_root_relative(request.user)
@@ -2121,6 +1761,7 @@ def _get_visible_git_repo_root_relative(request, repo) -> str:
 
 
 def _get_git_repo_mount_prefixes(request) -> tuple[str, ...]:
+    """가상 repo mount prefix 목록을 길이순으로 캐시해 반환한다."""
     cached = getattr(request, "_docs_git_repo_mount_prefixes", None)
     if cached is not None:
         return cached
@@ -2136,6 +1777,7 @@ def _get_git_repo_mount_prefixes(request) -> tuple[str, ...]:
 
 
 def _get_owner_visible_root_relative(owner) -> str:
+    """소유자 유형에 따라 repo 가 노출될 HanDrive 루트 경로를 계산한다."""
     username = str(getattr(owner, "username", "") or "").strip()
     if not username:
         return ""
@@ -2147,23 +1789,28 @@ def _get_owner_visible_root_relative(owner) -> str:
 
 
 def _get_repo_restore_relative_path(owner, repo_name: str) -> str:
+    """repo 삭제 후 일반 폴더로 복원될 HanDrive 상대경로를 계산한다."""
     base = _get_owner_visible_root_relative(owner)
     return f"{base}/{repo_name}" if base else repo_name
 
 
 def _get_repo_storage_path(owner, repo_name: str) -> Path:
+    """Forgejo bare repo 의 실제 저장 경로를 반환한다."""
     return (Path(settings.BASE_DIR) / "forgejo" / "data" / "repos" / owner.username / f"{repo_name}.git").resolve()
 
 
 def _encode_git_branch_segment(branch_name: str) -> str:
+    """브랜치명을 HanDrive path segment 로 안전하게 인코딩한다."""
     return quote(str(branch_name or ""), safe="")
 
 
 def _decode_git_branch_segment(branch_segment: str) -> str:
+    """HanDrive path segment 에서 원래 브랜치명을 복원한다."""
     return unquote(str(branch_segment or ""))
 
 
 def _copy_tree_contents(source_dir: Path, destination_dir: Path) -> None:
+    """디렉터리 내용을 symlink 보존 상태로 새 대상 경로에 복사한다."""
     destination_dir.mkdir(parents=True, exist_ok=False)
     for child in source_dir.iterdir():
         target_child = destination_dir / child.name
@@ -2174,6 +1821,7 @@ def _copy_tree_contents(source_dir: Path, destination_dir: Path) -> None:
 
 
 def _run_git_repo_command(repo, *args: str, text: bool = True, check: bool = True, timeout: int = 120):
+    """bare repo 를 대상으로 git 명령을 실행하는 공통 helper."""
     repo_storage_path = _get_repo_storage_path(repo.owner, repo.repo_name)
     command = [GIT_BIN, f"--git-dir={repo_storage_path}", *args]
     result = subprocess.run(
@@ -2189,6 +1837,7 @@ def _run_git_repo_command(repo, *args: str, text: bool = True, check: bool = Tru
 
 
 def _git_repo_branches(repo) -> list[str]:
+    """repo 에 존재하는 local branch 이름 목록을 반환한다."""
     result = _run_git_repo_command(
         repo,
         "for-each-ref",
@@ -2199,18 +1848,21 @@ def _git_repo_branches(repo) -> list[str]:
 
 
 def _git_repo_object_type(repo, branch_name: str, repo_relative_path: str = "") -> str:
+    """branch/path 가 tree 인지 blob 인지 확인한다."""
     spec = branch_name if not repo_relative_path else f"{branch_name}:{repo_relative_path}"
     result = _run_git_repo_command(repo, "cat-file", "-t", spec)
     return (result.stdout or "").strip()
 
 
 def _git_repo_read_file_bytes(repo, branch_name: str, repo_relative_path: str) -> bytes:
+    """branch 내부 파일을 bare repo 에서 직접 읽는다."""
     spec = f"{branch_name}:{repo_relative_path}"
     result = _run_git_repo_command(repo, "show", spec, text=False)
     return result.stdout or b""
 
 
 def _git_repo_list_tree(repo, branch_name: str, repo_relative_path: str = "") -> list[dict]:
+    """branch 디렉터리 엔트리를 HanDrive list 용 dict 목록으로 변환한다."""
     spec = branch_name if not repo_relative_path else f"{branch_name}:{repo_relative_path}"
     result = _run_git_repo_command(repo, "ls-tree", "-z", spec, text=False)
     payload = result.stdout or b""
@@ -2240,6 +1892,7 @@ def _git_repo_list_tree(repo, branch_name: str, repo_relative_path: str = "") ->
 
 
 def _git_repo_latest_commit_meta(repo, branch_name: str, repo_relative_path: str = "") -> dict[str, str]:
+    """경로 기준 최신 커밋 subject/author 를 조회한다."""
     args = ["log", "-1", "--format=%s%x1f%an", branch_name]
     normalized_path = normalize_relative_path(repo_relative_path, allow_empty=True)
     if normalized_path:
@@ -2256,10 +1909,12 @@ def _git_repo_latest_commit_meta(repo, branch_name: str, repo_relative_path: str
 
 
 def _git_repo_latest_commit_subject(repo, branch_name: str, repo_relative_path: str = "") -> str:
+    """최신 커밋 제목만 필요한 곳을 위한 helper."""
     return _git_repo_latest_commit_meta(repo, branch_name, repo_relative_path).get("subject", "")
 
 
 def _git_repo_path_exists(repo, branch_name: str, repo_relative_path: str) -> bool:
+    """branch 내부 경로가 실제로 존재하는지 확인한다."""
     normalized_path = normalize_relative_path(repo_relative_path, allow_empty=False)
     spec = f"{branch_name}:{normalized_path}"
     result = _run_git_repo_command(repo, "cat-file", "-e", spec, check=False)
@@ -2267,6 +1922,7 @@ def _git_repo_path_exists(repo, branch_name: str, repo_relative_path: str) -> bo
 
 
 def _resolve_git_worktree_path(worktree_dir: Path, repo_relative_path: str = "") -> Path:
+    """temp clone worktree 안의 안전한 대상 경로를 계산한다."""
     normalized_path = normalize_relative_path(repo_relative_path, allow_empty=True)
     target_path = worktree_dir if not normalized_path else worktree_dir.joinpath(*normalized_path.split("/"))
     resolved_root = worktree_dir.resolve()
@@ -2277,12 +1933,14 @@ def _resolve_git_worktree_path(worktree_dir: Path, repo_relative_path: str = "")
 
 
 def _remove_gitkeep_placeholder(directory: Path) -> None:
+    """빈 폴더 보존용 ``.gitkeep`` placeholder 를 제거한다."""
     placeholder = directory / ".gitkeep"
     if placeholder.exists():
         placeholder.unlink()
 
 
 def _ensure_gitkeep_if_empty(directory: Path, repo_root: Path) -> None:
+    """삭제 후 폴더가 비면 ``.gitkeep`` 를 넣어 empty dir 을 유지한다."""
     current = directory
     resolved_root = repo_root.resolve()
     while True:
@@ -2296,6 +1954,7 @@ def _ensure_gitkeep_if_empty(directory: Path, repo_root: Path) -> None:
 
 
 def _copy_local_item_to_git_worktree(source_path: Path, destination_path: Path) -> None:
+    """일반 HanDrive 파일/폴더를 temp git worktree 로 복사한다."""
     if source_path.is_dir():
         shutil.copytree(source_path, destination_path, symlinks=True)
         git_dir = destination_path / ".git"
@@ -2306,6 +1965,7 @@ def _copy_local_item_to_git_worktree(source_path: Path, destination_path: Path) 
 
 
 def _commit_git_branch_mutation(repo, branch_name: str, commit_message: str, author_user, mutator) -> None:
+    """temp clone 에 mutation 을 적용한 뒤 commit/push 까지 수행한다."""
     message = str(commit_message or "").strip()
     if not message:
         raise ValueError("커밋 메시지를 입력해주세요.")
@@ -2347,6 +2007,7 @@ def _commit_git_branch_mutation(repo, branch_name: str, commit_message: str, aut
 
 
 def _build_available_git_repo_filename(repo, branch_name: str, repo_relative_dir: str, original_name: str) -> str:
+    """repo branch 내부에서 충돌 없는 업로드 파일명을 계산한다."""
     raw_name = (original_name or "").strip()
     if not raw_name:
         raise ValueError("업로드할 파일 이름이 올바르지 않습니다.")
@@ -2377,6 +2038,13 @@ def _build_available_git_repo_filename(repo, branch_name: str, repo_relative_dir
 
 
 def _get_git_virtual_context(request, path_value: str | None):
+    """HanDrive 가상 repo 경로를 repo/branch 메타로 해석한다.
+
+    예:
+    - ``users/adihang/repo`` -> repo_root
+    - ``users/adihang/repo/main`` -> branch_dir
+    - ``users/adihang/repo/main/src/app.js`` -> branch_file
+    """
     if request is None or not hasattr(request, "user") or not request.user.is_authenticated:
         return None
 
@@ -2436,6 +2104,7 @@ def _get_git_virtual_context(request, path_value: str | None):
 
 
 def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *, scoped_home_dir: str = "", root_url: str | None = None):
+    """repo/branch 가상 경로를 포함한 breadcrumb 목록을 생성한다."""
     context = _get_git_virtual_context(request, current_path)
     if context is None:
         return build_docs_breadcrumbs(
@@ -2490,6 +2159,7 @@ def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *,
 
 
 def _build_git_virtual_entries(request, context) -> list[dict]:
+    """repo root 또는 branch 경로를 HanDrive list entry 목록으로 변환한다."""
     repo = context["repo"]
     repo_root = context["repo_root"]
     repo_permission = str(context.get("repo_permission") or "").lower()
@@ -2549,6 +2219,7 @@ def _build_git_virtual_entries(request, context) -> list[dict]:
 
 
 def _commit_git_branch_changes(repo, branch_name: str, commit_message: str, file_updates: dict[str, bytes], author_user) -> None:
+    """메모리의 파일 업데이트 dict 를 branch commit 으로 반영한다."""
     def _mutate(worktree_dir: Path) -> None:
         for repo_relative_path, content_bytes in file_updates.items():
             target_file = _resolve_git_worktree_path(worktree_dir, repo_relative_path)
@@ -2560,6 +2231,7 @@ def _commit_git_branch_changes(repo, branch_name: str, commit_message: str, file
 
 
 def _materialize_git_repo_mount(target_path: Path, destination_path: Path) -> None:
+    """bare repo 내용을 일반 폴더 형태로 checkout 해서 복원한다."""
     with tempfile.TemporaryDirectory(prefix="handrive_repo_restore_") as temp_dir:
         checkout_path = Path(temp_dir) / "checkout"
         result = subprocess.run(
@@ -3138,6 +2810,7 @@ def delete_docs_shared_links_for_path(path_value: str) -> None:
 
 
 def docs_common_context(request, ui_lang):
+    """HanDrive 전 페이지가 공유하는 기본 템플릿 context를 구성한다."""
     context = {}
     apply_ui_context(request, context, ui_lang)
     docs_text = get_docs_text(ui_lang)
@@ -3965,6 +3638,7 @@ def docs_ops_apply_static(request, ui_lang=None):
 
 @with_request_docs_root
 def docs_list(request, folder_path="", ui_lang=None):
+    """HanDrive 목록 페이지를 렌더한다."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
@@ -4055,6 +3729,7 @@ def docs_list(request, folder_path="", ui_lang=None):
 
 @with_request_docs_root
 def docs_view(request, doc_path, ui_lang=None):
+    """HanDrive 단일 파일 보기 페이지를 렌더한다."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
@@ -4240,6 +3915,11 @@ def docs_shared_view(request, owner_username, share_slug, ui_lang=None):
 
 @with_request_docs_root
 def docs_write(request, ui_lang=None):
+    """HanDrive 편집 페이지를 렌더한다.
+
+    새 문서 작성과 기존 파일 수정이 같은 view를 사용한다.
+    repo branch 내부에서는 commit message 요구 여부도 함께 계산한다.
+    """
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = docs_common_context(request, resolved_lang)
     docs_text = context["docs_text"]
@@ -4642,6 +4322,7 @@ def docs_api_url_share(request):
 @require_http_methods(["GET"])
 @with_request_docs_root
 def docs_api_list(request):
+    """디렉터리 엔트리 목록을 JSON으로 반환한다."""
     rel_path = request.GET.get("path", "")
 
     try:
@@ -4679,6 +4360,10 @@ def docs_api_list(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_rename(request):
+    """파일/폴더 이름 변경 API.
+
+    일반 경로는 파일 시스템 rename 을, repo branch 경로는 temp clone + commit/push 를 사용한다.
+    """
     try:
         payload = parse_json_body(request)
         rel_path = normalize_relative_path(payload.get("path"), allow_empty=False)
@@ -4775,6 +4460,11 @@ def docs_api_rename(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_delete(request):
+    """파일/폴더 삭제 API.
+
+    repo root 삭제는 일반 삭제와 분리해서 다룬다.
+    또한 repo branch 내부 다중 삭제는 같은 repo/branch 묶음만 허용한다.
+    """
     try:
         payload = parse_json_body(request)
         path_values = parse_path_values(payload, allow_empty=False)
@@ -4923,6 +4613,7 @@ def docs_api_delete(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_mkdir(request):
+    """새 폴더 생성 API."""
     try:
         payload = parse_json_body(request)
         parent_dir = normalize_relative_path(payload.get("parent_dir"), allow_empty=True)
@@ -4975,6 +4666,11 @@ def docs_api_mkdir(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_move(request):
+    """파일/폴더 이동 API.
+
+    일반 경로 이동과 repo branch 이동을 둘 다 지원하며,
+    repo branch 대상 이동은 Git commit/push 로 변환된다.
+    """
     try:
         payload = parse_json_body(request)
         source_path_value = normalize_relative_path(payload.get("source_path"), allow_empty=False)
@@ -5157,6 +4853,10 @@ def docs_api_move(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_upload(request):
+    """파일 업로드 API.
+
+    일반 폴더 업로드, 청크 업로드, repo branch 업로드를 모두 처리한다.
+    """
     try:
         target_dir_value = normalize_relative_path(request.POST.get("dir"), allow_empty=True)
         git_virtual_target = _get_git_virtual_context(request, target_dir_value)
@@ -5399,6 +5099,7 @@ def docs_api_upload_cancel(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_preview(request):
+    """목록 우측 미리보기 패널에서 사용할 HTML 조각을 반환한다."""
     try:
         payload = parse_json_body(request)
         preview_relative_path = normalize_relative_path(payload.get("path"), allow_empty=True)
@@ -5559,6 +5260,11 @@ def docs_api_preview(request):
 @csrf_protect
 @with_request_docs_root
 def docs_api_save(request):
+    """에디터 저장 API.
+
+    목록 인라인 에디터와 쓰기 페이지가 같은 저장 포맷을 사용한다.
+    repo branch 파일은 commit message 검증이 함께 들어간다.
+    """
     try:
         payload = parse_json_body(request)
         original_relative_path = normalize_relative_path(payload.get("original_path"), allow_empty=True)
@@ -5723,6 +5429,7 @@ def docs_api_save(request):
 @require_http_methods(["GET"])
 @with_request_docs_root
 def docs_api_download(request):
+    """일반 파일과 repo virtual file을 공통 다운로드 엔드포인트로 제공한다."""
     try:
         rel_path = normalize_relative_path(request.GET.get("path"), allow_empty=False)
     except ValueError:

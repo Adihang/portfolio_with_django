@@ -1,0 +1,279 @@
+(function () {
+    "use strict";
+
+    // Queue operation helpers run the side-effectful upload/move/delete workers that back the
+    // floating queue panel. They are intentionally serial to keep progress ordering predictable.
+
+    async function processUploadQueue(options) {
+        // One worker drains queued items serially so progress state, conflict prompts,
+        // and post-upload refresh timing stay deterministic.
+        var settings = options || {};
+        var state = settings.state || {};
+        var renderUploadQueue = settings.renderUploadQueue || function () {};
+        var uploadSingleFile = settings.uploadSingleFile || function () { return Promise.resolve(); };
+        var refreshCurrentDirectory = settings.refreshCurrentDirectory || function () { return Promise.resolve(); };
+        var alertError = settings.alertError || function () {};
+        var t = settings.t || function (_, fallbackValue) { return fallbackValue || ""; };
+
+        if (state.uploadWorkerActive) {
+            return;
+        }
+        state.uploadWorkerActive = true;
+        try {
+            while (true) {
+                var nextItem = (state.uploadQueueItems || []).find(function (item) {
+                    return item.status === "queued";
+                });
+                if (!nextItem) {
+                    break;
+                }
+
+                nextItem.status = "uploading";
+                nextItem.progress = 0;
+                nextItem.errorMessage = "";
+                renderUploadQueue();
+
+                try {
+                    await uploadSingleFile(nextItem);
+                } catch (error) {
+                    if (nextItem.abortRequested) {
+                        continue;
+                    }
+                    nextItem.status = "failed";
+                    nextItem.errorMessage = error && error.message
+                        ? error.message
+                        : t("job_status_failed", "실패");
+                    renderUploadQueue();
+                }
+            }
+        } finally {
+            state.uploadWorkerActive = false;
+            if (state.uploadRefreshPending) {
+                state.uploadRefreshPending = false;
+                try {
+                    await refreshCurrentDirectory();
+                } catch (error) {
+                    alertError(error);
+                }
+            }
+            renderUploadQueue();
+        }
+    }
+
+    async function runDeleteOperationQueueItem(item, options) {
+        // Delete queue items can represent multiple selected paths, so progress is computed
+        // per child deletion while preserving one logical queue row in the UI.
+        var settings = options || {};
+        var requestJson = settings.requestJson || function () { return Promise.resolve(); };
+        var buildPostOptions = settings.buildPostOptions || function () { return {}; };
+        var deleteApiUrl = settings.deleteApiUrl || "";
+        var renderUploadQueue = settings.renderUploadQueue || function () {};
+        var removeExpandedFoldersByDeletedPaths = settings.removeExpandedFoldersByDeletedPaths || function () {};
+        var applySelection = settings.applySelection || function () {};
+        var queueNeedsRefresh = settings.queueNeedsRefresh || function () {};
+        var t = settings.t || function (_, fallbackValue) { return fallbackValue || ""; };
+
+        var entries = Array.isArray(item.entries) ? item.entries.slice() : [];
+        var totalCount = entries.length;
+        var deletedPaths = [];
+
+        for (var index = 0; index < entries.length; index += 1) {
+            if (item.abortRequested) {
+                throw new Error(t("queue_cancel", "취소"));
+            }
+            var controller = new AbortController();
+            item.abortController = controller;
+            var entry = entries[index];
+            await requestJson(deleteApiUrl, Object.assign(
+                buildPostOptions({
+                    path: entry.path,
+                    commit_message: item.commitMessage || "",
+                    repo_delete: Boolean(item.isRepoDelete),
+                }),
+                { signal: controller.signal }
+            ));
+            deletedPaths.push(entry.path);
+            item.progress = ((index + 1) / totalCount) * 100;
+            item.savedPath = entry.path;
+            item.abortController = null;
+            renderUploadQueue();
+        }
+
+        removeExpandedFoldersByDeletedPaths(deletedPaths);
+        applySelection([], { render: false });
+        queueNeedsRefresh();
+    }
+
+    async function runMoveOperationQueueItem(item, options) {
+        // Move queue items mirror delete semantics but persist the last moved target path
+        // so the queue row can still show a useful destination after completion.
+        var settings = options || {};
+        var requestJson = settings.requestJson || function () { return Promise.resolve({}); };
+        var buildPostOptions = settings.buildPostOptions || function () { return {}; };
+        var moveApiUrl = settings.moveApiUrl || "";
+        var renderUploadQueue = settings.renderUploadQueue || function () {};
+        var applySelection = settings.applySelection || function () {};
+        var queueNeedsRefresh = settings.queueNeedsRefresh || function () {};
+        var t = settings.t || function (_, fallbackValue) { return fallbackValue || ""; };
+
+        var entries = Array.isArray(item.entries) ? item.entries.slice() : [];
+        var totalCount = entries.length;
+        var movedPaths = [];
+
+        for (var index = 0; index < entries.length; index += 1) {
+            if (item.abortRequested) {
+                throw new Error(t("queue_cancel", "취소"));
+            }
+            var controller = new AbortController();
+            item.abortController = controller;
+            var entry = entries[index];
+            var data = await requestJson(moveApiUrl, Object.assign(
+                buildPostOptions({
+                    source_path: entry.path,
+                    target_dir: item.targetDirPath,
+                    commit_message: item.commitMessage || "",
+                }),
+                { signal: controller.signal }
+            ));
+            var movedPath = data && data.path ? data.path : entry.path;
+            movedPaths.push(movedPath);
+            item.progress = ((index + 1) / totalCount) * 100;
+            item.savedPath = movedPath;
+            item.savedSlugPath = data && data.slug_path ? data.slug_path : "";
+            item.abortController = null;
+            renderUploadQueue();
+        }
+
+        applySelection(movedPaths, {
+            primaryPath: movedPaths[0] || "",
+            anchorPath: movedPaths[0] || "",
+            render: false,
+        });
+        queueNeedsRefresh();
+    }
+
+    async function processOperationQueue(options) {
+        // Synthetic move/delete jobs share the same queue panel as uploads but run in
+        // a dedicated worker so destructive operations stay serialized and inspectable.
+        var settings = options || {};
+        var state = settings.state || {};
+        var renderUploadQueue = settings.renderUploadQueue || function () {};
+        var removeUploadQueueItem = settings.removeUploadQueueItem || function () {};
+        var runDeleteOperationQueueItem = settings.runDeleteOperationQueueItem || function () { return Promise.resolve(); };
+        var runMoveOperationQueueItem = settings.runMoveOperationQueueItem || function () { return Promise.resolve(); };
+        var refreshCurrentDirectory = settings.refreshCurrentDirectory || function () { return Promise.resolve(); };
+        var alertError = settings.alertError || function () {};
+        var t = settings.t || function (_, fallbackValue) { return fallbackValue || ""; };
+
+        if (state.operationWorkerActive) {
+            return;
+        }
+        state.operationWorkerActive = true;
+        try {
+            while (true) {
+                var nextItem = (state.uploadQueueItems || []).find(function (item) {
+                    return item.kind === "operation" && item.status === "queued";
+                });
+                if (!nextItem) {
+                    break;
+                }
+                nextItem.status = "uploading";
+                nextItem.progress = 0;
+                nextItem.errorMessage = "";
+                renderUploadQueue();
+                try {
+                    if (nextItem.operationType === "delete") {
+                        await runDeleteOperationQueueItem(nextItem);
+                    } else if (nextItem.operationType === "move") {
+                        await runMoveOperationQueueItem(nextItem);
+                    }
+                    if (nextItem.abortRequested) {
+                        removeUploadQueueItem(nextItem.id);
+                        continue;
+                    }
+                    nextItem.status = "done";
+                    nextItem.progress = 100;
+                    renderUploadQueue();
+                } catch (error) {
+                    if (nextItem.abortRequested) {
+                        removeUploadQueueItem(nextItem.id);
+                        continue;
+                    }
+                    nextItem.status = "failed";
+                    nextItem.errorMessage = error && error.message ? error.message : t("job_status_failed", "실패");
+                    renderUploadQueue();
+                }
+            }
+        } finally {
+            state.operationWorkerActive = false;
+            if (state.uploadRefreshPending) {
+                state.uploadRefreshPending = false;
+                try {
+                    await refreshCurrentDirectory();
+                } catch (error) {
+                    alertError(error);
+                }
+            }
+            renderUploadQueue();
+        }
+    }
+
+    async function enqueueUploadFiles(files, targetDirPath, options) {
+        // Queue raw File objects first, then let the worker handle transport so drag/drop
+        // and picker uploads can reuse the same status UI and commit-message flow.
+        var settings = options || {};
+        var state = settings.state || {};
+        var uploadApiUrl = settings.uploadApiUrl || "";
+        var normalizePath = settings.normalizePath || function (value) { return value || ""; };
+        var requiresCommitMessageForDirectory = settings.requiresCommitMessageForDirectory || function () { return false; };
+        var promptCommitMessage = settings.promptCommitMessage || function () { return Promise.resolve(""); };
+        var renderUploadQueue = settings.renderUploadQueue || function () {};
+        var processUploadQueue = settings.processUploadQueue || function () { return Promise.resolve(); };
+        var alertError = settings.alertError || function () {};
+
+        var fileList = Array.from(files || []).filter(function (file) {
+            return Boolean(file);
+        });
+        if (!uploadApiUrl || fileList.length === 0) {
+            return;
+        }
+
+        var normalizedTargetDir = normalizePath(targetDirPath, true);
+        var commitMessage = "";
+        if (requiresCommitMessageForDirectory(normalizedTargetDir)) {
+            commitMessage = await promptCommitMessage(normalizedTargetDir);
+            if (commitMessage === null) {
+                return;
+            }
+        }
+
+        fileList.forEach(function (file) {
+            state.uploadQueueSequence += 1;
+            state.uploadQueueItems.push({
+                id: state.uploadQueueSequence,
+                file: file,
+                fileName: file.name || "untitled",
+                targetDirPath: normalizedTargetDir,
+                status: "queued",
+                progress: 0,
+                errorMessage: "",
+                savedPath: "",
+                savedSlugPath: "",
+                commitMessage: commitMessage,
+                abortRequested: false,
+                xhr: null,
+            });
+        });
+        state.uploadQueueDismissed = false;
+        renderUploadQueue();
+        processUploadQueue().catch(alertError);
+    }
+
+    window.HandriveQueueOperationHelpers = {
+        enqueueUploadFiles: enqueueUploadFiles,
+        processOperationQueue: processOperationQueue,
+        processUploadQueue: processUploadQueue,
+        runDeleteOperationQueueItem: runDeleteOperationQueueItem,
+        runMoveOperationQueueItem: runMoveOperationQueueItem,
+    };
+})();

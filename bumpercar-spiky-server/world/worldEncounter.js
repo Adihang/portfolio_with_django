@@ -96,6 +96,8 @@ module.exports = {
      * 인카운터 공지 및 카운트다운 상태를 초기화한다.
      */
     clearEncounterAnnouncement() {
+        // 공지와 실제 카운트다운을 같이 비워야
+        // 클라이언트가 남은 타이머를 계속 표시하지 않는다.
         this.encounterAnnouncementKey = ""
         this.encounterAnnouncementUntil = 0
         this.encounterCountdownUntil = 0
@@ -109,6 +111,7 @@ module.exports = {
      * @param {number} durationMs - 공지 지속 시간 (ms)
      */
     startEncounterAnnouncement(now, key, durationMs) {
+        // announcement 와 countdown 은 같은 끝 시각을 공유한다.
         this.encounterAnnouncementKey = key
         this.encounterAnnouncementUntil = now + durationMs
         this.encounterCountdownUntil = now + durationMs

@@ -1,3 +1,5 @@
+"""Main Django views for Hanplanet pages, portfolio APIs, and game configuration endpoints."""
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -164,6 +166,7 @@ BUMPERCAR_SPIKY_ACCOUNT_STATS_KEYS = tuple(BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULT
 
 
 def _derive_boost_profile(base_speed, distance, duration_ms):
+    """Normalize admin input into a boost profile the bumpercar runtime can consume."""
     safe_duration_ms = max(1, int(duration_ms))
     duration_seconds = safe_duration_ms / 1000.0
     minimum_distance = base_speed * duration_seconds + 1.0
@@ -182,6 +185,7 @@ def _derive_boost_profile(base_speed, distance, duration_ms):
 
 
 def _static_with_mtime_version(relative_path):
+    """Attach a file modification timestamp to a static URL so browser caches invalidate cleanly."""
     normalized_path = str(relative_path).lstrip("/")
     base_url = static(normalized_path)
     candidate_paths = []
@@ -202,6 +206,7 @@ def _static_with_mtime_version(relative_path):
 
 
 def normalize_bumpercar_spiky_account_stats(raw_stats=None):
+    """Return a complete integer-only stats payload for bumpercar profile and unlock logic."""
     raw_stats = raw_stats or {}
     normalized = dict(BUMPERCAR_SPIKY_ACCOUNT_STATS_DEFAULTS)
     if not isinstance(raw_stats, dict):
@@ -216,6 +221,7 @@ def normalize_bumpercar_spiky_account_stats(raw_stats=None):
 
 
 def _collect_bumpercar_skin_sound_urls(skin_name, folder_name):
+    """Collect versioned sound URLs for one bumpercar skin asset folder."""
     sound_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / folder_name
     if not sound_dir.exists():
         return []
@@ -227,6 +233,7 @@ def _collect_bumpercar_skin_sound_urls(skin_name, folder_name):
 
 
 def _find_bumpercar_skin_icon_url(skin_name, *parts):
+    """Resolve the first matching icon asset URL for a skin path fragment."""
     icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / "icon"
     relative_dir = Path("Spikip") / f"speaki_{skin_name}" / "icon"
     for part in parts:
@@ -246,6 +253,7 @@ def _find_bumpercar_skin_icon_url(skin_name, *parts):
 
 
 def _collect_bumpercar_skin_icon_urls(skin_name, folder_name, *parts):
+    """Collect every icon URL for a skin state folder in stable display order."""
     icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / "icon" / folder_name
     for part in parts:
         icon_dir /= str(part)
@@ -279,10 +287,12 @@ def _collect_bumpercar_skin_icon_urls(skin_name, folder_name, *parts):
 
 
 def _collect_bumpercar_skin_icon_sequence_urls(skin_name, folder_name, *parts):
+    """Alias for callers that conceptually expect ordered frame/state sequences."""
     return _collect_bumpercar_skin_icon_urls(skin_name, folder_name, *parts)
 
 
 def _collect_bumpercar_skin_variant_dirs(skin_name, folder_name):
+    """List child directories that represent grouped skin variants for one state folder."""
     icon_dir = Path(settings.BASE_DIR) / "static" / "Spikip" / f"speaki_{skin_name}" / "icon" / folder_name
     if not icon_dir.exists():
         return []
@@ -295,6 +305,7 @@ def _collect_bumpercar_skin_variant_dirs(skin_name, folder_name):
 
 
 def _build_bumpercar_skin_catalog(ui_lang, account_stats=None, user=None):
+    """Build the full skin catalog shown in the client, including unlock and asset metadata."""
     stats = normalize_bumpercar_spiky_account_stats(account_stats)
     total_game_clears = int(stats.get("game_clears", 0))
     total_play_seconds = int(stats.get("play_seconds", 0))
@@ -517,6 +528,7 @@ class _DummyTagRelation:
 
 
 def get_dummy_portfolio_projects(ui_lang):
+    """Return localized fallback portfolio project cards used for empty/demo portfolios."""
     is_english = ui_lang == "en"
     if is_english:
         return [
@@ -647,6 +659,7 @@ def get_dummy_portfolio_projects(ui_lang):
 
 
 def _build_fenced_code_html(info: str, code_lines: list[str], base_indent: str) -> str:
+    """Render extracted fenced code lines into safe HTML before placeholder restoration."""
     normalized_lines = []
     for line in code_lines:
         if base_indent and line.startswith(base_indent):
@@ -665,6 +678,7 @@ def _build_fenced_code_html(info: str, code_lines: list[str], base_indent: str) 
 
 
 def _extract_fenced_code_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
+    """Replace fenced code blocks with placeholders so raw HTML escaping skips their contents."""
     source = text or ""
     lines = source.splitlines()
     output_lines: list[str] = []
@@ -727,6 +741,7 @@ def _extract_fenced_code_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
 
 
 def _restore_fenced_code_blocks(rendered_html: str, blocks: list[tuple[str, str]]) -> str:
+    """Restore fenced code placeholders back into already-rendered HTML output."""
     result = rendered_html
     for token, html_block in blocks:
         result = result.replace(f"<p>{token}</p>", html_block)
@@ -791,6 +806,7 @@ def render_markdown_with_raw_html(text):
 
 
 def get_client_ip(request):
+    """Extract the best-effort client IP for lightweight throttling decisions."""
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
@@ -798,6 +814,7 @@ def get_client_ip(request):
 
 
 def is_score_submission_allowed(request, limit=20, window_seconds=60):
+    """Enforce a small per-IP submission rate limit for the public score API."""
     ip = get_client_ip(request)
     cache_key = f"stratagem_score_rate:{ip}"
     count = cache.get(cache_key, 0)
@@ -817,15 +834,18 @@ def is_score_submission_allowed(request, limit=20, window_seconds=60):
 
 
 def build_public_project_url(path):
+    """Build an absolute public project URL using the configured site origin."""
     base_url = getattr(settings, "PUBLIC_BASE_URL", "https://hanplanet.com").rstrip("/")
     return f"{base_url}{path}"
 
 
 def get_public_base_url():
+    """Return the configured canonical public origin for Hanplanet."""
     return str(getattr(settings, "PUBLIC_BASE_URL", "https://hanplanet.com") or "https://hanplanet.com").rstrip("/")
 
 
 def build_public_absolute_url(path):
+    """Convert a path into an absolute public URL rooted at the canonical origin."""
     normalized_path = str(path or "/").strip()
     if not normalized_path.startswith("/"):
         normalized_path = f"/{normalized_path}"
@@ -833,6 +853,7 @@ def build_public_absolute_url(path):
 
 
 def detect_preferred_ui_lang(request):
+    """Infer the preferred UI language from Accept-Language when no explicit preference exists."""
     accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
     for item in accept_language.split(","):
         language_tag = item.split(";", 1)[0].strip().lower()
@@ -848,6 +869,7 @@ def detect_preferred_ui_lang(request):
 
 
 def _save_profile_preferences(request, **fields):
+    """Persist selected preference fields onto the authenticated user's profile record."""
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return
     if not fields:
@@ -869,6 +891,7 @@ def _save_profile_preferences(request, **fields):
 
 
 def resolve_ui_lang(request, url_lang=None):
+    """Resolve the active UI language from explicit URL input, saved preference, or browser hints."""
     normalized_url_lang = (url_lang or "").strip().lower()
     if normalized_url_lang in SUPPORTED_UI_LANGS:
         request.session[UI_LANG_SESSION_KEY] = normalized_url_lang
@@ -908,6 +931,7 @@ def resolve_ui_lang(request, url_lang=None):
 
 
 def build_lang_switch_url(request, target_lang):
+    """Build the current page URL in another supported UI language while preserving query params."""
     normalized_target_lang = (target_lang or "").strip().lower()
     if normalized_target_lang not in SUPPORTED_UI_LANGS:
         normalized_target_lang = "ko"
@@ -927,6 +951,7 @@ def build_lang_switch_url(request, target_lang):
 
 
 def apply_ui_context(request, context, ui_lang):
+    """Populate shared template context used across Hanplanet pages and partials."""
     request_path = str(getattr(request, "path", "") or "")
     default_show_account_my_portfolio = "/fun/" not in request_path
     context["ui_lang"] = ui_lang
@@ -1022,6 +1047,7 @@ def apply_ui_context(request, context, ui_lang):
 
 
 def build_localized_url(request, route_name, **kwargs):
+    """Reverse a route using the request's active language and preserve non-language query params."""
     target_lang = resolve_ui_lang(request)
     route_kwargs = {"ui_lang": target_lang}
     route_kwargs.update(kwargs)
@@ -1037,6 +1063,7 @@ def build_localized_url(request, route_name, **kwargs):
 
 
 def _read_legal_markdown(filename: str) -> str:
+    """Load a legal markdown file from static storage, falling back to a readable placeholder."""
     legal_path = settings.BASE_DIR / "static" / filename
     try:
         return legal_path.read_text(encoding="utf-8")
@@ -1045,6 +1072,7 @@ def _read_legal_markdown(filename: str) -> str:
 
 
 def _render_legal_page(request, ui_lang, *, title_ko: str, title_en: str, filename: str):
+    """Render one of the legal document pages with shared UI context and localized titles."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     context = {
         "page_title": title_en if resolved_lang == "en" else title_ko,
@@ -1059,6 +1087,7 @@ def _render_legal_page(request, ui_lang, *, title_ko: str, title_en: str, filena
 
 
 def privacy_page(request, ui_lang=None):
+    """Render the privacy policy page using the shared legal-page template."""
     return _render_legal_page(
         request,
         ui_lang,
@@ -1069,6 +1098,7 @@ def privacy_page(request, ui_lang=None):
 
 
 def terms_page(request, ui_lang=None):
+    """Render the terms of service page using the shared legal-page template."""
     return _render_legal_page(
         request,
         ui_lang,
@@ -1079,6 +1109,7 @@ def terms_page(request, ui_lang=None):
 
 
 def licenses_page(request, ui_lang=None):
+    """Render the open-source licenses page using the shared legal-page template."""
     return _render_legal_page(
         request,
         ui_lang,
@@ -1089,6 +1120,7 @@ def licenses_page(request, ui_lang=None):
 
 
 def get_account_display_name(user):
+    """Prefer a user's full name and fall back to username for shared account UI surfaces."""
     if user is None:
         return ""
     full_name = str(user.get_full_name() or "").strip()
@@ -1098,20 +1130,24 @@ def get_account_display_name(user):
 
 
 def redirect_to_localized_route(request, route_name, **kwargs):
+    """Convenience redirect wrapper for routes that always follow the active UI language."""
     return redirect(build_localized_url(request, route_name, **kwargs))
 
 
 def _redirect_to_docs_login_with_next(request):
+    """Send unauthenticated requests to the docs login page while preserving the intended destination."""
     next_path = request.get_full_path() or "/"
     encoded_next = quote(next_path, safe="/")
     return redirect(f"{reverse('main:docs_login')}?next={encoded_next}")
 
 
 def _base64url_encode(raw_bytes):
+    """Return URL-safe base64 without padding for compact tokens and IDs."""
     return base64.urlsafe_b64encode(raw_bytes).rstrip(b"=").decode("ascii")
 
 
 def get_bumpercar_spiky_settings_path():
+    """Resolve the bumpercar settings file path, honoring any explicit override in Django settings."""
     custom_path = str(getattr(settings, "BUMPERCAR_SPIKY_SETTINGS_PATH", "") or "").strip()
     if custom_path:
         return Path(custom_path)
@@ -1119,6 +1155,7 @@ def get_bumpercar_spiky_settings_path():
 
 
 def _normalize_bumpercar_spiky_settings(raw_settings=None):
+    """Normalize raw bumpercar settings into a validated runtime payload with legacy compatibility."""
     normalized = dict(BUMPERCAR_SPIKY_SETTINGS_DEFAULTS)
     if not isinstance(raw_settings, dict):
         raw_settings = {}
@@ -1244,6 +1281,7 @@ def _normalize_bumpercar_spiky_settings(raw_settings=None):
 
 
 def load_bumpercar_spiky_settings():
+    """Load persisted bumpercar settings and normalize legacy or partial payloads."""
     settings_path = get_bumpercar_spiky_settings_path()
     if not settings_path.exists():
         return dict(BUMPERCAR_SPIKY_SETTINGS_DEFAULTS)
@@ -1256,6 +1294,7 @@ def load_bumpercar_spiky_settings():
 
 
 def save_bumpercar_spiky_settings(next_settings):
+    """Persist bumpercar settings back to disk while keeping derived values runtime-only."""
     settings_path = get_bumpercar_spiky_settings_path()
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     normalized = _normalize_bumpercar_spiky_settings(next_settings)
@@ -1274,11 +1313,13 @@ def save_bumpercar_spiky_settings(next_settings):
 
 
 def _to_admin_speed_multiplier(value, reference):
+    """Convert an absolute speed back into the normalized multiplier shown in the admin form."""
     safe_reference = max(0.0001, float(reference))
     return round(float(value) / safe_reference, 4)
 
 
 def restart_bumpercar_spiky_runtime():
+    """Restart both the Django site and the dedicated bumpercar runtime after admin changes."""
     subprocess.Popen(
         [
             "/bin/zsh",
@@ -1296,6 +1337,7 @@ def restart_bumpercar_spiky_runtime():
 
 
 def restart_bumpercar_spiky_server():
+    """Restart only the dedicated bumpercar runtime service without touching Django."""
     subprocess.run(
         ["/bin/zsh", "-lc", "launchctl kickstart -k gui/$(id -u)/com.hanplanet.bumpercar-spiky-server"],
         check=True,
@@ -1304,6 +1346,7 @@ def restart_bumpercar_spiky_server():
 
 
 def set_bumpercar_spiky_npc_health(npc_health):
+    """Forward an admin NPC health override to the local bumpercar runtime control API."""
     payload = json.dumps({"npcHealth": int(npc_health)}).encode("utf-8")
     request = Request(
         "http://127.0.0.1:8082/admin/npc-health",
@@ -1316,6 +1359,7 @@ def set_bumpercar_spiky_npc_health(npc_health):
 
 
 def get_bumpercar_spiky_connected_player_count():
+    """Read the current connected player count from the local bumpercar runtime status API."""
     request = Request(
         "http://127.0.0.1:8082/admin/status",
         headers={"Accept": "application/json"},
@@ -1327,6 +1371,7 @@ def get_bumpercar_spiky_connected_player_count():
 
 
 def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=False, skin_name="default"):
+    """Mint the short-lived JWT used by the web client to authenticate with the game server."""
     now = int(time.time())
     header = {"alg": "HS256", "typ": "JWT"}
     resolved_subject = str(
@@ -1361,6 +1406,7 @@ def build_game_auth_token(user=None, subject=None, display_name=None, is_guest=F
 
 
 def favicon_ico(request):
+    """Serve favicon.ico from collected static files or fall back to the source static directory."""
     static_root = Path(getattr(settings, "STATIC_ROOT", "") or "")
     base_dir = Path(getattr(settings, "BASE_DIR", Path.cwd()))
     candidates = [
@@ -1380,22 +1426,27 @@ def favicon_ico(request):
 
 
 def main_legacy_redirect(request):
+    """Redirect the historical root portfolio URL onto the current localized landing flow."""
     return portfolio_root_redirect(request)
 
 
 def portfolio_user_legacy_redirect(request, user_id):
+    """Redirect a legacy portfolio-user URL onto the localized portfolio route."""
     return redirect_to_localized_route(request, "main:portfolio_user_lang", user_id=user_id)
 
 
 def portfolio_write_legacy_redirect(request):
+    """Redirect the old portfolio write URL onto the localized editor."""
     return redirect_to_localized_route(request, "main:portfolio_write_lang")
 
 
 def project_detail_legacy_redirect(request, project_id):
+    """Redirect the legacy numeric project detail route onto the localized URL."""
     return redirect_to_localized_route(request, "main:ProjectDetail_lang", project_id=project_id)
 
 
 def project_detail_user_legacy_redirect(request, user_id, project_number):
+    """Redirect a legacy user/project detail URL onto the localized owner/project route."""
     return redirect_to_localized_route(
         request,
         "main:ProjectDetail_user_lang",
@@ -1405,38 +1456,47 @@ def project_detail_user_legacy_redirect(request, user_id, project_number):
 
 
 def dummy_project_detail_legacy_redirect(request, sample_id):
+    """Redirect legacy sample project URLs onto the localized dummy-project route."""
     return redirect_to_localized_route(request, "main:DummyProjectDetail_lang", sample_id=sample_id)
 
 
 def salvations_edge_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy Salvation's Edge page onto the localized mini-game page."""
     return redirect_to_localized_route(request, "main:Salvations_Edge_4_lang")
 
 
 def stratagem_hero_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy Stratagem Hero page onto the localized route."""
     return redirect_to_localized_route(request, "main:Stratagem_Hero_lang")
 
 
 def stratagem_hero_scoreboard_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy Stratagem Hero scoreboard onto the localized route."""
     return redirect_to_localized_route(request, "main:Stratagem_Hero_Scoreboard_lang")
 
 
 def minigame_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy minigame hub URL onto the localized hub."""
     return redirect_to_localized_route(request, "main:minigame_lang")
 
 
 def bubble_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy Bubble page onto the localized route."""
     return redirect_to_localized_route(request, "main:bubble_lang")
 
 
 def hanplanet_multiplayer_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy bumpercar page onto the localized public game route."""
     return redirect_to_localized_route(request, "main:bumpercar_spiky_lang")
 
 
 def bumpercar_spiky_admin_legacy_redirect(request, ui_lang=None):
+    """Redirect the legacy bumpercar admin URL onto the localized admin page."""
     return redirect_to_localized_route(request, "main:bumpercar_spiky_admin_lang")
 
 
 def minigame_page(request, ui_lang=None):
+    """Render the mini game landing page that links to the browser game collection."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
 
@@ -1507,6 +1567,7 @@ def minigame_page(request, ui_lang=None):
 
 
 def bubble_page(request, ui_lang=None):
+    """Render the simple bubble mini game page."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
     context = {
@@ -1524,6 +1585,7 @@ def bubble_page(request, ui_lang=None):
 
 
 def hanplanet_multiplayer_page(request, ui_lang=None):
+    """Render the public bumpercar game page with runtime config, assets, and account UI data."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     is_english = resolved_lang == "en"
     host = (request.get_host() or "").split(":")[0].strip().lower()
@@ -1672,6 +1734,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
 @csrf_protect
 @require_http_methods(["POST"])
 def bumpercar_spiky_restart_server(request, ui_lang=None):
+    """Handle the admin POST that restarts only the bumpercar runtime service."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not getattr(request.user, "is_authenticated", False):
         return redirect(
@@ -1691,6 +1754,7 @@ def bumpercar_spiky_restart_server(request, ui_lang=None):
 @csrf_protect
 @require_http_methods(["POST"])
 def bumpercar_spiky_set_npc_health(request, ui_lang=None):
+    """Handle the admin POST that forwards an NPC health override to the runtime service."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not getattr(request.user, "is_authenticated", False):
         return redirect(
@@ -1714,6 +1778,7 @@ def bumpercar_spiky_set_npc_health(request, ui_lang=None):
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def bumpercar_spiky_admin_page(request, ui_lang=None):
+    """Render the bumpercar admin page and persist gameplay settings updates for superusers."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not getattr(request.user, "is_authenticated", False):
         return redirect(
@@ -1912,6 +1977,7 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
 
 @require_http_methods(["GET"])
 def game_auth_token(request, ui_lang=None):
+    """Issue the short-lived JWT and websocket metadata needed by the browser game client."""
     resolve_ui_lang(request, ui_lang)
     secret = str(getattr(settings, "GAME_JWT_SECRET", "") or "").strip()
     if not secret:
@@ -1944,6 +2010,7 @@ def game_auth_token(request, ui_lang=None):
 
 
 def _is_local_internal_request(request):
+    """Allow internal-only bumpercar stat updates from loopback requests."""
     remote_addr = str(request.META.get("REMOTE_ADDR") or "").strip()
     return remote_addr in {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
 
@@ -1951,6 +2018,7 @@ def _is_local_internal_request(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def bumpercar_spiky_stats_record(request):
+    """Accept runtime stat deltas from the local game server and persist them onto the user profile."""
     if not _is_local_internal_request(request):
         raise Http404()
 
@@ -1998,6 +2066,7 @@ def bumpercar_spiky_stats_record(request):
 
 
 def none(request, ui_lang=None):
+    """Render the Hanplanet home page with root search, favorites, and install metadata."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
@@ -2053,6 +2122,7 @@ def none(request, ui_lang=None):
 
 
 def robots_txt(request):
+    """Serve the simple robots policy for the public site and point crawlers at the sitemap."""
     body = "\n".join(
         [
             "User-agent: *",
@@ -2067,6 +2137,7 @@ def robots_txt(request):
 
 
 def sitemap_xml(request):
+    """Build the lightweight XML sitemap for public root, handrive, and default portfolio pages."""
     now_iso = timezone.now().date().isoformat()
     urls = [
         {
@@ -2129,6 +2200,7 @@ def sitemap_xml(request):
 
 @cache_control(public=True, max_age=300, must_revalidate=True)
 def pwa_manifest(request):
+    """Serve the install manifest consumed by browsers when Hanplanet is added to the home screen."""
     # Browser install metadata for "Add to Home screen" / app install prompts.
     manifest = {
         "id": "/",
@@ -2163,6 +2235,7 @@ def pwa_manifest(request):
 
 @cache_control(public=True, max_age=0, must_revalidate=True)
 def service_worker(request):
+    """Serve the root-scope service worker used for Hanplanet page and static caching."""
     # Keep service worker script dynamic at root scope so it can control "/".
     script = """
 const STATIC_CACHE = 'hanplanet-static-v5';
@@ -2232,6 +2305,7 @@ self.addEventListener('fetch', (event) => {
 
 
 def _get_portfolio_owner(username):
+    """Resolve a portfolio owner account, lazily creating the default owner for bootstrap flows."""
     user_model = get_user_model()
     normalized_username = str(username or "").strip()
     if not normalized_username:
@@ -2241,6 +2315,7 @@ def _get_portfolio_owner(username):
 
 
 def _build_portfolio_view_context(request, ui_lang, owner):
+    """Assemble shared public portfolio context for owner profile, career, projects, and actions."""
     context = {}
     apply_ui_context(request, context, ui_lang)
     context["show_chat_widget"] = True
@@ -2370,12 +2445,14 @@ def _build_portfolio_view_context(request, ui_lang, owner):
 
 
 def _portfolio_write_redirect_with_status(request, status):
+    """Redirect back to the localized portfolio editor with a short status code in the query."""
     redirect_url = build_localized_url(request, "main:portfolio_write_lang")
     separator = "&" if "?" in redirect_url else "?"
     return redirect(f"{redirect_url}{separator}status={status}")
 
 
 def _ensure_authenticated_for_write(request):
+    """Return the docs-login redirect response when write pages require authentication."""
     if request.user.is_authenticated:
         return None
     return _redirect_to_docs_login_with_next(request)
@@ -2384,6 +2461,7 @@ def _ensure_authenticated_for_write(request):
 @require_http_methods(["POST"])
 @csrf_protect
 def account_profile_image_upload(request, ui_lang=None):
+    """Replace the authenticated user's account/profile image from shared account widgets."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     auth_redirect = _ensure_authenticated_for_write(request)
     if auth_redirect is not None:
@@ -2402,10 +2480,12 @@ def account_profile_image_upload(request, ui_lang=None):
 
 
 def main(request, ui_lang=None):
+    """Keep the main named route mapped to the portfolio-root redirect behavior."""
     return portfolio_root_redirect(request, ui_lang=ui_lang)
 
 
 def portfolio_root_redirect(request, ui_lang=None):
+    """Send visitors to the default portfolio owner, or authenticated users to their own portfolio."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not request.user.is_authenticated:
         try:
@@ -2432,6 +2512,7 @@ def portfolio_root_redirect(request, ui_lang=None):
 
 
 def portfolio_user(request, user_id, ui_lang=None):
+    """Render the public portfolio for one account using localized metadata and shared UI chrome."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     owner = get_object_or_404(get_user_model(), username=user_id)
     context = _build_portfolio_view_context(request, resolved_lang, owner)
@@ -2451,6 +2532,7 @@ def portfolio_user(request, user_id, ui_lang=None):
 
 @require_http_methods(["GET", "POST"])
 def portfolio_write(request, ui_lang=None):
+    """Render and process the authenticated portfolio editor for profile, career, project, and button CRUD."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
     auth_redirect = _ensure_authenticated_for_write(request)
     if auth_redirect is not None:
@@ -2609,6 +2691,7 @@ def portfolio_write(request, ui_lang=None):
 
 
 def ProjectDetail(request, project_id, ui_lang=None):
+    """Render a legacy project detail entry backed by the original Project model."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
@@ -2624,6 +2707,7 @@ def ProjectDetail(request, project_id, ui_lang=None):
 
 
 def ProjectDetailByUser(request, user_id, project_number, ui_lang=None):
+    """Render a portfolio project detail page addressed by owner username and project number."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
@@ -2642,6 +2726,7 @@ def ProjectDetailByUser(request, user_id, project_number, ui_lang=None):
 
 
 def DummyProjectDetail(request, sample_id, ui_lang=None):
+    """Render one of the built-in sample project detail pages used for placeholder/demo content."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
@@ -2675,18 +2760,21 @@ def DummyProjectDetail(request, sample_id, ui_lang=None):
 
 
 def ProjectComment_create(request, project_id, ui_lang=None):
+    """Create a legacy project comment row and redirect back to the old detail page."""
     project = get_object_or_404(Project, pk=project_id)
     project.project_comment_set.create(content=request.POST.get('content'), create_date=timezone.now())
     resolved_lang = resolve_ui_lang(request, ui_lang)
     return redirect('main:ProjectDetail_lang', ui_lang=resolved_lang, project_id=project.id)
 
 def Salvations_Edge_4(request, ui_lang=None):
+    """Render the Salvation's Edge 4 helper page."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
     return render(request, 'fun/Salvations_Edge_4.html', context)
 
 def Stratagem_Hero_page(request, ui_lang=None):
+    """Render the Stratagem Hero game page with a randomized challenge set."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
@@ -2695,6 +2783,7 @@ def Stratagem_Hero_page(request, ui_lang=None):
     return render(request, 'fun/Stratagem_Hero.html', context)
 
 def Stratagem_Hero_Scoreboard_page(request, ui_lang=None):
+    """Render the Stratagem Hero scoreboard page."""
     context = dict()
     resolved_lang = resolve_ui_lang(request, ui_lang)
     apply_ui_context(request, context, resolved_lang)
@@ -2704,6 +2793,7 @@ def Stratagem_Hero_Scoreboard_page(request, ui_lang=None):
 @require_http_methods(["POST"])
 @csrf_protect
 def add_score(request, ui_lang=None):
+    """Validate and persist a public Stratagem Hero score submission."""
     if not is_score_submission_allowed(request):
         return JsonResponse({"error": "Too many requests. Try again later."}, status=429)
 
@@ -2730,10 +2820,12 @@ def add_score(request, ui_lang=None):
 
 
 def _root_shortcuts_unauthorized_message(ui_lang):
+    """Return the localized login-required message used by root shortcut endpoints."""
     return "Login required." if ui_lang == "en" else "로그인이 필요합니다."
 
 
 def _normalize_theme_mode(raw_mode):
+    """Normalize a theme mode payload to the supported light/dark values only."""
     value = str(raw_mode or "").strip().lower()
     if value in ("light", "dark"):
         return value
@@ -2741,6 +2833,7 @@ def _normalize_theme_mode(raw_mode):
 
 
 def _normalize_root_search_engine(raw_value):
+    """Normalize the selected root search engine to the small allow-list used by the home page."""
     value = str(raw_value or "").strip().lower()
     if value in SUPPORTED_ROOT_SEARCH_ENGINES:
         return value
@@ -2750,6 +2843,7 @@ def _normalize_root_search_engine(raw_value):
 @require_http_methods(["GET", "PATCH"])
 @csrf_protect
 def theme_preference(request, ui_lang=None):
+    """Expose and update the authenticated user's light/dark theme preference."""
     resolve_ui_lang(request, ui_lang)
 
     if not request.user.is_authenticated:
@@ -2775,6 +2869,7 @@ def theme_preference(request, ui_lang=None):
 @require_http_methods(["GET", "PATCH"])
 @csrf_protect
 def user_preferences(request, ui_lang=None):
+    """Expose and update lightweight user preferences shared by common site UI."""
     resolve_ui_lang(request, ui_lang)
 
     if not request.user.is_authenticated:
@@ -2831,6 +2926,7 @@ def user_preferences(request, ui_lang=None):
 
 
 def _normalize_shortcut_url(raw_url):
+    """Validate and normalize a user-submitted shortcut URL into an absolute http/https URL."""
     value = str(raw_url or "").strip()
     if not value:
         return None
@@ -2847,6 +2943,7 @@ def _normalize_shortcut_url(raw_url):
 
 
 def _build_shortcut_icon_url(shortcut_url):
+    """Build the favicon service URL used to render shortcut icons on the home page."""
     parsed = urlparse(shortcut_url)
     host = parsed.netloc
     if not host:
@@ -2855,6 +2952,7 @@ def _build_shortcut_icon_url(shortcut_url):
 
 
 def _build_shortcut_display_name(shortcut_url):
+    """Generate a short human-readable label from a shortcut URL when the user omits one."""
     parsed = urlparse(shortcut_url)
     host = (parsed.netloc or "").strip().lower()
     if not host:
@@ -2873,6 +2971,7 @@ def _build_shortcut_display_name(shortcut_url):
 
 
 def _serialize_quick_link(quick_link):
+    """Serialize a QuickLink row into the compact payload consumed by the home page shortcut UI."""
     return {
         "id": quick_link.id,
         "name": quick_link.name,
@@ -2884,6 +2983,7 @@ def _serialize_quick_link(quick_link):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def root_shortcuts(request, ui_lang=None):
+    """List or create authenticated user's root-page shortcut items."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
 
     if not request.user.is_authenticated:
@@ -2925,6 +3025,7 @@ def root_shortcuts(request, ui_lang=None):
 @require_http_methods(["DELETE", "PATCH"])
 @csrf_protect
 def root_shortcuts_detail(request, shortcut_id, ui_lang=None):
+    """Update or delete one authenticated user's shortcut item."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
 
     if not request.user.is_authenticated:
@@ -2964,6 +3065,7 @@ def root_shortcuts_detail(request, shortcut_id, ui_lang=None):
 @require_http_methods(["POST"])
 @csrf_protect
 def root_shortcuts_reorder(request, ui_lang=None):
+    """Persist the user's shortcut ordering after drag-and-drop changes on the home page."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
 
     if not request.user.is_authenticated:
@@ -3014,7 +3116,7 @@ def root_shortcuts_reorder(request, ui_lang=None):
 logger = logging.getLogger(__name__)
 
 def sanitize_text(text):
-    """Remove potentially harmful characters and limit length"""
+    """Strip HTML-like tags from chat text and clamp message length to a small safe bound."""
     if not text:
         return ""
     # Remove script tags and other HTML/JS
@@ -3023,7 +3125,7 @@ def sanitize_text(text):
     return text[:500]  # Limit to 500 characters
 
 def is_valid_message(text):
-    """Basic validation for user messages"""
+    """Return whether a sanitized chat message still contains meaningful text."""
     if not text or len(text.strip()) == 0:
         return False
     # Add more validation rules as needed
@@ -3040,7 +3142,7 @@ def has_identity_impersonation(text):
 
 
 def should_return_github_link(user_message):
-    """Return GitHub link for code-design/style questions."""
+    """Shortcut code-design/style questions directly to GitHub instead of invoking the chatbot."""
     if not user_message:
         return False
     text = user_message.lower().replace(" ", "")
@@ -3052,7 +3154,7 @@ def should_return_github_link(user_message):
     return any(k in text for k in design_keywords)
 
 def normalize_chat_history(raw_history, current_user_message, max_items=20):
-    """Validate and sanitize client-provided chat history."""
+    """Normalize bounded chat history into the user/assistant shape expected by Ollama."""
     normalized = []
     if not isinstance(raw_history, list):
         raw_history = []
@@ -3081,7 +3183,7 @@ def normalize_chat_history(raw_history, current_user_message, max_items=20):
     return normalized
 
 def has_excessive_foreign_text(text):
-    """Detect responses that are not primarily Korean."""
+    """Detect Korean-mode replies that drift too far into non-Korean scripts or English-heavy text."""
     if not text:
         return False
 
@@ -3111,7 +3213,7 @@ def has_excessive_foreign_text(text):
 
 
 def has_excessive_korean_text(text):
-    """Detect responses that are not primarily English."""
+    """Detect English-mode replies that drift into too much Korean text."""
     if not text:
         return False
 
@@ -3126,6 +3228,7 @@ def has_excessive_korean_text(text):
     return len(hangul_chars) >= max(40, len(latin_chars) * 2)
 
 def call_ollama(system_message, messages):
+    """Send one non-streaming chat request to the local Ollama endpoint with conservative settings."""
     base_url = getattr(settings, "OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     model = getattr(settings, "OLLAMA_MODEL", "llama3.1")
     payload = {
@@ -3150,6 +3253,7 @@ PROJECT_OWNER_PATH_PATTERN = re.compile(r"^/(?:ko|en)/project/(?P<user_id>[A-Za-
 
 
 def _resolve_chat_portfolio_owner(request, payload):
+    """Resolve which portfolio owner the chatbot should talk about from payload hints or the referer URL."""
     requested_username = str(payload.get("portfolio_owner_username", "") or "").strip()
     if re.fullmatch(r"[A-Za-z0-9_.-]+", requested_username):
         owner = get_user_model().objects.filter(username=requested_username).first()
@@ -3174,6 +3278,7 @@ def _resolve_chat_portfolio_owner(request, payload):
 @require_http_methods(["POST"])
 @csrf_protect
 def chat_with_ai(request, ui_lang=None):
+    """Handle chatbot requests, validate input, and return a localized AI response payload."""
     try:
         logger.info("Received chat request")
         ui_lang = resolve_ui_lang(request, ui_lang)
@@ -3608,10 +3713,6 @@ def chat_with_ai(request, ui_lang=None):
     except Exception as e:
         logger.error(f"Unexpected error in chat_with_ai: {str(e)}", exc_info=True)
         return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
-
-# Create your views here.
-
-
 # ──────────────────────────────────────────────────────
 # Git Integration API Views
 # ──────────────────────────────────────────────────────
@@ -3624,17 +3725,14 @@ from .forgejo_client import ForgejoClient
 
 
 def _git_json_error(msg: str, status: int = 400) -> JsonResponse:
+    """Return a consistent JSON error payload for Git integration endpoints."""
     return JsonResponse({"ok": False, "error": msg}, status=status)
 
 
 @require_http_methods(["POST"])
 @login_required
 def git_repo_create(request):
-    """
-    POST /api/git/repos/
-    body: {"path": "/...", "repo_name": "my-repo"}
-    생성 작업을 Celery에 위임하고 즉시 repo 정보 반환
-    """
+    """Create a Git-backed Handrive repository record and enqueue the backend creation workflow."""
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -3693,10 +3791,7 @@ def git_repo_create(request):
 
 @login_required
 def git_repo_by_path(request):
-    """
-    GET /api/git/repos/by-path/?path=/...
-    handrive_path 기준으로 저장소 조회
-    """
+    """Look up the Git repository mapped to a Handrive path visible to the current user."""
     path = (request.GET.get("path") or "").strip()
     if not path:
         return _git_json_error("path is required")
@@ -3716,10 +3811,7 @@ def git_repo_by_path(request):
 @require_http_methods(["POST"])
 @login_required
 def git_repo_collaborator(request, repo_id: int):
-    """
-    POST /api/git/repos/<id>/collaborators/
-    body: {"username": "...", "permission": "read|write|admin"}
-    """
+    """Add or update a collaborator on a Git repository and sync the permission to Forgejo."""
     try:
         repo = GitRepository.objects.get(id=repo_id, owner=request.user)
     except GitRepository.DoesNotExist:
@@ -3746,7 +3838,8 @@ def git_repo_collaborator(request, repo_id: int):
     except User.DoesNotExist:
         return _git_json_error("사용자를 찾을 수 없습니다.", status=404)
 
-    # Forgejo 권한 동기화
+    # Django collaborator row 와 Forgejo collaborator state 를 함께 맞춰야
+    # Handrive 권한 UI 와 실제 clone/push 권한이 어긋나지 않는다.
     if repo.forgejo_owner and repo.forgejo_repo_name:
         try:
             ForgejoClient().add_collaborator(
@@ -3765,10 +3858,7 @@ def git_repo_collaborator(request, repo_id: int):
 
 @login_required
 def git_repo_clone_url(request, repo_id: int):
-    """
-    GET /api/git/repos/<id>/clone/
-    PUBLIC_GIT_BASE_URL 기준 clone URL 반환
-    """
+    """Return the public clone URLs shown in the repository management UI."""
     try:
         repo = GitRepository.objects.get(id=repo_id, owner=request.user)
     except GitRepository.DoesNotExist:
@@ -3786,10 +3876,7 @@ def git_repo_clone_url(request, repo_id: int):
 
 @login_required
 def git_repo_status(request, repo_id: int):
-    """
-    GET /api/git/repos/<id>/status/
-    현재 status + error_message 반환 (UI 폴링용)
-    """
+    """Return repository creation/import status for the polling UI in Handrive."""
     try:
         repo = GitRepository.objects.get(id=repo_id, owner=request.user)
     except GitRepository.DoesNotExist:
@@ -3809,10 +3896,7 @@ def git_repo_status(request, repo_id: int):
 @require_http_methods(["POST"])
 @login_required
 def git_repo_retry(request, repo_id: int):
-    """
-    POST /api/git/repos/<id>/retry/
-    status == "failed" 일 때만 허용 — 상태 초기화 후 태스크 재실행
-    """
+    """Retry a failed repository task after resetting the stored state back to pending."""
     try:
         repo = GitRepository.objects.get(id=repo_id, owner=request.user)
     except GitRepository.DoesNotExist:
@@ -3823,7 +3907,7 @@ def git_repo_retry(request, repo_id: int):
 
     from .git_tasks import create_repo_task, import_repo_task
 
-    # 이전 status에 따라 적절한 태스크 선택
+    # 생성/가져오기 태스크는 분기 entrypoint 가 다르므로 이전 작업 성격을 유지한다.
     was_import = "import" in (repo.status or "")
     repo.status = "pending_import" if was_import else "pending_create"
     repo.error_message = None
@@ -3842,7 +3926,7 @@ def git_repo_retry(request, repo_id: int):
 # ──────────────────────────────────────────────────────
 
 def _build_public_clone_url(forgejo_url: str) -> str:
-    """내부 Forgejo URL → PUBLIC_GIT_BASE_URL 기준으로 재조합"""
+    """Rewrite an internal Forgejo clone URL onto the public Git base URL exposed to users."""
     if not forgejo_url:
         return ""
     from django.conf import settings as _settings
@@ -3852,9 +3936,7 @@ def _build_public_clone_url(forgejo_url: str) -> str:
 
 
 def _build_user_authed_clone_url(repo: "GitRepository", user) -> str:
-    """유저 PAT을 포함한 clone URL 반환 — git CLI에서 바로 사용 가능.
-    GitUserMapping.forgejo_token 이 없으면 인증 없는 public URL 반환.
-    """
+    """Return a PAT-embedded clone URL for CLI use, or fall back to the public unauthenticated URL."""
     from .models import GitUserMapping
     public_url = _build_public_clone_url(repo.forgejo_clone_http_url)
     if not public_url:
@@ -3872,7 +3954,7 @@ def _build_user_authed_clone_url(repo: "GitRepository", user) -> str:
 
 
 def _build_gitea_web_url(forgejo_clone_http_url: str) -> str:
-    """clone URL (.git) → Gitea 웹 페이지 URL"""
+    """Convert a clone URL into the corresponding Forgejo/Gitea web page URL."""
     public = _build_public_clone_url(forgejo_clone_http_url)
     if not public:
         return ""
@@ -3880,6 +3962,7 @@ def _build_gitea_web_url(forgejo_clone_http_url: str) -> str:
 
 
 def _git_repo_dict(repo: GitRepository, request) -> dict:
+    """Serialize one GitRepository into the permission-aware payload used by Handrive UI."""
     permission = "owner" if repo.owner_id == getattr(request.user, "id", None) else ""
     if not permission:
         collaborator = repo.collaborators.filter(user=request.user).values("permission").first()
@@ -3918,9 +4001,8 @@ from django.utils import timezone as _tz
 @csrf_exempt
 @require_http_methods(["POST"])
 def git_auth_device(request):
-    """POST /api/git/auth/device/
-    device code 발급 — 인증 불필요, CSRF exempt (셸 스크립트 호출)
-    """
+    """Issue a short-lived device code pair used by terminal Git login flows."""
+    # CLI 는 긴 device_code 로 polling 하고, 사람이 브라우저에서 입력하는 값은 짧은 user_code 를 쓴다.
     device_code = _uuid.uuid4().hex + _uuid.uuid4().hex  # 64자
     user_code   = _secrets.token_hex(4).upper()           # 8자 대문자
     expires_at  = _tz.now() + timedelta(minutes=5)
@@ -3945,9 +4027,7 @@ def git_auth_device(request):
 
 @login_required
 def git_auth_page(request):
-    """GET /git-auth/?code=XXXX
-    승인 페이지 — 로그인 필요
-    """
+    """Render the browser approval page for a pending Git device-code login request."""
     code = (request.GET.get("code") or "").strip().upper()
     if not code:
         return render(request, "git_auth_approve.html", {"error": "코드가 없습니다."})
@@ -3969,9 +4049,7 @@ def git_auth_page(request):
 @require_http_methods(["POST"])
 @login_required
 def git_auth_approve(request):
-    """POST /api/git/auth/approve/
-    body: {"user_code": "ABCD1234"}
-    """
+    """Approve a pending device-code login request for the currently authenticated user."""
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -3999,10 +4077,7 @@ def git_auth_approve(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def git_auth_token(request):
-    """POST /api/git/auth/token/
-    body: {"device_code": "..."}
-    승인되면 Gitea PAT 반환 후 device code 삭제 (일회성)
-    """
+    """Exchange an approved device code for a Forgejo token and consume the one-time code."""
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -4026,7 +4101,7 @@ def git_auth_token(request):
 
     user = device.user
 
-    # Gitea PAT 조회 (없으면 발급)
+    # 승인된 device login 은 최종적으로 Forgejo PAT 로 교환되어야 git credential helper 가 바로 쓸 수 있다.
     try:
         mapping = GitUserMapping.objects.get(user=user)
         token = mapping.forgejo_token
@@ -4045,7 +4120,7 @@ def git_auth_token(request):
             },
         )
 
-    device.delete()  # 일회성
+    device.delete()  # 일회성 승인 코드는 교환 성공 직후 폐기한다.
 
     return JsonResponse({
         "status":   "ok",
@@ -4055,9 +4130,7 @@ def git_auth_token(request):
 
 
 def git_credential_helper_download(request):
-    """GET /git-auth/credential-helper/
-    git-credential-hanplanet 셸 스크립트 다운로드
-    """
+    """Download the bundled git-credential helper script used by Hanplanet Git login flows."""
     import os as _os
     script_path = _os.path.join(
         _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
