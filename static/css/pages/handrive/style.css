@@ -128,9 +128,7 @@ body.ui-page .portfolio-print-btn {
 .handrive-shell,
 .ui-shell {
     width: 100%;
-    max-width: 1300px;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: none;
     box-sizing: border-box;
 }
 
@@ -157,6 +155,9 @@ body.ui-page .portfolio-print-btn {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    max-width: 1300px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .handrive-toolbar-left,
@@ -238,8 +239,8 @@ body.ui-page .portfolio-print-btn {
 
 .handrive-list-search-form {
     width: 100%;
-    max-width: none;
-    margin: 0 0 var(--handrive-list-search-margin-b, 10px);
+    max-width: 1300px;
+    margin: 0 auto var(--handrive-list-search-margin-b, 10px);
     min-height: var(--handrive-list-search-height, 48px);
 }
 
@@ -923,6 +924,7 @@ body.theme-dark .handrive-help-icon-symbol {
 .ui-content {
     flex: 1 1 auto;
     width: 100%;
+    max-width: none;
     min-height: 0;
     padding: var(--handrive-content-pad-top, 16px) 12px var(--handrive-content-pad-bottom, 16px);
     overflow: hidden;
@@ -943,14 +945,20 @@ body.theme-dark .handrive-help-icon-symbol {
     padding: 0;
 }
 
-.handrive-list-layout:not(.has-preview) {
+.handrive-list-layout {
     max-width: 1300px;
     margin-left: auto;
     margin-right: auto;
+    transition: max-width 0.25s ease, grid-template-columns 0.25s ease;
+}
+
+.handrive-list-layout.is-landscape.has-preview,
+.handrive-list-layout.is-landscape.has-editor {
+    max-width: 100vw;
 }
 
 .handrive-list-layout.is-landscape {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 0fr;
     gap: 0;
     border: 1px solid var(--handrive-border);
     border-radius: var(--handrive-radius-lg);
@@ -2394,8 +2402,8 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     content: "";
     position: absolute;
     top: 0;
-    left: 8px;
-    right: 8px;
+    left: -6px;
+    right: -6px;
     height: 1px;
     background: var(--handrive-divider-weak);
     opacity: 0.45;
@@ -3170,6 +3178,28 @@ body.handrive-page.theme-dark .handrive-md-src-token-codeblock {
     background: #ffffff;
 }
 
+.handrive-list-preview-content.handrive-json,
+.handrive-list-preview-content.handrive-html,
+.handrive-list-preview-content.handrive-css,
+.handrive-list-preview-content.handrive-js,
+.handrive-list-preview-content.handrive-py,
+.handrive-list-preview-content.handrive-plain-text {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.handrive-list-preview-content.handrive-json pre,
+.handrive-list-preview-content.handrive-html pre,
+.handrive-list-preview-content.handrive-css pre,
+.handrive-list-preview-content.handrive-js pre,
+.handrive-list-preview-content.handrive-py pre {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
 .handrive-list-preview-content.handrive-html,
 .handrive-list-preview-content.handrive-office {
     display: flex;
@@ -3311,13 +3341,23 @@ body.handrive-page.theme-dark .handrive-md-src-token-codeblock {
     display: block;
 }
 
+.handrive-list-preview-content.handrive-office .handrive-media-pdf-wrap {
+    flex: 1 1 auto;
+    min-height: max(720px, calc(100vh - 220px));
+    overflow-x: hidden;
+}
+
+.handrive-list-preview-content.handrive-office .handrive-media-pdf-element {
+    min-height: max(720px, calc(100vh - 220px));
+}
+
 /* 가로모드 미리보기: PDF를 article 전체에 채움
    position: absolute; inset: 0 으로 flex/height:100% 해석 문제를 우회
    handrive-office(pptx/docx/xlsx)도 PDF iframe으로 렌더되므로 동일 규칙 적용 */
 .handrive-list-layout.is-landscape.has-preview .handrive-list-preview-content.handrive-media,
 .handrive-list-layout.is-landscape.has-preview .handrive-list-preview-content.handrive-office {
     position: relative;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .handrive-list-layout.is-landscape.has-preview .handrive-list-preview-content.handrive-media .handrive-media-pdf-wrap,

@@ -1578,13 +1578,19 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                 continue
             repo_name = Path(repo_path).name
             permission = _get_git_repo_permission_for_request(request, repo)
+            _repo_storage = _get_repo_storage_path(repo.owner, repo.repo_name)
+            try:
+                _repo_size = sum(p.stat().st_size for p in _repo_storage.rglob("*") if p.is_file()) if _repo_storage.exists() else 0
+                _repo_size_display = format_handrive_bytes_display(_repo_size) if _repo_size else ""
+            except OSError:
+                _repo_size_display = ""
             virtual_repo_entries.append(
                 {
                     "name": repo_name,
                     "path": repo_path,
                     "type": "dir",
                     "has_children": True,
-                    "size_display": "",
+                    "size_display": _repo_size_display,
                     "can_edit": False,
                     "can_write_children": False,
                     "can_delete": permission == "owner",
@@ -2393,7 +2399,8 @@ def enforce_handrive_scoped_quota(
         return
 
     current_bytes, current_entries = calculate_handrive_tree_usage(scoped_root)
-    projected_bytes = current_bytes + max(0, extra_bytes)
+    repo_bytes, _ = calculate_handrive_repo_usage(request.user)
+    projected_bytes = current_bytes + repo_bytes + max(0, extra_bytes)
     projected_entries = current_entries + max(0, extra_entries)
 
     if projected_bytes > DOCS_USER_SCOPED_QUOTA_BYTES:
@@ -2473,6 +2480,25 @@ def calculate_handrive_quota_breakdown(root_path: Path) -> tuple[int, int, dict[
     total_bytes = sum(byte_map.values())
     breakdown = {k: {"bytes": byte_map[k], "count": count_map[k]} for k in type_keys}
     return total_bytes, total_entries, breakdown
+
+
+def calculate_handrive_repo_usage(user) -> tuple[int, int]:
+    """유저의 활성 리포지토리 총 크기(bytes)와 리포 개수를 반환한다."""
+    from .models import GitRepository
+    total_bytes = 0
+    total_repos = 0
+    for repo in GitRepository.objects.filter(owner=user, status="active"):
+        repo_path = _get_repo_storage_path(user, repo.repo_name)
+        if not repo_path.exists():
+            continue
+        total_repos += 1
+        for path_obj in repo_path.rglob("*"):
+            if path_obj.is_file():
+                try:
+                    total_bytes += path_obj.stat().st_size
+                except OSError:
+                    continue
+    return total_bytes, total_repos
 
 
 def build_handrive_breadcrumbs(
@@ -2853,12 +2879,14 @@ def handrive_common_context(request, ui_lang):
         if _quota_home:
             _quota_root, _ = resolve_path(_quota_home, must_exist=False)
             _quota_used, _, _breakdown = calculate_handrive_quota_breakdown(_quota_root)
-            handrive_quota_used_bytes = _quota_used
+            _repo_bytes, _repo_count = calculate_handrive_repo_usage(request.user)
+            _total_used = _quota_used + _repo_bytes
+            handrive_quota_used_bytes = _total_used
             handrive_quota_total_bytes = DOCS_USER_SCOPED_QUOTA_BYTES
-            handrive_quota_percent = min(100, round(_quota_used / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 1))
-            handrive_quota_used_display = format_handrive_bytes_display(_quota_used)
+            handrive_quota_percent = min(100, round(_total_used / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 1))
+            handrive_quota_used_display = format_handrive_bytes_display(_total_used)
             handrive_quota_total_display = format_handrive_bytes_display(DOCS_USER_SCOPED_QUOTA_BYTES)
-            _free_bytes = max(0, DOCS_USER_SCOPED_QUOTA_BYTES - _quota_used)
+            _free_bytes = max(0, DOCS_USER_SCOPED_QUOTA_BYTES - _total_used)
             handrive_quota_free_bytes = _free_bytes
             handrive_quota_free_display = format_handrive_bytes_display(_free_bytes)
             handrive_quota_free_percent = round(_free_bytes / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2)
@@ -2874,6 +2902,16 @@ def handrive_common_context(request, ui_lang):
                 }
                 for key, label, color in _DOCS_QUOTA_TYPE_META
             ]
+            if _repo_count > 0:
+                handrive_quota_breakdown.append({
+                    "key": "repo",
+                    "label": "리포지토리",
+                    "color": "#7c3aed",
+                    "bytes": _repo_bytes,
+                    "count": _repo_count,
+                    "display": format_handrive_bytes_display(_repo_bytes),
+                    "percent": round(_repo_bytes / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2),
+                })
         else:
             handrive_quota_used_bytes = None
             handrive_quota_total_bytes = None
@@ -3673,7 +3711,15 @@ def handrive_list(request, folder_path="", ui_lang=None):
         if not directory.is_dir():
             raise Http404("폴더를 찾을 수 없습니다.")
         initial_entries = list_directory_entries(directory, request=request)
-        current_dir_size_display = format_handrive_bytes_display(calculate_handrive_quota_breakdown(directory)[0]) if directory.is_dir() else ""
+        if directory.is_dir():
+            _dir_bytes = calculate_handrive_quota_breakdown(directory)[0]
+            _is_root = (scoped_home_dir and current_dir == scoped_home_dir) or (not scoped_home_dir and current_dir == "")
+            if _is_root and request.user.is_authenticated:
+                _repo_extra, _ = calculate_handrive_repo_usage(request.user)
+                _dir_bytes += _repo_extra
+            current_dir_size_display = format_handrive_bytes_display(_dir_bytes)
+        else:
+            current_dir_size_display = ""
     else:
         if git_virtual["kind"] == "branch_file":
             raise Http404("폴더를 찾을 수 없습니다.")

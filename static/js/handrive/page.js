@@ -2282,6 +2282,7 @@
             const isLandscape = listLayout.classList.contains("is-landscape");
             const hasPreview = listLayout.classList.contains("has-preview");
             if (!isLandscape || !hasPreview) {
+                previewBody.style.height = "";
                 previewBody.style.minHeight = "";
                 previewBody.style.maxHeight = "";
                 return;
@@ -2301,9 +2302,13 @@
             const layoutBorderH = (parseFloat(layoutStyle.borderTopWidth) || 0) + (parseFloat(layoutStyle.borderBottomWidth) || 0);
             const previewHead = previewPanel.querySelector(".handrive-list-preview-head");
             const previewHeadH = previewHead ? previewHead.getBoundingClientRect().height : 0;
-            // contentEl.clientHeight = padding 포함 내부 높이 (scroll과 무관)
-            const availableForBody = contentEl.clientHeight - padTop - padBottom - searchH - searchMarginB - layoutBorderH - previewHeadH;
+            // contentEl.clientHeight 는 previewBody 의 min-height 에 영향받을 수 있으므로
+            // viewport 기준으로 계산 (contentEl top 위치는 content 높이와 무관하게 안정적)
+            const viewportH = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+            const contentTop = contentEl.getBoundingClientRect().top;
+            const availableForBody = viewportH - contentTop - padTop - padBottom - searchH - searchMarginB - layoutBorderH - previewHeadH;
             const height = Math.max(0, Math.floor(availableForBody));
+            previewBody.style.height = height + "px";
             previewBody.style.minHeight = height + "px";
             previewBody.style.maxHeight = height + "px";
         }
@@ -2761,9 +2766,19 @@
             }
             const entry = selectedEntries[0];
             if (!isPreviewableFileEntry(entry)) {
+                // 폴더 등 미리보기 불가 항목 선택 시 현재 미리보기 유지
+                return;
+            }
+            const entryPath = normalizePath(entry.path, true);
+            if (entryPath === state.activePreviewPath) {
+                // 현재 미리보기 중인 파일을 다시 선택하면 토글(닫기)
                 clearPreviewPane();
                 return;
             }
+            // 새 파일로 전환 시 activePreviewPath를 먼저 업데이트하고 재렌더해서
+            // 이전 파일의 선택 효과가 남지 않도록 함
+            state.activePreviewPath = entryPath;
+            renderList({ skipPreview: true });
             loadPreviewForEntry(entry).catch(alertError);
         }
 
@@ -2784,7 +2799,7 @@
             setContextButtonVisible(contextGitCreateRepoButton, Boolean(visibility.gitCreateRepo));
             setContextButtonVisible(contextGitManageRepoButton, Boolean(visibility.gitManageRepo));
             setContextButtonVisible(contextGitDeleteRepoButton, Boolean(visibility.gitDeleteRepo));
-            syncContextMenuDividers();
+            syncContextMenuDividers(contextMenu);
         }
 
         function resolveContextEntries(entry) {
@@ -2840,7 +2855,7 @@
                 return;
             }
             renderPathBreadcrumbs(state.selectedPath || currentDir);
-            renderList();
+            renderList({ skipPreview: Boolean(settings.skipPreview) });
             updatePathCurrentSize();
         }
 
@@ -2850,8 +2865,8 @@
             }
             if (state.selectedPaths.size === 1) {
                 const entry = state.entryByPath.get(state.selectedPath);
-                if (entry && entry.size_display) {
-                    pathCurrentSizeEl.textContent = entry.size_display;
+                if (entry) {
+                    pathCurrentSizeEl.textContent = entry.size_display || "";
                     return;
                 }
             }
@@ -3893,7 +3908,7 @@
             row.setAttribute("data-entry-path", currentFolderEntry.path);
             state.entryRowByPath.set(currentFolderEntry.path, row);
             row.draggable = false;
-            if (state.selectedPaths.has(currentFolderEntry.path)) {
+            if (state.selectedPaths.has(currentFolderEntry.path) || normalizePath(currentFolderEntry.path, true) === state.activePreviewPath) {
                 row.classList.add("is-selected");
             }
 
@@ -3927,6 +3942,7 @@
             appendEntryBadge(row, currentFolderEntry, t, appendBadgeWithPrefix);
 
             row.addEventListener("click", function (event) {
+                if (event.button !== 0) { return; }
                 event.preventDefault();
                 closeContextMenu();
                 selectEntriesByRowClick(currentFolderEntry, event);
@@ -4451,7 +4467,7 @@
             state.entryRowByPath.set(entry.path, row);
             const isPublicWriteFile = Boolean(entry.type === "file" && entry.is_public_write);
             row.draggable = Boolean(moveApiUrl && (entry.can_edit || entry.can_delete) && !isPublicWriteFile);
-            if (state.selectedPaths.has(entry.path)) {
+            if (state.selectedPaths.has(entry.path) || normalizePath(entry.path, true) === state.activePreviewPath) {
                 row.classList.add("is-selected");
             }
 
@@ -4478,6 +4494,7 @@
             appendEntryBadge(row, entry, t, appendBadgeWithPrefix);
 
             row.addEventListener("click", function (event) {
+                if (event.button !== 0) { return; }
                 event.preventDefault();
                 closeContextMenu();
                 selectEntriesByRowClick(entry, event);
@@ -4494,6 +4511,7 @@
             });
 
             row.addEventListener("dblclick", function (event) {
+                if (event.button !== 0) { return; }
                 event.preventDefault();
                 event.stopPropagation();
                 openEntry(entry);
@@ -4581,7 +4599,8 @@
             });
         }
 
-        function renderList() {
+        function renderList(options) {
+            const renderListOptions = options || {};
             if (!listContainer) {
                 return;
             }
@@ -4615,7 +4634,7 @@
                     ? state.selectionAnchorPath
                     : (state.selectedPath || "");
                 listContainer.appendChild(fragment);
-                syncPreviewFromSelection();
+                if (!renderListOptions.skipPreview) { syncPreviewFromSelection(); }
                 state.openingFolderPath = "";
                 return;
             }
@@ -4636,7 +4655,7 @@
                 ? state.selectionAnchorPath
                 : (state.selectedPath || "");
             listContainer.appendChild(fragment);
-            syncPreviewFromSelection();
+            if (!renderListOptions.skipPreview) { syncPreviewFromSelection(); }
             scheduleSyncCurrentDirRowHeightWithSideHead();
             state.openingFolderPath = "";
         }
@@ -4649,6 +4668,7 @@
                 applySelection([entry.path], {
                     primaryPath: entry.path,
                     anchorPath: entry.path,
+                    skipPreview: true,
                 });
             }
             openContextMenuAt(entry, x, y);

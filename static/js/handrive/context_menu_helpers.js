@@ -17,10 +17,7 @@
                 if (!button || button.hidden) {
                     return false;
                 }
-                if (button.style && button.style.display === "none") {
-                    return false;
-                }
-                return window.getComputedStyle(button).display !== "none";
+                return !button.style || button.style.display !== "none";
             });
             group.classList.toggle("is-hidden", !hasVisibleButton);
             group.classList.remove("has-divider");
