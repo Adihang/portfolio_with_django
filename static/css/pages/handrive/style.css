@@ -3184,8 +3184,7 @@ body.handrive-page.theme-dark .handrive-md-src-token-codeblock {
 .handrive-list-preview-content.handrive-js,
 .handrive-list-preview-content.handrive-py,
 .handrive-list-preview-content.handrive-plain-text {
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .handrive-list-preview-content.handrive-json pre,
