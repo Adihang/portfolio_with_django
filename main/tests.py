@@ -18,7 +18,7 @@ from importlib import import_module
 
 from .models import (
     Career,
-    DocsAccessRule,
+    HandriveAccessRule,
     NavLink,
     PortfolioActionButton,
     PortfolioCareer,
@@ -29,16 +29,16 @@ from .models import (
 )
 from .handrive_views import (
     DOCS_EDIT_PERMISSION_CODE,
-    DOCS_EDITOR_GROUP_NAME,
+    HANDRIVE_EDITOR_GROUP_NAME,
     DOCS_PUBLIC_WRITE_GROUP_NAME,
     DOCS_USER_SCOPED_ENTRY_LIMIT,
     DOCS_USER_SCOPED_QUOTA_BYTES,
     DOCS_URL_ONLY_GROUP_NAME,
     _build_forgejo_session_blob,
-    _resolve_docs_post_login_url,
-    get_docs_upload_tmp_dir,
-    get_docs_public_write_group,
-    is_docs_editor,
+    _resolve_handrive_post_login_url,
+    get_handrive_upload_tmp_dir,
+    get_handrive_public_write_group,
+    is_handrive_editor,
 )
 from .views import (
     build_game_auth_token,
@@ -318,13 +318,13 @@ class LanguageUrlRoutingTests(TestCase):
         self.assertEqual(response["Location"], "/login?next=/portfolio/")
 
 
-class DocsSignupAutoLoginTests(TestCase):
+class HandriveSignupAutoLoginTests(TestCase):
     @mock.patch("main.handrive_views._attach_forgejo_login_session")
     @mock.patch("main.handrive_views._trigger_gitea_password_sync")
     def test_signup_logs_user_in_immediately(self, mock_trigger_sync, mock_attach_session):
         mock_attach_session.side_effect = lambda response, user: response
         response = self.client.post(
-            reverse("main:docs_signup_lang", kwargs={"ui_lang": "ko"}),
+            reverse("main:handrive_signup_lang", kwargs={"ui_lang": "ko"}),
             data={
                 "username": "autologin_user",
                 "password1": "pw123456!!AA",
@@ -348,7 +348,7 @@ class DocsSignupAutoLoginTests(TestCase):
 
     def test_signup_saves_privacy_and_terms_consent(self):
         self.client.post(
-            reverse("main:docs_signup_lang", kwargs={"ui_lang": "ko"}),
+            reverse("main:handrive_signup_lang", kwargs={"ui_lang": "ko"}),
             data={
                 "username": "consent_user",
                 "password1": "pw123456!!AA",
@@ -551,46 +551,46 @@ class PortfolioPerUserRoutingTests(TestCase):
         self.assertContains(response, "/static/icons/hanplanet-og-1200.png", html=False)
 
 
-class DocsEditorPermissionTests(TestCase):
+class HandriveEditorPermissionTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.user_model = get_user_model()
-        self.docs_editor_group, _ = Group.objects.get_or_create(name=DOCS_EDITOR_GROUP_NAME)
+        self.handrive_editor_group, _ = Group.objects.get_or_create(name=HANDRIVE_EDITOR_GROUP_NAME)
         content_type = ContentType.objects.get_for_model(NavLink)
-        self.docs_permission, _ = Permission.objects.get_or_create(
+        self.handrive_permission, _ = Permission.objects.get_or_create(
             content_type=content_type,
             codename=DOCS_EDIT_PERMISSION_CODE.split(".", 1)[1],
             defaults={"name": "Can edit HanDrive content"},
         )
-        self.docs_editor_group.permissions.set([self.docs_permission])
+        self.handrive_editor_group.permissions.set([self.handrive_permission])
 
-    def test_docs_editor_group_user_is_allowed(self):
-        user = self.user_model.objects.create_user(username="docs_editor", password="pw123456")
-        user.groups.add(self.docs_editor_group)
-        request = self.factory.get("/ko/docs/list/")
+    def test_handrive_editor_group_user_is_allowed(self):
+        user = self.user_model.objects.create_user(username="handrive_editor", password="pw123456")
+        user.groups.add(self.handrive_editor_group)
+        request = self.factory.get("/ko/handrive/list/")
         request.user = user
 
-        self.assertTrue(is_docs_editor(request))
+        self.assertTrue(is_handrive_editor(request))
 
     def test_regular_user_is_denied_for_write_api(self):
         user = self.user_model.objects.create_user(username="regular_user", password="pw123456")
         self.client.force_login(user)
 
         response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "", "folder_name": "tmp"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 403)
 
-    def test_docs_editor_group_user_passes_auth_gate_for_write_api(self):
-        user = self.user_model.objects.create_user(username="docs_editor2", password="pw123456")
-        user.groups.add(self.docs_editor_group)
+    def test_handrive_editor_group_user_passes_auth_gate_for_write_api(self):
+        user = self.user_model.objects.create_user(username="handrive_editor2", password="pw123456")
+        user.groups.add(self.handrive_editor_group)
         self.client.force_login(user)
 
         response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "__missing__", "folder_name": "tmp"}),
             content_type="application/json",
         )
@@ -616,11 +616,11 @@ class UserPreferenceApiTests(TestCase):
         self.assertEqual(profile.preferred_root_search_engine, "gpt")
 
 
-class DocsAuthFlowTests(TestCase):
+class HandriveAuthFlowTests(TestCase):
     def setUp(self):
         self.user_model = get_user_model()
         self.user = self.user_model.objects.create_user(
-            username="docs_login_user",
+            username="handrive_login_user",
             password="pw123456",
             is_staff=False,
         )
@@ -641,7 +641,7 @@ class DocsAuthFlowTests(TestCase):
 
         mock_run.return_value = mock.Mock(returncode=0, stdout="Zm9v")
         with mock.patch("main.handrive_views.Path.exists", fake_exists):
-            blob = _build_forgejo_session_blob(123, "docs_login_user")
+            blob = _build_forgejo_session_blob(123, "handrive_login_user")
 
         self.assertEqual(blob, b"foo")
         self.assertEqual(mock_run.call_args.args[0][0], "/opt/homebrew/bin/go")
@@ -653,40 +653,40 @@ class DocsAuthFlowTests(TestCase):
         mock_attach_session.side_effect = lambda response, user: response
         response = self.client.post(
             "/ko/login/",
-            data={"username": "docs_login_user", "password": "pw123456", "next": "/ko/docs/list/"},
+            data={"username": "handrive_login_user", "password": "pw123456", "next": "/ko/handrive/list/"},
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/ko/docs/list/")
+        self.assertEqual(response["Location"], "/ko/handrive/list/")
         self.assertTrue("_auth_user_id" in self.client.session)
         mock_attach_session.assert_called_once()
         mock_trigger_sync.assert_called_once()
 
-    def test_resolve_docs_post_login_url_keeps_portfolio_next(self):
+    def test_resolve_handrive_post_login_url_keeps_portfolio_next(self):
         public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
         self.user.groups.add(public_group)
         request = RequestFactory().get("/ko/login/")
 
-        resolved = _resolve_docs_post_login_url(
+        resolved = _resolve_handrive_post_login_url(
             request,
             "ko",
-            "/ko/portfolio/docs_login_user/",
+            "/ko/portfolio/handrive_login_user/",
             self.user,
         )
 
-        self.assertEqual(resolved, "/ko/portfolio/docs_login_user/")
+        self.assertEqual(resolved, "/ko/portfolio/handrive_login_user/")
 
     def test_docs_logout_clears_session(self):
         self.client.force_login(self.user)
 
         response = self.client.post(
             "/ko/logout/",
-            data={"next": "/ko/docs/list/"},
+            data={"next": "/ko/handrive/list/"},
         )
 
         self.assertIn(response.status_code, (200, 302))
         if response.status_code == 302:
-            self.assertEqual(response["Location"], "/ko/docs/list/")
+            self.assertEqual(response["Location"], "/ko/handrive/list/")
         else:
             self.assertContains(response, "hp-git-logout-form")
         self.assertFalse("_auth_user_id" in self.client.session)
@@ -697,7 +697,7 @@ class DocsAuthFlowTests(TestCase):
 
         response = csrf_client.post(
             "/ko/logout/",
-            data={"next": "/ko/docs/list/"},
+            data={"next": "/ko/handrive/list/"},
         )
 
         self.assertEqual(response.status_code, 403)
@@ -1159,7 +1159,7 @@ class HanplanetMultiplayerPageTests(TestCase):
         self.assertFalse(response.context["show_account_bumpercar_spiky_stats"])
 
 
-class DocsAccessRuleTests(TestCase):
+class HandriveAccessRuleTests(TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.override_settings = override_settings(MEDIA_ROOT=self.temp_dir.name)
@@ -1168,27 +1168,27 @@ class DocsAccessRuleTests(TestCase):
         self.addCleanup(self.temp_dir.cleanup)
 
         self.user_model = get_user_model()
-        self.docs_editor_group, _ = Group.objects.get_or_create(name=DOCS_EDITOR_GROUP_NAME)
+        self.handrive_editor_group, _ = Group.objects.get_or_create(name=HANDRIVE_EDITOR_GROUP_NAME)
         content_type = ContentType.objects.get_for_model(NavLink)
-        self.docs_permission, _ = Permission.objects.get_or_create(
+        self.handrive_permission, _ = Permission.objects.get_or_create(
             content_type=content_type,
             codename=DOCS_EDIT_PERMISSION_CODE.split(".", 1)[1],
             defaults={"name": "Can edit HanDrive content"},
         )
-        self.docs_editor_group.permissions.set([self.docs_permission])
+        self.handrive_editor_group.permissions.set([self.handrive_permission])
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "restricted").mkdir(parents=True, exist_ok=True)
-        (docs_root / "restricted" / "secret.md").write_text("# secret", encoding="utf-8")
-        (docs_root / "public.md").write_text("# public", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "restricted").mkdir(parents=True, exist_ok=True)
+        (handrive_root / "restricted" / "secret.md").write_text("# secret", encoding="utf-8")
+        (handrive_root / "public.md").write_text("# public", encoding="utf-8")
 
-    def create_docs_editor(self, username):
+    def create_handrive_editor(self, username):
         user = self.user_model.objects.create_user(username=username, password="pw123456")
-        user.groups.add(self.docs_editor_group)
+        user.groups.add(self.handrive_editor_group)
         return user
 
-    def create_scoped_docs_editor(self, username):
-        user = self.create_docs_editor(username)
+    def create_scoped_handrive_editor(self, username):
+        user = self.create_handrive_editor(username)
         public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
         user.groups.add(public_group)
         user_home = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / username
@@ -1196,8 +1196,8 @@ class DocsAccessRuleTests(TestCase):
         return user
 
     def test_restricted_path_blocks_non_allowed_user_from_read(self):
-        reader_group = Group.objects.create(name="docs_readers")
-        rule = DocsAccessRule.objects.create(path="restricted")
+        reader_group = Group.objects.create(name="handrive_readers")
+        rule = HandriveAccessRule.objects.create(path="restricted")
         rule.read_groups.add(reader_group)
 
         blocked_user = self.user_model.objects.create_user(username="blocked", password="pw123456")
@@ -1209,18 +1209,18 @@ class DocsAccessRuleTests(TestCase):
         allowed_response = self.client.get("/ko/docs/restricted/secret/")
         self.assertEqual(allowed_response.status_code, 200)
 
-    def test_restricted_path_blocks_docs_editor_write_when_not_in_acl(self):
-        writers_group = Group.objects.create(name="docs_writers")
-        rule = DocsAccessRule.objects.create(path="restricted")
+    def test_restricted_path_blocks_handrive_editor_write_when_not_in_acl(self):
+        writers_group = Group.objects.create(name="handrive_writers")
+        rule = HandriveAccessRule.objects.create(path="restricted")
         rule.write_groups.add(writers_group)
 
-        blocked_editor = self.create_docs_editor("blocked_editor")
-        allowed_editor = self.create_docs_editor("allowed_editor")
+        blocked_editor = self.create_handrive_editor("blocked_editor")
+        allowed_editor = self.create_handrive_editor("allowed_editor")
         allowed_editor.groups.add(writers_group)
 
         self.client.force_login(blocked_editor)
         blocked = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "restricted", "folder_name": "new_folder"}),
             content_type="application/json",
         )
@@ -1228,23 +1228,23 @@ class DocsAccessRuleTests(TestCase):
 
         self.client.force_login(allowed_editor)
         allowed = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "restricted", "folder_name": "new_folder"}),
             content_type="application/json",
         )
         self.assertEqual(allowed.status_code, 200)
 
-    def test_child_file_write_acl_keeps_parent_directory_writable_for_docs_editors(self):
+    def test_child_file_write_acl_keeps_parent_directory_writable_for_handrive_editors(self):
         writers_group = Group.objects.create(name="child_file_writers")
-        rule = DocsAccessRule.objects.create(path="restricted/secret.md")
+        rule = HandriveAccessRule.objects.create(path="restricted/secret.md")
         rule.write_groups.add(writers_group)
 
-        allowed_editor = self.create_docs_editor("child_file_acl_editor")
+        allowed_editor = self.create_handrive_editor("child_file_acl_editor")
         allowed_editor.groups.add(writers_group)
         self.client.force_login(allowed_editor)
 
         parent_write_response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "restricted", "folder_name": "should_block"}),
             content_type="application/json",
         )
@@ -1253,17 +1253,17 @@ class DocsAccessRuleTests(TestCase):
         edit_page_response = self.client.get("/ko/docs/write/", data={"path": "restricted/secret.md"})
         self.assertEqual(edit_page_response.status_code, 200)
 
-    def test_child_file_write_acl_keeps_root_directory_writable_for_docs_editors(self):
+    def test_child_file_write_acl_keeps_root_directory_writable_for_handrive_editors(self):
         writers_group = Group.objects.create(name="root_parent_block_writers")
-        rule = DocsAccessRule.objects.create(path="public.md")
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(writers_group)
 
-        allowed_editor = self.create_docs_editor("root_parent_block_editor")
+        allowed_editor = self.create_handrive_editor("root_parent_block_editor")
         allowed_editor.groups.add(writers_group)
         self.client.force_login(allowed_editor)
 
         root_write_response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "", "folder_name": "root_should_block"}),
             content_type="application/json",
         )
@@ -1274,10 +1274,10 @@ class DocsAccessRuleTests(TestCase):
 
     def test_docs_list_uses_current_directory_write_access_for_write_button(self):
         writers_group = Group.objects.create(name="restricted_list_writers")
-        rule = DocsAccessRule.objects.create(path="restricted")
+        rule = HandriveAccessRule.objects.create(path="restricted")
         rule.write_groups.add(writers_group)
 
-        allowed_editor = self.create_docs_editor("restricted_list_editor")
+        allowed_editor = self.create_handrive_editor("restricted_list_editor")
         allowed_editor.groups.add(writers_group)
         self.client.force_login(allowed_editor)
 
@@ -1287,10 +1287,10 @@ class DocsAccessRuleTests(TestCase):
 
     def test_docs_view_uses_document_write_access_for_delete_button(self):
         writers_group = Group.objects.create(name="public_doc_writers")
-        rule = DocsAccessRule.objects.create(path="public.md")
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(writers_group)
 
-        allowed_editor = self.create_docs_editor("public_doc_editor")
+        allowed_editor = self.create_handrive_editor("public_doc_editor")
         allowed_editor.groups.add(writers_group)
         self.client.force_login(allowed_editor)
 
@@ -1299,25 +1299,25 @@ class DocsAccessRuleTests(TestCase):
         self.assertContains(view_response, 'id="handrive-delete-btn"')
 
     def test_inherited_root_write_acl_stays_usable_when_child_acl_exists(self):
-        root_rule = DocsAccessRule.objects.create(path="")
-        root_rule.write_groups.add(self.docs_editor_group)
+        root_rule = HandriveAccessRule.objects.create(path="")
+        root_rule.write_groups.add(self.handrive_editor_group)
 
         child_writers = Group.objects.create(name="child_override_writers")
-        child_rule = DocsAccessRule.objects.create(path="restricted/secret.md")
+        child_rule = HandriveAccessRule.objects.create(path="restricted/secret.md")
         child_rule.write_groups.add(child_writers)
 
-        editor = self.create_docs_editor("root_inherited_editor")
+        editor = self.create_handrive_editor("root_inherited_editor")
         self.client.force_login(editor)
 
         inherited_response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "restricted", "folder_name": "blocked_by_child_acl"}),
             content_type="application/json",
         )
         self.assertEqual(inherited_response.status_code, 200)
 
         root_allowed_response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "", "folder_name": "root_still_allowed"}),
             content_type="application/json",
         )
@@ -1325,12 +1325,12 @@ class DocsAccessRuleTests(TestCase):
 
     def test_write_only_rule_on_folder_does_not_block_read_access(self):
         writers_group = Group.objects.create(name="restricted_writers")
-        rule = DocsAccessRule.objects.create(path="restricted")
+        rule = HandriveAccessRule.objects.create(path="restricted")
         rule.write_groups.add(writers_group)
 
         anonymous_list = self.client.get("/ko/docs/restricted/list/")
         anonymous_doc = self.client.get("/ko/docs/restricted/secret/")
-        api_list = self.client.get(reverse("main:docs_api_list"), data={"path": "restricted"})
+        api_list = self.client.get(reverse("main:handrive_api_list"), data={"path": "restricted"})
 
         self.assertEqual(anonymous_list.status_code, 200)
         self.assertEqual(anonymous_doc.status_code, 200)
@@ -1338,14 +1338,14 @@ class DocsAccessRuleTests(TestCase):
 
     def test_url_only_group_hides_entry_from_list_and_blocks_direct_path(self):
         url_only_group = Group.objects.create(name=DOCS_URL_ONLY_GROUP_NAME)
-        rule = DocsAccessRule.objects.create(path="public.md")
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.read_groups.add(url_only_group)
         user = self.user_model.objects.create_user(username="url_only_reader", password="pw123456")
         user.groups.add(url_only_group)
         self.client.force_login(user)
 
         list_response = self.client.get("/ko/handrive/list/")
-        api_list = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
+        api_list = self.client.get(reverse("main:handrive_api_list"), data={"path": ""})
         direct_view = self.client.get("/ko/handrive/public/")
 
         self.assertEqual(list_response.status_code, 200)
@@ -1357,23 +1357,23 @@ class DocsAccessRuleTests(TestCase):
     def test_url_only_file_stays_visible_to_editor_and_uses_shared_url_for_anonymous(self):
         url_only_group = Group.objects.create(name=DOCS_URL_ONLY_GROUP_NAME)
         editors_group = Group.objects.create(name="url_only_editors")
-        rule = DocsAccessRule.objects.create(path="public.md")
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.read_groups.add(url_only_group)
         rule.write_groups.add(editors_group)
 
-        editor = self.create_docs_editor("url_only_editor")
+        editor = self.create_handrive_editor("url_only_editor")
         editor.groups.add(editors_group)
         self.client.force_login(editor)
 
         list_response = self.client.get("/ko/handrive/list/")
-        api_list = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
+        api_list = self.client.get(reverse("main:handrive_api_list"), data={"path": ""})
 
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(api_list.status_code, 200)
         self.assertTrue(any(entry.get("path") == "public.md" for entry in api_list.json().get("entries", [])))
 
         share_response = self.client.post(
-            reverse("main:docs_api_url_share"),
+            reverse("main:handrive_api_url_share"),
             data=json.dumps({"path": "public.md", "enabled": True}),
             content_type="application/json",
         )
@@ -1387,11 +1387,11 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(anonymous_shared_view.status_code, 200)
 
     def test_url_share_api_returns_shared_view_url(self):
-        editor = self.create_docs_editor("url_share_api_editor")
+        editor = self.create_handrive_editor("url_share_api_editor")
         self.client.force_login(editor)
 
         response = self.client.post(
-            reverse("main:docs_api_url_share"),
+            reverse("main:handrive_api_url_share"),
             data=json.dumps({"path": "public.md", "enabled": True}),
             content_type="application/json",
         )
@@ -1404,9 +1404,9 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(payload["share_slug"], "public")
         self.assertTrue(payload["share_url"].endswith("/ko/handrive/share/url_share_api_editor/public"))
 
-    def test_docs_root_for_superuser_defaults_to_user_folder(self):
+    def test_handrive_root_for_superuser_defaults_to_user_folder(self):
         admin_user = self.user_model.objects.create_user(
-            username="docs_superuser_root",
+            username="handrive_superuser_root",
             password="pw123456",
             is_staff=True,
             is_superuser=True,
@@ -1416,16 +1416,16 @@ class DocsAccessRuleTests(TestCase):
         response = self.client.get("/ko/handrive/")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/ko/handrive/users/docs_superuser_root/list")
+        self.assertEqual(response["Location"], "/ko/handrive/users/handrive_superuser_root/list")
 
         redirected_response = self.client.get(response["Location"])
         self.assertEqual(redirected_response.status_code, 200)
-        self.assertContains(redirected_response, 'data-current-dir="users/docs_superuser_root"')
-        self.assertContains(redirected_response, ">docs_superuser_root<")
+        self.assertContains(redirected_response, 'data-current-dir="users/handrive_superuser_root"')
+        self.assertContains(redirected_response, ">handrive_superuser_root<")
 
     def test_docs_superuser_can_still_open_unscoped_root_directly(self):
         admin_user = self.user_model.objects.create_user(
-            username="docs_superuser_direct_root",
+            username="handrive_superuser_direct_root",
             password="pw123456",
             is_staff=True,
             is_superuser=True,
@@ -1443,7 +1443,7 @@ class DocsAccessRuleTests(TestCase):
 
     def test_docs_superuser_can_open_unscoped_root_file_directly(self):
         admin_user = self.user_model.objects.create_user(
-            username="docs_superuser_root_file",
+            username="handrive_superuser_root_file",
             password="pw123456",
             is_staff=True,
             is_superuser=True,
@@ -1457,7 +1457,7 @@ class DocsAccessRuleTests(TestCase):
 
     def test_docs_superuser_can_open_unscoped_root_folder_directly(self):
         admin_user = self.user_model.objects.create_user(
-            username="docs_superuser_root_folder",
+            username="handrive_superuser_root_folder",
             password="pw123456",
             is_staff=True,
             is_superuser=True,
@@ -1485,8 +1485,8 @@ class DocsAccessRuleTests(TestCase):
         self.assertContains(response, ">Hanplanet<")
         self.assertContains(response, ">admin<")
 
-    def test_docs_root_for_staff_user_keeps_scoped_home_dir(self):
-        staff_user = self.create_docs_editor("docs_staff_scoped")
+    def test_handrive_root_for_staff_user_keeps_scoped_home_dir(self):
+        staff_user = self.create_handrive_editor("handrive_staff_scoped")
         staff_user.is_staff = True
         staff_user.save(update_fields=["is_staff"])
         public_group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
@@ -1497,7 +1497,7 @@ class DocsAccessRuleTests(TestCase):
         redirected_response = self.client.get(response["Location"])
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/ko/handrive/users/docs_staff_scoped/list", response["Location"])
+        self.assertIn("/ko/handrive/users/handrive_staff_scoped/list", response["Location"])
         self.assertNotContains(redirected_response, "스태틱파일 적용+구니콘 재시작")
 
     @mock.patch("main.handrive_views.subprocess.Popen")
@@ -1508,7 +1508,7 @@ class DocsAccessRuleTests(TestCase):
         mock_popen,
     ):
         admin_user = self.user_model.objects.create_user(
-            username="docs_ops_superuser",
+            username="handrive_ops_superuser",
             password="pw123456",
             is_staff=True,
             is_superuser=True,
@@ -1516,7 +1516,7 @@ class DocsAccessRuleTests(TestCase):
 
         self.client.force_login(admin_user)
         response = self.client.post(
-            reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
+            reverse("main:handrive_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
             data={"next": "/ko/handrive/"},
         )
 
@@ -1530,66 +1530,66 @@ class DocsAccessRuleTests(TestCase):
         mock_popen.assert_called_once()
 
     def test_docs_ops_apply_static_requires_superuser(self):
-        editor = self.create_docs_editor("docs_ops_editor")
+        editor = self.create_handrive_editor("handrive_ops_editor")
         self.client.force_login(editor)
 
         response = self.client.post(
-            reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
+            reverse("main:handrive_ops_apply_static_lang", kwargs={"ui_lang": "ko"}),
             data={"next": "/ko/handrive/"},
         )
 
         self.assertEqual(response.status_code, 403)
 
     def test_docs_api_move_moves_file_into_target_directory(self):
-        editor = self.create_docs_editor("move_editor")
+        editor = self.create_handrive_editor("move_editor")
         self.client.force_login(editor)
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "archive").mkdir(parents=True, exist_ok=True)
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "archive").mkdir(parents=True, exist_ok=True)
 
         response = self.client.post(
-            reverse("main:docs_api_move"),
+            reverse("main:handrive_api_move"),
             data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse((docs_root / "public.md").exists())
-        self.assertTrue((docs_root / "archive" / "public.md").exists())
+        self.assertFalse((handrive_root / "public.md").exists())
+        self.assertTrue((handrive_root / "archive" / "public.md").exists())
         self.assertEqual(response.json().get("path"), "archive/public.md")
 
     def test_docs_api_move_blocks_folder_move_into_descendant(self):
-        editor = self.create_docs_editor("move_descendant_editor")
+        editor = self.create_handrive_editor("move_descendant_editor")
         self.client.force_login(editor)
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "restricted" / "child").mkdir(parents=True, exist_ok=True)
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "restricted" / "child").mkdir(parents=True, exist_ok=True)
 
         response = self.client.post(
-            reverse("main:docs_api_move"),
+            reverse("main:handrive_api_move"),
             data=json.dumps({"source_path": "restricted", "target_dir": "restricted/child"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertTrue((docs_root / "restricted").exists())
-        self.assertTrue((docs_root / "restricted" / "child").exists())
+        self.assertTrue((handrive_root / "restricted").exists())
+        self.assertTrue((handrive_root / "restricted" / "child").exists())
 
     def test_docs_api_move_requires_write_access_on_target_directory(self):
         writers_group = Group.objects.create(name="archive_writers")
-        rule = DocsAccessRule.objects.create(path="archive")
+        rule = HandriveAccessRule.objects.create(path="archive")
         rule.write_groups.add(writers_group)
 
-        blocked_editor = self.create_docs_editor("blocked_move_editor")
-        allowed_editor = self.create_docs_editor("allowed_move_editor")
+        blocked_editor = self.create_handrive_editor("blocked_move_editor")
+        allowed_editor = self.create_handrive_editor("allowed_move_editor")
         allowed_editor.groups.add(writers_group)
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "archive").mkdir(parents=True, exist_ok=True)
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "archive").mkdir(parents=True, exist_ok=True)
 
         self.client.force_login(blocked_editor)
         blocked_response = self.client.post(
-            reverse("main:docs_api_move"),
+            reverse("main:handrive_api_move"),
             data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
             content_type="application/json",
         )
@@ -1597,47 +1597,47 @@ class DocsAccessRuleTests(TestCase):
 
         self.client.force_login(allowed_editor)
         allowed_response = self.client.post(
-            reverse("main:docs_api_move"),
+            reverse("main:handrive_api_move"),
             data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
             content_type="application/json",
         )
         self.assertEqual(allowed_response.status_code, 200)
-        self.assertFalse((docs_root / "public.md").exists())
-        self.assertTrue((docs_root / "archive" / "public.md").exists())
+        self.assertFalse((handrive_root / "public.md").exists())
+        self.assertTrue((handrive_root / "archive" / "public.md").exists())
 
     def test_docs_api_move_allows_target_directory_without_explicit_acl_even_with_child_acl(self):
-        editor = self.create_docs_editor("move_target_default_editor")
+        editor = self.create_handrive_editor("move_target_default_editor")
         restricted_writer = self.user_model.objects.create_user(
             username="restricted_writer",
             password="pw123456",
         )
         self.client.force_login(editor)
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "WPF").mkdir(parents=True, exist_ok=True)
-        (docs_root / "C#" / "Winform").mkdir(parents=True, exist_ok=True)
-        (docs_root / "C#" / "Winform" / "test.md").write_text("# test", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "WPF").mkdir(parents=True, exist_ok=True)
+        (handrive_root / "C#" / "Winform").mkdir(parents=True, exist_ok=True)
+        (handrive_root / "C#" / "Winform" / "test.md").write_text("# test", encoding="utf-8")
 
-        rule = DocsAccessRule.objects.create(path="C#/Winform/test.md")
+        rule = HandriveAccessRule.objects.create(path="C#/Winform/test.md")
         rule.write_users.add(restricted_writer)
 
         response = self.client.post(
-            reverse("main:docs_api_move"),
+            reverse("main:handrive_api_move"),
             data=json.dumps({"source_path": "WPF", "target_dir": "C#"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json().get("path"), "C#/WPF")
-        self.assertFalse((docs_root / "WPF").exists())
-        self.assertTrue((docs_root / "C#" / "WPF").exists())
+        self.assertFalse((handrive_root / "WPF").exists())
+        self.assertTrue((handrive_root / "C#" / "WPF").exists())
 
     def test_docs_api_upload_saves_file_into_writable_directory(self):
-        editor = self.create_docs_editor("upload_editor")
+        editor = self.create_handrive_editor("upload_editor")
         self.client.force_login(editor)
 
         response = self.client.post(
-            reverse("main:docs_api_upload"),
+            reverse("main:handrive_api_upload"),
             data={
                 "dir": "restricted",
                 "files": SimpleUploadedFile("hello.txt", b"hello upload", content_type="text/plain"),
@@ -1652,14 +1652,14 @@ class DocsAccessRuleTests(TestCase):
 
     def test_docs_api_upload_requires_directory_write_access(self):
         writers_group = Group.objects.create(name="upload_writers")
-        rule = DocsAccessRule.objects.create(path="restricted")
+        rule = HandriveAccessRule.objects.create(path="restricted")
         rule.write_groups.add(writers_group)
 
-        blocked_editor = self.create_docs_editor("blocked_upload_editor")
+        blocked_editor = self.create_handrive_editor("blocked_upload_editor")
         self.client.force_login(blocked_editor)
 
         response = self.client.post(
-            reverse("main:docs_api_upload"),
+            reverse("main:handrive_api_upload"),
             data={
                 "dir": "restricted",
                 "files": SimpleUploadedFile("denied.txt", b"denied", content_type="text/plain"),
@@ -1670,11 +1670,11 @@ class DocsAccessRuleTests(TestCase):
         self.assertFalse((Path(settings.MEDIA_ROOT) / "HanDrive" / "restricted" / "denied.txt").exists())
 
     def test_docs_api_upload_accepts_chunked_upload_and_finalizes_file(self):
-        editor = self.create_docs_editor("chunk_upload_editor")
+        editor = self.create_handrive_editor("chunk_upload_editor")
         self.client.force_login(editor)
 
         first = self.client.post(
-            reverse("main:docs_api_upload"),
+            reverse("main:handrive_api_upload"),
             data={
                 "dir": "restricted",
                 "upload_id": "chunk-test-upload",
@@ -1688,7 +1688,7 @@ class DocsAccessRuleTests(TestCase):
         self.assertTrue(first.json().get("uploading"))
 
         second = self.client.post(
-            reverse("main:docs_api_upload"),
+            reverse("main:handrive_api_upload"),
             data={
                 "dir": "restricted",
                 "upload_id": "chunk-test-upload",
@@ -1706,11 +1706,11 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(saved_path.read_bytes(), b"hello world")
 
     def test_docs_api_upload_cancel_removes_chunk_session(self):
-        editor = self.create_docs_editor("cancel_upload_editor")
+        editor = self.create_handrive_editor("cancel_upload_editor")
         self.client.force_login(editor)
 
         self.client.post(
-            reverse("main:docs_api_upload"),
+            reverse("main:handrive_api_upload"),
             data={
                 "dir": "restricted",
                 "upload_id": "cancel-test-upload",
@@ -1721,11 +1721,11 @@ class DocsAccessRuleTests(TestCase):
             },
         )
 
-        session_dir = get_docs_upload_tmp_dir() / "cancel-test-upload"
+        session_dir = get_handrive_upload_tmp_dir() / "cancel-test-upload"
         self.assertTrue(session_dir.exists())
 
         response = self.client.post(
-            reverse("main:docs_api_upload_cancel"),
+            reverse("main:handrive_api_upload_cancel"),
             data={"upload_id": "cancel-test-upload"},
         )
 
@@ -1733,14 +1733,14 @@ class DocsAccessRuleTests(TestCase):
         self.assertFalse(session_dir.exists())
 
     def test_scoped_docs_api_mkdir_blocks_when_entry_limit_would_be_exceeded(self):
-        editor = self.create_scoped_docs_editor("quota_mkdir_editor")
+        editor = self.create_scoped_handrive_editor("quota_mkdir_editor")
         scoped_root = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / editor.username
         for index in range(DOCS_USER_SCOPED_ENTRY_LIMIT):
             (scoped_root / f"entry_{index}.txt").write_text("x", encoding="utf-8")
 
         self.client.force_login(editor)
         response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps(
                 {
                     "parent_dir": f"users/{editor.username}",
@@ -1755,14 +1755,14 @@ class DocsAccessRuleTests(TestCase):
         self.assertFalse((scoped_root / "blocked_folder").exists())
 
     def test_scoped_docs_api_upload_blocks_when_quota_would_be_exceeded(self):
-        editor = self.create_scoped_docs_editor("quota_upload_editor")
+        editor = self.create_scoped_handrive_editor("quota_upload_editor")
         scoped_root = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / editor.username
         with (scoped_root / "existing.bin").open("wb") as handle:
             handle.truncate(DOCS_USER_SCOPED_QUOTA_BYTES)
 
         self.client.force_login(editor)
         response = self.client.post(
-            reverse("main:docs_api_upload"),
+            reverse("main:handrive_api_upload"),
             data={
                 "dir": f"users/{editor.username}",
                 "files": SimpleUploadedFile("extra.txt", b"b", content_type="text/plain"),
@@ -1774,14 +1774,14 @@ class DocsAccessRuleTests(TestCase):
         self.assertFalse((scoped_root / "extra.txt").exists())
 
     def test_scoped_docs_api_save_blocks_when_entry_limit_would_be_exceeded(self):
-        editor = self.create_scoped_docs_editor("quota_save_editor")
+        editor = self.create_scoped_handrive_editor("quota_save_editor")
         scoped_root = Path(settings.MEDIA_ROOT) / "HanDrive" / "users" / editor.username
         for index in range(DOCS_USER_SCOPED_ENTRY_LIMIT):
             (scoped_root / f"entry_{index}.txt").write_text("x", encoding="utf-8")
 
         self.client.force_login(editor)
         response = self.client.post(
-            reverse("main:docs_api_save"),
+            reverse("main:handrive_api_save"),
             data=json.dumps(
                 {
                     "original_path": "",
@@ -1798,13 +1798,13 @@ class DocsAccessRuleTests(TestCase):
         self.assertFalse((scoped_root / "blocked_note.md").exists())
 
     def test_acl_api_is_admin_only(self):
-        editor = self.create_docs_editor("acl_editor")
+        editor = self.create_handrive_editor("acl_editor")
         target_group = Group.objects.create(name="target_group")
         target_user = self.user_model.objects.create_user(username="target_user", password="pw123456")
 
         self.client.force_login(editor)
         response = self.client.post(
-            reverse("main:docs_api_acl"),
+            reverse("main:handrive_api_acl"),
             data=json.dumps(
                 {
                     "path": "restricted/secret.md",
@@ -1831,7 +1831,7 @@ class DocsAccessRuleTests(TestCase):
 
         self.client.force_login(admin_user)
         response = self.client.post(
-            reverse("main:docs_api_acl"),
+            reverse("main:handrive_api_acl"),
             data=json.dumps(
                 {
                     "path": "restricted/secret.md",
@@ -1844,14 +1844,14 @@ class DocsAccessRuleTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        rule = DocsAccessRule.objects.get(path="restricted/secret.md")
+        rule = HandriveAccessRule.objects.get(path="restricted/secret.md")
         self.assertEqual(set(rule.read_users.values_list("id", flat=True)), {read_user.id})
         self.assertEqual(set(rule.read_groups.values_list("id", flat=True)), {read_group.id})
         self.assertEqual(set(rule.write_users.values_list("id", flat=True)), {write_user.id})
         self.assertEqual(set(rule.write_groups.values_list("id", flat=True)), {write_group.id})
 
         clear_response = self.client.post(
-            reverse("main:docs_api_acl"),
+            reverse("main:handrive_api_acl"),
             data=json.dumps(
                 {
                     "path": "restricted/secret.md",
@@ -1864,7 +1864,7 @@ class DocsAccessRuleTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(clear_response.status_code, 200)
-        self.assertFalse(DocsAccessRule.objects.filter(path="restricted/secret.md").exists())
+        self.assertFalse(HandriveAccessRule.objects.filter(path="restricted/secret.md").exists())
 
     def test_acl_api_can_apply_split_rule_to_multiple_paths(self):
         admin_user = self.user_model.objects.create_user(
@@ -1879,7 +1879,7 @@ class DocsAccessRuleTests(TestCase):
 
         self.client.force_login(admin_user)
         response = self.client.post(
-            reverse("main:docs_api_acl"),
+            reverse("main:handrive_api_acl"),
             data=json.dumps(
                 {
                     "paths": ["restricted/secret.md", "public.md"],
@@ -1896,7 +1896,7 @@ class DocsAccessRuleTests(TestCase):
         payload = response.json()
         self.assertEqual(set(payload.get("paths", [])), {"restricted/secret.md", "public.md"})
         for target_path in ["restricted/secret.md", "public.md"]:
-            rule = DocsAccessRule.objects.get(path=target_path)
+            rule = HandriveAccessRule.objects.get(path=target_path)
             self.assertEqual(set(rule.read_users.values_list("id", flat=True)), {read_user.id})
             self.assertEqual(set(rule.read_groups.values_list("id", flat=True)), {read_group.id})
             self.assertEqual(set(rule.write_users.values_list("id", flat=True)), {write_user.id})
@@ -1908,11 +1908,11 @@ class DocsAccessRuleTests(TestCase):
             password="pw123456",
             is_staff=True,
         )
-        public_group = get_docs_public_write_group()
+        public_group = get_handrive_public_write_group()
         self.client.force_login(admin_user)
 
         response = self.client.post(
-            reverse("main:docs_api_acl"),
+            reverse("main:handrive_api_acl"),
             data=json.dumps(
                 {
                     "paths": ["restricted", "public.md"],
@@ -1927,7 +1927,7 @@ class DocsAccessRuleTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("폴더에는 전체 권한을 설정할 수 없습니다", response.json().get("error", ""))
-        self.assertFalse(DocsAccessRule.objects.filter(path="restricted").exists())
+        self.assertFalse(HandriveAccessRule.objects.filter(path="restricted").exists())
 
     def test_acl_options_includes_public_all_group(self):
         admin_user = self.user_model.objects.create_user(
@@ -1937,7 +1937,7 @@ class DocsAccessRuleTests(TestCase):
         )
         self.client.force_login(admin_user)
 
-        response = self.client.get(reverse("main:docs_api_acl_options"))
+        response = self.client.get(reverse("main:handrive_api_acl_options"))
         self.assertEqual(response.status_code, 200)
 
         groups = response.json().get("groups", [])
@@ -1945,19 +1945,19 @@ class DocsAccessRuleTests(TestCase):
         self.assertTrue(any(group.get("label") == "전체" for group in groups))
 
     def test_anonymous_user_cannot_write_directory_when_public_all_group_is_set(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="")
         rule.write_groups.add(public_group)
 
         response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "", "folder_name": "anon_public_write"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 403)
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        self.assertFalse((docs_root / "anon_public_write").exists())
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        self.assertFalse((handrive_root / "anon_public_write").exists())
 
     def test_acl_api_rejects_public_all_group_for_directory(self):
         admin_user = self.user_model.objects.create_user(
@@ -1965,11 +1965,11 @@ class DocsAccessRuleTests(TestCase):
             password="pw123456",
             is_staff=True,
         )
-        public_group = get_docs_public_write_group()
+        public_group = get_handrive_public_write_group()
         self.client.force_login(admin_user)
 
         response = self.client.post(
-            reverse("main:docs_api_acl"),
+            reverse("main:handrive_api_acl"),
             data=json.dumps(
                 {
                     "path": "restricted",
@@ -1986,26 +1986,26 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("폴더에는 전체 권한을 설정할 수 없습니다", response.json().get("error", ""))
 
     def test_legacy_directory_public_all_rule_does_not_grant_write_access(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="restricted")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="restricted")
         rule.write_groups.add(public_group)
 
-        editor = self.create_docs_editor("legacy_dir_public_editor")
+        editor = self.create_handrive_editor("legacy_dir_public_editor")
         self.client.force_login(editor)
 
         response = self.client.post(
-            reverse("main:docs_api_mkdir"),
+            reverse("main:handrive_api_mkdir"),
             data=json.dumps({"parent_dir": "restricted", "folder_name": "should_not_create"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 403)
 
     def test_docs_api_list_marks_public_writable_file(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
-        response = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
+        response = self.client.get(reverse("main:handrive_api_list"), data={"path": ""})
         self.assertEqual(response.status_code, 200)
 
         entries = response.json().get("entries", [])
@@ -2018,7 +2018,7 @@ class DocsAccessRuleTests(TestCase):
     def test_docs_api_list_includes_write_acl_labels_for_accounts_and_groups(self):
         writer_group = Group.objects.create(name="writers_group")
         writer_user = self.user_model.objects.create_user(username="writer_user", password="pw123456")
-        rule = DocsAccessRule.objects.create(path="public.md")
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(writer_group)
         rule.write_users.add(writer_user)
 
@@ -2029,7 +2029,7 @@ class DocsAccessRuleTests(TestCase):
         )
         self.client.force_login(admin_user)
 
-        response = self.client.get(reverse("main:docs_api_list"), data={"path": ""})
+        response = self.client.get(reverse("main:handrive_api_list"), data={"path": ""})
         self.assertEqual(response.status_code, 200)
         entries = response.json().get("entries", [])
         public_entry = next((entry for entry in entries if entry.get("path") == "public.md"), None)
@@ -2039,8 +2039,8 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("@writer_user", labels)
 
     def test_docs_write_page_allows_anonymous_public_writable_file_edit(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
         response = self.client.get("/ko/docs/write/", data={"path": "public.md"})
@@ -2052,7 +2052,7 @@ class DocsAccessRuleTests(TestCase):
         self.client.force_login(user)
 
         response = self.client.post(
-            reverse("main:docs_api_preview"),
+            reverse("main:handrive_api_preview"),
             data=json.dumps({"original_path": "", "content": "# blocked"}),
             content_type="application/json",
         )
@@ -2060,13 +2060,13 @@ class DocsAccessRuleTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_docs_api_preview_allows_new_file_in_scoped_target_dir(self):
-        user = self.create_docs_editor("preview_scoped_editor")
-        public_group = get_docs_public_write_group()
+        user = self.create_handrive_editor("preview_scoped_editor")
+        public_group = get_handrive_public_write_group()
         user.groups.add(public_group)
         self.client.force_login(user)
 
         response = self.client.post(
-            reverse("main:docs_api_preview"),
+            reverse("main:handrive_api_preview"),
             data=json.dumps(
                 {
                     "original_path": "",
@@ -2084,12 +2084,12 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("<h1>", payload.get("html", ""))
 
     def test_docs_api_preview_allows_anonymous_for_public_writable_file(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
         response = self.client.post(
-            reverse("main:docs_api_preview"),
+            reverse("main:handrive_api_preview"),
             data=json.dumps({"original_path": "public.md", "content": "# 제목"}),
             content_type="application/json",
         )
@@ -2101,8 +2101,8 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("<h1>", payload.get("html", ""))
 
     def test_docs_view_shows_edit_button_for_anonymous_public_writable_file(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
         response = self.client.get("/ko/docs/public/")
@@ -2111,8 +2111,8 @@ class DocsAccessRuleTests(TestCase):
         self.assertContains(response, "path=public.md")
 
     def test_docs_view_renders_plain_text_for_non_markdown_file(self):
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "notes.txt").write_text("# heading\n**bold**", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "notes.txt").write_text("# heading\n**bold**", encoding="utf-8")
 
         response = self.client.get("/ko/docs/notes.txt/")
         self.assertEqual(response.status_code, 200)
@@ -2123,11 +2123,11 @@ class DocsAccessRuleTests(TestCase):
         self.assertNotIn("<strong>bold</strong>", html)
 
     def test_docs_api_preview_renders_plain_text_for_non_markdown_file(self):
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "notes.txt").write_text("# heading\n**bold**", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "notes.txt").write_text("# heading\n**bold**", encoding="utf-8")
 
         response = self.client.post(
-            reverse("main:docs_api_preview"),
+            reverse("main:handrive_api_preview"),
             data=json.dumps({"path": "notes.txt"}),
             content_type="application/json",
         )
@@ -2140,16 +2140,16 @@ class DocsAccessRuleTests(TestCase):
         self.assertNotIn("<strong>bold</strong>", payload.get("html", ""))
 
     def test_docs_view_renders_image_preview_and_hides_edit_button(self):
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
         image_bytes = base64.b64decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8S7sAAAAASUVORK5CYII="
         )
-        (docs_root / "sample.png").write_bytes(image_bytes)
-        editor = self.create_docs_editor("media_editor")
+        (handrive_root / "sample.png").write_bytes(image_bytes)
+        editor = self.create_handrive_editor("media_editor")
         self.client.force_login(editor)
 
         response = self.client.get(
-            reverse("main:docs_view_lang", kwargs={"ui_lang": "ko", "doc_path": "sample.png"})
+            reverse("main:handrive_view_lang", kwargs={"ui_lang": "ko", "doc_path": "sample.png"})
         )
 
         self.assertEqual(response.status_code, 200)
@@ -2159,13 +2159,13 @@ class DocsAccessRuleTests(TestCase):
         self.assertNotIn("/ko/docs/write?path=sample.png", html)
 
     def test_docs_api_preview_renders_audio_preview_for_media_file(self):
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "sample.mp3").write_bytes(b"ID3")
-        editor = self.create_docs_editor("audio_editor")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "sample.mp3").write_bytes(b"ID3")
+        editor = self.create_handrive_editor("audio_editor")
         self.client.force_login(editor)
 
         response = self.client.post(
-            reverse("main:docs_api_preview"),
+            reverse("main:handrive_api_preview"),
             data=json.dumps({"path": "sample.mp3"}),
             content_type="application/json",
         )
@@ -2177,10 +2177,10 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("/handrive/api/download?path=sample.mp3", payload.get("html", ""))
 
     def test_docs_view_renders_html_live_with_same_name_css_and_js(self):
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "sample.html").write_text("<main id='app'>hello</main>", encoding="utf-8")
-        (docs_root / "sample.css").write_text("#app { color: rgb(255, 0, 0); }", encoding="utf-8")
-        (docs_root / "sample.js").write_text("window.__sampleLoaded = true;", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "sample.html").write_text("<main id='app'>hello</main>", encoding="utf-8")
+        (handrive_root / "sample.css").write_text("#app { color: rgb(255, 0, 0); }", encoding="utf-8")
+        (handrive_root / "sample.js").write_text("window.__sampleLoaded = true;", encoding="utf-8")
 
         response = self.client.get("/ko/docs/sample.html/")
         self.assertEqual(response.status_code, 200)
@@ -2197,13 +2197,13 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("window.__sampleLoaded = true;", html)
 
     def test_docs_api_preview_renders_html_live_with_same_name_css_and_js(self):
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "sample.html").write_text("<main id='app'>hello</main>", encoding="utf-8")
-        (docs_root / "sample.css").write_text("#app { color: rgb(255, 0, 0); }", encoding="utf-8")
-        (docs_root / "sample.js").write_text("window.__sampleLoaded = true;", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "sample.html").write_text("<main id='app'>hello</main>", encoding="utf-8")
+        (handrive_root / "sample.css").write_text("#app { color: rgb(255, 0, 0); }", encoding="utf-8")
+        (handrive_root / "sample.js").write_text("window.__sampleLoaded = true;", encoding="utf-8")
 
         response = self.client.post(
-            reverse("main:docs_api_preview"),
+            reverse("main:handrive_api_preview"),
             data=json.dumps({"path": "sample.html"}),
             content_type="application/json",
         )
@@ -2220,101 +2220,101 @@ class DocsAccessRuleTests(TestCase):
         self.assertIn("Content-Security-Policy", payload.get("html", ""))
 
     def test_public_writable_file_cannot_be_renamed(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
         response = self.client.post(
-            reverse("main:docs_api_rename"),
+            reverse("main:handrive_api_rename"),
             data=json.dumps({"path": "public.md", "new_name": "public_renamed"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("전체 허용 파일은 이름을 바꿀 수 없습니다", response.json().get("error", ""))
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        self.assertTrue((docs_root / "public.md").exists())
-        self.assertFalse((docs_root / "public_renamed.md").exists())
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        self.assertTrue((handrive_root / "public.md").exists())
+        self.assertFalse((handrive_root / "public_renamed.md").exists())
 
     def test_public_writable_file_cannot_be_deleted(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
         response = self.client.post(
-            reverse("main:docs_api_delete"),
+            reverse("main:handrive_api_delete"),
             data=json.dumps({"path": "public.md"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("전체 허용 파일은 삭제할 수 없습니다", response.json().get("error", ""))
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        self.assertTrue((docs_root / "public.md").exists())
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        self.assertTrue((handrive_root / "public.md").exists())
 
     def test_docs_api_delete_supports_multiple_paths(self):
-        editor = self.create_docs_editor("bulk_delete_editor")
+        editor = self.create_handrive_editor("bulk_delete_editor")
         self.client.force_login(editor)
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "extra.md").write_text("# extra", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "extra.md").write_text("# extra", encoding="utf-8")
 
         response = self.client.post(
-            reverse("main:docs_api_delete"),
+            reverse("main:handrive_api_delete"),
             data=json.dumps({"paths": ["public.md", "extra.md"]}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse((docs_root / "public.md").exists())
-        self.assertFalse((docs_root / "extra.md").exists())
+        self.assertFalse((handrive_root / "public.md").exists())
+        self.assertFalse((handrive_root / "extra.md").exists())
 
     def test_docs_api_delete_bulk_rejects_when_public_writable_file_is_included(self):
-        editor = self.create_docs_editor("bulk_delete_public_block_editor")
+        editor = self.create_handrive_editor("bulk_delete_public_block_editor")
         self.client.force_login(editor)
 
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "extra.md").write_text("# extra", encoding="utf-8")
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "extra.md").write_text("# extra", encoding="utf-8")
 
         response = self.client.post(
-            reverse("main:docs_api_delete"),
+            reverse("main:handrive_api_delete"),
             data=json.dumps({"paths": ["public.md", "extra.md"]}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 403)
-        self.assertTrue((docs_root / "public.md").exists())
-        self.assertTrue((docs_root / "extra.md").exists())
+        self.assertTrue((handrive_root / "public.md").exists())
+        self.assertTrue((handrive_root / "extra.md").exists())
 
     def test_public_writable_file_cannot_be_moved(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "archive").mkdir(parents=True, exist_ok=True)
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "archive").mkdir(parents=True, exist_ok=True)
 
         response = self.client.post(
-            reverse("main:docs_api_move"),
+            reverse("main:handrive_api_move"),
             data=json.dumps({"source_path": "public.md", "target_dir": "archive"}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("전체 허용 파일은 이동할 수 없습니다", response.json().get("error", ""))
-        self.assertTrue((docs_root / "public.md").exists())
-        self.assertFalse((docs_root / "archive" / "public.md").exists())
+        self.assertTrue((handrive_root / "public.md").exists())
+        self.assertFalse((handrive_root / "archive" / "public.md").exists())
 
     def test_public_writable_file_save_api_rejects_rename(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
 
         response = self.client.post(
-            reverse("main:docs_api_save"),
+            reverse("main:handrive_api_save"),
             data=json.dumps(
                 {
                     "original_path": "public.md",
@@ -2328,19 +2328,19 @@ class DocsAccessRuleTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("전체 허용 파일은 위치나 이름을 바꿀 수 없습니다", response.json().get("error", ""))
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        self.assertTrue((docs_root / "public.md").exists())
-        self.assertFalse((docs_root / "public_renamed.md").exists())
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        self.assertTrue((handrive_root / "public.md").exists())
+        self.assertFalse((handrive_root / "public_renamed.md").exists())
 
     def test_public_writable_file_save_api_rejects_move(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
-        (docs_root / "archive").mkdir(parents=True, exist_ok=True)
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
+        (handrive_root / "archive").mkdir(parents=True, exist_ok=True)
 
         response = self.client.post(
-            reverse("main:docs_api_save"),
+            reverse("main:handrive_api_save"),
             data=json.dumps(
                 {
                     "original_path": "public.md",
@@ -2354,17 +2354,17 @@ class DocsAccessRuleTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertIn("전체 허용 파일은 위치나 이름을 바꿀 수 없습니다", response.json().get("error", ""))
-        self.assertTrue((docs_root / "public.md").exists())
-        self.assertFalse((docs_root / "archive" / "public.md").exists())
+        self.assertTrue((handrive_root / "public.md").exists())
+        self.assertFalse((handrive_root / "archive" / "public.md").exists())
 
     def test_public_writable_file_save_api_allows_same_path_update(self):
-        public_group = get_docs_public_write_group()
-        rule = DocsAccessRule.objects.create(path="public.md")
+        public_group = get_handrive_public_write_group()
+        rule = HandriveAccessRule.objects.create(path="public.md")
         rule.write_groups.add(public_group)
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
 
         response = self.client.post(
-            reverse("main:docs_api_save"),
+            reverse("main:handrive_api_save"),
             data=json.dumps(
                 {
                     "original_path": "public.md",
@@ -2377,15 +2377,15 @@ class DocsAccessRuleTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual((docs_root / "public.md").read_text(encoding="utf-8"), "# updated")
+        self.assertEqual((handrive_root / "public.md").read_text(encoding="utf-8"), "# updated")
 
     def test_docs_api_save_allows_custom_extension(self):
-        editor = self.create_docs_editor("custom_ext_editor")
+        editor = self.create_handrive_editor("custom_ext_editor")
         self.client.force_login(editor)
-        docs_root = Path(settings.MEDIA_ROOT) / "docs"
+        handrive_root = Path(settings.MEDIA_ROOT) / "docs"
 
         response = self.client.post(
-            reverse("main:docs_api_save"),
+            reverse("main:handrive_api_save"),
             data=json.dumps(
                 {
                     "original_path": "",
@@ -2402,17 +2402,17 @@ class DocsAccessRuleTests(TestCase):
         payload = response.json()
         self.assertEqual(payload.get("path"), "notes.txt")
         self.assertEqual(payload.get("slug_path"), "notes.txt")
-        self.assertTrue((docs_root / "notes.txt").exists())
+        self.assertTrue((handrive_root / "notes.txt").exists())
 
         view_response = self.client.get("/ko/docs/notes.txt/")
         self.assertEqual(view_response.status_code, 200)
 
     def test_docs_api_save_rejects_invalid_extension_format(self):
-        editor = self.create_docs_editor("invalid_ext_editor")
+        editor = self.create_handrive_editor("invalid_ext_editor")
         self.client.force_login(editor)
 
         response = self.client.post(
-            reverse("main:docs_api_save"),
+            reverse("main:handrive_api_save"),
             data=json.dumps(
                 {
                     "original_path": "",

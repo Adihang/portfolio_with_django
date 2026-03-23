@@ -99,9 +99,8 @@
     {% include "partials/pwa.html" %}
     {% include "partials/static_script_fallback.html" %}
     
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="shortcut icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" href="{% static 'icons/pwa-192.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/pwa-192.png' %}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{% static 'icons/pwa-512.png' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/vendor/bootstrap.min.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/common/layout.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static_v 'css/common/account_widget.css' %}">

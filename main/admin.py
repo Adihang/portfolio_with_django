@@ -20,7 +20,7 @@ from django.core.exceptions import ValidationError
 from .access_log_summary import BOT_UA_PATTERN, resolve_summary_dir, summary_markdown
 from .models import (
     Career,
-    DocsAccessRule,
+    HandriveAccessRule,
     GitCollaborator,
     GitRepository,
     GitUserMapping,
@@ -223,8 +223,8 @@ class PortfolioActionButtonAdmin(admin.ModelAdmin):
     ordering = ["user__username", "order", "id"]
 
 
-@admin.register(DocsAccessRule)
-class DocsAccessRuleAdmin(admin.ModelAdmin):
+@admin.register(HandriveAccessRule)
+class HandriveAccessRuleAdmin(admin.ModelAdmin):
     list_display = ["path", "updated_at", "read_subject_count", "write_subject_count"]
     search_fields = [
         "path",

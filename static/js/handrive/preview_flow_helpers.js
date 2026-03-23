@@ -13,7 +13,7 @@
         var previewGetImageElement = settings.previewGetImageElement || function () { return null; };
         var applyRenderedContentModeClass = settings.applyRenderedContentModeClass || function () {};
         var setPreviewPlaceholder = settings.setPreviewPlaceholder || function () {};
-        var applyDocsCodeHighlighting = settings.applyDocsCodeHighlighting || function () {};
+        var applyHandriveCodeHighlighting = settings.applyHandriveCodeHighlighting || function () {};
         var hydrateMediaAudioElements = settings.hydrateMediaAudioElements || function () {};
         var setPreviewActionTargets = settings.setPreviewActionTargets || function () {};
         var syncPreviewImageZoom = settings.syncPreviewImageZoom || function () {};
@@ -47,7 +47,7 @@
 
         previewContent.innerHTML = safeHtml;
         state.previewImageZoom = 1;
-        applyDocsCodeHighlighting(previewContent, normalizedRenderClass || "handrive-markdown");
+        applyHandriveCodeHighlighting(previewContent, normalizedRenderClass || "ui-markdown");
         hydrateMediaAudioElements(previewContent);
         setPreviewActionTargets(entry);
         window.requestAnimationFrame(function () {
@@ -128,7 +128,7 @@
                 scrollPreviewIntoViewIfPortrait();
                 return;
             }
-            renderPreviewHtml(entry, cached, "markdown", "handrive-markdown");
+            renderPreviewHtml(entry, cached, "markdown", "ui-markdown");
             scrollPreviewIntoViewIfPortrait();
             return;
         }

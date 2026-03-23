@@ -62,8 +62,8 @@ from .views import (
 )
 from .forgejo_client import ForgejoClient
 from .handrive.html_assets import load_local_html_companion_assets, load_repo_html_companion_assets
-from .handrive.preview import render_docs_html_live_safely, render_docs_office_preview_safely, render_docs_pdf_safely
-from .models import DocsAccessRule, DocsLoginAttemptGuard, DocsSharedLink, GitUserMapping, PortfolioProfile, UserProfile
+from .handrive.preview import render_handrive_html_live_safely, render_handrive_office_preview_safely, render_handrive_pdf_safely
+from .models import HandriveAccessRule, HandriveLoginAttemptGuard, HandriveSharedLink, GitUserMapping, PortfolioProfile, UserProfile
 
 logger = logging.getLogger(__name__)
 GIT_BIN = "/usr/bin/git"
@@ -88,7 +88,7 @@ PAGE_HELP_FILE_BASENAMES = {
     "write": "write",
     "view": "read",
 }
-DOCS_EDITOR_GROUP_NAME = "DocsEditors"
+HANDRIVE_EDITOR_GROUP_NAME = "HandriveEditors"
 DOCS_EDIT_PERMISSION_CODE = "main.can_edit_docs"
 DOCS_PUBLIC_WRITE_GROUP_NAME = "__DOCS_PUBLIC_ALL__"
 DOCS_URL_ONLY_GROUP_NAME = "url-only"
@@ -98,8 +98,8 @@ DOCS_LOGIN_CAPTCHA_THRESHOLD = 1
 DOCS_UPLOAD_RATE_LIMIT_BYTES_PER_SECOND = 10 * 1024 * 1024
 DOCS_USER_SCOPED_QUOTA_BYTES = 1024 * 1024 * 1024
 DOCS_USER_SCOPED_ENTRY_LIMIT = 100
-DOCS_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "docs_login_captcha_question"
-DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY = "docs_login_captcha_answer"
+HANDRIVE_LOGIN_CAPTCHA_QUESTION_SESSION_KEY = "handrive_login_captcha_question"
+HANDRIVE_LOGIN_CAPTCHA_ANSWER_SESSION_KEY = "handrive_login_captcha_answer"
 DOCS_SIGNUP_FORBIDDEN_TERMS = (
     "admin",
     "administrator",
@@ -131,8 +131,8 @@ DOCS_RENDER_MODE_MEDIA_IMAGE = "media_image"
 DOCS_RENDER_MODE_MEDIA_VIDEO = "media_video"
 DOCS_RENDER_MODE_MEDIA_AUDIO = "media_audio"
 DOCS_RENDER_MODE_OFFICE = "office"
-DOCS_ACTIVE_ROOT_DIR: ContextVar[Path | None] = ContextVar("docs_active_root_dir", default=None)
-DOCS_ACTIVE_REQUEST: ContextVar[object | None] = ContextVar("docs_active_request", default=None)
+HANDRIVE_ACTIVE_ROOT_DIR: ContextVar[Path | None] = ContextVar("handrive_active_root_dir", default=None)
+HANDRIVE_ACTIVE_REQUEST: ContextVar[object | None] = ContextVar("handrive_active_request", default=None)
 DOCS_DEFAULT_RENDER_PROFILE = {
     "mode": DOCS_RENDER_MODE_PLAIN_TEXT,
     "css_class": "handrive-plain-text",
@@ -688,7 +688,7 @@ DOCS_TEXT = {
 }
 
 
-def get_docs_text(ui_lang: str | None) -> dict:
+def get_handrive_text(ui_lang: str | None) -> dict:
     """UI 언어에 맞는 HanDrive 문자열 사본을 반환한다."""
     lang = (ui_lang or "").strip().lower()
     if lang not in DOCS_TEXT:
@@ -696,7 +696,7 @@ def get_docs_text(ui_lang: str | None) -> dict:
     return DOCS_TEXT[lang].copy()
 
 
-def get_request_docs_root_dir(request=None) -> Path:
+def get_request_handrive_root_dir(request=None) -> Path:
     """요청 사용자 기준 HanDrive root 를 계산한다."""
     user = getattr(request, "user", None)
     if user and user.is_authenticated and user.is_superuser:
@@ -706,7 +706,7 @@ def get_request_docs_root_dir(request=None) -> Path:
     root = media_root / "HanDrive"
     legacy_root = media_root / "docs"
     legacy_ide_root = media_root / "ide"
-    # 기존 docs/ide 저장소를 HanDrive 로 자동 이전해 기존 파일 접근이 끊기지 않게 유지한다.
+    # 기존 legacy 저장소를 HanDrive 로 자동 이전해 기존 파일 접근이 끊기지 않게 유지한다.
     if not root.exists() and legacy_root.exists():
         legacy_root.rename(root)
     if not root.exists() and legacy_ide_root.exists():
@@ -715,25 +715,25 @@ def get_request_docs_root_dir(request=None) -> Path:
     return root.resolve()
 
 
-def docs_root_dir() -> Path:
+def handrive_root_dir() -> Path:
     """현재 요청 기준 HanDrive 루트 디렉터리를 반환한다."""
-    active_root = DOCS_ACTIVE_ROOT_DIR.get()
+    active_root = HANDRIVE_ACTIVE_ROOT_DIR.get()
     if active_root is not None:
         return active_root
-    return get_request_docs_root_dir()
+    return get_request_handrive_root_dir()
 
 
-def with_request_docs_root(view_func):
-    """요청 처리 동안 docs root/request contextvar 를 주입한다."""
+def with_request_handrive_root(view_func):
+    """요청 처리 동안 HanDrive root/request contextvar 를 주입한다."""
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
-        token = DOCS_ACTIVE_ROOT_DIR.set(get_request_docs_root_dir(request))
-        request_token = DOCS_ACTIVE_REQUEST.set(request)
+        token = HANDRIVE_ACTIVE_ROOT_DIR.set(get_request_handrive_root_dir(request))
+        request_token = HANDRIVE_ACTIVE_REQUEST.set(request)
         try:
             return view_func(request, *args, **kwargs)
         finally:
-            DOCS_ACTIVE_ROOT_DIR.reset(token)
-            DOCS_ACTIVE_REQUEST.reset(request_token)
+            HANDRIVE_ACTIVE_ROOT_DIR.reset(token)
+            HANDRIVE_ACTIVE_REQUEST.reset(request_token)
 
     return _wrapped
 
@@ -763,8 +763,8 @@ def normalize_relative_path(raw_path: str | None, allow_empty: bool = True) -> s
 
 
 def resolve_path(relative_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
-    """상대경로를 현재 docs root 아래 절대경로로 변환한다."""
-    root = docs_root_dir().resolve()
+    """상대경로를 현재 HanDrive root 아래 절대경로로 변환한다."""
+    root = handrive_root_dir().resolve()
     normalized = normalize_relative_path(relative_path)
     candidate = (root / normalized).absolute()
 
@@ -791,7 +791,7 @@ def normalize_file_extension(extension: str | None, *, allow_empty: bool = False
     return candidate
 
 
-def normalize_docs_relative_path(raw_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
+def normalize_handrive_relative_path(raw_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
     """HanDrive 일반 문서 경로를 정규화하고 기본 확장자를 보정한다."""
     normalized = normalize_relative_path(raw_path, allow_empty=False)
     suffix = Path(normalized).suffix.lower()
@@ -816,8 +816,8 @@ def normalize_docs_relative_path(raw_path: str | None, must_exist: bool = True) 
 
 
 def normalize_markdown_relative_path(raw_path: str | None, must_exist: bool = True) -> tuple[Path, str]:
-    """Backward-compatible alias used across docs views."""
-    return normalize_docs_relative_path(raw_path, must_exist=must_exist)
+    """Backward-compatible alias used across HanDrive views."""
+    return normalize_handrive_relative_path(raw_path, must_exist=must_exist)
 
 
 def validate_name(
@@ -874,7 +874,7 @@ def build_available_upload_path(parent_dir: Path, original_name: str) -> Path:
         index += 1
 
 
-def get_docs_upload_tmp_dir() -> Path:
+def get_handrive_upload_tmp_dir() -> Path:
     """업로드 임시 파일 저장 디렉터리를 반환한다."""
     temp_dir = Path(tempfile.gettempdir()) / "hanplanet_handrive_uploads"
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -882,8 +882,8 @@ def get_docs_upload_tmp_dir() -> Path:
 
 
 def relative_from_root(path_obj: Path) -> str:
-    """docs root 기준 상대경로를 ``posix`` 문자열로 돌려준다."""
-    root = docs_root_dir().resolve()
+    """HanDrive root 기준 상대경로를 ``posix`` 문자열로 돌려준다."""
+    root = handrive_root_dir().resolve()
     absolute_path = path_obj.absolute()
     try:
         return absolute_path.relative_to(root).as_posix()
@@ -904,18 +904,18 @@ def render_plain_text_safely(text: str) -> str:
     return mark_safe(f"<pre><code>{escaped_text}</code></pre>")
 
 
-def build_docs_download_url(relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
+def build_handrive_download_url(relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
     """문서/공유문서 다운로드 API URL 을 생성한다."""
     encoded_path = quote(relative_path or "")
-    url = f"{reverse('main:docs_api_download')}?path={encoded_path}"
+    url = f"{reverse('main:handrive_api_download')}?path={encoded_path}"
     if share_owner and share_slug:
         url += f"&share_owner={quote(share_owner)}&share_slug={quote(share_slug)}"
     return url
 
 
-def render_docs_media_safely(source_path: Path, relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
+def render_handrive_media_safely(source_path: Path, relative_path: str, share_owner: str = "", share_slug: str = "") -> str:
     """이미지·비디오·오디오 파일을 HanDrive 미리보기용 HTML로 감싼다."""
-    source_url = escape(build_docs_download_url(relative_path, share_owner=share_owner, share_slug=share_slug))
+    source_url = escape(build_handrive_download_url(relative_path, share_owner=share_owner, share_slug=share_slug))
     extension = source_path.suffix.lower()
     if extension in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".avif"}:
         return mark_safe(
@@ -936,7 +936,7 @@ def render_docs_media_safely(source_path: Path, relative_path: str, share_owner:
     )
 
 
-def load_docs_html_companion_assets(source_path: Path, request=None) -> tuple[str, str]:
+def load_handrive_html_companion_assets(source_path: Path, request=None) -> tuple[str, str]:
     """일반 HTML 파일과 같은 이름의 css/js companion asset 을 읽는다."""
     def _can_read(asset_path: Path) -> bool:
         if request is None:
@@ -945,7 +945,7 @@ def load_docs_html_companion_assets(source_path: Path, request=None) -> tuple[st
             asset_relative_path = relative_from_root(asset_path)
         except (ValueError, OSError):
             return False
-        return has_docs_read_access(request, asset_relative_path)
+        return has_handrive_read_access(request, asset_relative_path)
 
     return load_local_html_companion_assets(source_path, can_read_path=_can_read)
 
@@ -971,7 +971,7 @@ def load_git_repo_html_companion_assets(request, repo, branch_name: str, repo_re
     )
 
 
-def resolve_docs_render_profile(file_extension: str | None) -> dict[str, str]:
+def resolve_handrive_render_profile(file_extension: str | None) -> dict[str, str]:
     """확장자별 preview render mode 와 CSS class 조합을 반환한다."""
     try:
         normalized_extension = normalize_file_extension(file_extension, allow_empty=True)
@@ -991,7 +991,7 @@ def resolve_docs_render_profile(file_extension: str | None) -> dict[str, str]:
     }
 
 
-def get_docs_save_extension_options() -> list[str]:
+def get_handrive_save_extension_options() -> list[str]:
     """쓰기 화면의 빠른 확장자 선택 목록을 만든다."""
     options = []
     for extension, profile in DOCS_RENDER_PROFILES_BY_EXTENSION.items():
@@ -1008,7 +1008,7 @@ def get_docs_save_extension_options() -> list[str]:
     return sorted(options)
 
 
-def render_docs_content(
+def render_handrive_content(
     content: str,
     file_extension: str | None,
     *,
@@ -1026,13 +1026,13 @@ def render_docs_content(
     markdown/plain text/media/office 렌더 경로를 한곳에서 통합하고,
     필요하면 source bytes 와 HTML companion asset 도 함께 사용한다.
     """
-    profile = resolve_docs_render_profile(file_extension)
+    profile = resolve_handrive_render_profile(file_extension)
     if profile["css_class"] == "handrive-html":
         resolved_companion_css = companion_css or ""
         resolved_companion_js = companion_js or ""
         if source_path is not None and not (resolved_companion_css or resolved_companion_js):
-            resolved_companion_css, resolved_companion_js = load_docs_html_companion_assets(source_path, request=request)
-        rendered = render_docs_html_live_safely(
+            resolved_companion_css, resolved_companion_js = load_handrive_html_companion_assets(source_path, request=request)
+        rendered = render_handrive_html_live_safely(
             content,
             companion_css=resolved_companion_css,
             companion_js=resolved_companion_js,
@@ -1044,7 +1044,7 @@ def render_docs_content(
                 office_bytes = source_path.read_bytes()
             except OSError:
                 office_bytes = b""
-        rendered = render_docs_office_preview_safely(profile["extension"], office_bytes or b"")
+        rendered = render_handrive_office_preview_safely(profile["extension"], office_bytes or b"")
     elif profile["mode"] == DOCS_RENDER_MODE_MARKDOWN:
         rendered = render_markdown_safely(content)
     elif profile["mode"] in {
@@ -1052,25 +1052,25 @@ def render_docs_content(
         DOCS_RENDER_MODE_MEDIA_VIDEO,
         DOCS_RENDER_MODE_MEDIA_AUDIO,
     } and source_path is not None:
-        rendered = render_docs_media_safely(source_path, relative_path, share_owner=share_owner, share_slug=share_slug)
+        rendered = render_handrive_media_safely(source_path, relative_path, share_owner=share_owner, share_slug=share_slug)
     else:
         rendered = render_plain_text_safely(content)
     return str(rendered), profile
 
 
-def is_docs_non_editable_media_extension(file_extension: str | None) -> bool:
+def is_handrive_non_editable_media_extension(file_extension: str | None) -> bool:
     """에디터 대신 전용 preview 를 써야 하는 확장자인지 판별한다."""
-    return resolve_docs_render_profile(file_extension).get("mode") in DOCS_NON_EDITABLE_MEDIA_MODES
+    return resolve_handrive_render_profile(file_extension).get("mode") in DOCS_NON_EDITABLE_MEDIA_MODES
 
 
-def load_docs_source_content(file_path: Path, *, request=None, relative_path: str = "") -> str:
+def load_handrive_source_content(file_path: Path, *, request=None, relative_path: str = "") -> str:
     """편집 가능한 텍스트 파일의 원본 내용을 읽는다."""
-    if is_docs_non_editable_media_extension(file_path.suffix.lower()):
+    if is_handrive_non_editable_media_extension(file_path.suffix.lower()):
         return ""
     try:
         return file_path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        if request is not None and relative_path and has_docs_read_access(request, relative_path):
+        if request is not None and relative_path and has_handrive_read_access(request, relative_path):
             raise Http404("파일을 읽을 수 없습니다.")
         raise
 
@@ -1096,13 +1096,13 @@ def build_entry(path_obj: Path) -> dict:
                 for child in path_obj.rglob("*")
                 if child.is_file()
             )
-            data["size_display"] = format_docs_bytes_display(total_bytes)
+            data["size_display"] = format_handrive_bytes_display(total_bytes)
         except OSError:
             data["size_display"] = ""
     else:
         data["slug_path"] = markdown_slug_from_relative(rel_path)
         try:
-            data["size_display"] = format_docs_bytes_display(path_obj.stat().st_size)
+            data["size_display"] = format_handrive_bytes_display(path_obj.stat().st_size)
         except OSError:
             data["size_display"] = ""
 
@@ -1124,32 +1124,32 @@ def build_acl_candidate_paths(path_value: str | None) -> list[str]:
     return candidates
 
 
-def get_docs_acl_rule_map(request) -> dict[str, DocsAccessRule]:
+def get_handrive_acl_rule_map(request) -> dict[str, HandriveAccessRule]:
     """요청 단위 ACL rule 캐시 맵을 반환한다."""
-    rule_map = getattr(request, "_docs_acl_rule_map", None)
+    rule_map = getattr(request, "_handrive_acl_rule_map", None)
     if rule_map is None:
-        rules = DocsAccessRule.objects.prefetch_related(
+        rules = HandriveAccessRule.objects.prefetch_related(
             "read_users",
             "read_groups",
             "write_users",
             "write_groups",
         ).all()
         rule_map = {rule.path: rule for rule in rules}
-        setattr(request, "_docs_acl_rule_map", rule_map)
+        setattr(request, "_handrive_acl_rule_map", rule_map)
     return rule_map
 
 
-def get_effective_docs_acl_rule(request, path_value: str | None) -> tuple[DocsAccessRule | None, str]:
+def get_effective_handrive_acl_rule(request, path_value: str | None) -> tuple[HandriveAccessRule | None, str]:
     """경로에 실제 적용되는 가장 가까운 ACL rule 을 찾는다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
-    cache = getattr(request, "_docs_acl_effective_cache", None)
+    cache = getattr(request, "_handrive_acl_effective_cache", None)
     if cache is None:
         cache = {}
-        setattr(request, "_docs_acl_effective_cache", cache)
+        setattr(request, "_handrive_acl_effective_cache", cache)
     if normalized in cache:
         return cache[normalized]
 
-    rule_map = get_docs_acl_rule_map(request)
+    rule_map = get_handrive_acl_rule_map(request)
     for candidate in build_acl_candidate_paths(normalized):
         rule = rule_map.get(candidate)
         if rule is not None:
@@ -1160,18 +1160,18 @@ def get_effective_docs_acl_rule(request, path_value: str | None) -> tuple[DocsAc
     return None, ""
 
 
-def has_descendant_docs_acl_rule(request, path_value: str | None) -> bool:
+def has_descendant_handrive_acl_rule(request, path_value: str | None) -> bool:
     """하위 트리에 별도 ACL rule 이 존재하는지 확인한다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
 
-    cache = getattr(request, "_docs_acl_descendant_rule_cache", None)
+    cache = getattr(request, "_handrive_acl_descendant_rule_cache", None)
     if cache is None:
         cache = {}
-        setattr(request, "_docs_acl_descendant_rule_cache", cache)
+        setattr(request, "_handrive_acl_descendant_rule_cache", cache)
     if normalized in cache:
         return cache[normalized]
 
-    rule_map = get_docs_acl_rule_map(request)
+    rule_map = get_handrive_acl_rule_map(request)
     if not normalized:
         has_descendant_rule = any(rule_path != "" for rule_path in rule_map.keys())
         cache[normalized] = has_descendant_rule
@@ -1183,13 +1183,13 @@ def has_descendant_docs_acl_rule(request, path_value: str | None) -> bool:
     return has_descendant_rule
 
 
-def get_docs_public_write_group() -> Group:
+def get_handrive_public_write_group() -> Group:
     """공개 쓰기 pseudo-group 을 보장하고 반환한다."""
     group, _ = Group.objects.get_or_create(name=DOCS_PUBLIC_WRITE_GROUP_NAME)
     return group
 
 
-def rule_has_public_group(rule: DocsAccessRule, group_relation: str) -> bool:
+def rule_has_public_group(rule: HandriveAccessRule, group_relation: str) -> bool:
     """ACL rule relation 안에 public-write marker group 이 있는지 검사한다."""
     groups = getattr(rule, group_relation).all()
     return any(group.name == DOCS_PUBLIC_WRITE_GROUP_NAME for group in groups)
@@ -1197,26 +1197,26 @@ def rule_has_public_group(rule: DocsAccessRule, group_relation: str) -> bool:
 
 def get_public_group_display_label(request) -> str:
     """UI 언어에 맞는 공개 그룹 표시 라벨을 캐시해 반환한다."""
-    cached = getattr(request, "_docs_public_group_display_label", None)
+    cached = getattr(request, "_handrive_public_group_display_label", None)
     if isinstance(cached, str) and cached:
         return cached
-    docs_text = get_docs_text(resolve_ui_lang(request, None))
-    label = docs_text.get("permission_public_group_label", "전체")
-    setattr(request, "_docs_public_group_display_label", label)
+    handrive_text = get_handrive_text(resolve_ui_lang(request, None))
+    label = handrive_text.get("permission_public_group_label", "전체")
+    setattr(request, "_handrive_public_group_display_label", label)
     return label
 
 
-def is_docs_public_write_enabled(request, path_value: str | None) -> bool:
+def is_handrive_public_write_enabled(request, path_value: str | None) -> bool:
     """주어진 경로에 public-write ACL 이 적용되는지 확인한다."""
-    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    rule, _ = get_effective_handrive_acl_rule(request, path_value)
     if rule is None:
         return False
     return rule_has_public_group(rule, "write_groups")
 
 
-def is_docs_url_only_enabled(request, path_value: str | None) -> bool:
+def is_handrive_url_only_enabled(request, path_value: str | None) -> bool:
     """URL-only 그룹으로 제한된 경로인지 확인한다."""
-    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    rule, _ = get_effective_handrive_acl_rule(request, path_value)
     if rule is None:
         return False
     return any(group.name == DOCS_URL_ONLY_GROUP_NAME for group in rule.read_groups.all()) or any(
@@ -1226,7 +1226,7 @@ def is_docs_url_only_enabled(request, path_value: str | None) -> bool:
 
 def get_write_acl_display_labels(request, path_value: str | None) -> list[str]:
     """쓰기 권한 배지에 노출할 사용자/그룹 라벨을 만든다."""
-    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    rule, _ = get_effective_handrive_acl_rule(request, path_value)
     if rule is None:
         return []
 
@@ -1255,7 +1255,7 @@ def get_write_acl_display_labels(request, path_value: str | None) -> list[str]:
 
 def get_request_user_group_ids(request) -> set[int]:
     """현재 요청 사용자의 group id 집합을 캐시해 반환한다."""
-    cached = getattr(request, "_docs_acl_user_group_ids", None)
+    cached = getattr(request, "_handrive_acl_user_group_ids", None)
     if cached is not None:
         return cached
 
@@ -1264,13 +1264,13 @@ def get_request_user_group_ids(request) -> set[int]:
         cached = set()
     else:
         cached = set(user.groups.values_list("id", flat=True))
-    setattr(request, "_docs_acl_user_group_ids", cached)
+    setattr(request, "_handrive_acl_user_group_ids", cached)
     return cached
 
 
-def user_matches_docs_acl_rule(
+def user_matches_handrive_acl_rule(
     request,
-    rule: DocsAccessRule,
+    rule: HandriveAccessRule,
     *,
     user_relation: str,
     group_relation: str,
@@ -1296,22 +1296,22 @@ def user_matches_docs_acl_rule(
     return bool(user_group_ids & rule_group_ids)
 
 
-def has_docs_read_access(request, path_value: str | None) -> bool:
+def has_handrive_read_access(request, path_value: str | None) -> bool:
     """주어진 경로를 읽을 수 있는지 최종 판정한다."""
     user = getattr(request, "user", None)
     if user and user.is_superuser:
         return True
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
-    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
+    if not is_path_in_handrive_scope(normalized_path, scoped_home_dir):
         return False
     if scoped_home_dir:
         return True
 
-    if is_docs_acl_admin(request):
+    if is_handrive_acl_admin(request):
         return True
 
-    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    rule, _ = get_effective_handrive_acl_rule(request, path_value)
     if rule is None:
         return True
     if rule_has_public_group(rule, "read_groups"):
@@ -1337,36 +1337,36 @@ def has_docs_read_access(request, path_value: str | None) -> bool:
     return bool(user_group_ids & read_group_ids)
 
 
-def has_docs_write_access(request, path_value: str | None) -> bool:
+def has_handrive_write_access(request, path_value: str | None) -> bool:
     """파일 단위 쓰기 권한을 판정한다."""
     user = getattr(request, "user", None)
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
     git_virtual = _get_git_virtual_context(request, normalized_path)
     if git_virtual is not None:
         return git_virtual["kind"] == "branch_file" and str(git_virtual.get("repo_permission") or "").lower() in {"write", "admin", "owner"}
-    if is_docs_git_repo_mounted_path(request, normalized_path):
+    if is_handrive_git_repo_mounted_path(request, normalized_path):
         return False
     if user and user.is_superuser:
         return True
     is_scoped_public_user = bool(scoped_home_dir and is_public_group_scoped_user(request))
-    in_scoped_home = is_path_in_docs_scope(normalized_path, scoped_home_dir)
+    in_scoped_home = is_path_in_handrive_scope(normalized_path, scoped_home_dir)
     if is_scoped_public_user and in_scoped_home:
         return True
 
-    rule, matched_rule_path = get_effective_docs_acl_rule(request, path_value)
-    has_descendant_rule = has_descendant_docs_acl_rule(request, normalized_path)
+    rule, matched_rule_path = get_effective_handrive_acl_rule(request, path_value)
+    has_descendant_rule = has_descendant_handrive_acl_rule(request, normalized_path)
     if rule is None:
         if scoped_home_dir and not in_scoped_home:
             return False
         # Root directory keeps editor-default write access even when
-        # descendant ACL rules exist. This allows DocsEditors to create
+        # descendant ACL rules exist. This allows HandriveEditors to create
         # new files/folders at unconfigured root scope by default.
         if normalized_path == "":
-            return is_docs_editor(request)
+            return is_handrive_editor(request)
         if has_descendant_rule:
             return False
-        return is_docs_editor(request)
+        return is_handrive_editor(request)
     if matched_rule_path != normalized_path and has_descendant_rule:
         return False
     if rule_has_public_group(rule, "write_groups"):
@@ -1380,7 +1380,7 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
             return False
         return True
 
-    return user_matches_docs_acl_rule(
+    return user_matches_handrive_acl_rule(
         request,
         rule,
         user_relation="write_users",
@@ -1388,34 +1388,34 @@ def has_docs_write_access(request, path_value: str | None) -> bool:
     )
 
 
-def has_docs_directory_write_access(request, path_value: str | None) -> bool:
+def has_handrive_directory_write_access(request, path_value: str | None) -> bool:
     """폴더 하위 생성/업로드 가능 여부를 판정한다."""
     user = getattr(request, "user", None)
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
     git_virtual = _get_git_virtual_context(request, normalized_path)
     if git_virtual is not None:
         return git_virtual["kind"] == "branch_dir" and str(git_virtual.get("repo_permission") or "").lower() in {"write", "admin", "owner"}
-    if is_docs_git_repo_mounted_path(request, normalized_path):
+    if is_handrive_git_repo_mounted_path(request, normalized_path):
         return False
     if user and user.is_superuser:
         return True
     is_scoped_public_user = bool(scoped_home_dir and is_public_group_scoped_user(request))
-    in_scoped_home = is_path_in_docs_scope(normalized_path, scoped_home_dir)
+    in_scoped_home = is_path_in_handrive_scope(normalized_path, scoped_home_dir)
     if is_scoped_public_user and in_scoped_home:
         return True
 
-    rule, _ = get_effective_docs_acl_rule(request, path_value)
+    rule, _ = get_effective_handrive_acl_rule(request, path_value)
     if rule is None:
         if scoped_home_dir and not in_scoped_home:
             return False
-        return is_docs_editor(request)
+        return is_handrive_editor(request)
 
     if rule_has_public_group(rule, "write_groups"):
         # public-write ACL is only valid on markdown files, never on directories.
         return False
 
-    return user_matches_docs_acl_rule(
+    return user_matches_handrive_acl_rule(
         request,
         rule,
         user_relation="write_users",
@@ -1423,17 +1423,17 @@ def has_docs_directory_write_access(request, path_value: str | None) -> bool:
     )
 
 
-def move_docs_acl_rules(source_path: str, destination_path: str) -> None:
+def move_handrive_acl_rules(source_path: str, destination_path: str) -> None:
     """경로 이동/이름변경 시 ACL rule 들도 같은 상대위치로 이동한다."""
     source_normalized = normalize_relative_path(source_path, allow_empty=True)
     destination_normalized = normalize_relative_path(destination_path, allow_empty=True)
     if source_normalized == destination_normalized:
         return
 
-    rules = list(DocsAccessRule.objects.filter(path=source_normalized))
+    rules = list(HandriveAccessRule.objects.filter(path=source_normalized))
     if source_normalized:
         rules += list(
-            DocsAccessRule.objects.filter(path__startswith=source_normalized + "/").exclude(
+            HandriveAccessRule.objects.filter(path__startswith=source_normalized + "/").exclude(
                 path=source_normalized
             )
         )
@@ -1445,7 +1445,7 @@ def move_docs_acl_rules(source_path: str, destination_path: str) -> None:
         if not destination_normalized:
             new_path = suffix.lstrip("/")
 
-        target_rule = DocsAccessRule.objects.filter(path=new_path).exclude(pk=rule.pk).first()
+        target_rule = HandriveAccessRule.objects.filter(path=new_path).exclude(pk=rule.pk).first()
         if target_rule:
             merged_read_user_ids = set(target_rule.read_users.values_list("id", flat=True)) | set(
                 rule.read_users.values_list("id", flat=True)
@@ -1470,15 +1470,15 @@ def move_docs_acl_rules(source_path: str, destination_path: str) -> None:
         rule.save(update_fields=["path", "updated_at"])
 
 
-def delete_docs_acl_rules_for_path(path_value: str) -> None:
+def delete_handrive_acl_rules_for_path(path_value: str) -> None:
     """경로와 하위 트리에 연결된 ACL rule 을 삭제한다."""
     normalized = normalize_relative_path(path_value, allow_empty=True)
     if not normalized:
-        DocsAccessRule.objects.filter(path="").delete()
+        HandriveAccessRule.objects.filter(path="").delete()
         return
 
-    DocsAccessRule.objects.filter(path=normalized).delete()
-    DocsAccessRule.objects.filter(path__startswith=normalized + "/").delete()
+    HandriveAccessRule.objects.filter(path=normalized).delete()
+    HandriveAccessRule.objects.filter(path__startswith=normalized + "/").delete()
 
 
 def list_directory_entries(directory: Path, request=None) -> list[dict]:
@@ -1491,19 +1491,19 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
             can_edit = False
             can_read = True
             if request is not None:
-                can_edit = has_docs_write_access(request, entry["path"])
-                can_read = has_docs_read_access(request, entry["path"])
+                can_edit = has_handrive_write_access(request, entry["path"])
+                can_read = has_handrive_read_access(request, entry["path"])
                 if not can_read and not can_edit:
                     continue
-                if is_docs_url_only_enabled(request, entry["path"]) and not can_edit:
+                if is_handrive_url_only_enabled(request, entry["path"]) and not can_edit:
                     continue
             if request is not None:
-                is_git_repo_root = is_docs_git_repo_root_path(request, entry["path"])
+                is_git_repo_root = is_handrive_git_repo_root_path(request, entry["path"])
                 entry["can_edit"] = can_edit
-                entry["can_write_children"] = has_docs_directory_write_access(request, entry["path"])
+                entry["can_write_children"] = has_handrive_directory_write_access(request, entry["path"])
                 entry["can_delete"] = can_edit or is_git_repo_root
                 entry["is_public_write"] = False
-                entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
+                entry["is_url_only"] = is_handrive_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
             entries.append(entry)
             existing_entry_paths.add(entry["path"])
@@ -1513,26 +1513,26 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
             can_edit = False
             can_read = True
             if request is not None:
-                can_edit = has_docs_write_access(request, entry["path"])
-                can_read = has_docs_read_access(request, entry["path"])
+                can_edit = has_handrive_write_access(request, entry["path"])
+                can_read = has_handrive_read_access(request, entry["path"])
                 if not can_read and not can_edit:
                     continue
-                if is_docs_url_only_enabled(request, entry["path"]) and not can_edit:
+                if is_handrive_url_only_enabled(request, entry["path"]) and not can_edit:
                     continue
             if request is not None:
                 entry["can_edit"] = can_edit
                 entry["can_write_children"] = False
                 entry["can_delete"] = can_edit
-                entry["is_public_write"] = is_docs_public_write_enabled(request, entry["path"])
-                entry["is_url_only"] = is_docs_url_only_enabled(request, entry["path"])
+                entry["is_public_write"] = is_handrive_public_write_enabled(request, entry["path"])
+                entry["is_url_only"] = is_handrive_url_only_enabled(request, entry["path"])
                 entry["write_acl_labels"] = get_write_acl_display_labels(request, entry["path"])
                 entry["share_url"] = ""
                 if entry["is_url_only"]:
-                    _link = DocsSharedLink.objects.select_related("owner").filter(path=entry["path"]).first()
+                    _link = HandriveSharedLink.objects.select_related("owner").filter(path=entry["path"]).first()
                     if _link:
                         _ui_lang = resolve_ui_lang(request, getattr(getattr(request, "resolver_match", None), "kwargs", {}).get("ui_lang"))
                         entry["share_url"] = request.build_absolute_uri(
-                            build_docs_shared_view_url(_ui_lang, _link.owner.username, _link.share_slug)
+                            build_handrive_shared_view_url(_ui_lang, _link.owner.username, _link.share_slug)
                         )
             entries.append(entry)
             existing_entry_paths.add(entry["path"])
@@ -1574,7 +1574,7 @@ def list_directory_entries(directory: Path, request=None) -> list[dict]:
                 repo_parent = ""
             if repo_parent != current_dir_relative or repo_path in existing_entry_paths:
                 continue
-            if not has_docs_read_access(request, repo_path):
+            if not has_handrive_read_access(request, repo_path):
                 continue
             repo_name = Path(repo_path).name
             permission = _get_git_repo_permission_for_request(request, repo)
@@ -1762,7 +1762,7 @@ def _get_visible_git_repo_root_relative(request, repo) -> str:
 
 def _get_git_repo_mount_prefixes(request) -> tuple[str, ...]:
     """가상 repo mount prefix 목록을 길이순으로 캐시해 반환한다."""
-    cached = getattr(request, "_docs_git_repo_mount_prefixes", None)
+    cached = getattr(request, "_handrive_git_repo_mount_prefixes", None)
     if cached is not None:
         return cached
 
@@ -1772,7 +1772,7 @@ def _get_git_repo_mount_prefixes(request) -> tuple[str, ...]:
             key=len,
         )
     )
-    setattr(request, "_docs_git_repo_mount_prefixes", prefixes)
+    setattr(request, "_handrive_git_repo_mount_prefixes", prefixes)
     return prefixes
 
 
@@ -1884,7 +1884,7 @@ def _git_repo_list_tree(repo, branch_name: str, repo_relative_path: str = "") ->
         if object_type == "blob":
             size_result = _run_git_repo_command(repo, "cat-file", "-s", object_sha)
             try:
-                entry["size_display"] = format_docs_bytes_display(int((size_result.stdout or "0").strip() or "0"))
+                entry["size_display"] = format_handrive_bytes_display(int((size_result.stdout or "0").strip() or "0"))
             except ValueError:
                 entry["size_display"] = ""
         entries.append(entry)
@@ -2107,7 +2107,7 @@ def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *,
     """repo/branch 가상 경로를 포함한 breadcrumb 목록을 생성한다."""
     context = _get_git_virtual_context(request, current_path)
     if context is None:
-        return build_docs_breadcrumbs(
+        return build_handrive_breadcrumbs(
             base_url,
             current_path,
             scoped_home_dir=scoped_home_dir,
@@ -2117,7 +2117,7 @@ def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *,
             root_parent_label=get_handrive_root_label(request, ""),
         )
 
-    breadcrumbs = build_docs_breadcrumbs(
+    breadcrumbs = build_handrive_breadcrumbs(
         base_url,
         context["repo_root"],
         scoped_home_dir=scoped_home_dir,
@@ -2135,7 +2135,7 @@ def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *,
     breadcrumbs.append(
         {
             "label": context["branch_name"],
-            "url": build_docs_list_url(base_url, branch_path),
+            "url": build_handrive_list_url(base_url, branch_path),
             "is_current": context["kind"] == "branch_dir" and not context["repo_relative_path"],
             "path": branch_path,
         }
@@ -2150,7 +2150,7 @@ def _build_git_virtual_breadcrumbs(request, base_url: str, current_path: str, *,
             breadcrumbs.append(
                 {
                     "label": part,
-                    "url": build_docs_list_url(base_url, path_value),
+                    "url": build_handrive_list_url(base_url, path_value),
                     "is_current": index == len(parts) - 1,
                     "path": path_value,
                 }
@@ -2248,9 +2248,9 @@ def _materialize_git_repo_mount(target_path: Path, destination_path: Path) -> No
         _copy_tree_contents(checkout_path, destination_path)
 
 
-def is_docs_git_repo_mounted_path(request, path_value: str | None) -> bool:
+def is_handrive_git_repo_mounted_path(request, path_value: str | None) -> bool:
     if request is None:
-        request = DOCS_ACTIVE_REQUEST.get()
+        request = HANDRIVE_ACTIVE_REQUEST.get()
     if request is None:
         return False
 
@@ -2264,9 +2264,9 @@ def is_docs_git_repo_mounted_path(request, path_value: str | None) -> bool:
     return False
 
 
-def is_docs_git_repo_root_path(request, path_value: str | None) -> bool:
+def is_handrive_git_repo_root_path(request, path_value: str | None) -> bool:
     if request is None:
-        request = DOCS_ACTIVE_REQUEST.get()
+        request = HANDRIVE_ACTIVE_REQUEST.get()
     if request is None:
         return False
 
@@ -2277,19 +2277,19 @@ def is_docs_git_repo_root_path(request, path_value: str | None) -> bool:
 
 
 def list_all_directories(request=None) -> list[str]:
-    root = docs_root_dir()
+    root = handrive_root_dir()
     directories = []
-    if request is None or has_docs_directory_write_access(request, ""):
+    if request is None or has_handrive_directory_write_access(request, ""):
         directories.append("")
     for directory in sorted([p for p in root.rglob("*") if p.is_dir()], key=lambda p: p.as_posix().lower()):
         rel_path = relative_from_root(directory)
-        if request is not None and not has_docs_directory_write_access(request, rel_path):
+        if request is not None and not has_handrive_directory_write_access(request, rel_path):
             continue
         directories.append(rel_path)
     return directories
 
 
-def build_docs_list_url(base_url: str, relative_path: str) -> str:
+def build_handrive_list_url(base_url: str, relative_path: str) -> str:
     normalized = normalize_relative_path(relative_path, allow_empty=True)
     if not normalized:
         return base_url
@@ -2297,7 +2297,7 @@ def build_docs_list_url(base_url: str, relative_path: str) -> str:
     return f"{base_url}/{encoded}/list"
 
 
-def get_scoped_docs_home_dir(request) -> str:
+def get_scoped_handrive_home_dir(request) -> str:
     user = getattr(request, "user", None)
     if not (user and user.is_authenticated):
         return "all"
@@ -2315,10 +2315,10 @@ def get_scoped_docs_home_dir(request) -> str:
         return ""
 
 
-def get_docs_initial_landing_dir(request) -> str:
+def get_handrive_initial_landing_dir(request) -> str:
     user = getattr(request, "user", None)
     if not (user and user.is_authenticated):
-        return get_scoped_docs_home_dir(request)
+        return get_scoped_handrive_home_dir(request)
     username = str(user.get_username() or "").strip()
     if user.is_superuser and username:
         try:
@@ -2326,7 +2326,7 @@ def get_docs_initial_landing_dir(request) -> str:
             return normalize_relative_path(f"media/HanDrive/users/{username}", allow_empty=False)
         except ValueError:
             return ""
-    return get_scoped_docs_home_dir(request)
+    return get_scoped_handrive_home_dir(request)
 
 
 def is_public_group_scoped_user(request) -> bool:
@@ -2336,7 +2336,7 @@ def is_public_group_scoped_user(request) -> bool:
     return user.groups.filter(name=DOCS_PUBLIC_WRITE_GROUP_NAME).exists()
 
 
-def is_path_in_docs_scope(path_value: str, scoped_home_dir: str) -> bool:
+def is_path_in_handrive_scope(path_value: str, scoped_home_dir: str) -> bool:
     if not scoped_home_dir:
         return True
     if not path_value:
@@ -2351,19 +2351,19 @@ def ensure_scoped_home_dir(scoped_home_dir: str) -> None:
     path_obj.mkdir(parents=True, exist_ok=True)
 
 
-def get_docs_scoped_quota_root(request, path_value: str | None) -> Path | None:
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+def get_handrive_scoped_quota_root(request, path_value: str | None) -> Path | None:
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     if not scoped_home_dir:
         return None
     normalized_path = normalize_relative_path(path_value, allow_empty=True)
-    if not is_path_in_docs_scope(normalized_path, scoped_home_dir):
+    if not is_path_in_handrive_scope(normalized_path, scoped_home_dir):
         return None
     scoped_root, _ = resolve_path(scoped_home_dir, must_exist=False)
     scoped_root.mkdir(parents=True, exist_ok=True)
     return scoped_root
 
 
-def calculate_docs_tree_usage(root_path: Path) -> tuple[int, int]:
+def calculate_handrive_tree_usage(root_path: Path) -> tuple[int, int]:
     total_bytes = 0
     total_entries = 0
     if not root_path.exists():
@@ -2379,7 +2379,7 @@ def calculate_docs_tree_usage(root_path: Path) -> tuple[int, int]:
     return total_bytes, total_entries
 
 
-def enforce_docs_scoped_quota(
+def enforce_handrive_scoped_quota(
     request,
     *,
     quota_path: str | None,
@@ -2388,11 +2388,11 @@ def enforce_docs_scoped_quota(
 ) -> None:
     if getattr(request.user, "is_superuser", False):
         return
-    scoped_root = get_docs_scoped_quota_root(request, quota_path)
+    scoped_root = get_handrive_scoped_quota_root(request, quota_path)
     if scoped_root is None:
         return
 
-    current_bytes, current_entries = calculate_docs_tree_usage(scoped_root)
+    current_bytes, current_entries = calculate_handrive_tree_usage(scoped_root)
     projected_bytes = current_bytes + max(0, extra_bytes)
     projected_entries = current_entries + max(0, extra_entries)
 
@@ -2402,7 +2402,7 @@ def enforce_docs_scoped_quota(
         raise ValueError("개인 폴더의 하위 폴더/파일 수가 100개를 초과해 더 이상 업로드하거나 생성할 수 없습니다.")
 
 
-def format_docs_bytes_display(byte_count: int) -> str:
+def format_handrive_bytes_display(byte_count: int) -> str:
     GB = 1024**3
     MB = 1024**2
     KB = 1024
@@ -2444,7 +2444,7 @@ _DOCS_QUOTA_TYPE_META: list[tuple[str, str, str]] = [
 ]
 
 
-def _docs_quota_file_type(suffix: str) -> str:
+def _handrive_quota_file_type(suffix: str) -> str:
     s = suffix.lower()
     for key, exts in _DOCS_QUOTA_TYPE_EXTS.items():
         if s in exts:
@@ -2452,7 +2452,7 @@ def _docs_quota_file_type(suffix: str) -> str:
     return "other"
 
 
-def calculate_docs_quota_breakdown(root_path: Path) -> tuple[int, int, dict[str, dict]]:
+def calculate_handrive_quota_breakdown(root_path: Path) -> tuple[int, int, dict[str, dict]]:
     """Returns (total_bytes, total_entries, breakdown).
     breakdown keys: photo, video, document, audio, other → {"bytes": int, "count": int}
     """
@@ -2464,7 +2464,7 @@ def calculate_docs_quota_breakdown(root_path: Path) -> tuple[int, int, dict[str,
         for path_obj in root_path.rglob("*"):
             total_entries += 1
             if path_obj.is_file():
-                tk = _docs_quota_file_type(path_obj.suffix)
+                tk = _handrive_quota_file_type(path_obj.suffix)
                 count_map[tk] += 1
                 try:
                     byte_map[tk] += path_obj.stat().st_size
@@ -2475,7 +2475,7 @@ def calculate_docs_quota_breakdown(root_path: Path) -> tuple[int, int, dict[str,
     return total_bytes, total_entries, breakdown
 
 
-def build_docs_breadcrumbs(
+def build_handrive_breadcrumbs(
     base_url: str,
     current_dir: str,
     *,
@@ -2497,7 +2497,7 @@ def build_docs_breadcrumbs(
             breadcrumbs.append(
                 {
                     "label": part,
-                    "url": build_docs_list_url(base_url, parent_path),
+                    "url": build_handrive_list_url(base_url, parent_path),
                     "is_current": index == len(parts) - 1,
                     "path": parent_path,
                 }
@@ -2520,7 +2520,7 @@ def build_docs_breadcrumbs(
     breadcrumbs.append(
         {
             "label": home_label,
-            "url": build_docs_list_url(base_url, scoped_home_dir),
+            "url": build_handrive_list_url(base_url, scoped_home_dir),
             "is_current": current_dir == scoped_home_dir,
             "path": scoped_home_dir,
         }
@@ -2532,7 +2532,7 @@ def build_docs_breadcrumbs(
         breadcrumbs.append(
             {
                 "label": part,
-                "url": build_docs_list_url(base_url, parent_path),
+                "url": build_handrive_list_url(base_url, parent_path),
                 "is_current": index == len(current_parts) - 1,
                 "path": parent_path,
             }
@@ -2557,7 +2557,7 @@ def get_handrive_js_root_label(request, scoped_home_dir: str = "") -> str:
     return get_handrive_root_label(request, scoped_home_dir)
 
 
-def is_docs_editor(request) -> bool:
+def is_handrive_editor(request) -> bool:
     user = getattr(request, "user", None)
     if not (user and user.is_authenticated):
         return False
@@ -2566,14 +2566,14 @@ def is_docs_editor(request) -> bool:
     return user.has_perm(DOCS_EDIT_PERMISSION_CODE)
 
 
-def is_docs_acl_admin(request) -> bool:
+def is_handrive_acl_admin(request) -> bool:
     user = getattr(request, "user", None)
     if not (user and user.is_authenticated):
         return False
     return bool(user.is_staff or user.is_superuser)
 
 
-def require_docs_superuser(view_func):
+def require_handrive_superuser(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         user = getattr(request, "user", None)
@@ -2584,20 +2584,20 @@ def require_docs_superuser(view_func):
     return _wrapped
 
 
-def require_docs_editor_json(view_func):
+def require_handrive_editor_json(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
-        if not is_docs_editor(request):
+        if not is_handrive_editor(request):
             return json_error("파일 수정 권한이 필요합니다.", status=403)
         return view_func(request, *args, **kwargs)
 
     return _wrapped
 
 
-def require_docs_acl_admin_json(view_func):
+def require_handrive_acl_admin_json(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
-        if not is_docs_acl_admin(request):
+        if not is_handrive_acl_admin(request):
             return json_error("권한 관리는 관리자만 사용할 수 있습니다.", status=403)
         return view_func(request, *args, **kwargs)
 
@@ -2634,7 +2634,7 @@ def resolve_auth_breadcrumb_url(request, fallback_url: str) -> str:
     return fallback_url
 
 
-def is_docs_share_auth_entry(request, fallback_url: str) -> bool:
+def is_handrive_share_auth_entry(request, fallback_url: str) -> bool:
     next_url = resolve_next_url(request, fallback_url)
     if "/handrive/share/" in next_url or "/handrive/share/" in next_url:
         return True
@@ -2658,7 +2658,7 @@ def get_global_help_root() -> Path:
 
 def get_markdown_help_candidates(ui_lang: str | None) -> list[Path]:
     help_root = get_global_help_root()
-    docs_root = docs_root_dir()
+    handrive_root = handrive_root_dir()
     markdown_help_candidates: list[Path] = []
     if ui_lang == "en":
         markdown_help_candidates.append(help_root / MARKDOWN_HELP_FILENAME_EN)
@@ -2674,16 +2674,16 @@ def get_markdown_help_candidates(ui_lang: str | None) -> list[Path]:
 
     # Backward compatibility for older deployments that still have root-level help files.
     if ui_lang == "en":
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN_DOT_LEGACY)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO_DOT_LEGACY)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_EN)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_KO)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_EN_DOT_LEGACY)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_KO_DOT_LEGACY)
     else:
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_KO_DOT_LEGACY)
-        markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_EN_DOT_LEGACY)
-    markdown_help_candidates.append(docs_root / MARKDOWN_HELP_FILENAME_LEGACY)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_KO)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_EN)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_KO_DOT_LEGACY)
+        markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_EN_DOT_LEGACY)
+    markdown_help_candidates.append(handrive_root / MARKDOWN_HELP_FILENAME_LEGACY)
     return markdown_help_candidates
 
 
@@ -2718,61 +2718,61 @@ def resolve_page_help_file(ui_lang: str | None, page_type: str) -> Path | None:
     return None
 
 
-def build_page_help_html(ui_lang: str | None, page_type: str, docs_text: dict) -> str:
+def build_page_help_html(ui_lang: str | None, page_type: str, handrive_text: dict) -> str:
     page_help_path = resolve_page_help_file(ui_lang, page_type)
     try:
         if page_help_path is not None:
             return render_markdown_safely(page_help_path.read_text(encoding="utf-8"))
         fallback_markdown = (
-            f"# {docs_text.get('help_button', 'Help')}\n\n"
-            f"{docs_text['markdown_help_fallback_missing']}"
+            f"# {handrive_text.get('help_button', 'Help')}\n\n"
+            f"{handrive_text['markdown_help_fallback_missing']}"
         )
     except OSError:
         fallback_markdown = (
-            f"# {docs_text.get('help_button', 'Help')}\n\n"
-            f"{docs_text['markdown_help_fallback_read_error']}"
+            f"# {handrive_text.get('help_button', 'Help')}\n\n"
+            f"{handrive_text['markdown_help_fallback_read_error']}"
         )
     return render_markdown_safely(fallback_markdown)
 
 
-def build_docs_help_url(ui_lang: str | None, docs_base_url: str) -> str:
+def build_handrive_help_url(ui_lang: str | None, handrive_base_url: str) -> str:
     help_file = resolve_markdown_help_file(ui_lang)
     if help_file is None:
-        return docs_base_url
+        return handrive_base_url
 
     help_relative = relative_from_root(help_file)
     help_slug = markdown_slug_from_relative(help_relative)
 
     if ui_lang in SUPPORTED_UI_LANGS:
-        return reverse("main:docs_view_lang", kwargs={"ui_lang": ui_lang, "doc_path": help_slug})
-    return reverse("main:docs_view", kwargs={"doc_path": help_slug})
+        return reverse("main:handrive_view_lang", kwargs={"ui_lang": ui_lang, "doc_path": help_slug})
+    return reverse("main:handrive_view", kwargs={"doc_path": help_slug})
 
 
-def build_docs_view_url(ui_lang: str | None, slug_path: str) -> str:
+def build_handrive_view_url(ui_lang: str | None, slug_path: str) -> str:
     if ui_lang in SUPPORTED_UI_LANGS:
-        return reverse("main:docs_view_lang", kwargs={"ui_lang": ui_lang, "doc_path": slug_path})
-    return reverse("main:docs_view", kwargs={"doc_path": slug_path})
+        return reverse("main:handrive_view_lang", kwargs={"ui_lang": ui_lang, "doc_path": slug_path})
+    return reverse("main:handrive_view", kwargs={"doc_path": slug_path})
 
 
-def build_docs_shared_view_url(ui_lang: str | None, owner_username: str, share_slug: str) -> str:
+def build_handrive_shared_view_url(ui_lang: str | None, owner_username: str, share_slug: str) -> str:
     if ui_lang in SUPPORTED_UI_LANGS:
         return reverse(
-            "main:docs_shared_view_lang",
+            "main:handrive_shared_view_lang",
             kwargs={"ui_lang": ui_lang, "owner_username": owner_username, "share_slug": share_slug},
         )
-    return reverse("main:docs_shared_view", kwargs={"owner_username": owner_username, "share_slug": share_slug})
+    return reverse("main:handrive_shared_view", kwargs={"owner_username": owner_username, "share_slug": share_slug})
 
 
-def build_docs_share_slug(relative_path: str) -> str:
+def build_handrive_share_slug(relative_path: str) -> str:
     base_name = Path(markdown_slug_from_relative(relative_path)).name.strip()
     return base_name or "document"
 
 
-def get_unique_docs_share_slug(owner, relative_path: str, *, exclude_path: str | None = None) -> str:
-    base_slug = build_docs_share_slug(relative_path)
+def get_unique_handrive_share_slug(owner, relative_path: str, *, exclude_path: str | None = None) -> str:
+    base_slug = build_handrive_share_slug(relative_path)
     candidate = base_slug
     suffix = 2
-    queryset = DocsSharedLink.objects.filter(owner=owner)
+    queryset = HandriveSharedLink.objects.filter(owner=owner)
     if exclude_path:
         queryset = queryset.exclude(path=exclude_path)
     existing_slugs = set(queryset.values_list("share_slug", flat=True))
@@ -2782,18 +2782,18 @@ def get_unique_docs_share_slug(owner, relative_path: str, *, exclude_path: str |
     return candidate
 
 
-def ensure_docs_shared_link(path_value: str, owner) -> DocsSharedLink:
-    shared_link = DocsSharedLink.objects.filter(path=path_value).select_related("owner").first()
+def ensure_handrive_shared_link(path_value: str, owner) -> HandriveSharedLink:
+    shared_link = HandriveSharedLink.objects.filter(path=path_value).select_related("owner").first()
     if shared_link:
         return shared_link
-    share_slug = get_unique_docs_share_slug(owner, path_value)
-    return DocsSharedLink.objects.create(path=path_value, owner=owner, share_slug=share_slug)
+    share_slug = get_unique_handrive_share_slug(owner, path_value)
+    return HandriveSharedLink.objects.create(path=path_value, owner=owner, share_slug=share_slug)
 
 
-def move_docs_shared_links(source_path: str, destination_path: str) -> None:
+def move_handrive_shared_links(source_path: str, destination_path: str) -> None:
     normalized_source = normalize_relative_path(source_path, allow_empty=False)
     normalized_destination = normalize_relative_path(destination_path, allow_empty=False)
-    links = list(DocsSharedLink.objects.filter(path=normalized_source) | DocsSharedLink.objects.filter(path__startswith=normalized_source + "/"))
+    links = list(HandriveSharedLink.objects.filter(path=normalized_source) | HandriveSharedLink.objects.filter(path__startswith=normalized_source + "/"))
     for link in links:
         old_path = link.path
         if old_path == normalized_source:
@@ -2803,39 +2803,39 @@ def move_docs_shared_links(source_path: str, destination_path: str) -> None:
         link.save(update_fields=["path", "updated_at"])
 
 
-def delete_docs_shared_links_for_path(path_value: str) -> None:
+def delete_handrive_shared_links_for_path(path_value: str) -> None:
     normalized = normalize_relative_path(path_value, allow_empty=False)
-    DocsSharedLink.objects.filter(path=normalized).delete()
-    DocsSharedLink.objects.filter(path__startswith=normalized + "/").delete()
+    HandriveSharedLink.objects.filter(path=normalized).delete()
+    HandriveSharedLink.objects.filter(path__startswith=normalized + "/").delete()
 
 
-def docs_common_context(request, ui_lang):
+def handrive_common_context(request, ui_lang):
     """HanDrive 전 페이지가 공유하는 기본 템플릿 context를 구성한다."""
     context = {}
     apply_ui_context(request, context, ui_lang)
-    docs_text = get_docs_text(ui_lang)
+    handrive_text = get_handrive_text(ui_lang)
 
     if ui_lang in SUPPORTED_UI_LANGS:
-        docs_base_url = reverse("main:docs_root_lang", kwargs={"ui_lang": ui_lang})
-        docs_write_url = reverse("main:docs_write_lang", kwargs={"ui_lang": ui_lang})
-        docs_login_url = reverse("main:docs_login_lang", kwargs={"ui_lang": ui_lang})
-        docs_signup_url = reverse("main:docs_signup_lang", kwargs={"ui_lang": ui_lang})
-        docs_logout_url = reverse("main:docs_logout_lang", kwargs={"ui_lang": ui_lang})
-        docs_ops_apply_static_url = reverse("main:docs_ops_apply_static_lang", kwargs={"ui_lang": ui_lang})
+        handrive_base_url = reverse("main:handrive_root_lang", kwargs={"ui_lang": ui_lang})
+        handrive_write_url = reverse("main:handrive_write_lang", kwargs={"ui_lang": ui_lang})
+        handrive_login_url = reverse("main:handrive_login_lang", kwargs={"ui_lang": ui_lang})
+        handrive_signup_url = reverse("main:handrive_signup_lang", kwargs={"ui_lang": ui_lang})
+        handrive_logout_url = reverse("main:handrive_logout_lang", kwargs={"ui_lang": ui_lang})
+        handrive_ops_apply_static_url = reverse("main:handrive_ops_apply_static_lang", kwargs={"ui_lang": ui_lang})
     else:
-        docs_base_url = reverse("main:docs_root")
-        docs_write_url = reverse("main:docs_write")
-        docs_login_url = reverse("main:docs_login")
-        docs_signup_url = reverse("main:docs_signup")
-        docs_logout_url = reverse("main:docs_logout")
-        docs_ops_apply_static_url = reverse("main:docs_ops_apply_static")
-    docs_help_url = build_docs_help_url(ui_lang, docs_base_url)
-    handrive_root_url = docs_base_url
+        handrive_base_url = reverse("main:handrive_root")
+        handrive_write_url = reverse("main:handrive_write")
+        handrive_login_url = reverse("main:handrive_login")
+        handrive_signup_url = reverse("main:handrive_signup")
+        handrive_logout_url = reverse("main:handrive_logout")
+        handrive_ops_apply_static_url = reverse("main:handrive_ops_apply_static")
+    handrive_help_url = build_handrive_help_url(ui_lang, handrive_base_url)
+    handrive_root_url = handrive_base_url
     if request.user.is_authenticated and request.user.is_superuser:
-        handrive_root_url = f"{docs_base_url}?root=1"
+        handrive_root_url = f"{handrive_base_url}?root=1"
     if request.user.is_authenticated:
         profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
-        docs_my_portfolio_url = reverse(
+        handrive_my_portfolio_url = reverse(
             "main:portfolio_user_lang",
             kwargs={"ui_lang": ui_lang, "user_id": request.user.username},
         )
@@ -2849,56 +2849,56 @@ def docs_common_context(request, ui_lang):
             )
         else:
             account_profile_upload_url = reverse("main:account_profile_image_upload")
-        _quota_home = get_scoped_docs_home_dir(request)
+        _quota_home = get_scoped_handrive_home_dir(request)
         if _quota_home:
             _quota_root, _ = resolve_path(_quota_home, must_exist=False)
-            _quota_used, _, _breakdown = calculate_docs_quota_breakdown(_quota_root)
-            docs_quota_used_bytes = _quota_used
-            docs_quota_total_bytes = DOCS_USER_SCOPED_QUOTA_BYTES
-            docs_quota_percent = min(100, round(_quota_used / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 1))
-            docs_quota_used_display = format_docs_bytes_display(_quota_used)
-            docs_quota_total_display = format_docs_bytes_display(DOCS_USER_SCOPED_QUOTA_BYTES)
+            _quota_used, _, _breakdown = calculate_handrive_quota_breakdown(_quota_root)
+            handrive_quota_used_bytes = _quota_used
+            handrive_quota_total_bytes = DOCS_USER_SCOPED_QUOTA_BYTES
+            handrive_quota_percent = min(100, round(_quota_used / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 1))
+            handrive_quota_used_display = format_handrive_bytes_display(_quota_used)
+            handrive_quota_total_display = format_handrive_bytes_display(DOCS_USER_SCOPED_QUOTA_BYTES)
             _free_bytes = max(0, DOCS_USER_SCOPED_QUOTA_BYTES - _quota_used)
-            docs_quota_free_bytes = _free_bytes
-            docs_quota_free_display = format_docs_bytes_display(_free_bytes)
-            docs_quota_free_percent = round(_free_bytes / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2)
-            docs_quota_breakdown = [
+            handrive_quota_free_bytes = _free_bytes
+            handrive_quota_free_display = format_handrive_bytes_display(_free_bytes)
+            handrive_quota_free_percent = round(_free_bytes / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2)
+            handrive_quota_breakdown = [
                 {
                     "key": key,
                     "label": label,
                     "color": color,
                     "bytes": _breakdown[key]["bytes"],
                     "count": _breakdown[key]["count"],
-                    "display": format_docs_bytes_display(_breakdown[key]["bytes"]),
+                    "display": format_handrive_bytes_display(_breakdown[key]["bytes"]),
                     "percent": round(_breakdown[key]["bytes"] / DOCS_USER_SCOPED_QUOTA_BYTES * 100, 2),
                 }
                 for key, label, color in _DOCS_QUOTA_TYPE_META
             ]
         else:
-            docs_quota_used_bytes = None
-            docs_quota_total_bytes = None
-            docs_quota_percent = None
-            docs_quota_used_display = ""
-            docs_quota_total_display = ""
-            docs_quota_free_bytes = None
-            docs_quota_free_display = ""
-            docs_quota_free_percent = None
-            docs_quota_breakdown = []
+            handrive_quota_used_bytes = None
+            handrive_quota_total_bytes = None
+            handrive_quota_percent = None
+            handrive_quota_used_display = ""
+            handrive_quota_total_display = ""
+            handrive_quota_free_bytes = None
+            handrive_quota_free_display = ""
+            handrive_quota_free_percent = None
+            handrive_quota_breakdown = []
     else:
-        docs_my_portfolio_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
+        handrive_my_portfolio_url = reverse("main:main_lang", kwargs={"ui_lang": ui_lang})
         account_profile_image_url = ""
         account_display_name = ""
         account_email = ""
         account_profile_upload_url = ""
-        docs_quota_used_bytes = None
-        docs_quota_total_bytes = None
-        docs_quota_percent = None
-        docs_quota_used_display = ""
-        docs_quota_total_display = ""
-        docs_quota_free_bytes = None
-        docs_quota_free_display = ""
-        docs_quota_free_percent = None
-        docs_quota_breakdown = []
+        handrive_quota_used_bytes = None
+        handrive_quota_total_bytes = None
+        handrive_quota_percent = None
+        handrive_quota_used_display = ""
+        handrive_quota_total_display = ""
+        handrive_quota_free_bytes = None
+        handrive_quota_free_display = ""
+        handrive_quota_free_percent = None
+        handrive_quota_breakdown = []
 
     context.update(
         {
@@ -2908,106 +2908,106 @@ def docs_common_context(request, ui_lang):
             "meta_description": DOCS_META_DESCRIPTION,
             "meta_og_description": DOCS_META_DESCRIPTION,
             "meta_robots": "index,follow",
-            "docs_base_url": docs_base_url,
+            "handrive_base_url": handrive_base_url,
             "handrive_root_url": handrive_root_url,
-            "docs_write_url": docs_write_url,
-            "docs_login_url": docs_login_url,
-            "docs_signup_url": docs_signup_url,
-            "docs_logout_url": docs_logout_url,
-            "docs_ops_apply_static_url": docs_ops_apply_static_url,
-            "docs_auth_next": request.get_full_path(),
-            "docs_logout_next": docs_base_url,
-            "docs_help_url": docs_help_url,
-            "docs_my_portfolio_url": docs_my_portfolio_url,
-            "account_my_portfolio_url": docs_my_portfolio_url,
+            "handrive_write_url": handrive_write_url,
+            "handrive_login_url": handrive_login_url,
+            "handrive_signup_url": handrive_signup_url,
+            "handrive_logout_url": handrive_logout_url,
+            "handrive_ops_apply_static_url": handrive_ops_apply_static_url,
+            "handrive_auth_next": request.get_full_path(),
+            "handrive_logout_next": handrive_base_url,
+            "handrive_help_url": handrive_help_url,
+            "handrive_my_portfolio_url": handrive_my_portfolio_url,
+            "account_my_portfolio_url": handrive_my_portfolio_url,
             "account_logout_form_id": "auth-logout-form",
-            "account_logout_next": docs_base_url,
-            "account_logout_url": docs_logout_url,
+            "account_logout_next": handrive_base_url,
+            "account_logout_url": handrive_logout_url,
             "account_profile_image_url": account_profile_image_url,
             "account_display_name": account_display_name,
             "account_email": account_email,
             "account_profile_upload_url": account_profile_upload_url,
-            "docs_api_list_url": reverse("main:docs_api_list"),
-            "docs_api_save_url": reverse("main:docs_api_save"),
-            "docs_api_preview_url": reverse("main:docs_api_preview"),
-            "docs_api_rename_url": reverse("main:docs_api_rename"),
-            "docs_api_delete_url": reverse("main:docs_api_delete"),
-            "docs_api_mkdir_url": reverse("main:docs_api_mkdir"),
-            "docs_api_move_url": reverse("main:docs_api_move"),
-            "docs_api_upload_url": reverse("main:docs_api_upload"),
-            "docs_api_upload_cancel_url": reverse("main:docs_api_upload_cancel"),
-            "docs_api_download_url": reverse("main:docs_api_download"),
-            "docs_api_acl_url": reverse("main:docs_api_acl"),
-            "docs_api_acl_options_url": reverse("main:docs_api_acl_options"),
-            "docs_api_url_share_url": reverse("main:docs_api_url_share"),
-            "docs_can_edit": has_docs_directory_write_access(request, ""),
-            "docs_can_manage_acl": is_docs_acl_admin(request),
-            "docs_file_extension_options": get_docs_save_extension_options(),
-            "docs_text": docs_text,
-            "docs_quota_used_bytes": docs_quota_used_bytes,
-            "docs_quota_total_bytes": docs_quota_total_bytes,
-            "docs_quota_percent": docs_quota_percent,
-            "docs_quota_used_display": docs_quota_used_display,
-            "docs_quota_total_display": docs_quota_total_display,
-            "docs_quota_free_bytes": docs_quota_free_bytes,
-            "docs_quota_free_display": docs_quota_free_display,
-            "docs_quota_free_percent": docs_quota_free_percent,
-            "docs_quota_breakdown": docs_quota_breakdown,
+            "handrive_api_list_url": reverse("main:handrive_api_list"),
+            "handrive_api_save_url": reverse("main:handrive_api_save"),
+            "handrive_api_preview_url": reverse("main:handrive_api_preview"),
+            "handrive_api_rename_url": reverse("main:handrive_api_rename"),
+            "handrive_api_delete_url": reverse("main:handrive_api_delete"),
+            "handrive_api_mkdir_url": reverse("main:handrive_api_mkdir"),
+            "handrive_api_move_url": reverse("main:handrive_api_move"),
+            "handrive_api_upload_url": reverse("main:handrive_api_upload"),
+            "handrive_api_upload_cancel_url": reverse("main:handrive_api_upload_cancel"),
+            "handrive_api_download_url": reverse("main:handrive_api_download"),
+            "handrive_api_acl_url": reverse("main:handrive_api_acl"),
+            "handrive_api_acl_options_url": reverse("main:handrive_api_acl_options"),
+            "handrive_api_url_share_url": reverse("main:handrive_api_url_share"),
+            "handrive_can_edit": has_handrive_directory_write_access(request, ""),
+            "handrive_can_manage_acl": is_handrive_acl_admin(request),
+            "handrive_file_extension_options": get_handrive_save_extension_options(),
+            "handrive_text": handrive_text,
+            "handrive_quota_used_bytes": handrive_quota_used_bytes,
+            "handrive_quota_total_bytes": handrive_quota_total_bytes,
+            "handrive_quota_percent": handrive_quota_percent,
+            "handrive_quota_used_display": handrive_quota_used_display,
+            "handrive_quota_total_display": handrive_quota_total_display,
+            "handrive_quota_free_bytes": handrive_quota_free_bytes,
+            "handrive_quota_free_display": handrive_quota_free_display,
+            "handrive_quota_free_percent": handrive_quota_free_percent,
+            "handrive_quota_breakdown": handrive_quota_breakdown,
         }
     )
     return context
 
 
-def docs_csrf_failure(request, reason="", template_name="403_csrf.html"):
+def handrive_csrf_failure(request, reason="", template_name="403_csrf.html"):
     path = request.path or ""
     logout_match = DOCS_LOGOUT_PATH_PATTERN.match(path)
     if logout_match:
         matched_lang = (logout_match.group(1) or "").strip().lower()
         if matched_lang in SUPPORTED_UI_LANGS:
-            return redirect(reverse("main:docs_root_lang", kwargs={"ui_lang": matched_lang}))
-        return redirect_to_localized_route(request, "main:docs_root_lang")
+            return redirect(reverse("main:handrive_root_lang", kwargs={"ui_lang": matched_lang}))
+        return redirect_to_localized_route(request, "main:handrive_root_lang")
     return default_csrf_failure(request, reason=reason, template_name=template_name)
 
 
-@with_request_docs_root
-def docs_root(request, ui_lang=None):
+@with_request_handrive_root
+def handrive_root(request, ui_lang=None):
     user = getattr(request, "user", None)
     root_requested = str(request.GET.get("root", "") or "").strip().lower() in {"1", "true", "yes"}
     if user and user.is_authenticated and user.is_superuser and root_requested:
-        return docs_list(request, folder_path="", ui_lang=ui_lang)
-    landing_dir = get_docs_initial_landing_dir(request)
+        return handrive_list(request, folder_path="", ui_lang=ui_lang)
+    landing_dir = get_handrive_initial_landing_dir(request)
     if landing_dir:
         ensure_scoped_home_dir(landing_dir)
         resolved_lang = resolve_ui_lang(request, ui_lang)
         if resolved_lang in SUPPORTED_UI_LANGS:
             return redirect(
-                reverse("main:docs_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": landing_dir})
+                reverse("main:handrive_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": landing_dir})
             )
-        return redirect(reverse("main:docs_list", kwargs={"folder_path": landing_dir}))
-    return docs_list(request, folder_path="", ui_lang=ui_lang)
+        return redirect(reverse("main:handrive_list", kwargs={"folder_path": landing_dir}))
+    return handrive_list(request, folder_path="", ui_lang=ui_lang)
 
 
-def docs_root_legacy_redirect(request, ui_lang=None):
-    return redirect_to_localized_route(request, "main:docs_root_lang", ui_lang=ui_lang)
+def handrive_root_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:handrive_root_lang", ui_lang=ui_lang)
 
 
-def docs_list_root_legacy_redirect(request, ui_lang=None):
-    return redirect_to_localized_route(request, "main:docs_root_lang", ui_lang=ui_lang)
+def handrive_list_root_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:handrive_root_lang", ui_lang=ui_lang)
 
 
-def docs_write_legacy_redirect(request, ui_lang=None):
-    return redirect_to_localized_route(request, "main:docs_write_lang", ui_lang=ui_lang)
+def handrive_write_legacy_redirect(request, ui_lang=None):
+    return redirect_to_localized_route(request, "main:handrive_write_lang", ui_lang=ui_lang)
 
 
-def docs_list_legacy_redirect(request, folder_path, ui_lang=None):
-    return redirect_to_localized_route(request, "main:docs_list_lang", ui_lang=ui_lang, folder_path=folder_path)
+def handrive_list_legacy_redirect(request, folder_path, ui_lang=None):
+    return redirect_to_localized_route(request, "main:handrive_list_lang", ui_lang=ui_lang, folder_path=folder_path)
 
 
-def docs_view_legacy_redirect(request, doc_path, ui_lang=None):
-    return redirect_to_localized_route(request, "main:docs_view_lang", ui_lang=ui_lang, doc_path=doc_path)
+def handrive_view_legacy_redirect(request, doc_path, ui_lang=None):
+    return redirect_to_localized_route(request, "main:handrive_view_lang", ui_lang=ui_lang, doc_path=doc_path)
 
 
-def _resolve_docs_login_target_user(username_value: str | None):
+def _resolve_handrive_login_target_user(username_value: str | None):
     username = (username_value or "").strip()
     if not username:
         return None
@@ -3018,22 +3018,22 @@ def _resolve_docs_login_target_user(username_value: str | None):
         return None
 
 
-def _get_docs_login_guard(user):
+def _get_handrive_login_guard(user):
     if user is None:
         return None
-    guard, _ = DocsLoginAttemptGuard.objects.get_or_create(user=user)
+    guard, _ = HandriveLoginAttemptGuard.objects.get_or_create(user=user)
     return guard
 
 
-def _is_docs_login_captcha_required(user) -> bool:
+def _is_handrive_login_captcha_required(user) -> bool:
     if user is None:
         return False
-    guard = DocsLoginAttemptGuard.objects.filter(user=user).only("captcha_required").first()
+    guard = HandriveLoginAttemptGuard.objects.filter(user=user).only("captcha_required").first()
     return bool(guard and guard.captcha_required)
 
 
-def _register_docs_login_failure(user):
-    guard = _get_docs_login_guard(user)
+def _register_handrive_login_failure(user):
+    guard = _get_handrive_login_guard(user)
     if guard is None:
         return
     guard.failed_attempts = int(guard.failed_attempts or 0) + 1
@@ -3042,10 +3042,10 @@ def _register_docs_login_failure(user):
     guard.save(update_fields=["failed_attempts", "captcha_required", "updated_at"])
 
 
-def _reset_docs_login_guard(user):
+def _reset_handrive_login_guard(user):
     if user is None:
         return
-    guard = DocsLoginAttemptGuard.objects.filter(user=user).first()
+    guard = HandriveLoginAttemptGuard.objects.filter(user=user).first()
     if guard is None:
         return
     guard.failed_attempts = 0
@@ -3053,7 +3053,7 @@ def _reset_docs_login_guard(user):
     guard.save(update_fields=["failed_attempts", "captcha_required", "updated_at"])
 
 
-def _verify_docs_turnstile_token(token: str | None, remote_ip: str | None) -> bool:
+def _verify_handrive_turnstile_token(token: str | None, remote_ip: str | None) -> bool:
     # 디버그 모드에서는 항상 통과
     if settings.DEBUG:
         return True
@@ -3085,62 +3085,62 @@ def _verify_docs_turnstile_token(token: str | None, remote_ip: str | None) -> bo
     return bool(data.get("success"))
 
 
-def _clear_docs_login_captcha(request):
-    request.session.pop(DOCS_LOGIN_CAPTCHA_QUESTION_SESSION_KEY, None)
-    request.session.pop(DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, None)
+def _clear_handrive_login_captcha(request):
+    request.session.pop(HANDRIVE_LOGIN_CAPTCHA_QUESTION_SESSION_KEY, None)
+    request.session.pop(HANDRIVE_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, None)
 
 
-def _build_docs_login_captcha(request, refresh: bool = False) -> str:
+def _build_handrive_login_captcha(request, refresh: bool = False) -> str:
     if not refresh:
-        existing_question = str(request.session.get(DOCS_LOGIN_CAPTCHA_QUESTION_SESSION_KEY, "") or "").strip()
-        existing_answer = str(request.session.get(DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
+        existing_question = str(request.session.get(HANDRIVE_LOGIN_CAPTCHA_QUESTION_SESSION_KEY, "") or "").strip()
+        existing_answer = str(request.session.get(HANDRIVE_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
         if existing_question and existing_answer:
             return existing_question
 
     left = secrets.randbelow(8) + 2
     right = secrets.randbelow(8) + 2
     question = f"{left} + {right} = ?"
-    request.session[DOCS_LOGIN_CAPTCHA_QUESTION_SESSION_KEY] = question
-    request.session[DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY] = str(left + right)
+    request.session[HANDRIVE_LOGIN_CAPTCHA_QUESTION_SESSION_KEY] = question
+    request.session[HANDRIVE_LOGIN_CAPTCHA_ANSWER_SESSION_KEY] = str(left + right)
     request.session.modified = True
     return question
 
 
-def _verify_docs_login_captcha_answer(request) -> bool:
-    expected = str(request.session.get(DOCS_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
+def _verify_handrive_login_captcha_answer(request) -> bool:
+    expected = str(request.session.get(HANDRIVE_LOGIN_CAPTCHA_ANSWER_SESSION_KEY, "") or "").strip()
     provided = str(request.POST.get("handrive-captcha-answer", "") or "").strip()
     if not expected or not provided:
         return False
     return provided == expected
 
 
-def _resolve_docs_post_login_url(request, ui_lang: str | None, fallback_next_url: str, user) -> str:
+def _resolve_handrive_post_login_url(request, ui_lang: str | None, fallback_next_url: str, user) -> str:
     fallback_path = urlparse(str(fallback_next_url or "")).path
     if fallback_path and not re.match(r"^/(?:(ko|en)/)?(?:docs|ide|handrive)(/|$)", fallback_path):
         return fallback_next_url
 
-    landing_dir = get_docs_initial_landing_dir(request)
+    landing_dir = get_handrive_initial_landing_dir(request)
     if user and user.is_authenticated and landing_dir:
         ensure_scoped_home_dir(landing_dir)
         if ui_lang in SUPPORTED_UI_LANGS:
-            return reverse("main:docs_list_lang", kwargs={"ui_lang": ui_lang, "folder_path": landing_dir})
-        return reverse("main:docs_list", kwargs={"folder_path": landing_dir})
+            return reverse("main:handrive_list_lang", kwargs={"ui_lang": ui_lang, "folder_path": landing_dir})
+        return reverse("main:handrive_list", kwargs={"folder_path": landing_dir})
     return fallback_next_url
 
 
-class DocsSignupForm(UserCreationForm):
+class HandriveSignupForm(UserCreationForm):
     first_name = forms.CharField(max_length=150, required=False)
     email = forms.EmailField(required=False)
     privacy_consent = forms.BooleanField(required=True)
 
     def __init__(self, *args, ui_lang: str | None = None, **kwargs):
         super().__init__(*args, **kwargs)
-        docs_text = get_docs_text(ui_lang)
-        self.fields["first_name"].label = docs_text.get("auth_name_label", "이름")
-        self.fields["email"].label = docs_text.get("auth_email_label", "이메일 주소")
-        self.fields["privacy_consent"].label = docs_text.get("auth_privacy_consent_label", "개인정보 처리방침 및 이용약관에 동의합니다.")
+        handrive_text = get_handrive_text(ui_lang)
+        self.fields["first_name"].label = handrive_text.get("auth_name_label", "이름")
+        self.fields["email"].label = handrive_text.get("auth_email_label", "이메일 주소")
+        self.fields["privacy_consent"].label = handrive_text.get("auth_privacy_consent_label", "개인정보 처리방침 및 이용약관에 동의합니다.")
         self.fields["privacy_consent"].error_messages = {
-            "required": docs_text.get("auth_privacy_consent_error", "개인정보 처리방침 및 이용약관 동의가 필요합니다."),
+            "required": handrive_text.get("auth_privacy_consent_error", "개인정보 처리방침 및 이용약관 동의가 필요합니다."),
         }
         self.fields["first_name"].widget.attrs.update({"autocomplete": "name"})
         self.fields["email"].widget.attrs.update({"autocomplete": "email"})
@@ -3334,7 +3334,7 @@ def _make_gitea_sso_url(post_login_url: str) -> str:
 
 
 @require_http_methods(["GET"])
-def docs_gitea_sso_relay(request):
+def handrive_gitea_sso_relay(request):
     """Hanplanet 로그인 후 Gitea OAuth2 로그인을 자동으로 시작합니다.
 
     1. hp_sso_return 쿠키를 .hanplanet.com 도메인으로 설정 (Gitea 측에서 읽어 복귀)
@@ -3367,15 +3367,15 @@ def docs_gitea_sso_relay(request):
 
 
 @require_http_methods(["GET", "POST"])
-@with_request_docs_root
-def docs_login(request, ui_lang=None):
+@with_request_handrive_root
+def handrive_login(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    docs_text = context["docs_text"]
-    post_login_url = context["docs_base_url"]
-    next_url = resolve_next_url(request, context["docs_base_url"])
-    auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
-    hide_global_nav = is_docs_share_auth_entry(request, context["docs_base_url"])
+    context = handrive_common_context(request, resolved_lang)
+    handrive_text = context["handrive_text"]
+    post_login_url = context["handrive_base_url"]
+    next_url = resolve_next_url(request, context["handrive_base_url"])
+    auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["handrive_base_url"])
+    hide_global_nav = is_handrive_share_auth_entry(request, context["handrive_base_url"])
 
     if request.user.is_authenticated:
         return redirect(post_login_url)
@@ -3395,67 +3395,67 @@ def docs_login(request, ui_lang=None):
 
     if request.method == "POST":
         username_value = request.POST.get("username", "")
-        target_user = _resolve_docs_login_target_user(username_value)
-        show_captcha = _is_docs_login_captcha_required(target_user)
+        target_user = _resolve_handrive_login_target_user(username_value)
+        show_captcha = _is_handrive_login_captcha_required(target_user)
 
         if settings.DEBUG:
             show_captcha = False
             captcha_question = ""
-            _clear_docs_login_captcha(request)
+            _clear_handrive_login_captcha(request)
 
         if show_captcha:
-            captcha_question = _build_docs_login_captcha(request)
+            captcha_question = _build_handrive_login_captcha(request)
             if not turnstile_site_key or not turnstile_secret_key:
-                login_error_message = docs_text.get(
+                login_error_message = handrive_text.get(
                     "auth_login_captcha_unavailable",
                     "캡챠 설정이 준비되지 않았습니다. 관리자에게 문의해주세요.",
                 )
-            elif not _verify_docs_login_captcha_answer(request) or not _verify_docs_turnstile_token(
+            elif not _verify_handrive_login_captcha_answer(request) or not _verify_handrive_turnstile_token(
                 request.POST.get("cf-turnstile-response", ""),
                 request.META.get("REMOTE_ADDR", ""),
             ):
-                login_error_message = docs_text.get("auth_login_captcha_error", "캡챠 인증에 실패했습니다. 다시 시도해주세요.")
-                captcha_question = _build_docs_login_captcha(request, refresh=True)
+                login_error_message = handrive_text.get("auth_login_captcha_error", "캡챠 인증에 실패했습니다. 다시 시도해주세요.")
+                captcha_question = _build_handrive_login_captcha(request, refresh=True)
             elif form.is_valid():
                 authed_user = form.get_user()
-                _reset_docs_login_guard(authed_user)
-                _clear_docs_login_captcha(request)
+                _reset_handrive_login_guard(authed_user)
+                _clear_handrive_login_captcha(request)
                 auth_login(request, authed_user)
                 _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
                 response = redirect(post_login_url)
                 return _attach_forgejo_login_session(response, authed_user)
             else:
-                login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
-                captcha_question = _build_docs_login_captcha(request, refresh=True)
+                login_error_message = handrive_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
+                captcha_question = _build_handrive_login_captcha(request, refresh=True)
                 if target_user is not None:
-                    _register_docs_login_failure(target_user)
-                    show_captcha = _is_docs_login_captcha_required(target_user)
+                    _register_handrive_login_failure(target_user)
+                    show_captcha = _is_handrive_login_captcha_required(target_user)
         elif form.is_valid():
             authed_user = form.get_user()
-            _reset_docs_login_guard(authed_user)
-            _clear_docs_login_captcha(request)
+            _reset_handrive_login_guard(authed_user)
+            _clear_handrive_login_captcha(request)
             auth_login(request, authed_user)
             _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password", ""))
             response = redirect(post_login_url)
             return _attach_forgejo_login_session(response, authed_user)
         else:
-            login_error_message = docs_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
+            login_error_message = handrive_text.get("auth_login_error", "아이디 또는 비밀번호를 확인해주세요.")
             if target_user is not None:
-                _register_docs_login_failure(target_user)
-                show_captcha = _is_docs_login_captcha_required(target_user)
+                _register_handrive_login_failure(target_user)
+                show_captcha = _is_handrive_login_captcha_required(target_user)
                 if show_captcha:
-                    captcha_question = _build_docs_login_captcha(request, refresh=True)
+                    captcha_question = _build_handrive_login_captcha(request, refresh=True)
     context.update(
         {
-            "docs_login_form": form,
-            "docs_login_next": next_url,
-            "docs_login_error_message": login_error_message,
-            "docs_login_show_captcha": show_captcha,
-            "docs_turnstile_site_key": turnstile_site_key,
-            "docs_login_captcha_question": captcha_question,
-            "docs_api_login_captcha_status_url": reverse("main:docs_api_login_captcha_status"),
-            "docs_auth_breadcrumb_url": auth_breadcrumb_url,
-            "docs_auth_breadcrumb_label": docs_text.get("auth_previous_page", "Previous Page"),
+            "handrive_login_form": form,
+            "handrive_login_next": next_url,
+            "handrive_login_error_message": login_error_message,
+            "handrive_login_show_captcha": show_captcha,
+            "handrive_turnstile_site_key": turnstile_site_key,
+            "handrive_login_captcha_question": captcha_question,
+            "handrive_api_login_captcha_status_url": reverse("main:handrive_api_login_captcha_status"),
+            "handrive_auth_breadcrumb_url": auth_breadcrumb_url,
+            "handrive_auth_breadcrumb_label": handrive_text.get("auth_previous_page", "Previous Page"),
             "hide_global_nav": hide_global_nav,
         }
     )
@@ -3463,33 +3463,33 @@ def docs_login(request, ui_lang=None):
 
 
 @require_http_methods(["GET"])
-@with_request_docs_root
-def docs_api_login_captcha_status(request):
+@with_request_handrive_root
+def handrive_api_login_captcha_status(request):
     username_value = request.GET.get("username", "")
-    target_user = _resolve_docs_login_target_user(username_value)
-    required = _is_docs_login_captcha_required(target_user)
+    target_user = _resolve_handrive_login_target_user(username_value)
+    required = _is_handrive_login_captcha_required(target_user)
     question = ""
     if required:
-        question = _build_docs_login_captcha(request)
+        question = _build_handrive_login_captcha(request)
     else:
-        _clear_docs_login_captcha(request)
+        _clear_handrive_login_captcha(request)
     return JsonResponse({"ok": True, "required": required, "question": question})
 
 
 @require_http_methods(["GET", "POST"])
-@with_request_docs_root
-def docs_signup(request, ui_lang=None):
+@with_request_handrive_root
+def handrive_signup(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    docs_text = context["docs_text"]
-    next_url = resolve_next_url(request, context["docs_base_url"])
-    auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["docs_base_url"])
-    hide_global_nav = is_docs_share_auth_entry(request, context["docs_base_url"])
+    context = handrive_common_context(request, resolved_lang)
+    handrive_text = context["handrive_text"]
+    next_url = resolve_next_url(request, context["handrive_base_url"])
+    auth_breadcrumb_url = resolve_auth_breadcrumb_url(request, context["handrive_base_url"])
+    hide_global_nav = is_handrive_share_auth_entry(request, context["handrive_base_url"])
 
     if request.user.is_authenticated:
         return redirect(next_url)
 
-    form = DocsSignupForm(request.POST or None, ui_lang=resolved_lang)
+    form = HandriveSignupForm(request.POST or None, ui_lang=resolved_lang)
     signup_error_message = ""
     if request.method == "POST":
         if form.is_valid():
@@ -3499,9 +3499,9 @@ def docs_signup(request, ui_lang=None):
             profile.privacy_policy_agreed_at = consented_at
             profile.terms_of_service_agreed_at = consented_at
             profile.save(update_fields=["privacy_policy_agreed_at", "terms_of_service_agreed_at", "updated_at"])
-            public_group = get_docs_public_write_group()
+            public_group = get_handrive_public_write_group()
             user.groups.add(public_group)
-            scoped_home_dir = get_scoped_docs_home_dir(request)
+            scoped_home_dir = get_scoped_handrive_home_dir(request)
             if not scoped_home_dir:
                 try:
                     scoped_home_dir = normalize_relative_path(f"users/{user.get_username()}", allow_empty=False)
@@ -3517,17 +3517,17 @@ def docs_signup(request, ui_lang=None):
                 authed_user = user
             auth_login(request, authed_user)
             _trigger_gitea_password_sync(authed_user, form.cleaned_data.get("password1", ""))
-            response = redirect(_resolve_docs_post_login_url(request, resolved_lang, next_url, user))
+            response = redirect(_resolve_handrive_post_login_url(request, resolved_lang, next_url, user))
             return _attach_forgejo_login_session(response, authed_user)
-        signup_error_message = docs_text.get("auth_signup_error", "회원가입 정보를 확인해주세요.")
+        signup_error_message = handrive_text.get("auth_signup_error", "회원가입 정보를 확인해주세요.")
 
     context.update(
         {
-            "docs_signup_form": form,
-            "docs_signup_next": next_url,
-            "docs_signup_error_message": signup_error_message,
-            "docs_auth_breadcrumb_url": auth_breadcrumb_url,
-            "docs_auth_breadcrumb_label": docs_text.get("auth_previous_page", "Previous Page"),
+            "handrive_signup_form": form,
+            "handrive_signup_next": next_url,
+            "handrive_signup_error_message": signup_error_message,
+            "handrive_auth_breadcrumb_url": auth_breadcrumb_url,
+            "handrive_auth_breadcrumb_label": handrive_text.get("auth_previous_page", "Previous Page"),
             "hide_global_nav": hide_global_nav,
         }
     )
@@ -3536,11 +3536,11 @@ def docs_signup(request, ui_lang=None):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_logout(request, ui_lang=None):
+@with_request_handrive_root
+def handrive_logout(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    next_url = resolve_next_url(request, context["docs_base_url"])
+    context = handrive_common_context(request, resolved_lang)
+    next_url = resolve_next_url(request, context["handrive_base_url"])
     # Forgejo 세션/토큰 서버사이드 선제 삭제 (로그아웃 전에 user 정보 참조)
     _forgejo_server_logout(request.user)
     auth_logout(request)
@@ -3608,12 +3608,12 @@ def _forgejo_server_logout(user):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-@require_docs_superuser
-def docs_ops_apply_static(request, ui_lang=None):
+@with_request_handrive_root
+@require_handrive_superuser
+def handrive_ops_apply_static(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    next_url = resolve_next_url(request, context["docs_base_url"])
+    context = handrive_common_context(request, resolved_lang)
+    next_url = resolve_next_url(request, context["handrive_base_url"])
     venv_python = settings.BASE_DIR / ".venv" / "bin" / "python"
     python_executable = str(venv_python) if venv_python.exists() else sys.executable
 
@@ -3636,15 +3636,15 @@ def docs_ops_apply_static(request, ui_lang=None):
     return redirect(next_url)
 
 
-@with_request_docs_root
-def docs_list(request, folder_path="", ui_lang=None):
+@with_request_handrive_root
+def handrive_list(request, folder_path="", ui_lang=None):
     """HanDrive 목록 페이지를 렌더한다."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    docs_text = context["docs_text"]
+    context = handrive_common_context(request, resolved_lang)
+    handrive_text = context["handrive_text"]
     is_superuser = bool(getattr(request.user, "is_superuser", False))
     root_requested = str(request.GET.get("root", "") or "").strip().lower() in {"1", "true", "yes"}
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     if is_superuser and root_requested:
         scoped_home_dir = ""
     requested_dir = normalize_relative_path(folder_path, allow_empty=True)
@@ -3653,10 +3653,10 @@ def docs_list(request, folder_path="", ui_lang=None):
         if not requested_dir:
             if resolved_lang in SUPPORTED_UI_LANGS:
                 return redirect(
-                    reverse("main:docs_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": scoped_home_dir})
+                    reverse("main:handrive_list_lang", kwargs={"ui_lang": resolved_lang, "folder_path": scoped_home_dir})
                 )
-            return redirect(reverse("main:docs_list", kwargs={"folder_path": scoped_home_dir}))
-        if not is_superuser and not is_path_in_docs_scope(requested_dir, scoped_home_dir):
+            return redirect(reverse("main:handrive_list", kwargs={"folder_path": scoped_home_dir}))
+        if not is_superuser and not is_path_in_handrive_scope(requested_dir, scoped_home_dir):
             raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     try:
@@ -3673,14 +3673,14 @@ def docs_list(request, folder_path="", ui_lang=None):
         if not directory.is_dir():
             raise Http404("폴더를 찾을 수 없습니다.")
         initial_entries = list_directory_entries(directory, request=request)
-        current_dir_size_display = format_docs_bytes_display(calculate_docs_quota_breakdown(directory)[0]) if directory.is_dir() else ""
+        current_dir_size_display = format_handrive_bytes_display(calculate_handrive_quota_breakdown(directory)[0]) if directory.is_dir() else ""
     else:
         if git_virtual["kind"] == "branch_file":
             raise Http404("폴더를 찾을 수 없습니다.")
         initial_entries = _build_git_virtual_entries(request, git_virtual)
         current_dir_size_display = ""
 
-    if not has_docs_read_access(request, current_dir):
+    if not has_handrive_read_access(request, current_dir):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     current_dir_commit_meta = {"subject": "", "author_username": ""}
@@ -3699,10 +3699,10 @@ def docs_list(request, folder_path="", ui_lang=None):
             "handrive_root_label": get_handrive_js_root_label(request, scoped_home_dir),
             "scoped_home_dir": scoped_home_dir,
             "current_dir_is_root": bool((scoped_home_dir and current_dir == scoped_home_dir) or (not scoped_home_dir and current_dir == "")),
-            "current_dir_can_edit": has_docs_write_access(request, current_dir),
-            "current_dir_can_write_children": has_docs_directory_write_access(request, current_dir),
+            "current_dir_can_edit": has_handrive_write_access(request, current_dir),
+            "current_dir_can_write_children": has_handrive_directory_write_access(request, current_dir),
             "current_dir_has_children": bool(initial_entries),
-            "current_dir_is_git_repo_root": is_docs_git_repo_root_path(request, current_dir),
+            "current_dir_is_git_repo_root": is_handrive_git_repo_root_path(request, current_dir),
             "current_dir_requires_commit_message": bool(git_virtual is not None and git_virtual["kind"] == "branch_dir"),
             "current_dir_git_branch_root": bool(
                 git_virtual is not None
@@ -3713,7 +3713,7 @@ def docs_list(request, folder_path="", ui_lang=None):
             "current_dir_git_commit_author_username": current_dir_commit_meta.get("author_username", ""),
             "breadcrumbs": _build_git_virtual_breadcrumbs(
                 request,
-                context["docs_base_url"],
+                context["handrive_base_url"],
                 current_dir,
                 scoped_home_dir=scoped_home_dir,
                 root_url=context["handrive_root_url"],
@@ -3721,19 +3721,19 @@ def docs_list(request, folder_path="", ui_lang=None):
             "initial_entries": initial_entries,
             "current_dir_git_repo": _get_current_dir_git_repo(request, current_dir),
             "list_current_dir_size_display": current_dir_size_display,
-            "page_help_html": build_page_help_html(resolved_lang, "list", docs_text),
+            "page_help_html": build_page_help_html(resolved_lang, "list", handrive_text),
         }
     )
     return render(request, "handrive/list.html", context)
 
 
-@with_request_docs_root
-def docs_view(request, doc_path, ui_lang=None):
+@with_request_handrive_root
+def handrive_view(request, doc_path, ui_lang=None):
     """HanDrive 단일 파일 보기 페이지를 렌더한다."""
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    docs_text = context["docs_text"]
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+    context = handrive_common_context(request, resolved_lang)
+    handrive_text = context["handrive_text"]
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     is_superuser = bool(getattr(request.user, "is_superuser", False))
 
     try:
@@ -3743,15 +3743,15 @@ def docs_view(request, doc_path, ui_lang=None):
     git_virtual = _get_git_virtual_context(request, relative_file_path)
     if git_virtual is None:
         try:
-            file_path, relative_file_path = normalize_docs_relative_path(doc_path, must_exist=True)
+            file_path, relative_file_path = normalize_handrive_relative_path(doc_path, must_exist=True)
         except (ValueError, FileNotFoundError):
             raise Http404("파일을 찾을 수 없습니다.")
         file_name = file_path.name
         file_extension = file_path.suffix.lower()
-        file_size_display = format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else ""
-        if resolve_docs_render_profile(file_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
+        file_size_display = format_handrive_bytes_display(file_path.stat().st_size) if file_path.exists() else ""
+        if resolve_handrive_render_profile(file_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
             content = ""
-            rendered_content_html, render_profile = render_docs_content(
+            rendered_content_html, render_profile = render_handrive_content(
                 content,
                 file_extension,
                 source_path=file_path,
@@ -3759,8 +3759,8 @@ def docs_view(request, doc_path, ui_lang=None):
                 request=request,
             )
         else:
-            content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-            rendered_content_html, render_profile = render_docs_content(
+            content = load_handrive_source_content(file_path, request=request, relative_path=relative_file_path)
+            rendered_content_html, render_profile = render_handrive_content(
                 content,
                 file_extension,
                 source_path=file_path,
@@ -3777,10 +3777,10 @@ def docs_view(request, doc_path, ui_lang=None):
             git_virtual["branch_name"],
             git_virtual["repo_relative_path"],
         )
-        file_size_display = format_docs_bytes_display(len(repo_file_bytes))
-        if is_docs_non_editable_media_extension(file_extension):
+        file_size_display = format_handrive_bytes_display(len(repo_file_bytes))
+        if is_handrive_non_editable_media_extension(file_extension):
             content = ""
-            rendered_content_html, render_profile = render_docs_content(
+            rendered_content_html, render_profile = render_handrive_content(
                 content,
                 file_extension,
                 source_path=Path(file_name),
@@ -3790,7 +3790,7 @@ def docs_view(request, doc_path, ui_lang=None):
             )
         else:
             content = ""
-            if resolve_docs_render_profile(file_extension).get("mode") != DOCS_RENDER_MODE_OFFICE:
+            if resolve_handrive_render_profile(file_extension).get("mode") != DOCS_RENDER_MODE_OFFICE:
                 content = repo_file_bytes.decode("utf-8")
             companion_css, companion_js = load_git_repo_html_companion_assets(
                 request,
@@ -3798,7 +3798,7 @@ def docs_view(request, doc_path, ui_lang=None):
                 git_virtual["branch_name"],
                 git_virtual["repo_relative_path"],
             )
-            rendered_content_html, render_profile = render_docs_content(
+            rendered_content_html, render_profile = render_handrive_content(
                 content,
                 file_extension,
                 source_bytes=repo_file_bytes,
@@ -3807,22 +3807,22 @@ def docs_view(request, doc_path, ui_lang=None):
                 relative_path=relative_file_path,
                 request=request,
             )
-    if not is_superuser and not is_path_in_docs_scope(relative_file_path, scoped_home_dir):
+    if not is_superuser and not is_path_in_handrive_scope(relative_file_path, scoped_home_dir):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
-    if not has_docs_read_access(request, relative_file_path):
+    if not has_handrive_read_access(request, relative_file_path):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
     slug_path = markdown_slug_from_relative(relative_file_path)
     parent_dir = str(Path(relative_file_path).parent).replace("\\", "/")
     if parent_dir == ".":
         parent_dir = ""
 
-    doc_is_url_only = is_docs_url_only_enabled(request, relative_file_path)
+    doc_is_url_only = is_handrive_url_only_enabled(request, relative_file_path)
     doc_share_url = ""
     if doc_is_url_only:
-        _shared_link = DocsSharedLink.objects.select_related("owner").filter(path=relative_file_path).first()
+        _shared_link = HandriveSharedLink.objects.select_related("owner").filter(path=relative_file_path).first()
         if _shared_link:
             doc_share_url = request.build_absolute_uri(
-                build_docs_shared_view_url(resolved_lang, _shared_link.owner.username, _shared_link.share_slug)
+                build_handrive_shared_view_url(resolved_lang, _shared_link.owner.username, _shared_link.share_slug)
             )
 
     context.update(
@@ -3831,9 +3831,9 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_relative_path": relative_file_path,
             "doc_slug_path": slug_path,
             "doc_parent_dir": parent_dir,
-            "doc_can_edit": has_docs_write_access(request, relative_file_path),
-            "doc_can_show_edit": has_docs_write_access(request, relative_file_path)
-            and not is_docs_non_editable_media_extension(file_extension),
+            "doc_can_edit": has_handrive_write_access(request, relative_file_path),
+            "doc_can_show_edit": has_handrive_write_access(request, relative_file_path)
+            and not is_handrive_non_editable_media_extension(file_extension),
             "doc_is_url_only": doc_is_url_only,
             "doc_share_url": doc_share_url,
             "doc_content_html": rendered_content_html,
@@ -3841,42 +3841,42 @@ def docs_view(request, doc_path, ui_lang=None):
             "doc_content_class": render_profile["css_class"],
             "view_breadcrumbs": _build_git_virtual_breadcrumbs(
                 request,
-                context["docs_base_url"],
+                context["handrive_base_url"],
                 parent_dir,
                 scoped_home_dir=scoped_home_dir,
                 root_url=context["handrive_root_url"],
             ),
             "view_current_file_name": file_name,
             "view_current_file_size_display": file_size_display,
-            "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
+            "page_help_html": build_page_help_html(resolved_lang, "view", handrive_text),
         }
     )
     return render(request, "handrive/view.html", context)
 
 
-@with_request_docs_root
-def docs_shared_view(request, owner_username, share_slug, ui_lang=None):
+@with_request_handrive_root
+def handrive_shared_view(request, owner_username, share_slug, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    docs_text = context["docs_text"]
+    context = handrive_common_context(request, resolved_lang)
+    handrive_text = context["handrive_text"]
 
-    shared_link = DocsSharedLink.objects.select_related("owner").filter(
+    shared_link = HandriveSharedLink.objects.select_related("owner").filter(
         owner__username=owner_username,
         share_slug=share_slug,
     ).first()
     if shared_link is None:
         raise Http404("공유 문서를 찾을 수 없습니다.")
-    if not is_docs_url_only_enabled(request, shared_link.path):
+    if not is_handrive_url_only_enabled(request, shared_link.path):
         raise Http404("공유 문서를 찾을 수 없습니다.")
 
     try:
-        file_path, relative_file_path = normalize_docs_relative_path(shared_link.path, must_exist=True)
+        file_path, relative_file_path = normalize_handrive_relative_path(shared_link.path, must_exist=True)
     except (ValueError, FileNotFoundError):
         shared_link.delete()
         raise Http404("공유 문서를 찾을 수 없습니다.")
 
-    content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-    rendered_content_html, render_profile = render_docs_content(
+    content = load_handrive_source_content(file_path, request=request, relative_path=relative_file_path)
+    rendered_content_html, render_profile = render_handrive_content(
         content,
         file_path.suffix.lower(),
         source_path=file_path,
@@ -3895,35 +3895,35 @@ def docs_shared_view(request, owner_username, share_slug, ui_lang=None):
             "doc_can_edit": False,
             "doc_is_url_only": True,
             "hide_global_nav": True,
-            "is_docs_shared_view": True,
+            "is_handrive_shared_view": True,
             "doc_content_html": rendered_content_html,
             "doc_content_mode": render_profile["mode"],
             "doc_content_class": render_profile["css_class"],
             "view_breadcrumbs": [
                 {
                     "label": owner_username,
-                    "url": build_docs_shared_view_url(resolved_lang, owner_username, share_slug),
+                    "url": build_handrive_shared_view_url(resolved_lang, owner_username, share_slug),
                 }
             ],
             "view_current_file_name": file_path.name,
-            "view_current_file_size_display": format_docs_bytes_display(file_path.stat().st_size) if file_path.exists() else "",
-            "page_help_html": build_page_help_html(resolved_lang, "view", docs_text),
+            "view_current_file_size_display": format_handrive_bytes_display(file_path.stat().st_size) if file_path.exists() else "",
+            "page_help_html": build_page_help_html(resolved_lang, "view", handrive_text),
         }
     )
     return render(request, "handrive/view.html", context)
 
 
-@with_request_docs_root
-def docs_write(request, ui_lang=None):
+@with_request_handrive_root
+def handrive_write(request, ui_lang=None):
     """HanDrive 편집 페이지를 렌더한다.
 
     새 문서 작성과 기존 파일 수정이 같은 view를 사용한다.
     repo branch 내부에서는 commit message 요구 여부도 함께 계산한다.
     """
     resolved_lang = resolve_ui_lang(request, ui_lang)
-    context = docs_common_context(request, resolved_lang)
-    docs_text = context["docs_text"]
-    scoped_home_dir = get_scoped_docs_home_dir(request)
+    context = handrive_common_context(request, resolved_lang)
+    handrive_text = context["handrive_text"]
+    scoped_home_dir = get_scoped_handrive_home_dir(request)
     is_superuser = bool(getattr(request.user, "is_superuser", False))
     if scoped_home_dir:
         ensure_scoped_home_dir(scoped_home_dir)
@@ -3970,11 +3970,11 @@ def docs_write(request, ui_lang=None):
             ).decode("utf-8")
             write_requires_commit_message = True
             write_public_direct_save = True
-        if not is_superuser and not is_path_in_docs_scope(original_relative_path, scoped_home_dir):
+        if not is_superuser and not is_path_in_handrive_scope(original_relative_path, scoped_home_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
-        if not has_docs_write_access(request, original_relative_path):
+        if not has_handrive_write_access(request, original_relative_path):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
-        write_public_direct_save = write_public_direct_save or is_docs_public_write_enabled(request, original_relative_path)
+        write_public_direct_save = write_public_direct_save or is_handrive_public_write_enabled(request, original_relative_path)
         mode = "edit"
         initial_filename_input = f"{initial_filename}{initial_extension}"
         write_current_file_name = file_name
@@ -3982,7 +3982,7 @@ def docs_write(request, ui_lang=None):
         initial_dir = "" if parent_dir == "." else parent_dir
     elif requested_dir:
         initial_dir = normalize_relative_path(requested_dir)
-        if not is_superuser and not is_path_in_docs_scope(initial_dir, scoped_home_dir):
+        if not is_superuser and not is_path_in_handrive_scope(initial_dir, scoped_home_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
         git_virtual = _get_git_virtual_context(request, initial_dir)
         if git_virtual is None:
@@ -3993,12 +3993,12 @@ def docs_write(request, ui_lang=None):
             if git_virtual["kind"] != "branch_dir":
                 raise Http404("대상 폴더를 찾을 수 없습니다.")
             write_requires_commit_message = True
-        if not has_docs_directory_write_access(request, initial_dir):
+        if not has_handrive_directory_write_access(request, initial_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
     else:
         if scoped_home_dir:
             initial_dir = scoped_home_dir
-        if not has_docs_directory_write_access(request, initial_dir):
+        if not has_handrive_directory_write_access(request, initial_dir):
             raise PermissionDenied("파일을 수정할 권한이 없습니다.")
 
     markdown_help_path = resolve_markdown_help_file(resolved_lang)
@@ -4007,13 +4007,13 @@ def docs_write(request, ui_lang=None):
             markdown_help_content = markdown_help_path.read_text(encoding="utf-8")
         else:
             markdown_help_content = (
-                f"# {docs_text['markdown_help_fallback_title']}\n\n"
-                f"{docs_text['markdown_help_fallback_missing']}"
+                f"# {handrive_text['markdown_help_fallback_title']}\n\n"
+                f"{handrive_text['markdown_help_fallback_missing']}"
             )
     except OSError:
         markdown_help_content = (
-            f"# {docs_text['markdown_help_fallback_title']}\n\n"
-            f"{docs_text['markdown_help_fallback_read_error']}"
+            f"# {handrive_text['markdown_help_fallback_title']}\n\n"
+            f"{handrive_text['markdown_help_fallback_read_error']}"
         )
 
     context.update(
@@ -4028,9 +4028,9 @@ def docs_write(request, ui_lang=None):
             "initial_content": initial_content,
             "available_directories": list_all_directories(request=request),
             "markdown_help_html": render_markdown_safely(markdown_help_content),
-            "page_help_html": build_page_help_html(resolved_lang, "write", docs_text),
-            "write_breadcrumbs": build_docs_breadcrumbs(
-                context["docs_base_url"],
+            "page_help_html": build_page_help_html(resolved_lang, "write", handrive_text),
+            "write_breadcrumbs": build_handrive_breadcrumbs(
+                context["handrive_base_url"],
                 initial_dir,
                 scoped_home_dir=scoped_home_dir,
                 root_label=get_handrive_root_label(request, scoped_home_dir),
@@ -4096,10 +4096,10 @@ def parse_path_values(payload: dict, allow_empty: bool) -> list[str]:
 
 
 @require_http_methods(["GET"])
-@require_docs_acl_admin_json
-@with_request_docs_root
-def docs_api_acl_options(request):
-    public_group = get_docs_public_write_group()
+@require_handrive_acl_admin_json
+@with_request_handrive_root
+def handrive_api_acl_options(request):
+    public_group = get_handrive_public_write_group()
     url_only_group, _ = Group.objects.get_or_create(name=DOCS_URL_ONLY_GROUP_NAME)
     User = get_user_model()
     users = [
@@ -4136,9 +4136,9 @@ def docs_api_acl_options(request):
 
 @require_http_methods(["GET", "POST"])
 @csrf_protect
-@require_docs_acl_admin_json
-@with_request_docs_root
-def docs_api_acl(request):
+@require_handrive_acl_admin_json
+@with_request_handrive_root
+def handrive_api_acl(request):
     if request.method == "GET":
         rel_path_raw = request.GET.get("path", "")
         try:
@@ -4153,7 +4153,7 @@ def docs_api_acl(request):
             return json_error(str(exc), status=400)
 
     if request.method == "GET":
-        rule = DocsAccessRule.objects.filter(path=rel_path).prefetch_related(
+        rule = HandriveAccessRule.objects.filter(path=rel_path).prefetch_related(
             "read_users",
             "read_groups",
             "write_users",
@@ -4197,7 +4197,7 @@ def docs_api_acl(request):
 
     all_user_ids = sorted(set(read_user_ids) | set(write_user_ids))
     all_group_ids = sorted(set(read_group_ids) | set(write_group_ids))
-    public_group_id = get_docs_public_write_group().id
+    public_group_id = get_handrive_public_write_group().id
 
     if any(path_obj.is_dir() for path_obj, _ in resolved_targets) and (
         public_group_id in read_group_ids or public_group_id in write_group_ids
@@ -4212,7 +4212,7 @@ def docs_api_acl(request):
 
     target_paths = [relative_path for _, relative_path in resolved_targets]
     if not all_user_ids and not all_group_ids:
-        DocsAccessRule.objects.filter(path__in=target_paths).delete()
+        HandriveAccessRule.objects.filter(path__in=target_paths).delete()
         response_payload = {
             "ok": True,
             "paths": target_paths,
@@ -4232,7 +4232,7 @@ def docs_api_acl(request):
 
     with transaction.atomic():
         for target_path in target_paths:
-            rule, _ = DocsAccessRule.objects.get_or_create(path=target_path)
+            rule, _ = HandriveAccessRule.objects.get_or_create(path=target_path)
             rule.read_users.set(read_users_queryset)
             rule.read_groups.set(read_groups_queryset)
             rule.write_users.set(write_users_queryset)
@@ -4253,8 +4253,8 @@ def docs_api_acl(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_url_share(request):
+@with_request_handrive_root
+def handrive_api_url_share(request):
     try:
         payload = parse_json_body(request)
         rel_path = normalize_relative_path(payload.get("path"), allow_empty=False)
@@ -4265,21 +4265,21 @@ def docs_api_url_share(request):
 
     if not target_path_obj.is_file():
         return json_error("파일만 url공유를 설정할 수 있습니다.", status=400)
-    if not has_docs_write_access(request, rel_path):
+    if not has_handrive_write_access(request, rel_path):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
     if not request.user.is_authenticated:
         return json_error("로그인한 사용자만 url공유를 설정할 수 있습니다.", status=403)
 
     url_only_group, _ = Group.objects.get_or_create(name=DOCS_URL_ONLY_GROUP_NAME)
-    rule, _ = DocsAccessRule.objects.get_or_create(path=rel_path)
+    rule, _ = HandriveAccessRule.objects.get_or_create(path=rel_path)
     shared_link = None
 
     if enabled:
         rule.read_groups.add(url_only_group)
-        shared_link = ensure_docs_shared_link(rel_path, request.user)
+        shared_link = ensure_handrive_shared_link(rel_path, request.user)
     else:
         rule.read_groups.remove(url_only_group)
-        DocsSharedLink.objects.filter(path=rel_path).delete()
+        HandriveSharedLink.objects.filter(path=rel_path).delete()
         if (
             not rule.read_users.exists()
             and not rule.read_groups.exists()
@@ -4289,9 +4289,9 @@ def docs_api_url_share(request):
             rule.delete()
 
     for attr_name in (
-        "_docs_acl_rule_map",
-        "_docs_acl_effective_cache",
-        "_docs_acl_descendant_rule_cache",
+        "_handrive_acl_rule_map",
+        "_handrive_acl_effective_cache",
+        "_handrive_acl_descendant_rule_cache",
     ):
         if hasattr(request, attr_name):
             delattr(request, attr_name)
@@ -4303,7 +4303,7 @@ def docs_api_url_share(request):
     if shared_link is not None:
         owner_username = shared_link.owner.username
         share_url = request.build_absolute_uri(
-            build_docs_shared_view_url(ui_lang, owner_username, shared_link.share_slug)
+            build_handrive_shared_view_url(ui_lang, owner_username, shared_link.share_slug)
         )
 
     return JsonResponse(
@@ -4320,8 +4320,8 @@ def docs_api_url_share(request):
 
 
 @require_http_methods(["GET"])
-@with_request_docs_root
-def docs_api_list(request):
+@with_request_handrive_root
+def handrive_api_list(request):
     """디렉터리 엔트리 목록을 JSON으로 반환한다."""
     rel_path = request.GET.get("path", "")
 
@@ -4344,7 +4344,7 @@ def docs_api_list(request):
             return json_error("폴더 경로가 아닙니다.", status=400)
         entries = _build_git_virtual_entries(request, git_virtual)
 
-    if not has_docs_read_access(request, normalized):
+    if not has_handrive_read_access(request, normalized):
         return json_error("파일을 볼 권한이 없습니다.", status=403)
 
     return JsonResponse(
@@ -4358,8 +4358,8 @@ def docs_api_list(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_rename(request):
+@with_request_handrive_root
+def handrive_api_rename(request):
     """파일/폴더 이름 변경 API.
 
     일반 경로는 파일 시스템 rename 을, repo branch 경로는 temp clone + commit/push 를 사용한다.
@@ -4420,9 +4420,9 @@ def docs_api_rename(request):
         if git_virtual_source["kind"] == "branch_file":
             response["slug_path"] = relative_destination
         return JsonResponse(response)
-    if not has_docs_write_access(request, source_relative):
+    if not has_handrive_write_access(request, source_relative):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
-    if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
+    if source_path.is_file() and is_handrive_public_write_enabled(request, source_relative):
         return json_error("전체 허용 파일은 이름을 바꿀 수 없습니다.", status=403)
 
     parent = source_path.parent
@@ -4442,8 +4442,8 @@ def docs_api_rename(request):
 
     source_path.rename(destination)
     relative_destination = relative_from_root(destination)
-    move_docs_acl_rules(source_relative, relative_destination)
-    move_docs_shared_links(source_relative, relative_destination)
+    move_handrive_acl_rules(source_relative, relative_destination)
+    move_handrive_shared_links(source_relative, relative_destination)
 
     response = {
         "ok": True,
@@ -4458,8 +4458,8 @@ def docs_api_rename(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_delete(request):
+@with_request_handrive_root
+def handrive_api_delete(request):
     """파일/폴더 삭제 API.
 
     repo root 삭제는 일반 삭제와 분리해서 다룬다.
@@ -4542,12 +4542,12 @@ def docs_api_delete(request):
     for target_path, target_relative, _git_virtual in resolved_targets:
         if target_relative == "":
             return json_error("루트 폴더는 삭제할 수 없습니다.", status=400)
-        is_repo_root_delete = target_path.is_dir() and is_docs_git_repo_root_path(request, target_relative)
+        is_repo_root_delete = target_path.is_dir() and is_handrive_git_repo_root_path(request, target_relative)
         if is_repo_root_delete and not repo_delete_requested:
             return json_error("Repo 루트 삭제는 Repo 삭제를 사용해주세요.", status=403)
-        if not is_repo_root_delete and not has_docs_write_access(request, target_relative):
+        if not is_repo_root_delete and not has_handrive_write_access(request, target_relative):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
-        if target_path.is_file() and is_docs_public_write_enabled(request, target_relative):
+        if target_path.is_file() and is_handrive_public_write_enabled(request, target_relative):
             return json_error("전체 허용 파일은 삭제할 수 없습니다.", status=403)
         if target_path.is_file():
             try:
@@ -4590,8 +4590,8 @@ def docs_api_delete(request):
                     shutil.rmtree(target_path)
                 _copy_tree_contents(staged_restore_path, restore_path)
                 if restore_path != target_path:
-                    move_docs_acl_rules(target_relative, restore_relative)
-                    move_docs_shared_links(target_relative, restore_relative)
+                    move_handrive_acl_rules(target_relative, restore_relative)
+                    move_handrive_shared_links(target_relative, restore_relative)
             git_repo.delete()
             deleted_paths.append(target_relative)
             continue
@@ -4602,8 +4602,8 @@ def docs_api_delete(request):
                 shutil.rmtree(target_path)
         else:
             target_path.unlink()
-        delete_docs_acl_rules_for_path(target_relative)
-        delete_docs_shared_links_for_path(target_relative)
+        delete_handrive_acl_rules_for_path(target_relative)
+        delete_handrive_shared_links_for_path(target_relative)
         deleted_paths.append(target_relative)
 
     return JsonResponse({"ok": True, "deleted_paths": deleted_paths})
@@ -4611,8 +4611,8 @@ def docs_api_delete(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_mkdir(request):
+@with_request_handrive_root
+def handrive_api_mkdir(request):
     """새 폴더 생성 API."""
     try:
         payload = parse_json_body(request)
@@ -4622,7 +4622,7 @@ def docs_api_mkdir(request):
         git_virtual_parent = _get_git_virtual_context(request, parent_dir)
         if git_virtual_parent is None:
             parent_path, _ = resolve_path(parent_dir, must_exist=True)
-            enforce_docs_scoped_quota(request, quota_path=parent_dir, extra_entries=1)
+            enforce_handrive_scoped_quota(request, quota_path=parent_dir, extra_entries=1)
         else:
             parent_path = None
     except (ValueError, FileNotFoundError) as exc:
@@ -4630,7 +4630,7 @@ def docs_api_mkdir(request):
 
     if git_virtual_parent is None and not parent_path.is_dir():
         return json_error("폴더 생성 위치가 올바르지 않습니다.", status=400)
-    if not has_docs_directory_write_access(request, parent_dir):
+    if not has_handrive_directory_write_access(request, parent_dir):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
     if git_virtual_parent is not None:
         if git_virtual_parent["kind"] != "branch_dir":
@@ -4664,8 +4664,8 @@ def docs_api_mkdir(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_move(request):
+@with_request_handrive_root
+def handrive_api_move(request):
     """파일/폴더 이동 API.
 
     일반 경로 이동과 repo branch 이동을 둘 다 지원하며,
@@ -4699,9 +4699,9 @@ def docs_api_move(request):
                 return json_error("이동 대상 경로가 올바르지 않습니다.", status=400)
             if not target_dir_relative or git_virtual_target["kind"] != "branch_dir":
                 return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
-            if not has_docs_write_access(request, source_relative):
+            if not has_handrive_write_access(request, source_relative):
                 return json_error("파일을 수정할 권한이 없습니다.", status=403)
-            if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
+            if source_path.is_file() and is_handrive_public_write_enabled(request, source_relative):
                 return json_error("전체 허용 파일은 이동할 수 없습니다.", status=403)
             source_was_dir = source_path.is_dir()
             source_name = source_path.name
@@ -4731,8 +4731,8 @@ def docs_api_move(request):
                     shutil.rmtree(source_path)
             else:
                 source_path.unlink()
-            delete_docs_acl_rules_for_path(source_relative)
-            delete_docs_shared_links_for_path(source_relative)
+            delete_handrive_acl_rules_for_path(source_relative)
+            delete_handrive_shared_links_for_path(source_relative)
 
             destination_relative = f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{target_repo_relative}"
             response = {
@@ -4801,11 +4801,11 @@ def docs_api_move(request):
         return JsonResponse(response)
     if not target_dir_path.is_dir():
         return json_error("이동 대상 경로가 폴더가 아닙니다.", status=400)
-    if not has_docs_write_access(request, source_relative):
+    if not has_handrive_write_access(request, source_relative):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
-    if source_path.is_file() and is_docs_public_write_enabled(request, source_relative):
+    if source_path.is_file() and is_handrive_public_write_enabled(request, source_relative):
         return json_error("전체 허용 파일은 이동할 수 없습니다.", status=403)
-    if not has_docs_directory_write_access(request, target_dir_relative):
+    if not has_handrive_directory_write_access(request, target_dir_relative):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
     source_parent_relative = normalize_relative_path(
@@ -4836,8 +4836,8 @@ def docs_api_move(request):
 
     source_path.rename(destination_path)
     destination_relative = relative_from_root(destination_path)
-    move_docs_acl_rules(source_relative, destination_relative)
-    move_docs_shared_links(source_relative, destination_relative)
+    move_handrive_acl_rules(source_relative, destination_relative)
+    move_handrive_shared_links(source_relative, destination_relative)
 
     response = {
         "ok": True,
@@ -4851,8 +4851,8 @@ def docs_api_move(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_upload(request):
+@with_request_handrive_root
+def handrive_api_upload(request):
     """파일 업로드 API.
 
     일반 폴더 업로드, 청크 업로드, repo branch 업로드를 모두 처리한다.
@@ -4870,7 +4870,7 @@ def docs_api_upload(request):
 
     if git_virtual_target is None and not target_dir_path.is_dir():
         return json_error("업로드 위치가 폴더가 아닙니다.", status=400)
-    if not has_docs_directory_write_access(request, target_dir_relative):
+    if not has_handrive_directory_write_access(request, target_dir_relative):
         return json_error("파일을 수정할 권한이 없습니다.", status=403)
     commit_message = str(request.POST.get("commit_message") or "").strip()
 
@@ -4892,7 +4892,7 @@ def docs_api_upload(request):
         if not original_name:
             return json_error("업로드할 파일 이름이 올바르지 않습니다.", status=400)
 
-        tmp_dir = get_docs_upload_tmp_dir()
+        tmp_dir = get_handrive_upload_tmp_dir()
         session_dir = tmp_dir / upload_id
         session_dir.mkdir(parents=True, exist_ok=True)
         chunk_path = session_dir / f"{chunk_index:06d}.part"
@@ -4942,7 +4942,7 @@ def docs_api_upload(request):
             )
             if git_virtual_target is None:
                 destination_path = build_available_upload_path(target_dir_path, original_name)
-                enforce_docs_scoped_quota(
+                enforce_handrive_scoped_quota(
                     request,
                     quota_path=target_dir_relative,
                     extra_bytes=upload_size,
@@ -4987,7 +4987,7 @@ def docs_api_upload(request):
                 "path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
                 "type": "file",
                 "slug_path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
-                "size_display": format_docs_bytes_display(len(content_bytes)),
+                "size_display": format_handrive_bytes_display(len(content_bytes)),
             }
         return JsonResponse(
             {
@@ -5024,7 +5024,7 @@ def docs_api_upload(request):
 
     if git_virtual_target is None:
         try:
-            enforce_docs_scoped_quota(
+            enforce_handrive_scoped_quota(
                 request,
                 quota_path=target_dir_relative,
                 extra_bytes=upload_total_size,
@@ -5061,7 +5061,7 @@ def docs_api_upload(request):
                     "path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
                     "type": "file",
                     "slug_path": f"{git_virtual_target['repo_root']}/{git_virtual_target['branch_segment']}/{repo_relative_path}",
-                    "size_display": format_docs_bytes_display(len(file_updates[repo_relative_path])),
+                    "size_display": format_handrive_bytes_display(len(file_updates[repo_relative_path])),
                 }
             )
         _commit_git_branch_changes(
@@ -5083,12 +5083,12 @@ def docs_api_upload(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-def docs_api_upload_cancel(request):
+def handrive_api_upload_cancel(request):
     upload_id = str(request.POST.get("upload_id") or "").strip()
     if not upload_id:
         return json_error("취소할 업로드가 없습니다.", status=400)
 
-    session_dir = get_docs_upload_tmp_dir() / upload_id
+    session_dir = get_handrive_upload_tmp_dir() / upload_id
     if session_dir.exists():
         shutil.rmtree(session_dir, ignore_errors=True)
 
@@ -5097,8 +5097,8 @@ def docs_api_upload_cancel(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_preview(request):
+@with_request_handrive_root
+def handrive_api_preview(request):
     """목록 우측 미리보기 패널에서 사용할 HTML 조각을 반환한다."""
     try:
         payload = parse_json_body(request)
@@ -5107,7 +5107,7 @@ def docs_api_preview(request):
         if preview_relative_path:
             git_virtual = _get_git_virtual_context(request, preview_relative_path)
             if git_virtual is None:
-                file_path, relative_file_path = normalize_docs_relative_path(
+                file_path, relative_file_path = normalize_handrive_relative_path(
                     preview_relative_path, must_exist=True
                 )
             else:
@@ -5115,13 +5115,13 @@ def docs_api_preview(request):
                     return json_error("파일을 찾을 수 없습니다.", status=404)
                 file_path = None
                 relative_file_path = preview_relative_path
-            if not has_docs_read_access(request, relative_file_path):
+            if not has_handrive_read_access(request, relative_file_path):
                 return json_error("파일을 볼 권한이 없습니다.", status=403)
             if git_virtual is None:
                 file_extension = file_path.suffix.lower()
-                if resolve_docs_render_profile(file_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
+                if resolve_handrive_render_profile(file_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
                     content = ""
-                    rendered_html, render_profile = render_docs_content(
+                    rendered_html, render_profile = render_handrive_content(
                         content,
                         file_extension,
                         source_path=file_path,
@@ -5129,8 +5129,8 @@ def docs_api_preview(request):
                         request=request,
                     )
                 else:
-                    content = load_docs_source_content(file_path, request=request, relative_path=relative_file_path)
-                    rendered_html, render_profile = render_docs_content(
+                    content = load_handrive_source_content(file_path, request=request, relative_path=relative_file_path)
+                    rendered_html, render_profile = render_handrive_content(
                         content,
                         file_extension,
                         source_path=file_path,
@@ -5141,9 +5141,9 @@ def docs_api_preview(request):
             else:
                 title = Path(git_virtual["repo_relative_path"]).name
                 file_extension = Path(title).suffix.lower()
-                if is_docs_non_editable_media_extension(file_extension):
+                if is_handrive_non_editable_media_extension(file_extension):
                     content = ""
-                    rendered_html, render_profile = render_docs_content(
+                    rendered_html, render_profile = render_handrive_content(
                         content,
                         file_extension,
                         source_path=Path(title),
@@ -5157,7 +5157,7 @@ def docs_api_preview(request):
                         git_virtual["repo_relative_path"],
                     )
                     content = ""
-                    if resolve_docs_render_profile(file_extension).get("mode") != DOCS_RENDER_MODE_OFFICE:
+                    if resolve_handrive_render_profile(file_extension).get("mode") != DOCS_RENDER_MODE_OFFICE:
                         content = repo_file_bytes.decode("utf-8")
                     companion_css, companion_js = load_git_repo_html_companion_assets(
                         request,
@@ -5165,7 +5165,7 @@ def docs_api_preview(request):
                         git_virtual["branch_name"],
                         git_virtual["repo_relative_path"],
                     )
-                    rendered_html, render_profile = render_docs_content(
+                    rendered_html, render_profile = render_handrive_content(
                         content,
                         file_extension,
                         source_bytes=repo_file_bytes,
@@ -5201,7 +5201,7 @@ def docs_api_preview(request):
         git_virtual = _get_git_virtual_context(request, original_relative_path)
         if git_virtual is None:
             try:
-                source_path, source_relative = normalize_docs_relative_path(
+                source_path, source_relative = normalize_handrive_relative_path(
                     original_relative_path, must_exist=True
                 )
             except (ValueError, FileNotFoundError) as exc:
@@ -5210,10 +5210,10 @@ def docs_api_preview(request):
         else:
             source_relative = original_relative_path
             source_extension = Path(git_virtual["repo_relative_path"]).suffix.lower() or DOCS_FILE_EXTENSION
-        if not has_docs_write_access(request, source_relative):
+        if not has_handrive_write_access(request, source_relative):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
     else:
-        if not has_docs_directory_write_access(request, preview_target_dir):
+        if not has_handrive_directory_write_access(request, preview_target_dir):
             return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
     companion_css = ""
@@ -5231,13 +5231,13 @@ def docs_api_preview(request):
             git_virtual["branch_name"],
             git_virtual["repo_relative_path"],
         )
-    elif source_path is not None and resolve_docs_render_profile(source_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
+    elif source_path is not None and resolve_handrive_render_profile(source_extension).get("mode") == DOCS_RENDER_MODE_OFFICE:
         try:
             source_bytes = source_path.read_bytes()
         except OSError:
             source_bytes = b""
 
-    rendered_html, render_profile = render_docs_content(
+    rendered_html, render_profile = render_handrive_content(
         content,
         source_extension,
         source_path=source_path,
@@ -5258,8 +5258,8 @@ def docs_api_preview(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
-@with_request_docs_root
-def docs_api_save(request):
+@with_request_handrive_root
+def handrive_api_save(request):
     """에디터 저장 API.
 
     목록 인라인 에디터와 쓰기 페이지가 같은 저장 포맷을 사용한다.
@@ -5300,9 +5300,9 @@ def docs_api_save(request):
             else:
                 source_relative = original_relative_path
                 source_extension = Path(git_virtual_source["repo_relative_path"]).suffix.lower() or DOCS_FILE_EXTENSION
-            if not has_docs_write_access(request, source_relative):
+            if not has_handrive_write_access(request, source_relative):
                 return json_error("파일을 수정할 권한이 없습니다.", status=403)
-            source_is_public_write = is_docs_public_write_enabled(request, source_relative)
+            source_is_public_write = is_handrive_public_write_enabled(request, source_relative)
 
         target_extension = requested_extension or source_extension or DOCS_FILE_EXTENSION
         if source_is_public_write:
@@ -5357,7 +5357,7 @@ def docs_api_save(request):
             return json_error("전체 허용 파일은 위치나 이름을 바꿀 수 없습니다.", status=403)
 
         if source_path is None or not is_same_as_source:
-            if not has_docs_directory_write_access(request, target_dir_rel):
+            if not has_handrive_directory_write_access(request, target_dir_rel):
                 return json_error("파일을 수정할 권한이 없습니다.", status=403)
 
         if destination.exists():
@@ -5365,8 +5365,8 @@ def docs_api_save(request):
                 return json_error("같은 이름의 파일이 이미 존재합니다.", status=409)
 
         destination_relative = relative_from_root(destination)
-        destination_in_scope = get_docs_scoped_quota_root(request, destination_relative) is not None
-        source_in_scope = bool(source_relative) and get_docs_scoped_quota_root(request, source_relative) is not None
+        destination_in_scope = get_handrive_scoped_quota_root(request, destination_relative) is not None
+        source_in_scope = bool(source_relative) and get_handrive_scoped_quota_root(request, source_relative) is not None
         source_size = source_path.stat().st_size if source_path is not None and source_path.exists() else 0
         destination_size = destination.stat().st_size if destination_exists else 0
         new_size = len(content.encode("utf-8"))
@@ -5385,7 +5385,7 @@ def docs_api_save(request):
                 quota_extra_bytes = new_size - destination_size
                 quota_extra_entries = 0 if destination_exists else 1
 
-        enforce_docs_scoped_quota(
+        enforce_handrive_scoped_quota(
             request,
             quota_path=destination_relative,
             extra_bytes=quota_extra_bytes,
@@ -5398,8 +5398,8 @@ def docs_api_save(request):
     destination.write_text(content, encoding="utf-8")
 
     if source_path is not None and destination.resolve() != source_path.resolve():
-        move_docs_acl_rules(source_relative, relative_from_root(destination))
-        move_docs_shared_links(source_relative, relative_from_root(destination))
+        move_handrive_acl_rules(source_relative, relative_from_root(destination))
+        move_handrive_shared_links(source_relative, relative_from_root(destination))
         source_path.unlink(missing_ok=True)
 
     destination_relative = relative_from_root(destination)
@@ -5409,11 +5409,11 @@ def docs_api_save(request):
         parent_dir = ""
 
     if parent_dir:
-        list_url = reverse("main:docs_list", kwargs={"folder_path": parent_dir})
+        list_url = reverse("main:handrive_list", kwargs={"folder_path": parent_dir})
     else:
-        list_url = reverse("main:docs_root")
+        list_url = reverse("main:handrive_root")
 
-    view_url = reverse("main:docs_view", kwargs={"doc_path": destination_slug})
+    view_url = reverse("main:handrive_view", kwargs={"doc_path": destination_slug})
 
     return JsonResponse(
         {
@@ -5427,8 +5427,8 @@ def docs_api_save(request):
 
 
 @require_http_methods(["GET"])
-@with_request_docs_root
-def docs_api_download(request):
+@with_request_handrive_root
+def handrive_api_download(request):
     """일반 파일과 repo virtual file을 공통 다운로드 엔드포인트로 제공한다."""
     try:
         rel_path = normalize_relative_path(request.GET.get("path"), allow_empty=False)
@@ -5437,7 +5437,7 @@ def docs_api_download(request):
     git_virtual = _get_git_virtual_context(request, rel_path)
     if git_virtual is None:
         try:
-            file_path, rel_path = normalize_docs_relative_path(request.GET.get("path"), must_exist=True)
+            file_path, rel_path = normalize_handrive_relative_path(request.GET.get("path"), must_exist=True)
         except (ValueError, FileNotFoundError):
             raise Http404("다운로드할 파일을 찾을 수 없습니다.")
         filename = file_path.name
@@ -5457,14 +5457,14 @@ def docs_api_download(request):
     share_owner = request.GET.get("share_owner", "").strip()
     share_slug = request.GET.get("share_slug", "").strip()
     if share_owner and share_slug:
-        shared_link = DocsSharedLink.objects.select_related("owner").filter(
+        shared_link = HandriveSharedLink.objects.select_related("owner").filter(
             owner__username=share_owner,
             share_slug=share_slug,
             path=rel_path,
         ).first()
         if shared_link is None:
             raise PermissionDenied("파일을 볼 권한이 없습니다.")
-    elif not has_docs_read_access(request, rel_path):
+    elif not has_handrive_read_access(request, rel_path):
         raise PermissionDenied("파일을 볼 권한이 없습니다.")
 
     return FileResponse(file_handle, as_attachment=True, filename=filename)

@@ -128,7 +128,7 @@
             return;
         }
         var repoLabel = document.createElement("span");
-        repoLabel.className = "handrive-current-dir-repo-name";
+        repoLabel.className = "handrive-item-meta-label";
         repoLabel.textContent = String(repoMeta.repo_name || "").trim();
         nameWrap.appendChild(repoLabel);
     }

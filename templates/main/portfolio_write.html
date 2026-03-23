@@ -123,7 +123,7 @@
         </div>
         <div class="handrive-toolbar-right ui-toolbar-right">
             <div class="handrive-toolbar-actions ui-toolbar-actions">
-                <a class="handrive-btn" href="{% url 'main:portfolio_user_lang' ui_lang=ui_lang user_id=request.user.username %}">Portfolio</a>
+                <a class="ui-btn" href="{% url 'main:portfolio_user_lang' ui_lang=ui_lang user_id=request.user.username %}">Portfolio</a>
             </div>
         </div>
     </div>
@@ -160,7 +160,7 @@
                     <label class="portfolio-write-field full">main_subtitle_en<textarea name="main_subtitle_en" rows="4">{{ profile.main_subtitle_en }}</textarea></label>
                 </div>
                 <div class="portfolio-write-actions">
-                    <button class="handrive-btn handrive-btn-primary" type="submit">프로필 저장</button>
+                    <button class="ui-btn ui-btn-primary" type="submit">프로필 저장</button>
                 </div>
             </form>
         </div>
@@ -207,7 +207,7 @@
                     <label class="portfolio-write-field full">content_en<textarea name="content_en" rows="3">{% if selected_career %}{{ selected_career.content_en }}{% endif %}</textarea></label>
                 </div>
                 <div class="portfolio-write-actions">
-                    <button class="handrive-btn handrive-btn-primary" type="submit">{% if career_mode == 'add' %}경력 추가{% else %}경력 수정{% endif %}</button>
+                    <button class="ui-btn ui-btn-primary" type="submit">{% if career_mode == 'add' %}경력 추가{% else %}경력 수정{% endif %}</button>
                 </div>
             </form>
             {% if selected_career and career_mode != 'add' %}
@@ -216,7 +216,7 @@
                 <input type="hidden" name="action" value="delete_career" />
                 <input type="hidden" name="career_id" value="{{ selected_career.id }}" />
                 <div class="portfolio-write-actions">
-                    <button class="handrive-btn" type="submit">선택 경력 삭제</button>
+                    <button class="ui-btn" type="submit">선택 경력 삭제</button>
                 </div>
             </form>
             {% endif %}
@@ -270,7 +270,7 @@
                     </label>
                 </div>
                 <div class="portfolio-write-actions">
-                    <button class="handrive-btn handrive-btn-primary" type="submit">{% if project_mode == 'add' %}프로젝트 추가{% else %}프로젝트 수정{% endif %}</button>
+                    <button class="ui-btn ui-btn-primary" type="submit">{% if project_mode == 'add' %}프로젝트 추가{% else %}프로젝트 수정{% endif %}</button>
                 </div>
             </form>
             {% if selected_project and project_mode != 'add' %}
@@ -279,7 +279,7 @@
                 <input type="hidden" name="action" value="delete_project" />
                 <input type="hidden" name="project_id" value="{{ selected_project.id }}" />
                 <div class="portfolio-write-actions">
-                    <button class="handrive-btn" type="submit">선택 프로젝트 삭제</button>
+                    <button class="ui-btn" type="submit">선택 프로젝트 삭제</button>
                 </div>
             </form>
             {% endif %}
@@ -316,7 +316,7 @@
                         <label class="portfolio-write-field full">icon_url (선택)<input type="url" name="icon_url" value="{{ button.icon_url }}" /></label>
                     </div>
                     <div class="portfolio-write-actions">
-                        <button class="handrive-btn handrive-btn-primary" type="submit">수정</button>
+                        <button class="ui-btn ui-btn-primary" type="submit">수정</button>
                     </div>
                 </form>
                 <form method="post" class="portfolio-write-form" style="padding: 0;">
@@ -324,7 +324,7 @@
                     <input type="hidden" name="action" value="delete_button" />
                     <input type="hidden" name="button_id" value="{{ button.id }}" />
                     <div class="portfolio-write-actions">
-                        <button class="handrive-btn" type="submit">삭제</button>
+                        <button class="ui-btn" type="submit">삭제</button>
                     </div>
                 </form>
                 <hr style="margin: 0; border-color: var(--handrive-border-soft);">
@@ -341,7 +341,7 @@
                         <label class="portfolio-write-field full">icon_url (선택)<input type="url" name="icon_url" /></label>
                     </div>
                     <div class="portfolio-write-actions">
-                        <button class="handrive-btn handrive-btn-primary" type="submit">버튼 추가</button>
+                        <button class="ui-btn ui-btn-primary" type="submit">버튼 추가</button>
                     </div>
                 </form>
                 {% endif %}

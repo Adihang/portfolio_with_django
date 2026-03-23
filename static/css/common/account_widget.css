@@ -24,7 +24,7 @@
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--ide-text-stronger);
+    color: var(--account-text-stronger);
     font-size: 16px;
     font-weight: 700;
     line-height: 1.1;
@@ -65,7 +65,7 @@ body.theme-dark .ui-auth-account-avatar {
 }
 
 .ui-auth-account-name {
-    color: var(--ide-text-stronger);
+    color: var(--account-text-stronger);
 }
 
 body.hanplanet-multiplayer-page .ui-auth-account-name {
@@ -105,7 +105,7 @@ body.theme-dark .ui-auth-account-menu {
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: var(--ide-text);
+    color: var(--account-text);
     text-align: center;
     padding: 12px 12px;
     font-size: 14px;
@@ -117,8 +117,8 @@ body.theme-dark .ui-auth-account-menu {
 
 .ui-auth-account-menu-item:hover,
 .ui-auth-account-menu-item:focus-visible {
-    background: var(--ide-hover);
-    color: var(--ide-text-stronger);
+    background: var(--account-hover);
+    color: var(--account-text-stronger);
 }
 
 .ui-auth-account-menu-actions .ui-auth-account-menu-item:hover,
@@ -191,13 +191,13 @@ img.ui-auth-account-avatar {
 .ui-auth-account-profile-name {
     font-size: 18px;
     line-height: 1.2;
-    color: var(--ide-text-stronger);
+    color: var(--account-text-stronger);
 }
 
 .ui-auth-account-profile-email {
     font-size: 16px;
     line-height: 1.3;
-    color: var(--ide-text);
+    color: var(--account-text);
     word-break: break-all;
 }
 
@@ -217,7 +217,7 @@ img.ui-auth-account-avatar {
     margin: 0 16px 14px;
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.05);
-    color: var(--ide-text-stronger);
+    color: var(--account-text-stronger);
 }
 
 .ui-auth-account-stats-toggle:hover,
@@ -237,7 +237,7 @@ body.theme-dark .ui-auth-account-stats-toggle:focus-visible {
 .ui-auth-account-stats-title {
     font-size: 14px;
     line-height: 1.2;
-    color: var(--ide-text-stronger);
+    color: var(--account-text-stronger);
 }
 
 .ui-auth-account-stats-list {
@@ -254,13 +254,13 @@ body.theme-dark .ui-auth-account-stats-toggle:focus-visible {
     padding: 8px 10px;
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.05);
-    color: var(--ide-text);
+    color: var(--account-text);
     font-size: 13px;
     line-height: 1.3;
 }
 
 .ui-auth-account-stats-row strong {
-    color: var(--ide-text-stronger);
+    color: var(--account-text-stronger);
     font-size: 14px;
 }
 

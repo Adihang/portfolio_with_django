@@ -21,10 +21,10 @@
                 {% include "partials/account_widget.html" %}
             {% else %}
                 <div class="ui-toolbar-actions">
-                    <a class="handrive-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
+                    <a class="ui-btn" href="{{ handrive_login_url }}?next={{ request.get_full_path|urlencode }}">
                         {% include 'partials/ui_i18n.html' with key='login' %}
                     </a>
-                    <a class="handrive-btn handrive-btn-primary" href="{{ docs_signup_url }}?next={{ request.get_full_path|urlencode }}">
+                    <a class="ui-btn ui-btn-primary" href="{{ handrive_signup_url }}?next={{ request.get_full_path|urlencode }}">
                         {% include 'partials/ui_i18n.html' with key='signup' %}
                     </a>
                 </div>
@@ -40,7 +40,7 @@
                 <li>
                     <div class="minigame-link-shell">
                         {% if request.user.is_authenticated and item.slug == "bumpercar-spiky" %}
-                            <button class="handrive-btn minigame-link-stats-button" type="button" data-bumpercar-stats-open>
+                            <button class="ui-btn minigame-link-stats-button" type="button" data-bumpercar-stats-open>
                                 {% include 'partials/ui_i18n.html' with key='account_bumpercar_stats_button' %}
                             </button>
                         {% endif %}

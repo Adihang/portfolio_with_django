@@ -76,9 +76,9 @@ GIT_BIN = "/usr/bin/git"
 
 
 def _abs_handrive_path(owner, relative_path: str) -> str:
-    """handrive_path (docs_root 기준 상대 경로) → 절대 파일시스템 경로.
-    슈퍼유저: docs_root = BASE_DIR
-    일반 유저: docs_root = MEDIA_ROOT/HanDrive
+    """handrive_path (HanDrive root 기준 상대 경로) → 절대 파일시스템 경로.
+    슈퍼유저: HanDrive root = BASE_DIR
+    일반 유저: HanDrive root = MEDIA_ROOT/HanDrive
     """
     from pathlib import Path
     if owner.is_superuser:
@@ -137,10 +137,10 @@ def _replace_source_with_repo_mount(repo, source_relative: str) -> str:
     os.symlink(str(repo_storage_path), str(mount_abs), target_is_directory=True)
 
     if mount_relative != source_relative:
-        from .handrive_views import move_docs_acl_rules, move_docs_shared_links
+        from .handrive_views import move_handrive_acl_rules, move_handrive_shared_links
 
-        move_docs_acl_rules(source_relative, mount_relative)
-        move_docs_shared_links(source_relative, mount_relative)
+        move_handrive_acl_rules(source_relative, mount_relative)
+        move_handrive_shared_links(source_relative, mount_relative)
 
     return mount_relative
 

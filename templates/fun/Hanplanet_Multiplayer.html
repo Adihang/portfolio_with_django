@@ -98,22 +98,22 @@
                                         data-game-start-character-image
                                     >
                                 </button>
-                                <button class="handrive-btn handrive-btn-primary multiplayer-primary-btn multiplayer-start-button" type="button" data-game-start>
+                                <button class="ui-btn ui-btn-primary multiplayer-primary-btn multiplayer-start-button" type="button" data-game-start>
                                     {% include 'partials/ui_i18n.html' with key='multiplayer_start_button' %}
                                 </button>
                                 {% if not request.user.is_authenticated %}
                                 <div class="multiplayer-start-auth-actions">
-                                    <a class="handrive-btn handrive-btn-primary multiplayer-primary-btn" href="{{ docs_login_url }}?next={{ request.get_full_path|urlencode }}">
+                                    <a class="ui-btn ui-btn-primary multiplayer-primary-btn" href="{{ handrive_login_url }}?next={{ request.get_full_path|urlencode }}">
                                         {% include 'partials/ui_i18n.html' with key='login' %}
                                     </a>
-                                    <a class="handrive-btn" href="{{ docs_signup_url }}?next={{ request.get_full_path|urlencode }}">
+                                    <a class="ui-btn" href="{{ handrive_signup_url }}?next={{ request.get_full_path|urlencode }}">
                                         {% include 'partials/ui_i18n.html' with key='signup' %}
                                     </a>
                                 </div>
                                 {% endif %}
                                 {% if request.user.is_superuser %}
                                 <div class="multiplayer-start-admin-actions">
-                                    <a class="handrive-btn handrive-btn-primary multiplayer-primary-btn" href="{{ bumpercar_admin_url }}">
+                                    <a class="ui-btn ui-btn-primary multiplayer-primary-btn" href="{{ bumpercar_admin_url }}">
                                         {% include 'partials/ui_i18n.html' with key='bumpercar_admin_title' %}
                                     </a>
                                     <form class="ui-auth-form" method="post" action="{{ bumpercar_set_npc_health_url }}">
@@ -128,14 +128,14 @@
                                             value="{{ gameplay_settings.npc_max_health|default:20 }}"
                                             aria-label="{% include 'partials/ui_i18n.html' with key='multiplayer_set_npc_health' %}"
                                         >
-                                        <button class="handrive-btn handrive-btn-primary multiplayer-primary-btn multiplayer-npc-health-submit" type="submit">
+                                        <button class="ui-btn ui-btn-primary multiplayer-primary-btn multiplayer-npc-health-submit" type="submit">
                                             {% include 'partials/ui_i18n.html' with key='multiplayer_set_npc_health' %}
                                         </button>
                                     </form>
                                     <form class="ui-auth-form" method="post" action="{{ bumpercar_restart_server_url }}">
                                         {% csrf_token %}
                                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                        <button class="handrive-btn handrive-btn-primary multiplayer-primary-btn" type="submit">
+                                        <button class="ui-btn ui-btn-primary multiplayer-primary-btn" type="submit">
                                             {% include 'partials/ui_i18n.html' with key='multiplayer_restart_server' %}
                                         </button>
                                     </form>

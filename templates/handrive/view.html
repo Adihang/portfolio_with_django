@@ -6,20 +6,20 @@
 <div class="handrive-toolbar-wrap ui-toolbar-wrap">
     <div class="handrive-shell ui-shell handrive-toolbar ui-toolbar">
         <div class="handrive-toolbar-left ui-toolbar-left">
-            {% if is_docs_shared_view %}
-            <div class="handrive-shared-head">
-                <div class="handrive-shared-controls">
+            {% if is_handrive_shared_view %}
+            <div class="ui-shared-head">
+                <div class="ui-shared-controls">
                     {% include "partials/ui_controls_stack.html" %}
                 </div>
                 <div class="handrive-title-row ui-title-row">
                     <h1 class="handrive-title ui-title">{{ doc_title }}</h1>
-                    <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
+                    <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ handrive_text.help_button }}" title="{{ handrive_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
                 </div>
             </div>
             {% else %}
             <div class="handrive-title-row ui-title-row">
                 <h1 class="handrive-title ui-title">{{ doc_title }}</h1>
-                <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
+                <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ handrive_text.help_button }}" title="{{ handrive_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
             <div class="handrive-subtitle-wrap">
                 <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
@@ -37,20 +37,20 @@
             {% include "handrive/_auth_account.html" %}
             <div class="handrive-toolbar-actions ui-toolbar-actions">
                 {% if doc_can_edit %}
-                    <button class="handrive-icon-btn" type="button" id="handrive-url-share-btn" aria-label="{{ docs_text.url_share_button }}" title="{{ docs_text.url_share_button }}">
+                    <button class="handrive-icon-btn" type="button" id="handrive-url-share-btn" aria-label="{{ handrive_text.url_share_button }}" title="{{ handrive_text.url_share_button }}">
                         <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="15" cy="4" r="2"/><circle cx="15" cy="16" r="2"/><circle cx="5" cy="10" r="2"/><line x1="7" y1="9" x2="13" y2="5"/><line x1="7" y1="11" x2="13" y2="15"/></svg>
                     </button>
                 {% endif %}
-                <a class="handrive-icon-btn" href="{{ docs_api_download_url }}?path={{ doc_relative_path|urlencode }}" aria-label="{{ docs_text.download_button }}" title="{{ docs_text.download_button }}">
+                <a class="handrive-icon-btn" href="{{ handrive_api_download_url }}?path={{ doc_relative_path|urlencode }}" aria-label="{{ handrive_text.download_button }}" title="{{ handrive_text.download_button }}">
                     <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="10" y1="3" x2="10" y2="13"/><polyline points="6,9 10,13 14,9"/><line x1="4" y1="17" x2="16" y2="17"/></svg>
                 </a>
                 {% include "handrive/_auth_button.html" %}
                 {% include "handrive/_superuser_ops_button.html" %}
                 {% if doc_can_show_edit %}
-                    <a class="handrive-btn" href="{{ docs_write_url }}?path={{ doc_relative_path|urlencode }}">{{ docs_text.edit_button }}</a>
+                    <a class="ui-btn" href="{{ handrive_write_url }}?path={{ doc_relative_path|urlencode }}">{{ handrive_text.edit_button }}</a>
                 {% endif %}
                 {% if doc_can_edit %}
-                    <button class="handrive-btn" type="button" id="handrive-delete-btn">{{ docs_text.delete_button }}</button>
+                    <button class="ui-btn" type="button" id="handrive-delete-btn">{{ handrive_text.delete_button }}</button>
                 {% endif %}
             </div>
         </div>
@@ -60,10 +60,10 @@
 <main
     class="handrive-shell ui-shell handrive-content ui-content"
     data-handrive-page="view"
-    data-handrive-base-url="{{ docs_base_url }}"
+    data-handrive-base-url="{{ handrive_base_url }}"
     data-handrive-root-url="{{ handrive_root_url }}"
-    data-delete-api-url="{{ docs_api_delete_url }}"
-    data-url-share-api-url="{{ docs_api_url_share_url }}"
+    data-delete-api-url="{{ handrive_api_delete_url }}"
+    data-url-share-api-url="{{ handrive_api_url_share_url }}"
     data-doc-path="{{ doc_relative_path }}"
     data-doc-slug-path="{{ doc_slug_path }}"
     data-doc-is-url-only="{% if doc_is_url_only %}1{% else %}0{% endif %}"
@@ -72,14 +72,14 @@
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
     <div class="handrive-view-zoom" id="handrive-view-zoom" hidden>
-        <button class="handrive-view-zoom-btn" type="button" id="handrive-view-zoom-out" aria-label="{{ docs_text.zoom_out_button|default:'축소' }}">
+        <button class="handrive-view-zoom-btn" type="button" id="handrive-view-zoom-out" aria-label="{{ handrive_text.zoom_out_button|default:'축소' }}">
             <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
                 <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
                 <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
                 <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
             </svg>
         </button>
-        <button class="handrive-view-zoom-btn" type="button" id="handrive-view-zoom-in" aria-label="{{ docs_text.zoom_in_button|default:'확대' }}">
+        <button class="handrive-view-zoom-btn" type="button" id="handrive-view-zoom-in" aria-label="{{ handrive_text.zoom_in_button|default:'확대' }}">
             <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
                 <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
                 <line x1="15" y1="15" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
@@ -98,6 +98,6 @@
 {% include "popup/handrive/auth_logout_modal.html" %}
 {% include "popup/handrive/page_help_modal.html" %}
 
-{{ docs_text|json_script:"handrive-i18n" }}
+{{ handrive_text|json_script:"handrive-i18n" }}
 {% include 'handrive/_assets_script.html' %}
 {% endblock %}

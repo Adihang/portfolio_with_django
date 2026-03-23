@@ -54,8 +54,8 @@
         var isEntryDeletable = options && typeof options.isEntryDeletable === "function"
             ? options.isEntryDeletable
             : function () { return false; };
-        var isEditableDocsFileEntry = options && typeof options.isEditableDocsFileEntry === "function"
-            ? options.isEditableDocsFileEntry
+        var isEditableHandriveFileEntry = options && typeof options.isEditableHandriveFileEntry === "function"
+            ? options.isEditableHandriveFileEntry
             : function () { return false; };
 
         var flags = {
@@ -80,7 +80,7 @@
         var isDirectory = Boolean(targetEntry.type === "dir");
         var isCurrentFolder = Boolean(targetEntry.isCurrentFolder);
         var canEditEntry = Boolean(targetEntry.can_edit);
-        var canShowEditEntry = Boolean(canEditEntry && isEditableDocsFileEntry(targetEntry));
+        var canShowEditEntry = Boolean(canEditEntry && isEditableHandriveFileEntry(targetEntry));
         var canWriteChildren = Boolean(targetEntry.type === "dir" && targetEntry.can_write_children);
         var isGitVirtualEntry = Boolean(
             targetEntry.git_repo ||

@@ -41,7 +41,7 @@ def _normalize_file_extension(extension: str | None, *, allow_empty: bool = Fals
     return value if value.startswith(".") else f".{value}"
 
 
-def render_docs_pdf_safely(pdf_bytes: bytes, file_name: str = "preview.pdf") -> str:
+def render_handrive_pdf_safely(pdf_bytes: bytes, file_name: str = "preview.pdf") -> str:
     """PDF 바이트를 base64 data URL iframe 으로 감싼다."""
     encoded_pdf = base64.b64encode(pdf_bytes).decode("ascii")
     pdf_data_url = f"data:application/pdf;base64,{encoded_pdf}#view=FitH"
@@ -157,7 +157,7 @@ def _inject_before_first_closing_tag(source: str, closing_tag: str, injection: s
     return f"{source}{injection}"
 
 
-def build_docs_html_live_document(html_source: str, *, companion_css: str = "", companion_js: str = "") -> str:
+def build_handrive_html_live_document(html_source: str, *, companion_css: str = "", companion_js: str = "") -> str:
     document = html_source or ""
     css_text = companion_css or ""
     js_text = companion_js or ""
@@ -201,8 +201,8 @@ def build_docs_html_live_document(html_source: str, *, companion_css: str = "", 
     return document
 
 
-def render_docs_html_live_safely(html_source: str, *, companion_css: str = "", companion_js: str = "") -> str:
-    live_document = build_docs_html_live_document(
+def render_handrive_html_live_safely(html_source: str, *, companion_css: str = "", companion_js: str = "") -> str:
+    live_document = build_handrive_html_live_document(
         html_source,
         companion_css=companion_css,
         companion_js=companion_js,
@@ -376,7 +376,7 @@ def _extract_pptx_preview_html(file_bytes: bytes) -> str:
         return "<p>미리보기를 지원하지 않는 PowerPoint 파일입니다.</p>"
 
 
-def render_docs_office_preview_safely(file_extension: str, source_bytes: bytes) -> str:
+def render_handrive_office_preview_safely(file_extension: str, source_bytes: bytes) -> str:
     extension = str(file_extension or "").lower()
     if extension in {".xls", ".xlsx"}:
         html_text = convert_office_bytes_to_html(extension, source_bytes)
@@ -429,10 +429,10 @@ html body col {
     width: auto;
 }
 """
-            return render_docs_html_live_safely(html_text, companion_css=office_override_css)
+            return render_handrive_html_live_safely(html_text, companion_css=office_override_css)
     pdf_bytes = convert_office_bytes_to_pdf(extension, source_bytes, f"preview{extension or '.docx'}")
     if pdf_bytes:
-        return render_docs_pdf_safely(pdf_bytes, f"preview{extension or '.pdf'}")
+        return render_handrive_pdf_safely(pdf_bytes, f"preview{extension or '.pdf'}")
     if extension == ".docx":
         return mark_safe(_extract_docx_preview_html(source_bytes))
     if extension == ".xlsx":

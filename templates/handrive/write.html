@@ -7,8 +7,8 @@
     <div class="handrive-shell ui-shell handrive-toolbar ui-toolbar">
         <div class="handrive-toolbar-left ui-toolbar-left">
             <div class="handrive-title-row ui-title-row">
-                <h1 class="handrive-title ui-title">{% if write_mode == 'edit' %}{{ docs_text.write_title_edit }}{% else %}{{ docs_text.write_title_create }}{% endif %}</h1>
-                <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ docs_text.help_button }}" title="{{ docs_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
+                <h1 class="handrive-title ui-title">{% if write_mode == 'edit' %}{{ handrive_text.write_title_edit }}{% else %}{{ handrive_text.write_title_create }}{% endif %}</h1>
+                <button class="handrive-help-icon-link" type="button" id="handrive-page-help-btn" aria-label="{{ handrive_text.help_button }}" title="{{ handrive_text.help_button }}"><span class="handrive-help-icon-symbol" aria-hidden="true"></span></button>
             </div>
             <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
                 {% for crumb in write_breadcrumbs %}
@@ -26,8 +26,8 @@
             <div class="handrive-toolbar-actions ui-toolbar-actions">
                 {% include "handrive/_auth_button.html" %}
                 {% include "handrive/_superuser_ops_button.html" %}
-                <button class="handrive-btn" type="button" id="handrive-cancel-btn">{{ docs_text.cancel }}</button>
-                <button class="handrive-btn handrive-btn-primary" type="button" id="handrive-save-btn">{{ docs_text.save_button }}</button>
+                <button class="ui-btn" type="button" id="handrive-cancel-btn">{{ handrive_text.cancel }}</button>
+                <button class="ui-btn ui-btn-primary" type="button" id="handrive-save-btn">{{ handrive_text.save_button }}</button>
             </div>
         </div>
     </div>
@@ -36,11 +36,11 @@
 <main
     class="handrive-shell ui-shell handrive-content ui-content"
     data-handrive-page="write"
-    data-handrive-base-url="{{ docs_base_url }}"
+    data-handrive-base-url="{{ handrive_base_url }}"
     data-handrive-root-url="{{ handrive_root_url }}"
-    data-save-api-url="{{ docs_api_save_url }}"
-    data-preview-api-url="{{ docs_api_preview_url }}"
-    data-mkdir-api-url="{{ docs_api_mkdir_url }}"
+    data-save-api-url="{{ handrive_api_save_url }}"
+    data-preview-api-url="{{ handrive_api_preview_url }}"
+    data-mkdir-api-url="{{ handrive_api_mkdir_url }}"
     data-write-mode="{{ write_mode }}"
     data-original-path="{{ original_relative_path }}"
     data-initial-dir="{{ initial_dir }}"
@@ -51,16 +51,16 @@
 >
     <div class="handrive-form-grid">
         <label class="handrive-field handrive-field-full">
-            <span>{{ docs_text.filename_label }}</span>
-            <input type="text" id="handrive-filename-input" value="{{ initial_filename_input }}" placeholder="{{ docs_text.filename_placeholder }}">
+            <span>{{ handrive_text.filename_label }}</span>
+            <input type="text" id="handrive-filename-input" value="{{ initial_filename_input }}" placeholder="{{ handrive_text.filename_placeholder }}">
         </label>
 
         <div class="handrive-field handrive-field-full">
             <div class="handrive-field-head">
-                <label for="handrive-content-input" class="handrive-field-label">{{ docs_text.content_label }}</label>
+                <label for="handrive-content-input" class="handrive-field-label">{{ handrive_text.content_label }}</label>
                 <div class="handrive-content-snippet-tools">
-                    <button class="handrive-btn" type="button" id="handrive-markdown-help-btn"{% if not write_is_markdown %} hidden disabled{% endif %}>{{ docs_text.markdown_guide_button }}</button>
-                    <button class="handrive-btn" type="button" id="handrive-markdown-preview-btn"{% if not write_is_markdown %} hidden disabled{% endif %}>{{ docs_text.markdown_preview_button }}</button>
+                    <button class="ui-btn" type="button" id="ui-markdown-help-btn"{% if not write_is_markdown %} hidden disabled{% endif %}>{{ handrive_text.markdown_guide_button }}</button>
+                    <button class="ui-btn" type="button" id="ui-markdown-preview-btn"{% if not write_is_markdown %} hidden disabled{% endif %}>{{ handrive_text.markdown_preview_button }}</button>
                 </div>
             </div>
             <div class="handrive-editor-surface" id="handrive-editor-surface">
@@ -89,7 +89,7 @@
 
 <datalist id="handrive-directory-options"></datalist>
 
-{{ docs_text|json_script:"handrive-i18n" }}
+{{ handrive_text|json_script:"handrive-i18n" }}
 {{ available_directories|json_script:"handrive-directory-data" }}
 {% include 'handrive/_assets_script.html' %}
 {% endblock %}

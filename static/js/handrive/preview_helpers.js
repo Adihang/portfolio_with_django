@@ -100,7 +100,7 @@
         var previewUrlShareButton = settings.previewUrlShareButton || null;
         var urlShareApiUrl = settings.urlShareApiUrl || "";
         var isPreviewableFileEntry = settings.isPreviewableFileEntry || function () { return false; };
-        var isEditableDocsFileEntry = settings.isEditableDocsFileEntry || function () { return false; };
+        var isEditableHandriveFileEntry = settings.isEditableHandriveFileEntry || function () { return false; };
         var buildDownloadUrl = settings.buildDownloadUrl || function () { return ""; };
         var onEdit = settings.onEdit || function () {};
 
@@ -123,7 +123,7 @@
         }
 
         if (previewEditButton) {
-            previewEditButton.hidden = !(isFileEntry && canEdit && isEditableDocsFileEntry(entry));
+            previewEditButton.hidden = !(isFileEntry && canEdit && isEditableHandriveFileEntry(entry));
             if (!previewEditButton.hidden) {
                 previewEditButton.onclick = function (event) {
                     event.preventDefault();

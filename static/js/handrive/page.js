@@ -339,14 +339,14 @@
     }
 
     // 문서 렌더링 콘텐츠 모드 클래스를 적용하는 함수
-    function applyDocsRenderedContentModeClass(targetElement, renderMode, renderClass) {
+    function applyHandriveRenderedContentModeClass(targetElement, renderMode, renderClass) {
         // Preview renderers return both a high-level mode and optional CSS class hints.
         // Normalize those hints here so the preview pane has exactly one coherent style family.
         if (!targetElement || !(targetElement instanceof Element)) {
             return;
         }
         targetElement.classList.remove(
-            "handrive-markdown",
+            "ui-markdown",
             "handrive-plain-text",
             "handrive-json",
             "handrive-html",
@@ -417,7 +417,7 @@
             return;
         }
         if (renderMode === "markdown") {
-            targetElement.classList.add("handrive-markdown");
+            targetElement.classList.add("ui-markdown");
             return;
         }
         targetElement.classList.add("handrive-plain-text");
@@ -467,12 +467,12 @@
         };
     }
 
-    if (!window.__docsCalculateCursorPosition) {
-        window.__docsCalculateCursorPosition = calculateCursorPosition;
+    if (!window.__handriveCalculateCursorPosition) {
+        window.__handriveCalculateCursorPosition = calculateCursorPosition;
     }
 
 
-    const docsEditorCompletionExtensionAliasMap = {
+    const handriveEditorCompletionExtensionAliasMap = {
         ".ts": ".js",
         ".tsx": ".js",
         ".jsx": ".js",
@@ -486,12 +486,12 @@
     function resolveEditorCompletionItemsByExtension(extension) {
         // Reuse completion packs across adjacent extensions (ts->js, yaml->json, etc.)
         // so the editor can stay lightweight without duplicating snippet tables.
-        const completionMap = window.__docsEditorCompletionMap || {};
+        const completionMap = window.__handriveEditorCompletionMap || {};
         const normalized = String(extension || "").trim().toLowerCase();
         if (normalized && Array.isArray(completionMap[normalized])) {
             return completionMap[normalized];
         }
-        const alias = docsEditorCompletionExtensionAliasMap[normalized];
+        const alias = handriveEditorCompletionExtensionAliasMap[normalized];
         if (alias && Array.isArray(completionMap[alias])) {
             return completionMap[alias];
         }
@@ -865,7 +865,7 @@
     }
 
     // 문서 코드 하이라이팅을 적용하는 함수
-    function applyDocsCodeHighlighting(targetElement, renderClass) {
+    function applyHandriveCodeHighlighting(targetElement, renderClass) {
         if (!targetElement || !(targetElement instanceof Element)) {
             return;
         }
@@ -874,7 +874,7 @@
             renderClass !== "handrive-css" &&
             renderClass !== "handrive-json" &&
             renderClass !== "handrive-py" &&
-            renderClass !== "handrive-markdown"
+            renderClass !== "ui-markdown"
         ) {
             return;
         }
@@ -887,7 +887,7 @@
             if (codeNode.dataset.handriveCodeHighlighted === "1") {
                 return;
             }
-            const effectiveRenderClass = renderClass === "handrive-markdown"
+            const effectiveRenderClass = renderClass === "ui-markdown"
                 ? detectCodeLanguageClass(codeNode)
                 : renderClass;
             if (!effectiveRenderClass) {
@@ -908,7 +908,7 @@
     }
 
     // 열린 문서 모달이 있는지 확인하는 함수
-    function hasOpenDocsModal() {
+    function hasOpenHandriveModal() {
         return Boolean(
             document.querySelector(
                 ".handrive-rename-modal:not([hidden]), .handrive-save-modal:not([hidden]), .handrive-help-modal:not([hidden]), .handrive-folder-modal:not([hidden])"
@@ -917,12 +917,12 @@
     }
 
     // 문서 모달 바디 상태를 동기화하는 함수
-    function syncDocsModalBodyState() {
-        document.body.classList.toggle("handrive-modal-open", hasOpenDocsModal());
+    function syncHandriveModalBodyState() {
+        document.body.classList.toggle("handrive-modal-open", hasOpenHandriveModal());
     }
 
     // 문서 확인 다이얼로그를 생성하는 함수
-    function createDocsConfirmDialog() {
+    function createHandriveConfirmDialog() {
         const confirmModal = document.getElementById("handrive-confirm-modal");
         const confirmBackdrop = document.getElementById("handrive-confirm-modal-backdrop");
         const confirmTitle = document.getElementById("handrive-confirm-title");
@@ -1016,9 +1016,9 @@
         };
     }
 
-    const requestConfirmDialog = createDocsConfirmDialog();
+    const requestConfirmDialog = createHandriveConfirmDialog();
 
-    function createDocsCommitMessageDialog() {
+    function createHandriveCommitMessageDialog() {
         const modal = document.getElementById("handrive-commit-message-modal");
         const backdrop = document.getElementById("handrive-commit-message-modal-backdrop");
         const target = document.getElementById("handrive-commit-message-target");
@@ -1109,9 +1109,9 @@
         };
     }
 
-    const requestCommitMessageDialog = createDocsCommitMessageDialog();
+    const requestCommitMessageDialog = createHandriveCommitMessageDialog();
 
-    function createDocsUrlShareModal() {
+    function createHandriveUrlShareModal() {
         const shareModal = document.getElementById("handrive-url-share-modal");
         const shareBackdrop = document.getElementById("handrive-url-share-modal-backdrop");
         const shareCheckbox = document.getElementById("handrive-url-share-enabled-checkbox");
@@ -1154,7 +1154,7 @@
                 lastFocusedElement.focus();
             }
             lastFocusedElement = null;
-            syncDocsModalBodyState();
+            syncHandriveModalBodyState();
         }
 
         async function copyCurrentUrl() {
@@ -1188,7 +1188,7 @@
             shareCopyButton.textContent = t("url_share_copy_button", "복사");
             shareModal.hidden = false;
             lastFocusedElement = document.activeElement;
-            syncDocsModalBodyState();
+            syncHandriveModalBodyState();
             window.requestAnimationFrame(function () {
                 shareCheckbox.focus();
             });
@@ -1229,10 +1229,10 @@
         return { open: open, close: close };
     }
 
-    const urlShareModal = createDocsUrlShareModal();
+    const urlShareModal = createHandriveUrlShareModal();
 
     // 문서 페이지 도움말 모달을 초기화하는 함수
-    function initializeDocsPageHelpModal() {
+    function initializeHandrivePageHelpModal() {
         const pageHelpButton = document.getElementById("handrive-page-help-btn");
         const pageHelpModal = document.getElementById("handrive-page-help-modal");
         const pageHelpBackdrop = document.getElementById("handrive-page-help-backdrop");
@@ -1246,7 +1246,7 @@
         function setPageHelpModalOpen(opened) {
             pageHelpModal.hidden = !opened;
             pageHelpButton.setAttribute("aria-expanded", opened ? "true" : "false");
-            syncDocsModalBodyState();
+            syncHandriveModalBodyState();
             if (opened) {
                 lastFocusedElement = document.activeElement;
                 return;
@@ -1276,7 +1276,7 @@
     }
 
     // 문서 인증 상호작용을 초기화하는 함수
-    function initializeDocsAuthInteraction() {
+    function initializeHandriveAuthInteraction() {
         const accountTrigger = document.querySelector("[data-auth-account-trigger]");
         const accountMenu = document.querySelector("[data-auth-account-menu]");
         const accountLogoutButton = document.querySelector("[data-auth-account-logout]");
@@ -1423,7 +1423,7 @@
     }
 
     // 문서 툴바 자동 축소를 초기화하는 함수
-    function initializeDocsToolbarAutoCollapse() {
+    function initializeHandriveToolbarAutoCollapse() {
         const toolbar = document.querySelector(".handrive-toolbar-wrap .handrive-toolbar");
         if (!toolbar) {
             return;
@@ -1552,6 +1552,8 @@
         const listLayout = document.getElementById("handrive-list-layout");
         const listPane = root.querySelector(".handrive-list-pane");
         const listContainer = document.getElementById("handrive-list");
+        const listSearchForm = document.getElementById("handrive-list-search-form");
+        const listSearchInput = document.getElementById("handriveListSearchInput");
         const previewPanel = document.getElementById("handrive-list-preview");
         const previewHead = previewPanel ? previewPanel.querySelector(".handrive-list-preview-head") : null;
         const previewTitle = document.getElementById("handrive-list-preview-title");
@@ -1576,13 +1578,13 @@
         const editorHighlight = document.getElementById("handrive-list-editor-highlight");
         const editorSuggest = document.getElementById("handrive-list-editor-suggest");
         const editorSuggestLabel = document.getElementById("handrive-list-editor-suggest-label");
-        const markdownSnippetMenu = document.getElementById("handrive-markdown-snippet-menu");
+        const markdownSnippetMenu = document.getElementById("ui-markdown-snippet-menu");
         const markdownSnippetButtons = markdownSnippetMenu
             ? Array.from(markdownSnippetMenu.querySelectorAll("button[data-editor-snippet]"))
             : [];
         
         // API URL들
-        const ideApiPreviewUrl = previewApiUrl;
+        const handriveApiPreviewUrl = previewApiUrl;
         const scopedHomeDir = normalizePath(root.dataset.scopedHomeDir || "", true);
         const isSuperuser = root.dataset.isSuperuser === "1";
         const initialBreadcrumbNode = pathBreadcrumbs
@@ -1685,8 +1687,8 @@
         const currentDirGitCommitMessage = String(root.dataset.currentDirGitCommitMessage || "").trim();
         const currentDirGitCommitAuthorUsername = String(root.dataset.currentDirGitCommitAuthorUsername || "").trim();
         const accountProfileImageUrl = String(root.dataset.accountProfileImageUrl || "").trim();
-        const docsRootLabel = (root.dataset.handriveRootLabel || breadcrumbRootLabel || "HanDrive").trim() || "HanDrive";
-        const effectiveRootLabel = (isSuperuser && scopedHomeDir) ? "Hanplanet" : docsRootLabel;
+        const handriveRootLabel = (root.dataset.handriveRootLabel || breadcrumbRootLabel || "HanDrive").trim() || "HanDrive";
+        const effectiveRootLabel = (isSuperuser && scopedHomeDir) ? "Hanplanet" : handriveRootLabel;
         const initialEntries = getJsonScriptData("handrive-initial-entries", []);
         let currentDirGitRepo = getJsonScriptData("handrive-current-dir-git-repo", null);
 
@@ -1751,6 +1753,8 @@
             uploadQueueDismissed: false,
             uploadQueueContextItem: null,
             pendingContextUploadDir: "",
+            searchQuery: "",
+            searchResults: null,
         };
 
         let activeListEditorSuggestions = [];
@@ -2129,7 +2133,7 @@
             renderListEditorSuggestDropdown();
             editorSuggest.hidden = false;
 
-            const calc = window.__docsCalculateCursorPosition;
+            const calc = window.__handriveCalculateCursorPosition;
             const cursorPosition = typeof calc === "function" ? calc(editorContentInput, start) : null;
             if (cursorPosition) {
                 const surfaceRect = editorSurface ? editorSurface.getBoundingClientRect() : null;
@@ -2342,12 +2346,12 @@
             return fileName.slice(dotIndex).toLowerCase();
         }
 
-        function isEditableDocsFileEntry(entry) {
+        function isEditableHandriveFileEntry(entry) {
             return !nonEditableMediaExtensions.has(getEntryFileExtension(entry));
         }
 
         function applyRenderedContentModeClass(targetElement, renderMode, renderClass) {
-            applyDocsRenderedContentModeClass(targetElement, renderMode, renderClass);
+            applyHandriveRenderedContentModeClass(targetElement, renderMode, renderClass);
         }
 
         function setPreviewActionTargets(entry) {
@@ -2359,7 +2363,7 @@
                 previewUrlShareButton: previewUrlShareButton,
                 urlShareApiUrl: urlShareApiUrl,
                 isPreviewableFileEntry: isPreviewableFileEntry,
-                isEditableDocsFileEntry: isEditableDocsFileEntry,
+                isEditableHandriveFileEntry: isEditableHandriveFileEntry,
                 buildDownloadUrl: buildDownloadUrl,
                 onEdit: switchToEditor,
             });
@@ -2555,7 +2559,7 @@
                 editorSaveButton.disabled = true;
             }
             try {
-                // 쓰기 화면 저장 버튼과 동일한 docs_api_save payload로 저장
+                // 쓰기 화면 저장 버튼과 동일한 handrive_api_save payload로 저장
                 const payload = {
                     original_path: sourcePath,
                     target_dir: targetDir,
@@ -2646,7 +2650,7 @@
 
         function renderPreviewHtml(entry, html, renderMode, renderClass) {
             renderPreviewHtmlFlow({
-                applyDocsCodeHighlighting: applyDocsCodeHighlighting,
+                applyHandriveCodeHighlighting: applyHandriveCodeHighlighting,
                 applyRenderedContentModeClass: applyRenderedContentModeClass,
                 entry: entry,
                 html: html,
@@ -2709,7 +2713,7 @@
         function syncContextMenuByEntries(entries) {
             const visibility = computeContextMenuVisibility(entries, {
                 isEntryDeletable: isEntryDeletable,
-                isEditableDocsFileEntry: isEditableDocsFileEntry,
+                isEditableHandriveFileEntry: isEditableHandriveFileEntry,
             });
             setContextButtonVisible(contextOpenButton, Boolean(visibility.open));
             setContextButtonVisible(contextDownloadButton, Boolean(visibility.download));
@@ -2918,7 +2922,7 @@
 
         function renderPathBreadcrumbs(pathValue) {
             renderNavigationBreadcrumbs(pathValue, {
-                bindDocsPathDropTargets: bindDocsPathDropTargets,
+                bindHandrivePathDropTargets: bindHandrivePathDropTargets,
                 buildBreadcrumbItems: buildBreadcrumbItems,
                 buildListUrl: buildListUrl,
                 documentRef: document,
@@ -3045,10 +3049,10 @@
         }
 
         function syncModalBodyState() {
-            syncDocsModalBodyState();
+            syncHandriveModalBodyState();
         }
 
-        function getDocsPathLabel(pathValue) {
+        function getHandrivePathLabel(pathValue) {
             const normalized = normalizePath(pathValue, true);
             if (!normalized) {
                 return "/handrive";
@@ -3176,7 +3180,7 @@
                     return createQueueListItem(item, {
                         documentRef: document,
                         getMetaLabel: function (nextItem) {
-                            return getQueueItemMetaLabel(nextItem, getDocsPathLabel);
+                            return getQueueItemMetaLabel(nextItem, getHandrivePathLabel);
                         },
                         getStatusLabel: function (nextItem) {
                             return getQueueItemStatusLabel(nextItem, t);
@@ -3846,11 +3850,11 @@
             });
 
             const name = document.createElement("span");
-            name.className = "handrive-item-name handrive-current-dir-name";
+            name.className = "handrive-item-name";
             name.textContent = getCurrentFolderName(currentDir);
 
             const nameWrap = document.createElement("span");
-            nameWrap.className = "handrive-current-dir-name-wrap";
+            nameWrap.className = "handrive-item-name-wrap";
 
             row.appendChild(typeMarker);
             row.appendChild(nameWrap);
@@ -3910,7 +3914,7 @@
             }
             state.folderCreateParentEntry = entry || null;
             const parentPath = entry && entry.path ? entry.path : "";
-            const targetLabel = t("create_folder_in_label", "생성 위치") + ": " + getDocsPathLabel(parentPath);
+            const targetLabel = t("create_folder_in_label", "생성 위치") + ": " + getHandrivePathLabel(parentPath);
             modalSetFolderCreateModalOpen(folderCreateModal, folderCreateTarget, folderCreateInput, syncModalBodyState, true, state.folderCreateParentEntry, targetLabel);
         }
 
@@ -4312,10 +4316,46 @@
                 window.location.href = buildWriteUrl(writeUrl, { dir: entry.path });
                 return;
             }
-            if (!isEditableDocsFileEntry(entry)) {
+            if (!isEditableHandriveFileEntry(entry)) {
                 return;
             }
             window.location.href = buildWriteUrl(writeUrl, { path: entry.path });
+        }
+
+        function syncSearchQueryFromInput() {
+            state.searchQuery = String(listSearchInput && listSearchInput.value || "").trim();
+        }
+
+        async function collectSearchEntriesInDirectory(directoryPath, normalizedQuery, matches) {
+            await loadDirectory(directoryPath);
+            const directoryEntries = getCachedEntries(directoryPath);
+            for (const entry of directoryEntries) {
+                if (!entry) {
+                    continue;
+                }
+                if (entry.type === "file" && String(entry.name || "").toLocaleLowerCase().includes(normalizedQuery)) {
+                    matches.push(entry);
+                    continue;
+                }
+                if (entry.type === "dir") {
+                    await collectSearchEntriesInDirectory(entry.path, normalizedQuery, matches);
+                }
+            }
+        }
+
+        async function applyListSearch() {
+            syncSearchQueryFromInput();
+            const normalizedQuery = String(state.searchQuery || "").trim().toLocaleLowerCase();
+            if (!normalizedQuery) {
+                state.searchResults = null;
+                renderList();
+                return;
+            }
+
+            const matches = [];
+            await collectSearchEntriesInDirectory(currentDir, normalizedQuery, matches);
+            state.searchResults = matches;
+            renderList();
         }
 
         function addEntryNode(entry, fragment, ancestorHasNextSiblings, isLastSibling) {
@@ -4370,6 +4410,10 @@
                 event.preventDefault();
                 closeContextMenu();
                 selectEntriesByRowClick(entry, event);
+                if (event.detail >= 2) {
+                    openEntry(entry);
+                    return;
+                }
                 if (entry.type === "dir") {
                     if (event.detail === 1 && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
                         toggleFolderExpansion(entry).catch(alertError);
@@ -4380,9 +4424,7 @@
 
             row.addEventListener("dblclick", function (event) {
                 event.preventDefault();
-                if (entry.type === "dir") {
-                    return;
-                }
+                event.stopPropagation();
                 openEntry(entry);
             });
 
@@ -4472,7 +4514,9 @@
             state.entryRowByPath = new Map();
             state.visibleEntryPaths = [];
             const fragment = document.createDocumentFragment();
-            const entries = getCachedEntries(currentDir);
+            const entries = state.searchQuery
+                ? (Array.isArray(state.searchResults) ? state.searchResults : [])
+                : getCachedEntries(currentDir);
             addCurrentDirectoryNode(fragment);
 
             if (entries.length === 0) {
@@ -4480,7 +4524,9 @@
                 emptyItem.className = "handrive-item";
                 const emptyRow = document.createElement("div");
                 emptyRow.className = "handrive-item-row is-empty";
-                emptyRow.textContent = t("js_empty_documents", "문서가 없습니다.");
+                emptyRow.textContent = state.searchQuery
+                    ? t("js_search_no_results", "검색 결과가 없습니다.")
+                    : t("js_empty_documents", "문서가 없습니다.");
                 emptyItem.appendChild(emptyRow);
                 fragment.appendChild(emptyItem);
                 const filteredSelection = Array.from(state.selectedPaths).filter(function (pathValue) {
@@ -4527,7 +4573,7 @@
             openContextMenuAt(entry, x, y);
         }
 
-        function bindDocsPathDropTargets() {
+        function bindHandrivePathDropTargets() {
             if (!moveApiUrl) {
                 return;
             }
@@ -5187,7 +5233,18 @@
         if (pathBreadcrumbs) {
             renderPathBreadcrumbs(currentDir);
         } else {
-            bindDocsPathDropTargets();
+        bindHandrivePathDropTargets();
+
+        if (listSearchForm && listSearchInput) {
+            listSearchForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                applyListSearch().catch(alertError);
+            });
+
+            listSearchInput.addEventListener("search", function () {
+                applyListSearch().catch(alertError);
+            });
+        }
         }
         
         // 초기화 시 약간의 지연 후 레이아웃 업데이트
@@ -5200,8 +5257,8 @@
     }
 
     function initializeViewPage() {
-        const ideBaseUrl = root.dataset.handriveBaseUrl || "/handrive";
-        const ideRootUrl = root.dataset.handriveRootUrl || ideBaseUrl;
+        const handriveBaseUrl = root.dataset.handriveBaseUrl || "/handrive";
+        const handriveRootUrl = root.dataset.handriveRootUrl || handriveBaseUrl;
         const deleteApiUrl = root.dataset.deleteApiUrl;
         const urlShareApiUrl = root.dataset.urlShareApiUrl;
         const docPath = root.dataset.docPath || "";
@@ -5261,15 +5318,15 @@
         }
 
         if (contentArticle && contentArticle.classList.contains("handrive-js")) {
-            applyDocsCodeHighlighting(contentArticle, "handrive-js");
+            applyHandriveCodeHighlighting(contentArticle, "handrive-js");
         } else if (contentArticle && contentArticle.classList.contains("handrive-css")) {
-            applyDocsCodeHighlighting(contentArticle, "handrive-css");
+            applyHandriveCodeHighlighting(contentArticle, "handrive-css");
         } else if (contentArticle && contentArticle.classList.contains("handrive-json")) {
-            applyDocsCodeHighlighting(contentArticle, "handrive-json");
+            applyHandriveCodeHighlighting(contentArticle, "handrive-json");
         } else if (contentArticle && contentArticle.classList.contains("handrive-py")) {
-            applyDocsCodeHighlighting(contentArticle, "handrive-py");
-        } else if (contentArticle && contentArticle.classList.contains("handrive-markdown")) {
-            applyDocsCodeHighlighting(contentArticle, "handrive-markdown");
+            applyHandriveCodeHighlighting(contentArticle, "handrive-py");
+        } else if (contentArticle && contentArticle.classList.contains("ui-markdown")) {
+            applyHandriveCodeHighlighting(contentArticle, "ui-markdown");
         }
 
         hydrateMediaAudioElements(contentArticle);
@@ -5326,7 +5383,7 @@
 
             try {
                 await requestJson(deleteApiUrl, buildPostOptions({ path: docPath }));
-                window.location.href = buildListUrl(ideBaseUrl, parentDir, ideRootUrl);
+                window.location.href = buildListUrl(handriveBaseUrl, parentDir, handriveRootUrl);
             } catch (error) {
                 alertError(error);
             }
@@ -5334,8 +5391,8 @@
     }
 
     function initializeWritePage() {
-        const ideBaseUrl = root.dataset.handriveBaseUrl || "/handrive";
-        const ideRootUrl = root.dataset.handriveRootUrl || ideBaseUrl;
+        const handriveBaseUrl = root.dataset.handriveBaseUrl || "/handrive";
+        const handriveRootUrl = root.dataset.handriveRootUrl || handriveBaseUrl;
         const saveApiUrl = root.dataset.saveApiUrl;
         const previewApiUrl = root.dataset.previewApiUrl;
         const mkdirApiUrl = root.dataset.mkdirApiUrl;
@@ -5353,13 +5410,13 @@
         const editorHighlightCode = document.getElementById("handrive-editor-highlight-code");
         const editorSuggest = document.getElementById("handrive-editor-suggest");
         const editorSuggestLabel = document.getElementById("handrive-editor-suggest-label");
-        const markdownHelpButton = document.getElementById("handrive-markdown-help-btn");
-        const markdownHelpModal = document.getElementById("handrive-markdown-help-modal");
-        const markdownHelpBackdrop = document.getElementById("handrive-markdown-help-backdrop");
-        const markdownPreviewButton = document.getElementById("handrive-markdown-preview-btn");
-        const markdownPreviewModal = document.getElementById("handrive-markdown-preview-modal");
-        const markdownPreviewBackdrop = document.getElementById("handrive-markdown-preview-backdrop");
-        const markdownPreviewContent = document.getElementById("handrive-markdown-preview-content");
+        const markdownHelpButton = document.getElementById("ui-markdown-help-btn");
+        const markdownHelpModal = document.getElementById("ui-markdown-help-modal");
+        const markdownHelpBackdrop = document.getElementById("ui-markdown-help-backdrop");
+        const markdownPreviewButton = document.getElementById("ui-markdown-preview-btn");
+        const markdownPreviewModal = document.getElementById("ui-markdown-preview-modal");
+        const markdownPreviewBackdrop = document.getElementById("ui-markdown-preview-backdrop");
+        const markdownPreviewContent = document.getElementById("ui-markdown-preview-content");
         const cancelButton = document.getElementById("handrive-cancel-btn");
         const saveButton = document.getElementById("handrive-save-btn");
         const createFolderButton = document.getElementById("handrive-create-folder-btn");
@@ -5385,7 +5442,7 @@
         const unsavedLeaveButton = document.getElementById("handrive-unsaved-leave-btn");
         const unsavedSaveButton = document.getElementById("handrive-unsaved-save-btn");
         const directoryOptions = document.getElementById("handrive-directory-options");
-        const markdownSnippetMenu = document.getElementById("handrive-markdown-snippet-menu");
+        const markdownSnippetMenu = document.getElementById("ui-markdown-snippet-menu");
         const markdownSnippetButtons = Array.from(
             document.querySelectorAll("button[data-editor-snippet]")
         );
@@ -5427,8 +5484,8 @@
         let activeEditorSuggestions = [];
         let activeEditorSuggestionIndex = -1;
         let writeSuggestEventsBound = false;
-        // 자동완성 단어 리스트는 전역 단일 맵(window.__docsEditorCompletionMap)만 사용
-        const editorCompletionMap = window.__docsEditorCompletionMap || {};
+        // 자동완성 단어 리스트는 전역 단일 맵(window.__handriveEditorCompletionMap)만 사용
+        const editorCompletionMap = window.__handriveEditorCompletionMap || {};
 
         function markCurrentAsSaved() {
             savedFilenameValue = filenameInput ? filenameInput.value : "";
@@ -6231,7 +6288,7 @@
             };
         }
 
-        window.__docsCalculateCursorPosition = calculateCursorPosition;
+        window.__handriveCalculateCursorPosition = calculateCursorPosition;
 
         function acceptEditorSuggestion() {
             if (!contentInput) {
@@ -6648,7 +6705,7 @@
             }
         }
 
-        function getDocsPathLabel(pathValue) {
+        function getHandrivePathLabel(pathValue) {
             if (scopedHomeDir && isPathInsideScopedHome(pathValue || scopedHomeDir)) {
                 return buildBreadcrumbItems(pathValue || scopedHomeDir)
                     .map(function (crumb) {
@@ -6671,7 +6728,7 @@
             if (opened) {
                 const basePath = getFolderCreateBasePath();
                 if (folderTargetPath) {
-                    folderTargetPath.textContent = getDocsPathLabel(basePath);
+                    folderTargetPath.textContent = getHandrivePathLabel(basePath);
                 }
                 if (folderNameInput) {
                     folderNameInput.value = "";
@@ -6682,7 +6739,7 @@
         }
 
         function syncModalBodyState() {
-            syncDocsModalBodyState();
+            syncHandriveModalBodyState();
         }
 
         function setMarkdownHelpModalOpen(opened) {
@@ -6706,7 +6763,7 @@
                 return;
             }
 
-            applyDocsRenderedContentModeClass(markdownPreviewContent, "plain_text", "handrive-plain-text");
+            applyHandriveRenderedContentModeClass(markdownPreviewContent, "plain_text", "handrive-plain-text");
             markdownPreviewContent.innerHTML = "<p>" + t("markdown_preview_loading", "Loading preview...") + "</p>";
             setMarkdownPreviewModalOpen(true);
 
@@ -6738,11 +6795,11 @@
                     ? data.render_mode
                     : "plain_text";
                 const renderClass = data && typeof data.render_class === "string" ? data.render_class : "";
-                applyDocsRenderedContentModeClass(markdownPreviewContent, renderMode, renderClass);
+                applyHandriveRenderedContentModeClass(markdownPreviewContent, renderMode, renderClass);
                 markdownPreviewContent.innerHTML = data && typeof data.html === "string" ? data.html : "";
-                applyDocsCodeHighlighting(markdownPreviewContent, renderClass || "handrive-markdown");
+                applyHandriveCodeHighlighting(markdownPreviewContent, renderClass || "ui-markdown");
             } catch (error) {
-                applyDocsRenderedContentModeClass(markdownPreviewContent, "plain_text", "handrive-plain-text");
+                applyHandriveRenderedContentModeClass(markdownPreviewContent, "plain_text", "handrive-plain-text");
                 markdownPreviewContent.innerHTML =
                     "<p>" +
                     (error && error.message ? error.message : t("js_error_processing_failed", "처리 중 오류가 발생했습니다.")) +
@@ -6872,12 +6929,12 @@
 
                 if (data && data.slug_path) {
                     runWithBeforeUnloadBypass(function () {
-                        window.location.href = buildViewUrl(ideBaseUrl, data.slug_path);
+                        window.location.href = buildViewUrl(handriveBaseUrl, data.slug_path);
                     });
                     return data || {};
                 }
                 runWithBeforeUnloadBypass(function () {
-                    window.location.href = ideRootUrl;
+                    window.location.href = handriveRootUrl;
                 });
                 return data || {};
             } catch (error) {
@@ -6975,7 +7032,7 @@
             cancelButton.addEventListener("click", function () {
                 const targetDir = getCancelTargetDirectory();
                 attemptLeaveWithUnsavedGuard(function () {
-                    window.location.assign(buildListUrl(ideBaseUrl, targetDir, ideRootUrl));
+                    window.location.assign(buildListUrl(handriveBaseUrl, targetDir, handriveRootUrl));
                 });
             });
         }
@@ -7420,9 +7477,9 @@
         renderWriteEditorHighlight();
     }
 
-    initializeDocsAuthInteraction();
-    initializeDocsPageHelpModal();
-    initializeDocsToolbarAutoCollapse();
+    initializeHandriveAuthInteraction();
+    initializeHandrivePageHelpModal();
+    initializeHandriveToolbarAutoCollapse();
 
     if (pageType === "list") {
         initializeListPage();

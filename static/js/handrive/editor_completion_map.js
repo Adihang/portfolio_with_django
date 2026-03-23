@@ -3,8 +3,8 @@
 
     // Monaco/editor-like completion snippets are kept in one global map keyed by extension
     // so both list-page quick edit and write-page editing can share the same completions.
-    if (!window.__docsEditorCompletionMap) {
-        window.__docsEditorCompletionMap = {
+    if (!window.__handriveEditorCompletionMap) {
+        window.__handriveEditorCompletionMap = {
             ".md": [
                 { trigger: "head", insertText: "## ", label: "## Heading", priority: 100 },
                 { trigger: "head1", insertText: "# ", label: "# Heading 1", priority: 99 },

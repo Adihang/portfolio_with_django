@@ -4,11 +4,11 @@ from django.contrib.auth.models import Permission
 from django.core.management.base import BaseCommand
 from django.core.management.base import CommandError
 
-from main.handrive_views import DOCS_EDITOR_GROUP_NAME, DOCS_EDIT_PERMISSION_CODE
+from main.handrive_views import HANDRIVE_EDITOR_GROUP_NAME, DOCS_EDIT_PERMISSION_CODE
 
 
 class Command(BaseCommand):
-    help = "Create or update a HanDrive editor account (DocsEditors group)."
+    help = "Create or update a HanDrive editor account (HandriveEditors group)."
 
     def add_arguments(self, parser):
         parser.add_argument("--username", required=True, help="Login username")
@@ -36,7 +36,7 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
 
-        group, _ = Group.objects.get_or_create(name=DOCS_EDITOR_GROUP_NAME)
+        group, _ = Group.objects.get_or_create(name=HANDRIVE_EDITOR_GROUP_NAME)
         permission = (
             Permission.objects.filter(
                 content_type__app_label="main",
@@ -55,6 +55,6 @@ class Command(BaseCommand):
         state = "created" if created else "updated"
         self.stdout.write(
             self.style.SUCCESS(
-                f"Docs editor account {state}: {username} (group={DOCS_EDITOR_GROUP_NAME}, staff={user.is_staff})"
+                f"HanDrive editor account {state}: {username} (group={HANDRIVE_EDITOR_GROUP_NAME}, staff={user.is_staff})"
             )
         )

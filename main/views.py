@@ -1134,11 +1134,11 @@ def redirect_to_localized_route(request, route_name, **kwargs):
     return redirect(build_localized_url(request, route_name, **kwargs))
 
 
-def _redirect_to_docs_login_with_next(request):
-    """Send unauthenticated requests to the docs login page while preserving the intended destination."""
+def _redirect_to_handrive_login_with_next(request):
+    """Send unauthenticated requests to the HanDrive login page while preserving the intended destination."""
     next_path = request.get_full_path() or "/"
     encoded_next = quote(next_path, safe="/")
-    return redirect(f"{reverse('main:docs_login')}?next={encoded_next}")
+    return redirect(f"{reverse('main:handrive_login')}?next={encoded_next}")
 
 
 def _base64url_encode(raw_bytes):
@@ -1527,8 +1527,8 @@ def minigame_page(request, ui_lang=None):
         "page_title": "Mini Game" if is_english else "미니게임",
         "minigame_links": links,
         "minigame_home_label": "Home" if is_english else "홈",
-        "docs_login_url": reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang}),
-        "docs_signup_url": reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang}),
+        "handrive_login_url": reverse("main:handrive_login_lang", kwargs={"ui_lang": resolved_lang}),
+        "handrive_signup_url": reverse("main:handrive_signup_lang", kwargs={"ui_lang": resolved_lang}),
         "meta_title": "Hanplanet Mini Games" if is_english else "Hanplanet 미니게임",
         "meta_og_title": "Hanplanet Mini Games" if is_english else "Hanplanet 미니게임",
         "meta_description": (
@@ -1541,7 +1541,7 @@ def minigame_page(request, ui_lang=None):
     apply_ui_context(request, context, resolved_lang)
     if request.user.is_authenticated:
         portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
-        context["docs_my_portfolio_url"] = reverse(
+        context["handrive_my_portfolio_url"] = reverse(
             "main:portfolio_user_lang",
             kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
         )
@@ -1554,12 +1554,12 @@ def minigame_page(request, ui_lang=None):
             "main:account_profile_image_upload_lang",
             kwargs={"ui_lang": resolved_lang},
         )
-        context["account_my_portfolio_url"] = context["docs_my_portfolio_url"]
+        context["account_my_portfolio_url"] = context["handrive_my_portfolio_url"]
         context["account_logout_form_id"] = "auth-logout-form-minigame"
         context["account_logout_next"] = request.get_full_path() or reverse(
             "main:minigame_lang", kwargs={"ui_lang": resolved_lang}
         )
-        context["account_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
+        context["account_logout_url"] = reverse("main:handrive_logout_lang", kwargs={"ui_lang": resolved_lang})
     response = render(request, "fun/minigame.html", context)
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
@@ -1646,8 +1646,8 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
         "multiplayer_title": page_title,
         "multiplayer_description": page_description,
         "multiplayer_back_text": "Mini Game" if is_english else "미니게임",
-        "docs_login_url": reverse("main:docs_login_lang", kwargs={"ui_lang": resolved_lang}),
-        "docs_signup_url": reverse("main:docs_signup_lang", kwargs={"ui_lang": resolved_lang}),
+        "handrive_login_url": reverse("main:handrive_login_lang", kwargs={"ui_lang": resolved_lang}),
+        "handrive_signup_url": reverse("main:handrive_signup_lang", kwargs={"ui_lang": resolved_lang}),
         "bumpercar_restart_server_url": reverse(
             "main:bumpercar_spiky_restart_server_lang",
             kwargs={"ui_lang": resolved_lang},
@@ -1701,7 +1701,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
     context["meta_og_description"] = context["meta_description"]
     if request.user.is_authenticated:
         context.update({
-            "docs_my_portfolio_url": reverse(
+            "handrive_my_portfolio_url": reverse(
                 "main:portfolio_user_lang",
                 kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
             ),
@@ -1722,7 +1722,7 @@ def hanplanet_multiplayer_page(request, ui_lang=None):
             "account_logout_next": request.get_full_path() or reverse(
                 "main:bumpercar_spiky_lang", kwargs={"ui_lang": resolved_lang}
             ),
-            "account_logout_url": reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang}),
+            "account_logout_url": reverse("main:handrive_logout_lang", kwargs={"ui_lang": resolved_lang}),
         })
     apply_ui_context(request, context, resolved_lang)
     response = render(request, "fun/Hanplanet_Multiplayer.html", context)
@@ -1738,7 +1738,7 @@ def bumpercar_spiky_restart_server(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not getattr(request.user, "is_authenticated", False):
         return redirect(
-            f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
+            f"{reverse('main:handrive_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
         )
     if not getattr(request.user, "is_superuser", False):
         raise Http404()
@@ -1758,7 +1758,7 @@ def bumpercar_spiky_set_npc_health(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not getattr(request.user, "is_authenticated", False):
         return redirect(
-            f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
+            f"{reverse('main:handrive_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
         )
     if not getattr(request.user, "is_superuser", False):
         raise Http404()
@@ -1782,7 +1782,7 @@ def bumpercar_spiky_admin_page(request, ui_lang=None):
     resolved_lang = resolve_ui_lang(request, ui_lang)
     if not getattr(request.user, "is_authenticated", False):
         return redirect(
-            f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
+            f"{reverse('main:handrive_login_lang', kwargs={'ui_lang': resolved_lang})}?next={quote(request.get_full_path() or '/', safe='/')}"
         )
     if not getattr(request.user, "is_superuser", False):
         raise Http404()
@@ -2096,12 +2096,12 @@ def none(request, ui_lang=None):
     )
     current_path = request.get_full_path() or "/"
     encoded_current_path = quote(current_path, safe="/")
-    context["docs_login_url"] = f"{reverse('main:docs_login_lang', kwargs={'ui_lang': resolved_lang})}?next={encoded_current_path}"
-    context["docs_signup_url"] = f"{reverse('main:docs_signup_lang', kwargs={'ui_lang': resolved_lang})}?next={encoded_current_path}"
-    context["docs_logout_url"] = reverse("main:docs_logout_lang", kwargs={"ui_lang": resolved_lang})
+    context["handrive_login_url"] = f"{reverse('main:handrive_login_lang', kwargs={'ui_lang': resolved_lang})}?next={encoded_current_path}"
+    context["handrive_signup_url"] = f"{reverse('main:handrive_signup_lang', kwargs={'ui_lang': resolved_lang})}?next={encoded_current_path}"
+    context["handrive_logout_url"] = reverse("main:handrive_logout_lang", kwargs={"ui_lang": resolved_lang})
     if request.user.is_authenticated:
         portfolio_profile = PortfolioProfile.objects.filter(user=request.user).only("profile_img").first()
-        context["docs_my_portfolio_url"] = reverse(
+        context["handrive_my_portfolio_url"] = reverse(
             "main:portfolio_user_lang",
             kwargs={"ui_lang": resolved_lang, "user_id": request.user.username},
         )
@@ -2114,10 +2114,10 @@ def none(request, ui_lang=None):
             "main:account_profile_image_upload_lang",
             kwargs={"ui_lang": resolved_lang},
         )
-        context["account_my_portfolio_url"] = context["docs_my_portfolio_url"]
+        context["account_my_portfolio_url"] = context["handrive_my_portfolio_url"]
         context["account_logout_form_id"] = "auth-logout-form-root"
         context["account_logout_next"] = reverse("main:none_lang", kwargs={"ui_lang": resolved_lang})
-        context["account_logout_url"] = context["docs_logout_url"]
+        context["account_logout_url"] = context["handrive_logout_url"]
     return render(request, 'none.html', context)
 
 
@@ -2452,10 +2452,10 @@ def _portfolio_write_redirect_with_status(request, status):
 
 
 def _ensure_authenticated_for_write(request):
-    """Return the docs-login redirect response when write pages require authentication."""
+    """Return the HanDrive login redirect response when write pages require authentication."""
     if request.user.is_authenticated:
         return None
-    return _redirect_to_docs_login_with_next(request)
+    return _redirect_to_handrive_login_with_next(request)
 
 
 @require_http_methods(["POST"])
@@ -3748,16 +3748,16 @@ def git_repo_create(request):
 
     try:
         from .handrive_views import (
-            get_request_docs_root_dir,
+            get_request_handrive_root_dir,
             normalize_relative_path,
-            has_docs_write_access,
-            has_docs_directory_write_access,
+            has_handrive_write_access,
+            has_handrive_directory_write_access,
             _get_git_repo_for_relative_path,
         )
         normalized_path = normalize_relative_path(path, allow_empty=False)
-        docs_root = get_request_docs_root_dir(request).resolve()
-        target_path = (docs_root / normalized_path).absolute()
-        if target_path != docs_root and docs_root not in target_path.parents:
+        handrive_root = get_request_handrive_root_dir(request).resolve()
+        target_path = (handrive_root / normalized_path).absolute()
+        if target_path != handrive_root and handrive_root not in target_path.parents:
             raise ValueError("허용되지 않은 경로입니다.")
         if not target_path.exists():
             raise FileNotFoundError("경로를 찾을 수 없습니다.")
@@ -3768,7 +3768,7 @@ def git_repo_create(request):
         return _git_json_error("폴더에만 Repo를 생성할 수 있습니다.")
     if _get_git_repo_for_relative_path(request, normalized_path) is not None:
         return _git_json_error("이미 Git 저장소가 연결된 경로입니다.", status=409)
-    if not has_docs_write_access(request, normalized_path) or not has_docs_directory_write_access(request, normalized_path):
+    if not has_handrive_write_access(request, normalized_path) or not has_handrive_directory_write_access(request, normalized_path):
         return _git_json_error("Repo를 생성할 권한이 없습니다.", status=403)
 
     svc = GitRepositoryService()

@@ -1959,21 +1959,6 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     mask-image: url("/static/icons/handrive/text.svg");
 }
 
-.handrive-item-type-icon.is-file.is-generic[data-file-icon="document"]::before {
-    -webkit-mask-image: url("/static/icons/handrive/document.svg");
-    mask-image: url("/static/icons/handrive/document.svg");
-}
-
-.handrive-item-type-icon.is-file.is-generic[data-file-icon="sheet"]::before {
-    -webkit-mask-image: url("/static/icons/handrive/sheet.svg");
-    mask-image: url("/static/icons/handrive/sheet.svg");
-}
-
-.handrive-item-type-icon.is-file.is-generic[data-file-icon="presentation"]::before {
-    -webkit-mask-image: url("/static/icons/handrive/presentation.svg");
-    mask-image: url("/static/icons/handrive/presentation.svg");
-}
-
 .handrive-item-type-icon.is-file.is-generic[data-file-icon="data"]::before {
     -webkit-mask-image: url("/static/icons/handrive/data.svg");
     mask-image: url("/static/icons/handrive/data.svg");

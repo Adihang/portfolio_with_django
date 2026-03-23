@@ -6,11 +6,11 @@
 <div class="handrive-toolbar-wrap ui-toolbar-wrap">
     <div class="handrive-shell ui-shell handrive-toolbar ui-toolbar">
         <div class="handrive-toolbar-left ui-toolbar-left">
-            <h1 class="handrive-title ui-title">{{ docs_text.auth_login_button }}</h1>
+            <h1 class="handrive-title ui-title">{{ handrive_text.auth_login_button }}</h1>
             <div class="handrive-subtitle ui-subtitle handrive-path-breadcrumbs ui-path-breadcrumbs">
-                <a class="handrive-path-link ui-path-link" href="{{ docs_auth_breadcrumb_url|default:docs_base_url }}">{{ docs_auth_breadcrumb_label }}</a>
+                <a class="handrive-path-link ui-path-link" href="{{ handrive_auth_breadcrumb_url|default:handrive_base_url }}">{{ handrive_auth_breadcrumb_label }}</a>
                 <span class="handrive-path-sep ui-path-sep">/</span>
-                <span class="handrive-path-current ui-path-current">{{ docs_text.auth_login_button }}</span>
+                <span class="handrive-path-current ui-path-current">{{ handrive_text.auth_login_button }}</span>
             </div>
         </div>
     </div>
@@ -19,18 +19,18 @@
 <main class="handrive-shell ui-shell handrive-content ui-content">
     <form method="post" class="handrive-login-form" id="handrive-login-form">
         {% csrf_token %}
-        <input type="hidden" name="next" value="{{ docs_login_next }}">
+        <input type="hidden" name="next" value="{{ handrive_login_next }}">
 
-        {% if docs_login_error_message or docs_login_form.non_field_errors %}
-            <div class="handrive-login-error">{{ docs_login_error_message|default:docs_text.auth_login_error }}</div>
+        {% if handrive_login_error_message or handrive_login_form.non_field_errors %}
+            <div class="handrive-login-error">{{ handrive_login_error_message|default:handrive_text.auth_login_error }}</div>
         {% endif %}
 
         <label class="handrive-field handrive-field-full">
-            <span>{{ docs_text.auth_username_label }}</span>
+            <span>{{ handrive_text.auth_username_label }}</span>
             <input
                 type="text"
                 name="username"
-                value="{{ docs_login_form.username.value|default:'' }}"
+                value="{{ handrive_login_form.username.value|default:'' }}"
                 autocomplete="username"
                 required
                 autofocus
@@ -38,7 +38,7 @@
         </label>
 
         <label class="handrive-field handrive-field-full">
-            <span>{{ docs_text.auth_password_label }}</span>
+            <span>{{ handrive_text.auth_password_label }}</span>
             <input
                 type="password"
                 name="password"
@@ -47,26 +47,26 @@
             >
         </label>
 
-        <label class="handrive-field handrive-field-full" id="handrive-login-captcha-block"{% if not docs_login_show_captcha %} hidden{% endif %}>
-                <span>{{ docs_text.auth_login_captcha_label }}</span>
-                <span class="handrive-subtitle">{{ docs_text.auth_login_captcha_hint }}</span>
-                <span id="handrive-login-captcha-question">{{ docs_login_captcha_question }}</span>
+        <label class="handrive-field handrive-field-full" id="handrive-login-captcha-block"{% if not handrive_login_show_captcha %} hidden{% endif %}>
+                <span>{{ handrive_text.auth_login_captcha_label }}</span>
+                <span class="handrive-subtitle">{{ handrive_text.auth_login_captcha_hint }}</span>
+                <span id="handrive-login-captcha-question">{{ handrive_login_captcha_question }}</span>
                 <input
                     type="text"
                     name="handrive-captcha-answer"
                     inputmode="numeric"
                     autocomplete="off"
-                    placeholder="{{ docs_text.auth_login_captcha_placeholder }}"
-                    {% if docs_login_show_captcha %}required{% endif %}
+                    placeholder="{{ handrive_text.auth_login_captcha_placeholder }}"
+                    {% if handrive_login_show_captcha %}required{% endif %}
                 >
-                {% if docs_turnstile_site_key %}
+                {% if handrive_turnstile_site_key %}
                     <div id="handrive-turnstile-widget"></div>
                 {% endif %}
         </label>
 
         <div class="handrive-login-actions">
-            <a class="handrive-btn" href="{{ docs_base_url }}">{{ docs_text.cancel }}</a>
-            <button class="handrive-btn handrive-btn-primary" type="submit" id="handrive-login-submit-btn">{{ docs_text.auth_login_submit }}</button>
+            <a class="ui-btn" href="{{ handrive_base_url }}">{{ handrive_text.cancel }}</a>
+            <button class="ui-btn ui-btn-primary" type="submit" id="handrive-login-submit-btn">{{ handrive_text.auth_login_submit }}</button>
         </div>
     </form>
 </main>
@@ -101,8 +101,8 @@
         const captchaQuestionNode = document.getElementById("handrive-login-captcha-question");
         const captchaAnswerInput = loginForm.querySelector('input[name="handrive-captcha-answer"]');
         const turnstileContainer = document.getElementById("handrive-turnstile-widget");
-        const captchaStatusUrl = "{{ docs_api_login_captcha_status_url|escapejs }}";
-        const turnstileSiteKey = "{{ docs_turnstile_site_key|escapejs }}";
+        const captchaStatusUrl = "{{ handrive_api_login_captcha_status_url|escapejs }}";
+        const turnstileSiteKey = "{{ handrive_turnstile_site_key|escapejs }}";
 
         const getTurnstileTheme = function () {
             return document.body.classList.contains("theme-dark") ? "dark" : "light";
@@ -218,7 +218,7 @@
                 });
         };
 
-        window.ideTurnstileOnload = function () {
+        window.handriveTurnstileOnload = function () {
             if (captchaBlock && !captchaBlock.hasAttribute("hidden")) {
                 renderTurnstile();
             }
@@ -242,7 +242,7 @@
         };
 
         if (window.turnstile && typeof window.turnstile.render === "function") {
-            window.ideTurnstileOnload();
+            window.handriveTurnstileOnload();
         }
 
         if (usernameInput) {
@@ -261,7 +261,7 @@
         }
     })();
 </script>
-{% if docs_turnstile_site_key %}
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=ideTurnstileOnload&render=explicit" async defer></script>
+{% if handrive_turnstile_site_key %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=handriveTurnstileOnload&render=explicit" async defer></script>
 {% endif %}
 {% endblock %}

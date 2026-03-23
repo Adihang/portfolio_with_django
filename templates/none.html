@@ -15,7 +15,7 @@
         <div class="root-shell-links">
             <div data-root-nav-links-host></div>
         </div>
-        <form class="root-search-form" data-root-search-form>
+        <form class="ui-search-form" data-root-search-form>
             <button
                 type="submit"
                 class="root-search-submit"
@@ -66,10 +66,10 @@
             <p class="root-shortcuts-hint" data-root-shortcuts-hint></p>
             {% if not request.user.is_authenticated %}
             <div class="root-shortcuts-auth-actions">
-                <a class="root-shortcuts-auth-btn" href="{{ docs_login_url }}">
+                <a class="root-shortcuts-auth-btn" href="{{ handrive_login_url }}">
                     {% include 'partials/ui_i18n.html' with key='login' %}
                 </a>
-                <a class="root-shortcuts-auth-btn root-shortcuts-auth-btn-primary" href="{{ docs_signup_url }}">
+                <a class="root-shortcuts-auth-btn root-shortcuts-auth-btn-primary" href="{{ handrive_signup_url }}">
                     {% include 'partials/ui_i18n.html' with key='signup' %}
                 </a>
             </div>

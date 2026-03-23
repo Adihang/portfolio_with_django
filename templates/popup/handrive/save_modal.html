@@ -2,48 +2,48 @@
     <div class="handrive-save-modal-backdrop" id="handrive-save-modal-backdrop"></div>
     <div class="handrive-save-modal-dialog" data-popup-fit-bottom role="dialog" aria-modal="true" aria-labelledby="handrive-save-modal-title">
         <div class="handrive-save-modal-head">
-            <h2 id="handrive-save-modal-title" class="handrive-save-modal-title">{{ docs_text.save_location_title }}</h2>
-            <button type="button" class="handrive-save-close-btn" id="handrive-save-close-btn" aria-label="{{ docs_text.close_label }}">x</button>
+            <h2 id="handrive-save-modal-title" class="handrive-save-modal-title">{{ handrive_text.save_location_title }}</h2>
+            <button type="button" class="handrive-save-close-btn" id="handrive-save-close-btn" aria-label="{{ handrive_text.close_label }}">x</button>
         </div>
         <div class="handrive-save-location-bar">
-            <button type="button" class="handrive-btn" id="handrive-save-up-btn">{{ docs_text.up_button }}</button>
+            <button type="button" class="ui-btn" id="handrive-save-up-btn">{{ handrive_text.up_button }}</button>
             <div class="handrive-save-breadcrumb" id="handrive-save-breadcrumb"></div>
         </div>
         <div class="handrive-save-browser">
             <aside class="handrive-save-sidebar">
-                <div class="handrive-save-sidebar-title">{{ docs_text.quick_paths_title }}</div>
+                <div class="handrive-save-sidebar-title">{{ handrive_text.quick_paths_title }}</div>
                 <ul class="handrive-save-sidebar-list" id="handrive-save-quick-list"></ul>
             </aside>
             <section class="handrive-save-folder-pane">
-                <div class="handrive-save-folder-head">{{ docs_text.folder_title }}</div>
+                <div class="handrive-save-folder-head">{{ handrive_text.folder_title }}</div>
                 <ul class="handrive-save-folder-list" id="handrive-save-folder-list"></ul>
             </section>
         </div>
         <div class="handrive-save-file-meta-grid">
             <label id="handrive-save-name-field">
                 <span>
-                    <span class="handrive-save-name-label-main">{{ docs_text.save_filename_label_main|default:"파일명" }}</span>
-                    <span class="handrive-save-name-label-sub">{{ docs_text.save_filename_label_sub|default:"(확장자 포함)" }}</span>
+                    <span class="handrive-save-name-label-main">{{ handrive_text.save_filename_label_main|default:"파일명" }}</span>
+                    <span class="handrive-save-name-label-sub">{{ handrive_text.save_filename_label_sub|default:"(확장자 포함)" }}</span>
                 </span>
-                <input type="text" id="handrive-save-filename-input" value="{{ initial_filename }}" placeholder="{{ docs_text.save_filename_placeholder }}">
+                <input type="text" id="handrive-save-filename-input" value="{{ initial_filename }}" placeholder="{{ handrive_text.save_filename_placeholder }}">
             </label>
             <label id="handrive-save-extension-field">
-                <span>{{ docs_text.file_extension_label }}</span>
+                <span>{{ handrive_text.file_extension_label }}</span>
                 <div class="handrive-save-extension-controls">
-                    <select id="handrive-save-extension-select" aria-label="{{ docs_text.file_extension_quick_label }}">
-                        {% for ext in docs_file_extension_options %}
+                    <select id="handrive-save-extension-select" aria-label="{{ handrive_text.file_extension_quick_label }}">
+                        {% for ext in handrive_file_extension_options %}
                             <option value="{{ ext }}"{% if ext == initial_extension %} selected{% endif %}>{{ ext }}</option>
                         {% endfor %}
-                        <option value="__custom__">{{ docs_text.file_extension_custom_option }}</option>
+                        <option value="__custom__">{{ handrive_text.file_extension_custom_option }}</option>
                     </select>
                 </div>
             </label>
         </div>
         <div class="handrive-save-modal-actions">
-            <button type="button" class="handrive-btn" id="handrive-create-folder-btn">{{ docs_text.create_folder_button }}</button>
+            <button type="button" class="ui-btn" id="handrive-create-folder-btn">{{ handrive_text.create_folder_button }}</button>
             <div class="handrive-save-modal-actions-right">
-                <button type="button" class="handrive-btn" id="handrive-save-cancel-btn">{{ docs_text.cancel }}</button>
-                <button type="button" class="handrive-btn handrive-btn-primary" id="handrive-save-confirm-btn">{{ docs_text.save_confirm_button }}</button>
+                <button type="button" class="ui-btn" id="handrive-save-cancel-btn">{{ handrive_text.cancel }}</button>
+                <button type="button" class="ui-btn ui-btn-primary" id="handrive-save-confirm-btn">{{ handrive_text.save_confirm_button }}</button>
             </div>
         </div>
 

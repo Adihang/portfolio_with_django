@@ -87,7 +87,7 @@
         var buildListUrl = settings.buildListUrl || function () { return ""; };
         var handriveBaseUrl = settings.handriveBaseUrl || "";
         var handriveRootUrl = settings.handriveRootUrl || "";
-        var bindDocsPathDropTargets = settings.bindDocsPathDropTargets || function () {};
+        var bindHandrivePathDropTargets = settings.bindHandrivePathDropTargets || function () {};
         var isSuperuser = Boolean(settings.isSuperuser);
         var scopedHomeDir = settings.scopedHomeDir || "";
         var effectiveRootLabel = settings.effectiveRootLabel || "";
@@ -137,7 +137,7 @@
         });
 
         pathBreadcrumbs.replaceChildren(fragment);
-        bindDocsPathDropTargets();
+        bindHandrivePathDropTargets();
     }
 
     function getCachedEntries(dirPath, state) {

@@ -89,8 +89,11 @@
         if ([".odp", ".key"].includes(extension)) {
             return "file";
         }
-        if ([".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
+        if (extension === ".json") {
             return "data";
+        }
+        if ([".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
+            return "file";
         }
         if ([".js", ".mjs", ".cjs"].includes(extension)) {
             return "js";
@@ -151,9 +154,6 @@
         }
         if (extension === ".json") {
             return "json";
-        }
-        if ([".yaml", ".yml", ".toml", ".ini", ".conf", ".env", ".xml"].includes(extension)) {
-            return "data";
         }
         if (extension === ".md") {
             return "markdown";

@@ -198,7 +198,8 @@ class NavLink(models.Model):
         return f"{self.order}. {self.name}"
 
 
-class DocsAccessRule(models.Model):
+class HandriveAccessRule(models.Model):
+
     path = models.CharField(
         "경로",
         max_length=1024,
@@ -209,41 +210,98 @@ class DocsAccessRule(models.Model):
     )
     read_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
+        through="HandriveAccessRuleReadUser",
         verbose_name="읽기 허용 사용자",
         blank=True,
-        related_name="docs_read_access_rules",
+        related_name="handrive_read_access_rules",
     )
     read_groups = models.ManyToManyField(
         Group,
+        through="HandriveAccessRuleReadGroup",
         verbose_name="읽기 허용 그룹",
         blank=True,
-        related_name="docs_read_access_rules",
+        related_name="handrive_read_access_rules",
     )
     write_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
+        through="HandriveAccessRuleWriteUser",
         verbose_name="쓰기 허용 사용자",
         blank=True,
-        related_name="docs_write_access_rules",
+        related_name="handrive_write_access_rules",
     )
     write_groups = models.ManyToManyField(
         Group,
+        through="HandriveAccessRuleWriteGroup",
         verbose_name="쓰기 허용 그룹",
         blank=True,
-        related_name="docs_write_access_rules",
+        related_name="handrive_write_access_rules",
     )
     created_at = models.DateTimeField("생성일", auto_now_add=True)
     updated_at = models.DateTimeField("수정일", auto_now=True)
 
     class Meta:
         ordering = ["path"]
-        verbose_name = "문서 접근 규칙"
-        verbose_name_plural = "문서 접근 규칙"
+        db_table = "main_docsaccessrule"
+        verbose_name = "HanDrive 접근 규칙"
+        verbose_name_plural = "HanDrive 접근 규칙"
 
     def __str__(self):
         return self.path or "/handrive"
 
 
-class DocsSharedLink(models.Model):
+class HandriveAccessRuleReadUser(models.Model):
+    handrive_access_rule = models.ForeignKey(
+        HandriveAccessRule,
+        on_delete=models.CASCADE,
+        db_column="docsaccessrule_id",
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "main_docsaccessrule_read_users"
+        managed = False
+
+
+class HandriveAccessRuleReadGroup(models.Model):
+    handrive_access_rule = models.ForeignKey(
+        HandriveAccessRule,
+        on_delete=models.CASCADE,
+        db_column="docsaccessrule_id",
+    )
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "main_docsaccessrule_read_groups"
+        managed = False
+
+
+class HandriveAccessRuleWriteUser(models.Model):
+    handrive_access_rule = models.ForeignKey(
+        HandriveAccessRule,
+        on_delete=models.CASCADE,
+        db_column="docsaccessrule_id",
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "main_docsaccessrule_write_users"
+        managed = False
+
+
+class HandriveAccessRuleWriteGroup(models.Model):
+    handrive_access_rule = models.ForeignKey(
+        HandriveAccessRule,
+        on_delete=models.CASCADE,
+        db_column="docsaccessrule_id",
+    )
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "main_docsaccessrule_write_groups"
+        managed = False
+
+
+class HandriveSharedLink(models.Model):
     path = models.CharField(
         "문서 경로",
         max_length=1024,
@@ -253,7 +311,7 @@ class DocsSharedLink(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="docs_shared_links",
+        related_name="handrive_shared_links",
         verbose_name="공유 생성 사용자",
     )
     share_slug = models.CharField("공유 슬러그", max_length=255)
@@ -264,6 +322,7 @@ class DocsSharedLink(models.Model):
         ordering = ["owner__username", "share_slug"]
         verbose_name = "문서 공유 링크"
         verbose_name_plural = "문서 공유 링크"
+        db_table = "main_docssharedlink"
         constraints = [
             models.UniqueConstraint(
                 fields=["owner", "share_slug"],
@@ -275,11 +334,11 @@ class DocsSharedLink(models.Model):
         return f"{self.owner.username}/{self.share_slug}"
 
 
-class DocsLoginAttemptGuard(models.Model):
+class HandriveLoginAttemptGuard(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="docs_login_attempt_guard",
+        related_name="handrive_login_attempt_guard",
         verbose_name="사용자",
     )
     failed_attempts = models.PositiveIntegerField("연속 로그인 실패 횟수", default=0)
@@ -287,8 +346,9 @@ class DocsLoginAttemptGuard(models.Model):
     updated_at = models.DateTimeField("수정일", auto_now=True)
 
     class Meta:
-        verbose_name = "Docs 로그인 보호 상태"
-        verbose_name_plural = "Docs 로그인 보호 상태"
+        db_table = "main_docsloginattemptguard"
+        verbose_name = "HanDrive 로그인 보호 상태"
+        verbose_name_plural = "HanDrive 로그인 보호 상태"
 
 
 class QuickLink(models.Model):

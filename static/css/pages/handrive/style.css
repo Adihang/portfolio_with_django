@@ -28,20 +28,20 @@ body.ui-page {
     --handrive-shadow-lg: var(--site-shadow-lg);
     --handrive-shadow-xl: var(--site-shadow-xl);
     --handrive-link: var(--site-link);
-    --handrive-btn-base-bg: var(--btn-template-base-bg);
-    --handrive-btn-base-border: var(--btn-template-base-border);
-    --handrive-btn-base-color: var(--btn-template-base-color);
-    --handrive-btn-hover-bg: var(--btn-template-base-hover-bg);
-    --handrive-btn-hover-border: var(--btn-template-base-hover-border);
-    --handrive-btn-hover-color: var(--btn-template-base-hover-color);
-    --handrive-btn-primary-bg: var(--btn-template-primary-bg);
-    --handrive-btn-primary-border: var(--btn-template-primary-border);
-    --handrive-btn-primary-text: var(--btn-template-primary-color);
-    --handrive-btn-primary-hover-bg: var(--btn-template-primary-hover-bg);
-    --handrive-btn-primary-hover-border: var(--btn-template-primary-hover-border);
-    --handrive-btn-primary-hover-text: var(--btn-template-primary-hover-color);
-    --handrive-btn-hover-lift: var(--btn-template-hover-lift);
-    --handrive-btn-transition: var(--btn-template-transition);
+    --ui-btn-base-bg: var(--btn-template-base-bg);
+    --ui-btn-base-border: var(--btn-template-base-border);
+    --ui-btn-base-color: var(--btn-template-base-color);
+    --ui-btn-hover-bg: var(--btn-template-base-hover-bg);
+    --ui-btn-hover-border: var(--btn-template-base-hover-border);
+    --ui-btn-hover-color: var(--btn-template-base-hover-color);
+    --ui-btn-primary-bg: var(--btn-template-primary-bg);
+    --ui-btn-primary-border: var(--btn-template-primary-border);
+    --ui-btn-primary-text: var(--btn-template-primary-color);
+    --ui-btn-primary-hover-bg: var(--btn-template-primary-hover-bg);
+    --ui-btn-primary-hover-border: var(--btn-template-primary-hover-border);
+    --ui-btn-primary-hover-text: var(--btn-template-primary-hover-color);
+    --ui-btn-hover-lift: var(--btn-template-hover-lift);
+    --ui-btn-transition: var(--btn-template-transition);
     --handrive-selected-bg: var(--site-selected-bg);
     --handrive-divider-weak: var(--color-section-border);
     --handrive-panel-border: var(--color-section-border);
@@ -219,13 +219,36 @@ body.ui-page .portfolio-print-btn {
     margin-bottom: 0;
 }
 
-.handrive-content-snippet-tools .handrive-btn:focus-visible {
-    background: var(--handrive-btn-current-bg);
-    border-color: var(--handrive-btn-current-border);
-    color: var(--handrive-btn-current-color);
+.handrive-content-snippet-tools .ui-btn:focus-visible {
+    background: var(--ui-btn-current-bg);
+    border-color: var(--ui-btn-current-border);
+    color: var(--ui-btn-current-color);
     transform: translateY(0);
-    outline: 1px solid var(--handrive-btn-current-hover-border);
+    outline: 1px solid var(--ui-btn-current-hover-border);
     outline-offset: 1px;
+}
+
+.handrive-list-search-form {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 10px;
+    min-height: 48px;
+}
+
+.handrive-list-search-input {
+    width: 100%;
+    height: 48px;
+}
+
+.handrive-list-search-input::-webkit-search-cancel-button {
+    display: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.handrive-list-search-form .root-search-submit,
+.handrive-list-search-form .handrive-list-search-submit {
+    height: 48px;
 }
 
 .handrive-toolbar-right,
@@ -291,11 +314,11 @@ body.ui-page .portfolio-print-btn {
     order: -1;
 }
 
-.ui-toolbar-right:not(:has(.handrive-toolbar-actions > *)) .handrive-quota-bar {
+.ui-toolbar-right:not(:has(.handrive-toolbar-actions > *)) .account-storage-bar {
     padding-right: 8px;
 }
 
-.handrive-quota-bar {
+.account-storage-bar {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -310,41 +333,41 @@ body.ui-page .portfolio-print-btn {
     user-select: none;
 }
 
-.handrive-quota-bar:hover .handrive-quota-bar-label,
-.handrive-quota-bar:focus-visible .handrive-quota-bar-label {
+.account-storage-bar:hover .account-storage-bar-label,
+.account-storage-bar:focus-visible .account-storage-bar-label {
     color: var(--handrive-text-stronger);
 }
 
-.handrive-quota-bar:hover .handrive-quota-bar-track,
-.handrive-quota-bar:focus-visible .handrive-quota-bar-track {
+.account-storage-bar:hover .account-storage-bar-track,
+.account-storage-bar:focus-visible .account-storage-bar-track {
     background: rgba(0, 0, 0, 0.18);
 }
 
-body.theme-dark .handrive-quota-bar:hover .handrive-quota-bar-track,
-body.theme-dark .handrive-quota-bar:focus-visible .handrive-quota-bar-track {
+body.theme-dark .account-storage-bar:hover .account-storage-bar-track,
+body.theme-dark .account-storage-bar:focus-visible .account-storage-bar-track {
     background: rgba(255, 255, 255, 0.22);
 }
 
-.handrive-quota-bar:hover .handrive-quota-bar-fill,
-.handrive-quota-bar:focus-visible .handrive-quota-bar-fill {
+.account-storage-bar:hover .account-storage-bar-fill,
+.account-storage-bar:focus-visible .account-storage-bar-fill {
     filter: brightness(1.1);
 }
 
-.handrive-quota-bar:focus-visible {
+.account-storage-bar:focus-visible {
     outline: 2px solid var(--theme-accent, #4a90d9);
     outline-offset: 3px;
     border-radius: 4px;
 }
 
-.handrive-quota-bar[aria-expanded="true"] .handrive-quota-bar-label {
+.account-storage-bar[aria-expanded="true"] .account-storage-bar-label {
     color: var(--handrive-text-stronger);
 }
 
-.handrive-quota-bar[aria-expanded="true"] .handrive-quota-bar-fill {
+.account-storage-bar[aria-expanded="true"] .account-storage-bar-fill {
     filter: brightness(1.1);
 }
 
-.handrive-quota-popup {
+.account-storage-popup {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
@@ -359,15 +382,15 @@ body.theme-dark .handrive-quota-bar:focus-visible .handrive-quota-bar-track {
     gap: 12px;
 }
 
-body.theme-dark .handrive-quota-popup {
+body.theme-dark .account-storage-popup {
     background: rgba(46, 46, 46, 0.97);
 }
 
-.handrive-quota-popup[hidden] {
+.account-storage-popup[hidden] {
     display: none;
 }
 
-.handrive-quota-popup-header {
+.account-storage-popup-header {
     font-size: 14px;
     line-height: 1.3;
     color: var(--handrive-text);
@@ -377,28 +400,28 @@ body.theme-dark .handrive-quota-popup {
     flex-wrap: wrap;
 }
 
-.handrive-quota-popup-title {
+.account-storage-popup-title {
     font-weight: 600;
     color: var(--handrive-text-stronger);
     margin-right: 4px;
 }
 
-.handrive-quota-popup-used {
+.account-storage-popup-used {
     font-weight: 700;
     color: #3aaa5c;
     font-size: 15px;
 }
 
-body.theme-dark .handrive-quota-popup-used {
+body.theme-dark .account-storage-popup-used {
     color: var(--theme-accent, #4a90d9);
 }
 
-.handrive-quota-popup-sep,
-.handrive-quota-popup-total {
+.account-storage-popup-sep,
+.account-storage-popup-total {
     color: var(--handrive-text);
 }
 
-.handrive-quota-popup-bar {
+.account-storage-popup-bar {
     display: flex;
     width: 100%;
     height: 20px;
@@ -407,57 +430,57 @@ body.theme-dark .handrive-quota-popup-used {
     background: #e0e0e0;
 }
 
-body.theme-dark .handrive-quota-popup-bar {
+body.theme-dark .account-storage-popup-bar {
     background: rgba(255, 255, 255, 0.10);
 }
 
-.handrive-quota-popup-bar-seg {
+.account-storage-popup-bar-seg {
     height: 100%;
     flex-shrink: 0;
     transition: opacity 0.15s;
 }
 
-.handrive-quota-popup-bar-seg:hover {
+.account-storage-popup-bar-seg:hover {
     opacity: 0.82;
 }
 
-.handrive-quota-popup-bar-free {
+.account-storage-popup-bar-free {
     background: #d0d0d0;
     flex: 1 0 0;
 }
 
-body.theme-dark .handrive-quota-popup-bar-free {
+body.theme-dark .account-storage-popup-bar-free {
     background: rgba(255, 255, 255, 0.14);
 }
 
-.handrive-quota-popup-legend {
+.account-storage-popup-legend {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 6px 12px;
 }
 
-.handrive-quota-popup-legend-item {
+.account-storage-popup-legend-item {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.handrive-quota-popup-legend-dot {
+.account-storage-popup-legend-dot {
     width: 10px;
     height: 10px;
     border-radius: 2px;
     flex-shrink: 0;
 }
 
-.handrive-quota-popup-legend-dot-free {
+.account-storage-popup-legend-dot-free {
     background: #d0d0d0;
 }
 
-body.theme-dark .handrive-quota-popup-legend-dot-free {
+body.theme-dark .account-storage-popup-legend-dot-free {
     background: rgba(255, 255, 255, 0.14);
 }
 
-.handrive-quota-popup-legend-text {
+.account-storage-popup-legend-text {
     font-size: 12px;
     line-height: 1.3;
     color: var(--handrive-text);
@@ -465,7 +488,7 @@ body.theme-dark .handrive-quota-popup-legend-dot-free {
     font-variant-numeric: tabular-nums;
 }
 
-.handrive-quota-bar-track {
+.account-storage-bar-track {
     width: 100%;
     height: 8px;
     border-radius: 999px;
@@ -473,11 +496,11 @@ body.theme-dark .handrive-quota-popup-legend-dot-free {
     overflow: hidden;
 }
 
-body.theme-dark .handrive-quota-bar-track {
+body.theme-dark .account-storage-bar-track {
     background: rgba(255, 255, 255, 0.14);
 }
 
-.handrive-quota-bar-fill {
+.account-storage-bar-fill {
     height: 100%;
     border-radius: 999px;
     background: #3aaa5c;
@@ -485,11 +508,11 @@ body.theme-dark .handrive-quota-bar-track {
     min-width: 2px;
 }
 
-body.theme-dark .handrive-quota-bar-fill {
+body.theme-dark .account-storage-bar-fill {
     background: var(--theme-accent, #4a90d9);
 }
 
-.handrive-quota-bar-label {
+.account-storage-bar-label {
     font-size: 11px;
     line-height: 1.2;
     color: var(--handrive-text-muted, var(--handrive-text));
@@ -736,8 +759,8 @@ img.ui-auth-account-avatar {
     flex-wrap: wrap;
 }
 
-.handrive-toolbar-actions .handrive-btn,
-.handrive-toolbar-actions .ui-auth-form .handrive-btn {
+.handrive-toolbar-actions .ui-btn,
+.handrive-toolbar-actions .ui-auth-form .ui-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -763,26 +786,26 @@ img.ui-auth-account-avatar {
     cursor: pointer;
     appearance: none;
     -webkit-appearance: none;
-    background: var(--handrive-btn-base-bg);
-    color: var(--handrive-btn-base-color);
+    background: var(--ui-btn-base-bg);
+    color: var(--ui-btn-base-color);
     line-height: 1;
     text-decoration: none;
     box-sizing: border-box;
     transform: translateY(0);
-    transition: var(--handrive-btn-transition);
+    transition: var(--ui-btn-transition);
 }
 
 .handrive-help-icon-link:visited,
 .handrive-help-icon-link:active {
-    color: var(--handrive-btn-base-color);
+    color: var(--ui-btn-base-color);
     text-decoration: none;
 }
 
 .handrive-help-icon-link:hover,
 .handrive-help-icon-link:focus-visible {
-    background: var(--handrive-btn-hover-bg);
-    color: var(--handrive-btn-hover-color);
-    transform: translateY(var(--handrive-btn-hover-lift));
+    background: var(--ui-btn-hover-bg);
+    color: var(--ui-btn-hover-color);
+    transform: translateY(var(--ui-btn-hover-lift));
     text-decoration: none;
 }
 
@@ -1116,8 +1139,8 @@ body.theme-dark .handrive-help-icon-symbol {
 }
 
 .handrive-job-queue-item:hover {
-    background: color-mix(in srgb, var(--handrive-btn-current-bg) 16%, var(--handrive-surface-muted));
-    border-color: color-mix(in srgb, var(--handrive-btn-current-bg) 28%, var(--handrive-border-soft));
+    background: color-mix(in srgb, var(--ui-btn-current-bg) 16%, var(--handrive-surface-muted));
+    border-color: color-mix(in srgb, var(--ui-btn-current-bg) 28%, var(--handrive-border-soft));
 }
 
 .handrive-job-queue-item-head {
@@ -1221,7 +1244,7 @@ body.theme-dark .handrive-help-icon-symbol {
     inset: 0 auto 0 0;
     width: 0%;
     border-radius: inherit;
-    background: var(--handrive-btn-primary-bg);
+    background: var(--ui-btn-primary-bg);
     transition: width 0.18s ease;
 }
 
@@ -1501,7 +1524,7 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
 
 .handrive-list-preview-zoom-btn,
 .handrive-view-zoom-btn {
-    /* handrive-btn 클래스를 사용하지 않으므로 모든 스타일을 여기에 명시 */
+    /* ui-btn 클래스를 사용하지 않으므로 모든 스타일을 여기에 명시 */
     appearance: none;
     width: 50px;
     height: 50px;
@@ -1543,18 +1566,18 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     line-height: 1.55;
 }
 
-.handrive-btn {
-    --handrive-btn-current-bg: var(--handrive-btn-base-bg);
-    --handrive-btn-current-border: var(--handrive-btn-base-border);
-    --handrive-btn-current-color: var(--handrive-btn-base-color);
-    --handrive-btn-current-hover-bg: var(--handrive-btn-hover-bg);
-    --handrive-btn-current-hover-border: var(--handrive-btn-hover-border);
-    --handrive-btn-current-hover-color: var(--handrive-btn-hover-color);
+.ui-btn {
+    --ui-btn-current-bg: var(--ui-btn-base-bg);
+    --ui-btn-current-border: var(--ui-btn-base-border);
+    --ui-btn-current-color: var(--ui-btn-base-color);
+    --ui-btn-current-hover-bg: var(--ui-btn-hover-bg);
+    --ui-btn-current-hover-border: var(--ui-btn-hover-border);
+    --ui-btn-current-hover-color: var(--ui-btn-hover-color);
     appearance: none;
-    border: 1px solid var(--handrive-btn-current-border);
+    border: 1px solid var(--ui-btn-current-border);
     border-radius: var(--handrive-radius-sm);
-    background: var(--handrive-btn-current-bg);
-    color: var(--handrive-btn-current-color);
+    background: var(--ui-btn-current-bg);
+    color: var(--ui-btn-current-color);
     padding: 8px 12px;
     font-size: 16px;
     line-height: 1;
@@ -1563,38 +1586,38 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     cursor: pointer;
     box-shadow: none;
     transform: translateY(0);
-    transition: var(--handrive-btn-transition);
+    transition: var(--ui-btn-transition);
 }
 
-.handrive-btn:visited,
-.handrive-btn:active {
-    color: var(--handrive-btn-current-color);
+.ui-btn:visited,
+.ui-btn:active {
+    color: var(--ui-btn-current-color);
     text-decoration: none;
 }
 
-.handrive-btn:hover,
-.handrive-btn:focus-visible {
-    background: var(--handrive-btn-current-hover-bg);
-    border-color: var(--handrive-btn-current-hover-border);
-    color: var(--handrive-btn-current-hover-color);
+.ui-btn:hover,
+.ui-btn:focus-visible {
+    background: var(--ui-btn-current-hover-bg);
+    border-color: var(--ui-btn-current-hover-border);
+    color: var(--ui-btn-current-hover-color);
     box-shadow: none;
-    transform: translateY(var(--handrive-btn-hover-lift));
+    transform: translateY(var(--ui-btn-hover-lift));
 }
 
-.handrive-btn.handrive-btn-primary {
-    --handrive-btn-current-bg: var(--handrive-btn-primary-bg);
-    --handrive-btn-current-border: var(--handrive-btn-primary-border);
-    --handrive-btn-current-color: var(--handrive-btn-primary-text);
-    --handrive-btn-current-hover-bg: var(--handrive-btn-primary-hover-bg);
-    --handrive-btn-current-hover-border: var(--handrive-btn-primary-hover-border);
-    --handrive-btn-current-hover-color: var(--handrive-btn-primary-hover-text);
+.ui-btn.ui-btn-primary {
+    --ui-btn-current-bg: var(--ui-btn-primary-bg);
+    --ui-btn-current-border: var(--ui-btn-primary-border);
+    --ui-btn-current-color: var(--ui-btn-primary-text);
+    --ui-btn-current-hover-bg: var(--ui-btn-primary-hover-bg);
+    --ui-btn-current-hover-border: var(--ui-btn-primary-hover-border);
+    --ui-btn-current-hover-color: var(--ui-btn-primary-hover-text);
 }
 
-.handrive-btn.handrive-btn-primary:visited,
-.handrive-btn.handrive-btn-primary:hover,
-.handrive-btn.handrive-btn-primary:focus-visible,
-.handrive-btn.handrive-btn-primary:active {
-    color: var(--handrive-btn-current-hover-color);
+.ui-btn.ui-btn-primary:visited,
+.ui-btn.ui-btn-primary:hover,
+.ui-btn.ui-btn-primary:focus-visible,
+.ui-btn.ui-btn-primary:active {
+    color: var(--ui-btn-current-hover-color);
     text-decoration: none;
 }
 
@@ -1693,14 +1716,7 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     line-height: 1.2;
 }
 
-.handrive-current-dir-name {
-    flex: 0 1 auto;
-    min-width: 0;
-    font-weight: 700;
-    font-size: 18px;
-}
-
-.handrive-current-dir-name-wrap {
+.handrive-item-name-wrap {
     display: inline-flex;
     align-items: baseline;
     gap: 8px;
@@ -1708,7 +1724,7 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     min-width: 0;
 }
 
-.handrive-current-dir-repo-name {
+.handrive-item-meta-label {
     flex: 0 1 auto;
     min-width: 0;
     color: color-mix(in srgb, var(--handrive-text-subtle) 78%, transparent);
@@ -1733,8 +1749,10 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     white-space: nowrap;
 }
 
-.handrive-current-dir-row .handrive-current-dir-name {
+.handrive-current-dir-row .handrive-item-name {
     flex: 0 1 auto;
+    font-weight: 700;
+    font-size: 18px;
 }
 
 .handrive-item-tree-prefix {
@@ -2058,7 +2076,7 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     height: 20px;
     margin: 0;
     transform: scaleX(1.355) scaleY(1.66);
-    background-image: url("/static/icons/handrive/file.svg");
+    background-image: url("/static/icons/handrive/file.svg?v=blue2");
     background-position: center;
     background-repeat: no-repeat;
     background-size: contain;
@@ -2149,21 +2167,6 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     background-color: transparent;
     -webkit-mask-image: none;
     mask-image: none;
-}
-
-.handrive-item-type-icon.is-file.is-generic[data-file-icon="document"]::before {
-    -webkit-mask-image: url("/static/icons/handrive/document.svg");
-    mask-image: url("/static/icons/handrive/document.svg");
-}
-
-.handrive-item-type-icon.is-file.is-generic[data-file-icon="sheet"]::before {
-    -webkit-mask-image: url("/static/icons/handrive/sheet.svg");
-    mask-image: url("/static/icons/handrive/sheet.svg");
-}
-
-.handrive-item-type-icon.is-file.is-generic[data-file-icon="presentation"]::before {
-    -webkit-mask-image: url("/static/icons/handrive/presentation.svg");
-    mask-image: url("/static/icons/handrive/presentation.svg");
 }
 
 .handrive-item-type-icon.is-file.is-generic[data-file-icon="word"]::before {
@@ -2365,11 +2368,11 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     background: var(--handrive-hover);
 }
 
-.handrive-markdown-context-menu {
+.ui-markdown-context-menu {
     min-width: 220px;
 }
 
-.handrive-markdown-context-menu .handrive-md-snippet-btn {
+.ui-markdown-context-menu .handrive-md-snippet-btn {
     font-size: 16px;
     line-height: 1.2;
 }
@@ -2549,7 +2552,7 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     line-height: 1.4;
 }
 
-.handrive-markdown {
+.ui-markdown {
     border: 0;
     border-radius: var(--handrive-radius-lg);
     background: var(--handrive-bg);
@@ -2559,33 +2562,33 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     overflow-wrap: anywhere;
 }
 
-.handrive-markdown h1,
-.handrive-markdown h2,
-.handrive-markdown h3,
-.handrive-markdown h4 {
+.ui-markdown h1,
+.ui-markdown h2,
+.ui-markdown h3,
+.ui-markdown h4 {
     margin-top: 0;
     color: var(--handrive-text-stronger);
 }
 
-.handrive-markdown a,
-.handrive-markdown a:visited {
+.ui-markdown a,
+.ui-markdown a:visited {
     color: var(--handrive-link);
 }
 
-.handrive-markdown a:hover,
-.handrive-markdown a:focus-visible {
+.ui-markdown a:hover,
+.ui-markdown a:focus-visible {
     color: var(--handrive-text-strong);
 }
 
-.handrive-markdown table {
+.ui-markdown table {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0 0 12px;
 }
 
-.handrive-markdown th,
-.handrive-markdown td {
+.ui-markdown th,
+.ui-markdown td {
     border: 0;
     text-align: left;
     vertical-align: top;
@@ -2594,14 +2597,14 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     line-height: 1.45;
 }
 
-.handrive-markdown th {
+.ui-markdown th {
     background: var(--handrive-surface-muted);
     color: var(--handrive-text-subtle);
     font-size: 16px;
     font-weight: 700;
 }
 
-.handrive-markdown code {
+.ui-markdown code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-size: 16px;
     border: 0;
@@ -2611,7 +2614,7 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     overflow-wrap: anywhere;
 }
 
-.handrive-markdown pre {
+.ui-markdown pre {
     margin: 8px 0 0;
     border: 0;
     border-radius: 8px;
@@ -2620,7 +2623,7 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     overflow: auto;
 }
 
-.handrive-markdown pre code {
+.ui-markdown pre code {
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -2629,7 +2632,7 @@ body.theme-dark .handrive-item-type-icon.is-dir.is-root-avatar::before {
     line-height: 1.45;
 }
 
-.handrive-markdown img {
+.ui-markdown img {
     max-width: 100%;
     height: auto;
 }
@@ -4137,8 +4140,8 @@ body.handrive-modal-open {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .handrive-markdown th,
-    .handrive-markdown td {
+    .ui-markdown th,
+    .ui-markdown td {
         font-size: 16px;
         padding: 7px 8px;
     }

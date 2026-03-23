@@ -86,23 +86,23 @@
         return t("job_status_failed", "실패");
     }
 
-    function getQueueItemMetaLabel(item, getDocsPathLabel) {
+    function getQueueItemMetaLabel(item, getHandrivePathLabel) {
         if (!item) {
             return "";
         }
         if (item.kind === "operation") {
             if (item.status === "done") {
                 if (item.operationType === "move") {
-                    return getDocsPathLabel(item.savedPath || item.targetDirPath || item.sourcePath || "");
+                    return getHandrivePathLabel(item.savedPath || item.targetDirPath || item.sourcePath || "");
                 }
-                return getDocsPathLabel(item.sourcePath || "");
+                return getHandrivePathLabel(item.sourcePath || "");
             }
             if (item.operationType === "move") {
-                return getDocsPathLabel(item.targetDirPath || item.sourcePath || "");
+                return getHandrivePathLabel(item.targetDirPath || item.sourcePath || "");
             }
-            return getDocsPathLabel(item.sourcePath || "");
+            return getHandrivePathLabel(item.sourcePath || "");
         }
-        return getDocsPathLabel(item.savedPath || item.targetDirPath);
+        return getHandrivePathLabel(item.savedPath || item.targetDirPath);
     }
 
     function buildQueueItemLabel(entries, fallbackLabel, options) {
