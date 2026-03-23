@@ -1746,6 +1746,7 @@
             previewCache: new Map(),
             previewRequestToken: 0,
             activePreviewPath: "",
+            activeRenderedPreviewPath: "",
             previewImageZoom: 1,
             uploadQueueItems: [],
             uploadQueueSequence: 0,
@@ -2676,6 +2677,7 @@
 
         function clearPreviewPane() {
             state.activePreviewPath = "";
+            state.activeRenderedPreviewPath = "";
             state.previewRequestToken += 1;
             state.previewImageZoom = 1;
             setPreviewVisibility(false);

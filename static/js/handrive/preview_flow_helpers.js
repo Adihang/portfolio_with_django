@@ -110,7 +110,7 @@
         setPreviewVisibility(true);
 
         var pathValue = normalizePath(entry.path, true);
-        if (state.activePreviewPath === pathValue && !previewPanel.hidden && state.previewCache.has(pathValue)) {
+        if (state.activeRenderedPreviewPath === pathValue && !previewPanel.hidden) {
             setPreviewActionTargets(entry);
             return;
         }
@@ -125,10 +125,12 @@
             var cached = state.previewCache.get(pathValue);
             if (cached && typeof cached === "object") {
                 renderPreviewHtml(entry, cached.html, cached.renderMode, cached.renderClass);
+                state.activeRenderedPreviewPath = pathValue;
                 scrollPreviewIntoViewIfPortrait();
                 return;
             }
             renderPreviewHtml(entry, cached, "markdown", "ui-markdown");
+            state.activeRenderedPreviewPath = pathValue;
             scrollPreviewIntoViewIfPortrait();
             return;
         }
@@ -160,6 +162,7 @@
                 previewTitle.textContent = data.title;
             }
             renderPreviewHtml(entry, html, renderMode, renderClass);
+            state.activeRenderedPreviewPath = pathValue;
             scrollPreviewIntoViewIfPortrait();
         } catch (error) {
             if (requestToken !== state.previewRequestToken || state.activePreviewPath !== pathValue) {
