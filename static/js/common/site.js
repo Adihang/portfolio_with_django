@@ -493,11 +493,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 let horizontalDelta = deltaX;
-                if (Math.abs(horizontalDelta) < 0.01 && Math.abs(deltaY) > 0.01) {
+                const isYtoXFallback = Math.abs(horizontalDelta) < 0.01 && Math.abs(deltaY) > 0.01;
+                if (isYtoXFallback) {
                     horizontalDelta = deltaY;
                 }
 
                 if (canScrollX && canConsumeX(current, horizontalDelta)) {
+                    if (isYtoXFallback && current.closest('[data-scroll-y-priority]')) {
+                        current = current.parentElement;
+                        continue;
+                    }
                     current.scrollLeft += horizontalDelta;
                     event.preventDefault();
                     return;
