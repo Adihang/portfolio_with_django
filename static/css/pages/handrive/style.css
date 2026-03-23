@@ -1486,7 +1486,7 @@ body.handrive-page:not(.theme-dark) .handrive-list-editor-head {
     min-height: 0;
     /* min-height / max-height 는 JS(page.js syncPreviewBodyHeight)가 정확히 계산해 inline style로 세팅 */
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 .handrive-list-layout.is-portrait .handrive-list-preview-body {
