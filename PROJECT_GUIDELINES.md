@@ -182,10 +182,7 @@ Do not commit API keys or secrets. Production uses `DEBUG = False`.
 - 에셋: `forgejo/custom/public/assets/` — **www.hanplanet.com과 공유하는 공통 에셋**
 
 > ⚠️ **에셋 우선 원칙 — 반드시 준수:**
-> `forgejo/custom/public/assets/css/`, `js/` 의 파일들은 www와 공유하는 공통 파일이다.
 > - **Forgejo 전용 CSS 오버라이드 파일을 따로 만들지 않는다.** Gitea 기본 디자인을 별도 파일로 덮어쓰지 않는다.
-> - **www 디자인(style.css 등 공통 파일)을 그대로 사용한다.** `header.tmpl`에서 공통 CSS를 로드할 때 이 파일들을 사용한다.
-> - www 사이드에서 `static/css/style.css`를 수정하면 반드시 `forgejo/custom/public/assets/css/style.css`에도 동기화한다.
 > - **운영 캐시 주의:** Windows Chrome/Edge에서 Forgejo 기본 CSS(`index.css`, `theme-gitea-auto.css`)만 stale 캐시가 남고, 커스텀 CSS는 정상 갱신되는 경우가 있었다. 이 경우 Gitea 원본 스타일이 "안 먹는 것처럼" 보인다.
 > - **대응 규칙:** `forgejo/custom/templates/custom/header.tmpl`에서 기본 Gitea CSS도 cache-buster 쿼리로 다시 로드한다. 예: `/assets/css/index.css?v={{AppVer}}-orig1`, `/assets/css/theme-gitea-auto.css?v={{AppVer}}-orig1`
 > - **판단 기준:** macOS 브라우저는 정상인데 Windows 브라우저만 Gitea 원본 CSS가 빠진 것처럼 보이면, 서버 렌더링보다 stale asset 캐시를 먼저 의심한다.

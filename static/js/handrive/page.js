@@ -2245,14 +2245,15 @@
             }
             // 강제로 리플로우 트리거
             void listLayout.offsetWidth;
-            
+
             const isLandscape = window.innerWidth > window.innerHeight;
             listLayout.classList.toggle("is-landscape", isLandscape);
             listLayout.classList.toggle("is-portrait", !isLandscape);
-            
+
             // 레이아웃 변경 후 동기화
             setTimeout(function() {
                 scheduleSyncCurrentDirRowHeightWithSideHead();
+                schedulePreviewBodyHeight();
             }, 10);
         }
 
@@ -2263,6 +2264,57 @@
                 clearTimeout(layoutUpdateTimeout);
             }
             layoutUpdateTimeout = setTimeout(updateListLayoutMode, 50);
+        }
+
+        // preview body 높이를 content 실제 크기 기준으로 정확히 설정
+        // CSS calc 방식은 toolbar 실제 높이가 가변적이라 오차가 생기므로 JS로 처리
+        // hidden 상태에서 getBoundingClientRect()가 0을 반환하는 문제를 피하기 위해
+        // contentEl.clientHeight 에서 내부 요소들을 차감하는 방식 사용
+        let previewBodyHeightRafId = null;
+        function syncPreviewBodyHeight() {
+            if (!previewPanel || !listLayout) {
+                return;
+            }
+            const previewBody = previewPanel.querySelector(".handrive-list-preview-body");
+            if (!previewBody) {
+                return;
+            }
+            const isLandscape = listLayout.classList.contains("is-landscape");
+            const hasPreview = listLayout.classList.contains("has-preview");
+            if (!isLandscape || !hasPreview) {
+                previewBody.style.minHeight = "";
+                previewBody.style.maxHeight = "";
+                return;
+            }
+            const contentEl = listLayout.closest(".handrive-content, .ui-content");
+            if (!contentEl) {
+                return;
+            }
+            const contentStyle = window.getComputedStyle(contentEl);
+            const padTop = parseFloat(contentStyle.paddingTop) || 0;
+            const padBottom = parseFloat(contentStyle.paddingBottom) || 0;
+            const searchForm = contentEl.querySelector(".handrive-list-search-form");
+            const searchH = searchForm ? searchForm.getBoundingClientRect().height : 0;
+            const searchStyle = searchForm ? window.getComputedStyle(searchForm) : null;
+            const searchMarginB = searchStyle ? (parseFloat(searchStyle.marginBottom) || 0) : 0;
+            const layoutStyle = window.getComputedStyle(listLayout);
+            const layoutBorderH = (parseFloat(layoutStyle.borderTopWidth) || 0) + (parseFloat(layoutStyle.borderBottomWidth) || 0);
+            const previewHead = previewPanel.querySelector(".handrive-list-preview-head");
+            const previewHeadH = previewHead ? previewHead.getBoundingClientRect().height : 0;
+            // contentEl.clientHeight = padding 포함 내부 높이 (scroll과 무관)
+            const availableForBody = contentEl.clientHeight - padTop - padBottom - searchH - searchMarginB - layoutBorderH - previewHeadH;
+            const height = Math.max(0, Math.floor(availableForBody));
+            previewBody.style.minHeight = height + "px";
+            previewBody.style.maxHeight = height + "px";
+        }
+        function schedulePreviewBodyHeight() {
+            if (previewBodyHeightRafId !== null) {
+                return;
+            }
+            previewBodyHeightRafId = window.requestAnimationFrame(function () {
+                previewBodyHeightRafId = null;
+                syncPreviewBodyHeight();
+            });
         }
 
         let currentDirRowSyncRafId = null;
@@ -2326,6 +2378,9 @@
 
         function setPreviewVisibility(isVisible) {
             previewSetVisibility(previewPanel, listLayout, isVisible, scheduleSyncCurrentDirRowHeightWithSideHead);
+            if (isVisible) {
+                schedulePreviewBodyHeight();
+            }
         }
 
         function scrollPreviewIntoViewIfPortrait() {
@@ -5248,6 +5303,8 @@
         window.addEventListener("resize", closeListMarkdownSnippetMenu, { passive: true });
         window.addEventListener("resize", debouncedUpdateListLayoutMode, { passive: true });
         window.addEventListener("orientationchange", debouncedUpdateListLayoutMode, { passive: true });
+        window.addEventListener("resize", schedulePreviewBodyHeight, { passive: true });
+        window.addEventListener("orientationchange", schedulePreviewBodyHeight, { passive: true });
 
         if (window.ResizeObserver && previewHead) {
             const previewHeadResizeObserver = new ResizeObserver(function () {
@@ -5255,6 +5312,16 @@
             });
             previewHeadResizeObserver.observe(previewHead);
         }
+
+        if (window.ResizeObserver) {
+            const toolbarWrap = document.querySelector(".handrive-toolbar-wrap");
+            if (toolbarWrap) {
+                const listToolbarResizeObserver = new ResizeObserver(schedulePreviewBodyHeight);
+                listToolbarResizeObserver.observe(toolbarWrap);
+            }
+        }
+
+        schedulePreviewBodyHeight();
 
         if (pathBreadcrumbs) {
             renderPathBreadcrumbs(currentDir);

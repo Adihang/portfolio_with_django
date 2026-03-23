@@ -173,8 +173,7 @@ def build_handrive_html_live_document(html_source: str, *, companion_css: str = 
         "frame-src 'none'; "
         "object-src 'none'; "
         "form-action 'none'; "
-        "base-uri 'none'; "
-        "navigate-to 'none'\">"
+        "base-uri 'none'\">"
     )
 
     if re.search(r"</head\s*>", document, flags=re.IGNORECASE):
