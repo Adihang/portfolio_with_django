@@ -1554,6 +1554,8 @@
         const listContainer = document.getElementById("handrive-list");
         const listSearchForm = document.getElementById("handrive-list-search-form");
         const listSearchInput = document.getElementById("handriveListSearchInput");
+        const listSearchSubmitButton = document.getElementById("handrive-list-search-submit");
+        const listLoadingOverlay = document.getElementById("handrive-list-loading");
         const previewPanel = document.getElementById("handrive-list-preview");
         const previewHead = previewPanel ? previewPanel.querySelector(".handrive-list-preview-head") : null;
         const previewTitle = document.getElementById("handrive-list-preview-title");
@@ -4326,6 +4328,15 @@
             state.searchQuery = String(listSearchInput && listSearchInput.value || "").trim();
         }
 
+        function setListLoading(isLoading) {
+            if (listPane) {
+                listPane.classList.toggle("is-loading", Boolean(isLoading));
+            }
+            if (listLoadingOverlay) {
+                listLoadingOverlay.hidden = !isLoading;
+            }
+        }
+
         async function collectSearchEntriesInDirectory(directoryPath, normalizedQuery, matches) {
             await loadDirectory(directoryPath);
             const directoryEntries = getCachedEntries(directoryPath);
@@ -4344,6 +4355,8 @@
         }
 
         async function applyListSearch() {
+            setListLoading(true);
+            try {
             syncSearchQueryFromInput();
             const normalizedQuery = String(state.searchQuery || "").trim().toLocaleLowerCase();
             if (!normalizedQuery) {
@@ -4356,6 +4369,9 @@
             await collectSearchEntriesInDirectory(currentDir, normalizedQuery, matches);
             state.searchResults = matches;
             renderList();
+            } finally {
+                setListLoading(false);
+            }
         }
 
         function addEntryNode(entry, fragment, ancestorHasNextSiblings, isLastSibling) {
@@ -4504,6 +4520,12 @@
             }
         }
 
+        function renderSearchResultItems(fragment, entries) {
+            entries.forEach(function (entry) {
+                addEntryNode(entry, fragment, [], true);
+            });
+        }
+
         function renderList() {
             if (!listContainer) {
                 return;
@@ -4514,8 +4536,8 @@
             state.entryRowByPath = new Map();
             state.visibleEntryPaths = [];
             const fragment = document.createDocumentFragment();
-            const entries = state.searchQuery
-                ? (Array.isArray(state.searchResults) ? state.searchResults : [])
+            const entries = state.searchQuery && Array.isArray(state.searchResults)
+                ? state.searchResults
                 : getCachedEntries(currentDir);
             addCurrentDirectoryNode(fragment);
 
@@ -4542,10 +4564,14 @@
                 state.openingFolderPath = "";
                 return;
             }
-            entries.forEach(function (entry, index) {
-                const isLastRootEntry = index === entries.length - 1;
-                addEntryNode(entry, fragment, [], isLastRootEntry);
-            });
+            if (state.searchQuery) {
+                renderSearchResultItems(fragment, entries);
+            } else {
+                entries.forEach(function (entry, index) {
+                    const isLastRootEntry = index === entries.length - 1;
+                    addEntryNode(entry, fragment, [], isLastRootEntry);
+                });
+            }
             const filteredSelection = Array.from(state.selectedPaths).filter(function (pathValue) {
                 return state.entryByPath.has(pathValue);
             });
@@ -5233,18 +5259,33 @@
         if (pathBreadcrumbs) {
             renderPathBreadcrumbs(currentDir);
         } else {
-        bindHandrivePathDropTargets();
+            bindHandrivePathDropTargets();
+        }
 
         if (listSearchForm && listSearchInput) {
             listSearchForm.addEventListener("submit", function (event) {
                 event.preventDefault();
+                event.stopPropagation();
                 applyListSearch().catch(alertError);
             });
 
-            listSearchInput.addEventListener("search", function () {
+            listSearchInput.addEventListener("input", function () {
                 applyListSearch().catch(alertError);
             });
+
+            listSearchInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    applyListSearch().catch(alertError);
+                }
+            });
         }
+
+        if (listSearchSubmitButton) {
+            listSearchSubmitButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                applyListSearch().catch(alertError);
+            });
         }
         
         // 초기화 시 약간의 지연 후 레이아웃 업데이트
@@ -5254,6 +5295,23 @@
         
         clearPreviewPane();
         renderList();
+        var initialSearchQuery = listSearchInput
+            ? String(new URLSearchParams(window.location.search).get("q") || "").trim()
+            : "";
+        setListLoading(true);
+        loadDirectory(currentDir)
+            .then(function () {
+                if (initialSearchQuery && listSearchInput) {
+                    listSearchInput.value = initialSearchQuery;
+                    return applyListSearch();
+                }
+                renderList();
+                return null;
+            })
+            .finally(function () {
+                setListLoading(false);
+            })
+            .catch(alertError);
     }
 
     function initializeViewPage() {

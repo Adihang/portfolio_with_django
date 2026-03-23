@@ -14,6 +14,7 @@ body.ui-page {
     --handrive-border-mid: var(--color-section-border);
     --handrive-border-strong: var(--color-section-border);
     --handrive-border-heavy: var(--color-section-border);
+    --handrive-search-border-focus: color-mix(in srgb, var(--handrive-text-muted) 72%, var(--handrive-border));
     --handrive-border-context: var(--color-section-border);
     --handrive-hover-soft: var(--site-hover-soft);
     --handrive-hover: var(--site-hover);
@@ -95,6 +96,7 @@ body.ui-page.theme-dark {
     --handrive-border-mid: var(--theme-border);
     --handrive-border-strong: var(--theme-border);
     --handrive-border-heavy: var(--theme-border);
+    --handrive-search-border-focus: color-mix(in srgb, var(--handrive-text-subtle) 74%, var(--handrive-border));
     --handrive-hover-soft: rgba(255, 255, 255, 0.08);
     --handrive-hover: rgba(255, 255, 255, 0.13);
     --handrive-hover-strong: rgba(255, 255, 255, 0.19);
@@ -1013,6 +1015,44 @@ body.theme-dark .handrive-help-icon-symbol {
 .handrive-list-pane {
     min-width: 0;
     position: relative;
+}
+
+.handrive-list-pane.is-loading .handrive-list {
+    filter: blur(2px);
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.handrive-list-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--handrive-bg) 62%, transparent);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 4;
+    border-radius: 10px;
+}
+
+.handrive-list-loading[hidden] {
+    display: none;
+}
+
+.handrive-list-loading-spinner {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--handrive-text-subtle) 45%, transparent);
+    border-top-color: var(--handrive-text-stronger);
+    animation: handrive-list-loading-spin 0.8s linear infinite;
+}
+
+@keyframes handrive-list-loading-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .handrive-list-pane.is-file-drop-target {

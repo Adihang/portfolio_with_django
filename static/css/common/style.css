@@ -940,10 +940,16 @@ body.theme-dark .root-auth-modal-dialog {
     align-items: center;
     margin: 0;
     background: var(--site-surface-toolbar);
-    border: 1px solid var(--site-border);
+    border: 1px solid var(--handrive-border, var(--site-border));
     border-radius: 999px;
     box-shadow: none;
     overflow: visible;
+    transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.ui-search-form:focus-within {
+    border-color: var(--ui-search-border-focus, var(--handrive-search-border-focus, var(--site-text-muted)));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-search-border-focus, var(--handrive-search-border-focus, var(--site-text-muted))) 28%, transparent);
 }
 
 .root-search-input,

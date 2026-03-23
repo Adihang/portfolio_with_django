@@ -68,11 +68,11 @@
     data-write-url="{{ handrive_write_url }}"
     data-ui-lang="{{ ui_lang|default:'ko' }}"
 >
-    <form class="ui-search-form handrive-list-search-form" id="handrive-list-search-form">
+    <div class="ui-search-form handrive-list-search-form" id="handrive-list-search-form">
         <button
             class="root-search-submit handrive-list-search-submit"
             id="handrive-list-search-submit"
-            type="submit"
+            type="button"
             aria-label="{{ handrive_text.search_button|default:'검색' }}"
             title="{{ handrive_text.search_button|default:'검색' }}"
         >
@@ -84,15 +84,17 @@
         <input
             id="handriveListSearchInput"
             class="root-search-input handrive-list-search-input"
-            type="search"
-            name="q"
+            type="text"
             autocomplete="off"
             spellcheck="false"
             placeholder="{{ handrive_text.search_placeholder|default:'파일 검색' }}"
         >
-    </form>
+    </div>
     <div class="handrive-list-layout" id="handrive-list-layout">
         <div class="handrive-list-pane">
+            <div class="handrive-list-loading" id="handrive-list-loading" hidden aria-hidden="true">
+                <div class="handrive-list-loading-spinner"></div>
+            </div>
             <ul id="handrive-list" class="handrive-list" aria-label="{{ handrive_text.list_aria_label }}"></ul>
         </div>
         <aside class="handrive-list-preview" id="handrive-list-preview" aria-live="polite" aria-hidden="true" hidden>
